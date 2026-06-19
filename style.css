@@ -1,0 +1,798 @@
+/* =========================================================
+   MASTERS CD PÓVOA — FOLHA DE ESTILOS
+   Estrutura do ficheiro:
+   1. Reset & variáveis globais
+   2. Tipografia base
+   3. Utilitários / layout partilhado
+   4. Cabeçalho
+   5. Hero
+   6. Secção "Sobre a Equipa"
+   7. Secção "Plantel"
+   8. Secção "Treinos & Jogos"
+   9. Secção "Contactos"
+   10. Rodapé
+   11. Responsividade (mobile)
+   ========================================================= */
+
+/* ---------- 1. RESET & VARIÁVEIS GLOBAIS ---------- */
+:root {
+  /* Paleta CD Póvoa */
+  --azul-marinho: #0a2647;     /* azul principal, profundo */
+  --azul-medio: #16467a;       /* azul secundário, para gradientes/realces */
+  --branco: #ffffff;
+  --cinza-claro: #f4f6f9;      /* fundo de secções alternadas */
+  --cinza-linha: #dfe4ec;      /* linhas divisórias subtis */
+  --vermelho: #c8102e;         /* vermelho de destaque/ação */
+  --vermelho-escuro: #9c0c22;
+  --texto-principal: #161a1d;
+  --texto-suave: #51606f;
+
+  /* Tipografia */
+  --fonte-titulo: "Teko", "Oswald", sans-serif;
+  --fonte-corpo: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  /* Espaçamento e layout */
+  --largura-maxima: 1140px;
+  --raio-cartao: 10px;
+  --sombra-suave: 0 6px 18px rgba(10, 38, 71, 0.08);
+  --sombra-forte: 0 14px 34px rgba(10, 38, 71, 0.18);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--fonte-corpo);
+  color: var(--texto-principal);
+  background-color: var(--branco);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+ul {
+  list-style: none;
+}
+
+/* Foco visível para navegação por teclado (acessibilidade) */
+a:focus-visible,
+button:focus-visible {
+  outline: 3px solid var(--vermelho);
+  outline-offset: 3px;
+}
+
+/* Respeita preferência de movimento reduzido */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ---------- 2. TIPOGRAFIA BASE ---------- */
+h1, h2, h3, h4 {
+  font-family: var(--fonte-titulo);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  line-height: 1.1;
+  color: var(--azul-marinho);
+  text-transform: uppercase;
+}
+
+h2 {
+  font-size: clamp(2.1rem, 4vw, 2.9rem);
+}
+
+h3 {
+  font-size: 1.4rem;
+}
+
+p {
+  color: var(--texto-suave);
+  font-size: 1.02rem;
+}
+
+/* Eyebrow: pequeno rótulo acima dos títulos de secção */
+.etiqueta-seccao {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--fonte-titulo);
+  font-size: 0.95rem;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--vermelho);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.etiqueta-seccao::before {
+  content: "";
+  width: 28px;
+  height: 3px;
+  background: var(--vermelho);
+  display: inline-block;
+}
+
+/* ---------- 3. UTILITÁRIOS / LAYOUT PARTILHADO ---------- */
+.container {
+  width: 100%;
+  max-width: var(--largura-maxima);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+section {
+  padding: 90px 0;
+}
+
+.fundo-claro {
+  background-color: var(--cinza-claro);
+}
+
+.cabecalho-seccao {
+  max-width: 640px;
+  margin-bottom: 50px;
+}
+
+.cabecalho-seccao.centrado {
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+/* Botão genérico, usado em CTAs */
+.botao {
+  display: inline-block;
+  font-family: var(--fonte-titulo);
+  font-size: 1.05rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 14px 32px;
+  border-radius: 4px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.botao-primario {
+  background-color: var(--vermelho);
+  color: var(--branco);
+  box-shadow: var(--sombra-suave);
+}
+
+.botao-primario:hover {
+  background-color: var(--vermelho-escuro);
+  transform: translateY(-2px);
+  box-shadow: var(--sombra-forte);
+}
+
+.botao-secundario {
+  background-color: transparent;
+  color: var(--branco);
+  border: 2px solid rgba(255, 255, 255, 0.65);
+}
+
+.botao-secundario:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+  border-color: var(--branco);
+}
+
+/* ---------- 4. CABEÇALHO ---------- */
+.cabecalho {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background-color: var(--azul-marinho);
+  border-bottom: 3px solid var(--vermelho);
+}
+
+.cabecalho .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 78px;
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* Logótipo placeholder: emblema circular com iniciais */
+.logo-placeholder {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: linear-gradient(160deg, var(--vermelho) 0%, var(--vermelho-escuro) 100%);
+  color: var(--branco);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--fonte-titulo);
+  font-size: 1.15rem;
+  font-weight: 700;
+  border: 2px solid var(--branco);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15);
+}
+
+.nome-clube {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.nome-clube strong {
+  font-family: var(--fonte-titulo);
+  color: var(--branco);
+  font-size: 1.25rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.nome-clube span {
+  font-size: 0.72rem;
+  color: var(--vermelho);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.nav-principal ul {
+  display: flex;
+  gap: 34px;
+}
+
+.nav-principal a {
+  color: var(--branco);
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  position: relative;
+  padding-bottom: 6px;
+}
+
+.nav-principal a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 0;
+  height: 2px;
+  background-color: var(--vermelho);
+  transition: width 0.25s ease;
+}
+
+.nav-principal a:hover::after {
+  width: 100%;
+}
+
+/* Botão hambúrguer (apenas visível em mobile) */
+.botao-menu {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.botao-menu span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background-color: var(--branco);
+}
+
+/* ---------- 5. HERO ---------- */
+.hero {
+  position: relative;
+  background: linear-gradient(135deg, var(--azul-marinho) 0%, var(--azul-medio) 100%);
+  color: var(--branco);
+  padding: 110px 0 90px;
+  overflow: hidden;
+}
+
+/* Padrão decorativo: linhas tipo "marcador" no fundo do hero */
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.045) 0px,
+      rgba(255, 255, 255, 0.045) 1px,
+      transparent 1px,
+      transparent 64px
+    );
+  pointer-events: none;
+}
+
+.hero .container {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 50px;
+  align-items: center;
+}
+
+.hero-texto .etiqueta-seccao {
+  color: #ff8a9b;
+}
+
+.hero-texto .etiqueta-seccao::before {
+  background: #ff8a9b;
+}
+
+.hero-texto h1 {
+  color: var(--branco);
+  font-size: clamp(2.6rem, 6vw, 4.4rem);
+  margin-bottom: 18px;
+}
+
+.hero-texto h1 em {
+  display: block;
+  color: var(--vermelho);
+  font-style: normal;
+}
+
+.hero-texto p {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 1.12rem;
+  max-width: 480px;
+  margin-bottom: 32px;
+}
+
+.hero-acoes {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* Cartão de número grande, elemento de assinatura visual do design */
+.hero-numero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+}
+
+.hero-numero .numero-grande {
+  font-family: var(--fonte-titulo);
+  font-size: clamp(7rem, 14vw, 11rem);
+  font-weight: 700;
+  color: var(--branco);
+  line-height: 1;
+}
+
+.hero-numero .numero-legenda {
+  position: absolute;
+  bottom: 22px;
+  font-size: 0.78rem;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+/* ---------- 6. SECÇÃO "SOBRE A EQUIPA" ---------- */
+.sobre .container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: start;
+}
+
+.sobre-texto p {
+  margin-bottom: 18px;
+}
+
+.valores-lista {
+  display: grid;
+  gap: 18px;
+  margin-top: 28px;
+}
+
+.valor-item {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.valor-numero {
+  font-family: var(--fonte-titulo);
+  font-size: 1.6rem;
+  color: var(--vermelho);
+  min-width: 38px;
+}
+
+.valor-texto strong {
+  display: block;
+  color: var(--azul-marinho);
+  font-size: 1.04rem;
+  margin-bottom: 2px;
+}
+
+.valor-texto p {
+  font-size: 0.96rem;
+  margin: 0;
+}
+
+/* Foto de equipa: placeholder visual com moldura */
+.foto-equipa-wrapper {
+  position: relative;
+}
+
+.foto-equipa {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--raio-cartao);
+  object-fit: cover;
+  box-shadow: var(--sombra-forte);
+}
+
+.foto-legenda {
+  position: absolute;
+  bottom: -18px;
+  left: 24px;
+  background-color: var(--vermelho);
+  color: var(--branco);
+  font-family: var(--fonte-titulo);
+  font-size: 0.85rem;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 10px 20px;
+  border-radius: 4px;
+  box-shadow: var(--sombra-suave);
+}
+
+/* ---------- 7. SECÇÃO "PLANTEL" ---------- */
+.grelha-jogadores {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 24px;
+}
+
+.cartao-jogador {
+  background-color: var(--branco);
+  border: 1px solid var(--cinza-linha);
+  border-radius: var(--raio-cartao);
+  padding: 26px 22px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+
+.cartao-jogador:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--sombra-forte);
+  border-color: transparent;
+}
+
+.cartao-jogador::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background-color: var(--vermelho);
+}
+
+.cartao-cabecalho {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.numero-camisola {
+  font-family: var(--fonte-titulo);
+  font-size: 2.6rem;
+  font-weight: 700;
+  color: var(--azul-marinho);
+  line-height: 1;
+}
+
+.posicao-tag {
+  font-size: 0.72rem;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--vermelho);
+  background-color: rgba(200, 16, 46, 0.08);
+  padding: 5px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+  margin-top: 4px;
+}
+
+.nome-jogador {
+  font-family: var(--fonte-titulo);
+  font-size: 1.25rem;
+  text-transform: none;
+  letter-spacing: 0.3px;
+  color: var(--texto-principal);
+}
+
+/* ---------- 8. SECÇÃO "TREINOS & JOGOS" ---------- */
+.agenda .container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+}
+
+.cabecalho-agenda {
+  grid-column: 1 / -1;
+}
+
+.agenda-cartao {
+  background-color: var(--branco);
+  border-radius: var(--raio-cartao);
+  padding: 36px 32px;
+  box-shadow: var(--sombra-suave);
+  border-left: 5px solid var(--azul-marinho);
+}
+
+.agenda-cartao.destaque {
+  border-left-color: var(--vermelho);
+}
+
+.agenda-cartao h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 22px;
+  color: var(--azul-marinho);
+}
+
+.lista-horarios li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--cinza-linha);
+}
+
+.lista-horarios li:last-child {
+  border-bottom: none;
+}
+
+.dia-semana {
+  font-weight: 600;
+  color: var(--texto-principal);
+  font-size: 0.98rem;
+}
+
+.hora-local {
+  text-align: right;
+  font-size: 0.9rem;
+  color: var(--texto-suave);
+}
+
+.hora-local .hora {
+  display: block;
+  font-weight: 600;
+  color: var(--vermelho);
+}
+
+.nota-agenda {
+  margin-top: 20px;
+  font-size: 0.88rem;
+  color: var(--texto-suave);
+  font-style: italic;
+}
+
+/* ---------- 9. SECÇÃO "CONTACTOS" ---------- */
+.contactos {
+  background: linear-gradient(135deg, var(--azul-marinho) 0%, var(--azul-medio) 100%);
+  color: var(--branco);
+}
+
+.contactos .etiqueta-seccao {
+  color: #ff8a9b;
+}
+
+.contactos .etiqueta-seccao::before {
+  background: #ff8a9b;
+}
+
+.contactos h2 {
+  color: var(--branco);
+}
+
+.contactos .cabecalho-seccao p {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.grelha-contactos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
+}
+
+.contacto-item {
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--raio-cartao);
+  padding: 28px 24px;
+}
+
+.contacto-item .icone {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background-color: var(--vermelho);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  margin-bottom: 16px;
+}
+
+.contacto-item h3 {
+  color: var(--branco);
+  font-size: 1.1rem;
+  margin-bottom: 8px;
+}
+
+.contacto-item p,
+.contacto-item a {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.95rem;
+}
+
+.contacto-item a:hover {
+  color: var(--branco);
+  text-decoration: underline;
+}
+
+/* ---------- 10. RODAPÉ ---------- */
+.rodape {
+  background-color: #061830;
+  color: rgba(255, 255, 255, 0.6);
+  padding: 26px 0;
+  text-align: center;
+  font-size: 0.85rem;
+  border-top: 3px solid var(--vermelho);
+}
+
+.rodape strong {
+  color: var(--branco);
+}
+
+/* ---------- 11. RESPONSIVIDADE (MOBILE) ---------- */
+@media (max-width: 900px) {
+  .sobre .container,
+  .agenda .container {
+    grid-template-columns: 1fr;
+  }
+
+  .foto-equipa-wrapper {
+    order: -1;
+  }
+
+  .hero .container {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .hero-texto p {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .hero-acoes {
+    justify-content: center;
+  }
+
+  .hero-numero {
+    max-width: 280px;
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .nav-principal {
+    position: fixed;
+    top: 78px;
+    left: 0;
+    right: 0;
+    background-color: var(--azul-marinho);
+    border-bottom: 3px solid var(--vermelho);
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+
+  .nav-principal.aberto {
+    max-height: 320px;
+  }
+
+  .nav-principal ul {
+    flex-direction: column;
+    gap: 0;
+    padding: 10px 24px 20px;
+  }
+
+  .nav-principal li {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .nav-principal a {
+    display: block;
+    padding: 14px 0;
+  }
+
+  .botao-menu {
+    display: flex;
+  }
+
+  section {
+    padding: 64px 0;
+  }
+
+  .hero {
+    padding: 80px 0 60px;
+  }
+}
+
+@media (max-width: 540px) {
+  .nome-clube strong {
+    font-size: 1.05rem;
+  }
+
+  .hero-acoes {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .hero-acoes .botao {
+    text-align: center;
+  }
+
+  .grelha-jogadores {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 16px;
+  }
+
+  .cartao-jogador {
+    padding: 20px 16px;
+  }
+
+  .agenda-cartao {
+    padding: 28px 22px;
+  }
+
+  .foto-legenda {
+    left: 14px;
+    bottom: -14px;
+    font-size: 0.75rem;
+    padding: 8px 16px;
+  }
+}
