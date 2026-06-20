@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — Masters CD Póvoa</title>
+  <meta name="robots" content="noindex, nofollow" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Teko:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="../../public/style.css" />
+</head>
+<body>
+
+<div class="dashboard-layout">
+
+  <!-- ═══════════════════════════════════════════════════════
+       HEADER
+       ═══════════════════════════════════════════════════════ -->
+  <header class="dashboard-header">
+
+    <!-- Logo + nome do clube (link para o site público) -->
+    <a href="../../public/index.html" class="marca">
+      <div class="logo-placeholder" aria-hidden="true">CDP</div>
+      <div class="nome-clube">
+        <strong>CD Póvoa</strong>
+        <span>Masters</span>
+      </div>
+    </a>
+
+    <!--
+      BACKEND: req.user é preenchido após validação do JWT.
+      As iniciais do avatar e o nome serão injetados aqui pelo JS
+      a partir de localStorage.getItem('user') ou de um endpoint GET /api/auth/me.
+    -->
+    <div class="dashboard-utilizador">
+      <!-- TODO BACKEND: substituir "DA" e "Dario Leal" pelo utilizador autenticado -->
+      <div class="avatar-utilizador" id="avatar-utilizador" aria-hidden="true">DA</div>
+      <span class="nome-utilizador" id="nome-utilizador">Dario Leal</span>
+
+      <!--
+        BACKEND: ao clicar, chamar POST /api/auth/logout com o refreshToken,
+        limpar o localStorage e redirecionar para o login.
+      -->
+      <button class="btn-sair" id="btn-sair" type="button">Sair</button>
+    </div>
+
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════
+       SIDEBAR — navegação da área privada
+       ═══════════════════════════════════════════════════════ -->
+  <aside class="dashboard-sidebar">
+    <nav class="sidebar-nav" aria-label="Menu da área privada">
+
+      <p class="sidebar-seccao-titulo">Gestão</p>
+      <ul>
+
+        <!-- TODO BACKEND: GET /api/players?seasonId=current -->
+        <li>
+          <a href="#jogadores" class="ativo">
+            <span class="icone-nav" aria-hidden="true">🏀</span>
+            Jogadores
+          </a>
+        </li>
+
+        <!-- TODO BACKEND: GET /api/seasons/:id/events?type=jogo -->
+        <li>
+          <a href="#jogos">
+            <span class="icone-nav" aria-hidden="true">📅</span>
+            Jogos
+          </a>
+        </li>
+
+        <!-- TODO BACKEND: GET /api/stats (rota futura) -->
+        <li>
+          <a href="#estatisticas">
+            <span class="icone-nav" aria-hidden="true">📊</span>
+            Estatísticas
+          </a>
+        </li>
+
+        <!-- TODO BACKEND: GET /api/payments -->
+        <li>
+          <a href="#pagamentos">
+            <span class="icone-nav" aria-hidden="true">💳</span>
+            Pagamentos
+          </a>
+        </li>
+
+      </ul>
+
+      <p class="sidebar-seccao-titulo">Comunicação</p>
+      <ul>
+
+        <!-- TODO BACKEND: WebSocket ou GET /api/chat/messages -->
+        <li>
+          <a href="#chat">
+            <span class="icone-nav" aria-hidden="true">💬</span>
+            Chat Interno
+          </a>
+        </li>
+
+      </ul>
+
+      <p class="sidebar-seccao-titulo">Conta</p>
+      <ul>
+
+        <!-- TODO BACKEND: GET /api/users/me, PATCH /api/users/me -->
+        <li>
+          <a href="#configuracoes">
+            <span class="icone-nav" aria-hidden="true">⚙️</span>
+            Configurações
+          </a>
+        </li>
+
+      </ul>
+
+    </nav>
+  </aside>
+
+  <!-- ═══════════════════════════════════════════════════════
+       CONTEÚDO PRINCIPAL
+       ═══════════════════════════════════════════════════════ -->
+  <main class="dashboard-conteudo">
+
+    <!-- Boas-vindas -->
+    <div class="dashboard-boas-vindas">
+      <!--
+        BACKEND: substituir "Dario" por user.name (de localStorage ou de GET /api/auth/me).
+        A saudação ("Bom dia", "Boa tarde", "Boa noite") pode ser calculada em JS
+        a partir de new Date().getHours().
+      -->
+      <h1 id="titulo-boas-vindas">Bem-vindo, Dario 👋</h1>
+      <p>Aqui geres tudo o que diz respeito à equipa Masters CD Póvoa.</p>
+    </div>
+
+    <!-- Cards de resumo — valores reais virão do backend -->
+    <div class="dashboard-cards">
+
+      <div class="card">
+        <!--
+          BACKEND: GET /api/players?seasonId=current
+          → data.dados.length ou data.dados.total
+        -->
+        <div class="card-valor" id="total-jogadores">—</div>
+        <div class="card-rotulo">Jogadores</div>
+        <p class="card-nota">Plantel da temporada ativa</p>
+      </div>
+
+      <div class="card">
+        <!--
+          BACKEND: GET /api/seasons/:id/events?type=jogo
+          → data.dados.length
+        -->
+        <div class="card-valor" id="total-jogos">—</div>
+        <div class="card-rotulo">Jogos</div>
+        <p class="card-nota">Calendário da temporada</p>
+      </div>
+
+      <div class="card">
+        <!--
+          BACKEND: GET /api/payments?status=pendente
+          → data.dados.length
+        -->
+        <div class="card-valor" id="quotas-pendentes">—</div>
+        <div class="card-rotulo">Quotas Pendentes</div>
+        <p class="card-nota">Pagamentos em atraso</p>
+      </div>
+
+      <div class="card">
+        <!--
+          BACKEND: GET /api/seasons/active
+          → data.dados.name
+        -->
+        <div class="card-valor" id="temporada-ativa" style="font-size:1.35rem;">—</div>
+        <div class="card-rotulo">Temporada Ativa</div>
+        <p class="card-nota">Período atual de competição</p>
+      </div>
+
+    </div>
+
+    <!--
+      Aviso de desenvolvimento — remover quando a integração com a API estiver concluída.
+    -->
+    <div class="dashboard-aviso">
+      <p>
+        <strong>Modo de desenvolvimento:</strong> os valores acima são placeholders.
+        A integração com a API REST (definida em <code>src/</code>) estará disponível
+        após o servidor estar ativo e a autenticação configurada.
+      </p>
+    </div>
+
+  </main>
+
+</div><!-- /dashboard-layout -->
+
+<script>
+  /*
+   * Verificação de autenticação e carregamento de dados.
+   * ──────────────────────────────────────────────────────
+   * Estado atual: sem validação real (página acessível diretamente).
+   * Quando o backend estiver ativo, descomentar os blocos abaixo.
+   */
+
+  // ── 1. Verificar se o utilizador está autenticado ─────────────────────
+  // const token = localStorage.getItem('accessToken');
+  // if (!token) {
+  //   window.location.href = '../auth/login.html';
+  // }
+
+  // ── 2. Preencher dados do utilizador a partir do localStorage ─────────
+  // const userData = JSON.parse(localStorage.getItem('user') || '{}');
+  // if (userData.name) {
+  //   const iniciais = userData.name.split(' ').map(n => n[0]).slice(0, 2).join('');
+  //   document.getElementById('avatar-utilizador').textContent = iniciais.toUpperCase();
+  //   document.getElementById('nome-utilizador').textContent   = userData.name;
+  //   document.getElementById('titulo-boas-vindas').textContent =
+  //     `Bem-vindo, ${userData.name.split(' ')[0]} 👋`;
+  // }
+
+  // ── 3. Carregar dados de resumo da API ────────────────────────────────
+  // async function carregarDashboard() {
+  //   const headers = { Authorization: `Bearer ${localStorage.getItem('accessToken')}` };
+  //
+  //   try {
+  //     const [jogadores, jogos, quotas, temporada] = await Promise.all([
+  //       fetch('/api/players',                { headers }).then(r => r.json()),
+  //       fetch('/api/events?type=jogo',       { headers }).then(r => r.json()),
+  //       fetch('/api/payments?status=pendente',{ headers }).then(r => r.json()),
+  //       fetch('/api/seasons/active',          { headers }).then(r => r.json()),
+  //     ]);
+  //
+  //     document.getElementById('total-jogadores').textContent  = jogadores.dados.length  ?? '—';
+  //     document.getElementById('total-jogos').textContent      = jogos.dados.length      ?? '—';
+  //     document.getElementById('quotas-pendentes').textContent = quotas.dados.length     ?? '—';
+  //     document.getElementById('temporada-ativa').textContent  = temporada.dados?.name   ?? '—';
+  //
+  //   } catch (err) {
+  //     console.error('Erro ao carregar dados do dashboard:', err);
+  //   }
+  // }
+  //
+  // carregarDashboard();
+
+  // ── 4. Logout ─────────────────────────────────────────────────────────
+  document.getElementById('btn-sair').addEventListener('click', async () => {
+    // TODO BACKEND: chamar POST /api/auth/logout com o refreshToken
+    // const refreshToken = localStorage.getItem('refreshToken');
+    // if (refreshToken) {
+    //   await fetch('/api/auth/logout', {
+    //     method: 'POST',
+    //     headers: { 'Content-Type': 'application/json' },
+    //     body: JSON.stringify({ refreshToken }),
+    //   }).catch(() => {});
+    // }
+    // localStorage.removeItem('accessToken');
+    // localStorage.removeItem('refreshToken');
+    // localStorage.removeItem('user');
+
+    window.location.href = '../auth/login.html';
+  });
+</script>
+
+</body>
+</html>
