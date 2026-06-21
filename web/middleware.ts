@@ -39,16 +39,17 @@ export async function middleware(request: NextRequest) {
   const isAuth = !!user;
   const path = request.nextUrl.pathname;
   const isLoginPage = path.startsWith("/login");
-  const isDashboard = path === "/" || path.startsWith("/jogadores") ||
-    path.startsWith("/jogos") || path.startsWith("/pagamentos") ||
-    path.startsWith("/estatisticas") || path.startsWith("/configuracoes");
+  const isDashboard = path === "/dashboard" || path.startsWith("/dashboard") ||
+    path.startsWith("/jogadores") || path.startsWith("/jogos") ||
+    path.startsWith("/pagamentos") || path.startsWith("/estatisticas") ||
+    path.startsWith("/configuracoes");
 
   if (isDashboard && !isAuth) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
   if (isLoginPage && isAuth) {
-    return NextResponse.redirect(new URL("/", request.url));
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return supabaseResponse;

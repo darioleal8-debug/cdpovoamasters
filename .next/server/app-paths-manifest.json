@@ -1,11 +1,11 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
   "/api/health/route": "app/api/health/route.js",
-  "/(auth)/login/page": "app/(auth)/login/page.js",
   "/(dashboard)/configuracoes/page": "app/(dashboard)/configuracoes/page.js",
-  "/(dashboard)/jogos/page": "app/(dashboard)/jogos/page.js",
-  "/(dashboard)/jogadores/page": "app/(dashboard)/jogadores/page.js",
   "/(dashboard)/pagamentos/page": "app/(dashboard)/pagamentos/page.js",
+  "/(auth)/login/page": "app/(auth)/login/page.js",
   "/(dashboard)/estatisticas/page": "app/(dashboard)/estatisticas/page.js",
+  "/(dashboard)/jogadores/page": "app/(dashboard)/jogadores/page.js",
+  "/(dashboard)/jogos/page": "app/(dashboard)/jogos/page.js",
   "/(dashboard)/page": "app/(dashboard)/page.js"
 }

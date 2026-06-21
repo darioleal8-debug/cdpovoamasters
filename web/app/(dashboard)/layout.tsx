@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
@@ -14,7 +13,10 @@ export default async function DashboardLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  /* Página pública (ex: landing page em /) — sem sidebar nem header */
+  if (!user) {
+    return <>{children}</>;
+  }
 
   /* Buscar dados do perfil do utilizador na tabela users */
   const { data: profile } = await supabase

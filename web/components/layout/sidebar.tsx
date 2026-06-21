@@ -18,7 +18,7 @@ import { Separator } from "@/components/ui/separator";
 const navItems = [
   {
     label: "Visão Geral",
-    href: "/",
+    href: "/dashboard",
     icon: LayoutDashboard,
   },
 ];
@@ -48,7 +48,7 @@ function NavLink({
   label: string;
 }) {
   const pathname = usePathname();
-  const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href);
+  const isActive = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
 
   return (
     <Link
