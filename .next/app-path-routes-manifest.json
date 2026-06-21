@@ -1,0 +1,11 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/api/health/route": "/api/health",
+  "/(auth)/login/page": "/login",
+  "/(dashboard)/configuracoes/page": "/configuracoes",
+  "/(dashboard)/jogos/page": "/jogos",
+  "/(dashboard)/jogadores/page": "/jogadores",
+  "/(dashboard)/pagamentos/page": "/pagamentos",
+  "/(dashboard)/estatisticas/page": "/estatisticas",
+  "/(dashboard)/page": "/"
+}
