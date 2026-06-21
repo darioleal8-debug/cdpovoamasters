@@ -3,9 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dashboard — Masters CD Póvoa</title>
-  <meta name="robots" content="noindex, nofollow" />
+  <title>Masters CD Póvoa | Equipa de Basquetebol</title>
+  <meta name="description" content="Página oficial da equipa Masters CD Póvoa — história, plantel, treinos, jogos e contactos." />
 
+  <!-- Tipografia: Teko (display, estilo "scoreboard") + Inter (texto corrido) -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
@@ -13,259 +14,309 @@
     rel="stylesheet"
   />
 
-  <link rel="stylesheet" href="../../public/style.css" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-<div class="dashboard-layout">
+  <!-- =========================================================
+       CABEÇALHO
+       ========================================================= -->
+  <header class="cabecalho">
+    <div class="container">
 
-  <!-- ═══════════════════════════════════════════════════════
-       HEADER
-       ═══════════════════════════════════════════════════════ -->
-  <header class="dashboard-header">
+      <!-- Logótipo placeholder + nome do clube -->
+      <a href="#topo" class="marca">
+        <div class="logo-placeholder" aria-hidden="true">CDP</div>
+        <div class="nome-clube">
+          <strong>CD Póvoa</strong>
+          <span>Masters</span>
+        </div>
+      </a>
 
-    <!-- Logo + nome do clube (link para o site público) -->
-    <a href="../../public/index.html" class="marca">
-      <div class="logo-placeholder" aria-hidden="true">CDP</div>
-      <div class="nome-clube">
-        <strong>CD Póvoa</strong>
-        <span>Masters</span>
-      </div>
-    </a>
+      <!-- Navegação principal -->
+      <nav class="nav-principal" id="nav-principal">
+        <ul>
+          <li><a href="#sobre">A Equipa</a></li>
+          <li><a href="#plantel">Plantel</a></li>
+          <li><a href="#agenda">Treinos &amp; Jogos</a></li>
+          <li><a href="#contactos">Contactos</a></li>
+        </ul>
+      </nav>
 
-    <!--
-      BACKEND: req.user é preenchido após validação do JWT.
-      As iniciais do avatar e o nome serão injetados aqui pelo JS
-      a partir de localStorage.getItem('user') ou de um endpoint GET /api/auth/me.
-    -->
-    <div class="dashboard-utilizador">
-      <!-- TODO BACKEND: substituir "DA" e "Dario Leal" pelo utilizador autenticado -->
-      <div class="avatar-utilizador" id="avatar-utilizador" aria-hidden="true">DA</div>
-      <span class="nome-utilizador" id="nome-utilizador">Dario Leal</span>
+      <!-- Botão de acesso à área privada -->
+      <a href="../app/auth/login.html" class="botao-entrar">Entrar</a>
 
-      <!--
-        BACKEND: ao clicar, chamar POST /api/auth/logout com o refreshToken,
-        limpar o localStorage e redirecionar para o login.
-      -->
-      <button class="btn-sair" id="btn-sair" type="button">Sair</button>
+      <!-- Botão hambúrguer (mobile) -->
+      <button class="botao-menu" id="botao-menu" aria-label="Abrir menu de navegação" aria-expanded="false" aria-controls="nav-principal">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+
     </div>
-
   </header>
 
-  <!-- ═══════════════════════════════════════════════════════
-       SIDEBAR — navegação da área privada
-       ═══════════════════════════════════════════════════════ -->
-  <aside class="dashboard-sidebar">
-    <nav class="sidebar-nav" aria-label="Menu da área privada">
+  <main id="topo">
 
-      <p class="sidebar-seccao-titulo">Gestão</p>
-      <ul>
+    <!-- =========================================================
+         HERO
+         ========================================================= -->
+    <section class="hero">
+      <div class="container">
 
-        <!-- TODO BACKEND: GET /api/players?seasonId=current -->
-        <li>
-          <a href="#jogadores" class="ativo">
-            <span class="icone-nav" aria-hidden="true">🏀</span>
-            Jogadores
-          </a>
-        </li>
+        <div class="hero-texto">
+          <p class="etiqueta-seccao">Basquetebol Amador &middot; Veteranos</p>
+          <h1>Masters<em>CD Póvoa</em></h1>
+          <p>
+            Mais de uma década a vestir as cores do clube. Uma equipa de veteranos
+            unida pela paixão pelo basquetebol, pela amizade dentro e fora do
+            campo, e pelo orgulho de representar a Póvoa em cada jogo.
+          </p>
+          <div class="hero-acoes">
+            <a href="#plantel" class="botao botao-primario">Conhecer o Plantel</a>
+            <a href="#contactos" class="botao botao-secundario">Fala Connosco</a>
+          </div>
+        </div>
 
-        <!-- TODO BACKEND: GET /api/seasons/:id/events?type=jogo -->
-        <li>
-          <a href="#jogos">
-            <span class="icone-nav" aria-hidden="true">📅</span>
-            Jogos
-          </a>
-        </li>
+        <!-- Elemento visual de assinatura: número de camisola em destaque -->
+        <div class="hero-numero" aria-hidden="true">
+          <span class="numero-grande">11</span>
+          <span class="numero-legenda">Temporadas</span>
+        </div>
 
-        <!-- TODO BACKEND: GET /api/stats (rota futura) -->
-        <li>
-          <a href="#estatisticas">
-            <span class="icone-nav" aria-hidden="true">📊</span>
-            Estatísticas
-          </a>
-        </li>
-
-        <!-- TODO BACKEND: GET /api/payments -->
-        <li>
-          <a href="#pagamentos">
-            <span class="icone-nav" aria-hidden="true">💳</span>
-            Pagamentos
-          </a>
-        </li>
-
-      </ul>
-
-      <p class="sidebar-seccao-titulo">Comunicação</p>
-      <ul>
-
-        <!-- TODO BACKEND: WebSocket ou GET /api/chat/messages -->
-        <li>
-          <a href="#chat">
-            <span class="icone-nav" aria-hidden="true">💬</span>
-            Chat Interno
-          </a>
-        </li>
-
-      </ul>
-
-      <p class="sidebar-seccao-titulo">Conta</p>
-      <ul>
-
-        <!-- TODO BACKEND: GET /api/users/me, PATCH /api/users/me -->
-        <li>
-          <a href="#configuracoes">
-            <span class="icone-nav" aria-hidden="true">⚙️</span>
-            Configurações
-          </a>
-        </li>
-
-      </ul>
-
-    </nav>
-  </aside>
-
-  <!-- ═══════════════════════════════════════════════════════
-       CONTEÚDO PRINCIPAL
-       ═══════════════════════════════════════════════════════ -->
-  <main class="dashboard-conteudo">
-
-    <!-- Boas-vindas -->
-    <div class="dashboard-boas-vindas">
-      <!--
-        BACKEND: substituir "Dario" por user.name (de localStorage ou de GET /api/auth/me).
-        A saudação ("Bom dia", "Boa tarde", "Boa noite") pode ser calculada em JS
-        a partir de new Date().getHours().
-      -->
-      <h1 id="titulo-boas-vindas">Bem-vindo, Dario 👋</h1>
-      <p>Aqui geres tudo o que diz respeito à equipa Masters CD Póvoa.</p>
-    </div>
-
-    <!-- Cards de resumo — valores reais virão do backend -->
-    <div class="dashboard-cards">
-
-      <div class="card">
-        <!--
-          BACKEND: GET /api/players?seasonId=current
-          → data.dados.length ou data.dados.total
-        -->
-        <div class="card-valor" id="total-jogadores">—</div>
-        <div class="card-rotulo">Jogadores</div>
-        <p class="card-nota">Plantel da temporada ativa</p>
       </div>
+    </section>
 
-      <div class="card">
-        <!--
-          BACKEND: GET /api/seasons/:id/events?type=jogo
-          → data.dados.length
-        -->
-        <div class="card-valor" id="total-jogos">—</div>
-        <div class="card-rotulo">Jogos</div>
-        <p class="card-nota">Calendário da temporada</p>
+    <!-- =========================================================
+         SOBRE A EQUIPA — história, espírito, valores
+         ========================================================= -->
+    <section class="sobre" id="sobre">
+      <div class="container">
+
+        <div class="sobre-texto">
+          <p class="etiqueta-seccao">A Nossa História</p>
+          <h2>Quem Somos</h2>
+          <p>
+            O Masters CD Póvoa nasceu da vontade de antigos jogadores e amantes
+            do basquetebol em manter viva a competição e o convívio depois dos
+            tempos de competição federada. Desde então, tornámo-nos numa das
+            equipas mais respeitadas dos torneios de veteranos da região,
+            mantendo sempre o espírito de clube que nos viu nascer.
+          </p>
+          <p>
+            Mais do que resultados, valorizamos o grupo: o respeito pelo
+            adversário, o companheirismo entre gerações de jogadores e o gosto
+            por continuar a jogar ao mais alto nível possível, independentemente
+            da idade no cartão.
+          </p>
+
+          <ul class="valores-lista">
+            <li class="valor-item">
+              <span class="valor-numero">01</span>
+              <div class="valor-texto">
+                <strong>Espírito de Equipa</strong>
+                <p>Acima de tudo, jogamos uns para os outros.</p>
+              </div>
+            </li>
+            <li class="valor-item">
+              <span class="valor-numero">02</span>
+              <div class="valor-texto">
+                <strong>Respeito</strong>
+                <p>Pelos colegas, pelos adversários e pelo jogo.</p>
+              </div>
+            </li>
+            <li class="valor-item">
+              <span class="valor-numero">03</span>
+              <div class="valor-texto">
+                <strong>Paixão Pelo Clube</strong>
+                <p>Vestimos as cores do CD Póvoa com orgulho em cada jogo.</p>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Foto de equipa (placeholder em SVG — substituir por foto real do clube) -->
+        <div class="foto-equipa-wrapper">
+          <svg class="foto-equipa" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Foto de grupo da equipa Masters CD Póvoa">
+            <defs>
+              <linearGradient id="fundoFoto" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#16467a" />
+                <stop offset="100%" stop-color="#0a2647" />
+              </linearGradient>
+            </defs>
+            <rect width="800" height="600" fill="url(#fundoFoto)" />
+            <circle cx="400" cy="230" r="70" fill="rgba(255,255,255,0.12)" />
+            <text x="400" y="245" font-family="Teko, sans-serif" font-size="46" font-weight="700" fill="#ffffff" text-anchor="middle">CDP</text>
+            <text x="400" y="370" font-family="Inter, sans-serif" font-size="22" fill="rgba(255,255,255,0.65)" text-anchor="middle">FOTO DE EQUIPA</text>
+            <text x="400" y="400" font-family="Inter, sans-serif" font-size="15" fill="rgba(255,255,255,0.45)" text-anchor="middle">(substituir por fotografia real do clube)</text>
+          </svg>
+          <span class="foto-legenda">Temporada 2025/26</span>
+        </div>
+
       </div>
+    </section>
 
-      <div class="card">
-        <!--
-          BACKEND: GET /api/payments?status=pendente
-          → data.dados.length
-        -->
-        <div class="card-valor" id="quotas-pendentes">—</div>
-        <div class="card-rotulo">Quotas Pendentes</div>
-        <p class="card-nota">Pagamentos em atraso</p>
+    <!-- =========================================================
+         PLANTEL — lista de jogadores
+         ========================================================= -->
+    <section class="fundo-claro" id="plantel">
+      <div class="container">
+
+        <div class="cabecalho-seccao centrado">
+          <p class="etiqueta-seccao">O Plantel</p>
+          <h2>Os Nossos Jogadores</h2>
+          <p>Os veteranos que sobem ao campo em cada treino e jogo pelo CD Póvoa.</p>
+        </div>
+
+        <!-- BACKEND: esta grelha será preenchida dinamicamente via GET /api/players -->
+        <div class="grelha-jogadores">
+
+          <article class="cartao-jogador">
+            <div class="cartao-cabecalho">
+              <span class="numero-camisola">8</span>
+              <span class="posicao-tag">Base</span>
+            </div>
+            <h3 class="nome-jogador">Dario Leal</h3>
+          </article>
+
+          <!-- BACKEND: os restantes cartões serão gerados a partir dos dados da API -->
+
+        </div>
       </div>
+    </section>
 
-      <div class="card">
-        <!--
-          BACKEND: GET /api/seasons/active
-          → data.dados.name
-        -->
-        <div class="card-valor" id="temporada-ativa" style="font-size:1.35rem;">—</div>
-        <div class="card-rotulo">Temporada Ativa</div>
-        <p class="card-nota">Período atual de competição</p>
+    <!-- =========================================================
+         TREINOS & JOGOS — horários e local
+         ========================================================= -->
+    <section class="agenda" id="agenda">
+      <div class="container">
+
+        <div class="cabecalho-seccao cabecalho-agenda">
+          <p class="etiqueta-seccao">Agenda</p>
+          <h2>Treinos &amp; Jogos</h2>
+          <p>Onde e quando nos encontramos durante a semana e em dia de jogo.</p>
+        </div>
+
+        <!-- Cartão de treinos -->
+        <div class="agenda-cartao">
+          <h3>🏀 Treinos Semanais</h3>
+          <ul class="lista-horarios">
+            <li>
+              <span class="dia-semana">Terça-feira</span>
+              <span class="hora-local">
+                <span class="hora">20h30 – 22h00</span>
+                Pavilhão Municipal da Póvoa
+              </span>
+            </li>
+            <li>
+              <span class="dia-semana">Quinta-feira</span>
+              <span class="hora-local">
+                <span class="hora">20h30 – 22h00</span>
+                Pavilhão Municipal da Póvoa
+              </span>
+            </li>
+          </ul>
+          <p class="nota-agenda">Treinos abertos a todos os jogadores inscritos no plantel.</p>
+        </div>
+
+        <!-- Cartão de jogos -->
+        <div class="agenda-cartao destaque">
+          <h3>🏆 Jogos &amp; Torneios</h3>
+          <ul class="lista-horarios">
+            <li>
+              <span class="dia-semana">Jogos em Casa</span>
+              <span class="hora-local">
+                <span class="hora">Sábados, 18h00</span>
+                Pavilhão Municipal da Póvoa
+              </span>
+            </li>
+            <li>
+              <span class="dia-semana">Jogos Fora</span>
+              <span class="hora-local">
+                <span class="hora">Calendário variável</span>
+                Conforme organização do torneio
+              </span>
+            </li>
+          </ul>
+          <p class="nota-agenda">Calendário sujeito a alterações — confirma sempre junto da equipa.</p>
+        </div>
+
       </div>
+    </section>
 
-    </div>
+    <!-- =========================================================
+         CONTACTOS
+         ========================================================= -->
+    <section class="contactos" id="contactos">
+      <div class="container">
 
-    <!--
-      Aviso de desenvolvimento — remover quando a integração com a API estiver concluída.
-    -->
-    <div class="dashboard-aviso">
-      <p>
-        <strong>Modo de desenvolvimento:</strong> os valores acima são placeholders.
-        A integração com a API REST (definida em <code>src/</code>) estará disponível
-        após o servidor estar ativo e a autenticação configurada.
-      </p>
-    </div>
+        <div class="cabecalho-seccao centrado">
+          <p class="etiqueta-seccao">Fala Connosco</p>
+          <h2>Contactos</h2>
+          <p>Queres juntar-te a nós ou tens alguma questão? Estamos por aqui.</p>
+        </div>
+
+        <div class="grelha-contactos">
+
+          <div class="contacto-item">
+            <div class="icone" aria-hidden="true">✉️</div>
+            <h3>Email</h3>
+            <p><a href="mailto:masters@cdpovoa.pt">masters@cdpovoa.pt</a></p>
+          </div>
+
+          <div class="contacto-item">
+            <div class="icone" aria-hidden="true">📞</div>
+            <h3>Telefone</h3>
+            <p><a href="tel:+351912345678">+351 912 345 678</a></p>
+          </div>
+
+          <div class="contacto-item">
+            <div class="icone" aria-hidden="true">📍</div>
+            <h3>Pavilhão</h3>
+            <p>Pavilhão Municipal da Póvoa, Póvoa de Varzim</p>
+          </div>
+
+          <div class="contacto-item">
+            <div class="icone" aria-hidden="true">📱</div>
+            <h3>Redes Sociais</h3>
+            <p><a href="#" target="_blank" rel="noopener">@masterscdpovoa</a></p>
+          </div>
+
+        </div>
+      </div>
+    </section>
 
   </main>
 
-</div><!-- /dashboard-layout -->
+  <!-- =========================================================
+       RODAPÉ
+       ========================================================= -->
+  <footer class="rodape">
+    <div class="container">
+      <p>&copy; 2026 <strong>Masters CD Póvoa</strong>. Todos os direitos reservados.</p>
+    </div>
+  </footer>
 
-<script>
-  /*
-   * Verificação de autenticação e carregamento de dados.
-   * ──────────────────────────────────────────────────────
-   * Estado atual: sem validação real (página acessível diretamente).
-   * Quando o backend estiver ativo, descomentar os blocos abaixo.
-   */
+  <!-- =========================================================
+       SCRIPT MÍNIMO: alternar menu de navegação em mobile
+       ========================================================= -->
+  <script>
+    const botaoMenu = document.getElementById('botao-menu');
+    const navPrincipal = document.getElementById('nav-principal');
 
-  // ── 1. Verificar se o utilizador está autenticado ─────────────────────
-  // const token = localStorage.getItem('accessToken');
-  // if (!token) {
-  //   window.location.href = '../auth/login.html';
-  // }
+    botaoMenu.addEventListener('click', () => {
+      const aberto = navPrincipal.classList.toggle('aberto');
+      botaoMenu.setAttribute('aria-expanded', aberto ? 'true' : 'false');
+    });
 
-  // ── 2. Preencher dados do utilizador a partir do localStorage ─────────
-  // const userData = JSON.parse(localStorage.getItem('user') || '{}');
-  // if (userData.name) {
-  //   const iniciais = userData.name.split(' ').map(n => n[0]).slice(0, 2).join('');
-  //   document.getElementById('avatar-utilizador').textContent = iniciais.toUpperCase();
-  //   document.getElementById('nome-utilizador').textContent   = userData.name;
-  //   document.getElementById('titulo-boas-vindas').textContent =
-  //     `Bem-vindo, ${userData.name.split(' ')[0]} 👋`;
-  // }
-
-  // ── 3. Carregar dados de resumo da API ────────────────────────────────
-  // async function carregarDashboard() {
-  //   const headers = { Authorization: `Bearer ${localStorage.getItem('accessToken')}` };
-  //
-  //   try {
-  //     const [jogadores, jogos, quotas, temporada] = await Promise.all([
-  //       fetch('/api/players',                { headers }).then(r => r.json()),
-  //       fetch('/api/events?type=jogo',       { headers }).then(r => r.json()),
-  //       fetch('/api/payments?status=pendente',{ headers }).then(r => r.json()),
-  //       fetch('/api/seasons/active',          { headers }).then(r => r.json()),
-  //     ]);
-  //
-  //     document.getElementById('total-jogadores').textContent  = jogadores.dados.length  ?? '—';
-  //     document.getElementById('total-jogos').textContent      = jogos.dados.length      ?? '—';
-  //     document.getElementById('quotas-pendentes').textContent = quotas.dados.length     ?? '—';
-  //     document.getElementById('temporada-ativa').textContent  = temporada.dados?.name   ?? '—';
-  //
-  //   } catch (err) {
-  //     console.error('Erro ao carregar dados do dashboard:', err);
-  //   }
-  // }
-  //
-  // carregarDashboard();
-
-  // ── 4. Logout ─────────────────────────────────────────────────────────
-  document.getElementById('btn-sair').addEventListener('click', async () => {
-    // TODO BACKEND: chamar POST /api/auth/logout com o refreshToken
-    // const refreshToken = localStorage.getItem('refreshToken');
-    // if (refreshToken) {
-    //   await fetch('/api/auth/logout', {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify({ refreshToken }),
-    //   }).catch(() => {});
-    // }
-    // localStorage.removeItem('accessToken');
-    // localStorage.removeItem('refreshToken');
-    // localStorage.removeItem('user');
-
-    window.location.href = '../auth/login.html';
-  });
-</script>
+    // Fecha o menu mobile ao clicar num link de navegação
+    navPrincipal.querySelectorAll('a').forEach((link) => {
+      link.addEventListener('click', () => {
+        navPrincipal.classList.remove('aberto');
+        botaoMenu.setAttribute('aria-expanded', 'false');
+      });
+    });
+  </script>
 
 </body>
 </html>
