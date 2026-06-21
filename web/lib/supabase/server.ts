@@ -1,5 +1,12 @@
+import type { SerializeOptions } from "cookie";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+
+type SupabaseCookiesToSet = {
+  name: string;
+  value: string;
+  options: SerializeOptions;
+}[];
 
 export async function createClient() {
   const cookieStore = await cookies();
@@ -12,7 +19,7 @@ export async function createClient() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: SupabaseCookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
@@ -38,7 +45,7 @@ export async function createAdminClient() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: SupabaseCookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
