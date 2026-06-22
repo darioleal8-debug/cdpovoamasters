@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { Season } from "@/types/database";
+import { toast } from "@/components/ui/toaster";
+import type { Season, SeasonFormData } from "@/types/database";
 
 export function useSeasons() {
   const [seasons, setSeasons] = useState<Season[]>([]);
@@ -10,22 +11,93 @@ export function useSeasons() {
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      const { data } = await supabase
-        .from("seasons")
-        .select("*")
-        .order("start_date", { ascending: false });
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("seasons")
+      .select("*")
+      .order("start_date", { ascending: false });
 
-      if (data) {
-        setSeasons(data);
-        setActiveSeason(data.find((s) => s.status === "ativa") ?? null);
-      }
-      setLoading(false);
+    if (data) {
+      setSeasons(data);
+      setActiveSeason(data.find((s) => s.status === "ativa") ?? null);
     }
-    load();
+    setLoading(false);
   }, []);
 
-  return { seasons, activeSeason, loading };
+  useEffect(() => { load(); }, [load]);
+
+  async function createSeason(data: SeasonFormData): Promise<boolean> {
+    const { error } = await supabase.from("seasons").insert({
+      name: data.name,
+      year: data.year,
+      start_date: data.start_date,
+      end_date: data.end_date,
+      status: "arquivada",
+    });
+
+    if (error) {
+      toast({ title: "Erro ao criar temporada", description: error.message, variant: "destructive" });
+      return false;
+    }
+    toast({ title: "Temporada criada com sucesso" });
+    await load();
+    return true;
+  }
+
+  async function updateSeason(id: string, data: Partial<SeasonFormData>): Promise<boolean> {
+    const { error } = await supabase
+      .from("seasons")
+      .update({ ...data, updated_at: new Date().toISOString() })
+      .eq("id", id);
+
+    if (error) {
+      toast({ title: "Erro ao atualizar temporada", description: error.message, variant: "destructive" });
+      return false;
+    }
+    toast({ title: "Temporada atualizada com sucesso" });
+    await load();
+    return true;
+  }
+
+  async function activateSeason(id: string): Promise<boolean> {
+    // Usa RPC atómico para evitar violação do índice único idx_one_active_season
+    const { error } = await supabase.rpc("set_active_season", { p_season_id: id });
+
+    if (error) {
+      toast({ title: "Erro ao ativar temporada", description: error.message, variant: "destructive" });
+      return false;
+    }
+    toast({ title: "Temporada ativada com sucesso" });
+    await load();
+    return true;
+  }
+
+  async function deleteSeason(id: string): Promise<boolean> {
+    const season = seasons.find((s) => s.id === id);
+    if (season?.status === "ativa") {
+      toast({ title: "Não é possível eliminar a temporada ativa", variant: "destructive" });
+      return false;
+    }
+
+    const { error } = await supabase.from("seasons").delete().eq("id", id);
+    if (error) {
+      toast({ title: "Erro ao eliminar temporada", description: error.message, variant: "destructive" });
+      return false;
+    }
+    toast({ title: "Temporada eliminada" });
+    await load();
+    return true;
+  }
+
+  return {
+    seasons,
+    activeSeason,
+    loading,
+    refresh: load,
+    createSeason,
+    updateSeason,
+    activateSeason,
+    deleteSeason,
+  };
 }

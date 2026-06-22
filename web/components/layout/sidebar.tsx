@@ -5,11 +5,11 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   Calendar,
+  CalendarRange,
   CreditCard,
   LayoutDashboard,
   MessageSquare,
   Settings,
-  ShieldCheck,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -24,6 +24,7 @@ const navItems = [
 ];
 
 const managementItems = [
+  { label: "Temporadas",   href: "/temporadas",   icon: CalendarRange },
   { label: "Jogadores",    href: "/jogadores",    icon: Users },
   { label: "Jogos",        href: "/jogos",        icon: Calendar },
   { label: "Pagamentos",   href: "/pagamentos",   icon: CreditCard },

@@ -42,7 +42,7 @@ export async function middleware(request: NextRequest) {
   const isDashboard = path === "/dashboard" || path.startsWith("/dashboard") ||
     path.startsWith("/jogadores") || path.startsWith("/jogos") ||
     path.startsWith("/pagamentos") || path.startsWith("/estatisticas") ||
-    path.startsWith("/configuracoes");
+    path.startsWith("/configuracoes") || path.startsWith("/temporadas");
 
   if (isDashboard && !isAuth) {
     return NextResponse.redirect(new URL("/login", request.url));

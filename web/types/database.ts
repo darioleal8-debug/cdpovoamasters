@@ -135,6 +135,13 @@ export type PaymentFormData = {
   status: PaymentStatus;
 };
 
+export type SeasonFormData = {
+  name: string;
+  year: string;
+  start_date: string;
+  end_date: string;
+};
+
 // ── Métricas do dashboard ──────────────────────────────────────────────────
 
 export interface DashboardMetrics {
