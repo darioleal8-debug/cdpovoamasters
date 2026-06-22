@@ -61,13 +61,28 @@ export function useSeasons() {
   }
 
   async function activateSeason(id: string): Promise<boolean> {
-    // Usa RPC atómico para evitar violação do índice único idx_one_active_season
-    const { error } = await supabase.rpc("set_active_season", { p_season_id: id });
+    // Arquiva todas as temporadas ativas primeiro (evita violação do índice único)
+    const { error: e1 } = await supabase
+      .from("seasons")
+      .update({ status: "arquivada" })
+      .eq("status", "ativa");
 
-    if (error) {
-      toast({ title: "Erro ao ativar temporada", description: error.message, variant: "destructive" });
+    if (e1) {
+      toast({ title: "Erro ao ativar temporada", description: e1.message, variant: "destructive" });
       return false;
     }
+
+    // Ativa a temporada pretendida
+    const { error: e2 } = await supabase
+      .from("seasons")
+      .update({ status: "ativa" })
+      .eq("id", id);
+
+    if (e2) {
+      toast({ title: "Erro ao ativar temporada", description: e2.message, variant: "destructive" });
+      return false;
+    }
+
     toast({ title: "Temporada ativada com sucesso" });
     await load();
     return true;
