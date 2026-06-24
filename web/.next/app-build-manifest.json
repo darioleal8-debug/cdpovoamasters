@@ -51,7 +51,7 @@
       "static/chunks/996-abda8d96353646a8.js",
       "static/chunks/app/(dashboard)/layout-8b06806f2ec83e6d.js"
     ],
-    "/(dashboard)/estatisticas/page": [
+    "/(dashboard)/configuracoes/page": [
       "static/chunks/webpack-9fa08a4115df27e1.js",
       "static/chunks/c7879cf7-93b1c04336dd24e6.js",
       "static/chunks/131-b3040e10d5707102.js",
@@ -61,27 +61,9 @@
       "static/chunks/80-f13f1fa78c8f2028.js",
       "static/chunks/718-c75b1690d7180b54.js",
       "static/chunks/918-ef4df9814fc213ca.js",
-      "static/chunks/850-e102410cc5e498ce.js",
-      "static/chunks/624-c6b2a63fd7135ce2.js",
-      "static/chunks/478-05757573da7510fa.js",
-      "static/chunks/720-39d96b4814ebaa2a.js",
-      "static/chunks/app/(dashboard)/estatisticas/page-ae304af8e98b817b.js"
-    ],
-    "/(dashboard)/jogadores/page": [
-      "static/chunks/webpack-9fa08a4115df27e1.js",
-      "static/chunks/c7879cf7-93b1c04336dd24e6.js",
-      "static/chunks/131-b3040e10d5707102.js",
-      "static/chunks/main-app-6ccd81f2f0577cd8.js",
-      "static/chunks/d28dc9c7-a302ad7c38a5c119.js",
-      "static/chunks/844-06c99debe8896cc2.js",
-      "static/chunks/80-f13f1fa78c8f2028.js",
-      "static/chunks/718-c75b1690d7180b54.js",
-      "static/chunks/918-ef4df9814fc213ca.js",
-      "static/chunks/850-e102410cc5e498ce.js",
-      "static/chunks/624-c6b2a63fd7135ce2.js",
-      "static/chunks/537-6eb58989df752dd9.js",
+      "static/chunks/652-67e5e123eedf25d8.js",
       "static/chunks/86-5f1d116dc7792b5a.js",
-      "static/chunks/app/(dashboard)/jogadores/page-68ebbedda52fc8bf.js"
+      "static/chunks/app/(dashboard)/configuracoes/page-dffecfaf3ab45688.js"
     ],
     "/(dashboard)/jogos/page": [
       "static/chunks/webpack-9fa08a4115df27e1.js",
@@ -114,15 +96,7 @@
       "static/chunks/537-6eb58989df752dd9.js",
       "static/chunks/app/(dashboard)/pagamentos/page-d9c7a2c053480127.js"
     ],
-    "/(dashboard)/page": [
-      "static/chunks/webpack-9fa08a4115df27e1.js",
-      "static/chunks/c7879cf7-93b1c04336dd24e6.js",
-      "static/chunks/131-b3040e10d5707102.js",
-      "static/chunks/main-app-6ccd81f2f0577cd8.js",
-      "static/chunks/197-6a95cb570f718414.js",
-      "static/chunks/app/(dashboard)/page-d2c1969e9e528e50.js"
-    ],
-    "/(dashboard)/configuracoes/page": [
+    "/(dashboard)/jogadores/page": [
       "static/chunks/webpack-9fa08a4115df27e1.js",
       "static/chunks/c7879cf7-93b1c04336dd24e6.js",
       "static/chunks/131-b3040e10d5707102.js",
@@ -132,9 +106,35 @@
       "static/chunks/80-f13f1fa78c8f2028.js",
       "static/chunks/718-c75b1690d7180b54.js",
       "static/chunks/918-ef4df9814fc213ca.js",
-      "static/chunks/652-67e5e123eedf25d8.js",
+      "static/chunks/850-e102410cc5e498ce.js",
+      "static/chunks/624-c6b2a63fd7135ce2.js",
+      "static/chunks/537-6eb58989df752dd9.js",
       "static/chunks/86-5f1d116dc7792b5a.js",
-      "static/chunks/app/(dashboard)/configuracoes/page-dffecfaf3ab45688.js"
+      "static/chunks/app/(dashboard)/jogadores/page-68ebbedda52fc8bf.js"
+    ],
+    "/(dashboard)/estatisticas/page": [
+      "static/chunks/webpack-9fa08a4115df27e1.js",
+      "static/chunks/c7879cf7-93b1c04336dd24e6.js",
+      "static/chunks/131-b3040e10d5707102.js",
+      "static/chunks/main-app-6ccd81f2f0577cd8.js",
+      "static/chunks/d28dc9c7-a302ad7c38a5c119.js",
+      "static/chunks/844-06c99debe8896cc2.js",
+      "static/chunks/80-f13f1fa78c8f2028.js",
+      "static/chunks/718-c75b1690d7180b54.js",
+      "static/chunks/918-ef4df9814fc213ca.js",
+      "static/chunks/850-e102410cc5e498ce.js",
+      "static/chunks/624-c6b2a63fd7135ce2.js",
+      "static/chunks/478-05757573da7510fa.js",
+      "static/chunks/720-39d96b4814ebaa2a.js",
+      "static/chunks/app/(dashboard)/estatisticas/page-ae304af8e98b817b.js"
+    ],
+    "/(dashboard)/page": [
+      "static/chunks/webpack-9fa08a4115df27e1.js",
+      "static/chunks/c7879cf7-93b1c04336dd24e6.js",
+      "static/chunks/131-b3040e10d5707102.js",
+      "static/chunks/main-app-6ccd81f2f0577cd8.js",
+      "static/chunks/197-6a95cb570f718414.js",
+      "static/chunks/app/(dashboard)/page-d2c1969e9e528e50.js"
     ],
     "/(dashboard)/temporadas/page": [
       "static/chunks/webpack-9fa08a4115df27e1.js",
