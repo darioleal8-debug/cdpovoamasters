@@ -168,3 +168,109 @@ export interface PositionCount {
   value: number;
   fill: string;
 }
+
+// ── Estatísticas de Jogo ───────────────────────────────────────────────────
+
+export type GameStatus = "scheduled" | "live" | "finished";
+
+export type PlayEventType =
+  | "2pt_made" | "2pt_miss"
+  | "3pt_made" | "3pt_miss"
+  | "ft_made"  | "ft_miss"
+  | "rebound_off" | "rebound_def"
+  | "assist" | "steal" | "block" | "turnover"
+  | "foul_committed" | "foul_drawn"
+  | "substitution_in" | "substitution_out"
+  | "timeout"
+  | "period_start" | "period_end"
+  | "game_start" | "game_end";
+
+export interface GameSession {
+  id: string;
+  event_id: string;
+  season_id: string;
+  status: GameStatus;
+  current_period: number;
+  home_score: number;
+  away_score: number;
+  opponent_name: string;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlayByPlay {
+  id: string;
+  game_session_id: string;
+  season_id: string;
+  period: number;
+  game_clock: string;
+  event_type: PlayEventType;
+  player_id: string | null;
+  secondary_player_id: string | null;
+  is_home_team: boolean;
+  points_delta: number;
+  home_score_after: number;
+  away_score_after: number;
+  shot_x: number | null;
+  shot_y: number | null;
+  shot_zone: string | null;
+  description: string | null;
+  created_at: string;
+}
+
+export interface PlayerGameStats {
+  id: string;
+  game_session_id: string;
+  season_id: string;
+  player_id: string;
+  minutes_played: number;
+  pts: number;
+  fg2_made: number;
+  fg2_att: number;
+  fg3_made: number;
+  fg3_att: number;
+  ft_made: number;
+  ft_att: number;
+  reb_off: number;
+  reb_def: number;
+  ast: number;
+  stl: number;
+  blk: number;
+  tov: number;
+  fouls_committed: number;
+  fouls_drawn: number;
+  plus_minus: number;
+  efficiency: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlayerGameStatsWithUser extends PlayerGameStats {
+  user: Pick<User, "id" | "name">;
+}
+
+export interface GamePeriodScore {
+  id: string;
+  game_session_id: string;
+  period: number;
+  home_score: number;
+  away_score: number;
+}
+
+export interface PlayByPlayWithPlayers extends PlayByPlay {
+  player: Pick<User, "id" | "name"> | null;
+  secondary_player: Pick<User, "id" | "name"> | null;
+}
+
+// Evento a registar (input do treinador)
+export interface RecordPlayInput {
+  event_type: PlayEventType;
+  player_id?: string;
+  secondary_player_id?: string;
+  shot_x?: number;
+  shot_y?: number;
+  shot_zone?: string;
+  game_clock?: string;
+}

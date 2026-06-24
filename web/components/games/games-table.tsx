@@ -10,7 +10,8 @@ import {
   type ColumnDef,
   type SortingState,
 } from "@tanstack/react-table";
-import { ArrowUpDown, Plus, Search, Trash2, Pencil } from "lucide-react";
+import { ArrowUpDown, Plus, Search, Trash2, Pencil, Radio, BarChart2 } from "lucide-react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -96,6 +97,22 @@ export function GamesTable({ events, loading, onAdd, onEdit, onDelete }: GamesTa
         header: "",
         cell: ({ row }) => (
           <div className="flex items-center justify-end gap-1">
+            {row.original.type === "jogo" && (
+              <>
+                <Link href={`/jogos/${row.original.id}/live`}>
+                  <Button variant="ghost" size="sm" className="h-8 gap-1 text-green-700 hover:text-green-800 hover:bg-green-50 px-2">
+                    <Radio className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline text-xs">Live</span>
+                  </Button>
+                </Link>
+                <Link href={`/jogos/${row.original.id}/stats`}>
+                  <Button variant="ghost" size="sm" className="h-8 gap-1 text-cdpovoa-blue hover:bg-cdpovoa-blue/10 px-2">
+                    <BarChart2 className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline text-xs">Stats</span>
+                  </Button>
+                </Link>
+              </>
+            )}
             <Button variant="ghost" size="icon" className="h-8 w-8"
               onClick={() => onEdit?.(row.original)}>
               <Pencil className="h-4 w-4" />
@@ -107,7 +124,7 @@ export function GamesTable({ events, loading, onAdd, onEdit, onDelete }: GamesTa
             </Button>
           </div>
         ),
-        size: 80,
+        size: 140,
       },
     ],
     [onEdit, onDelete]
