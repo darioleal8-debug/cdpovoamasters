@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "start:3001": "next start -p 3001",
+    "start:4000": "next start -p 4000",
+    "lint": "next lint",
+    "kill-port": "powershell -ExecutionPolicy Bypass -File ..\\scripts\\kill-port.ps1 3000",
+    "safe-start": "powershell -ExecutionPolicy Bypass -File ..\\scripts\\start-safe.ps1"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
