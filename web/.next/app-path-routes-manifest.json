@@ -1,0 +1,15 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/(auth)/login/page": "/login",
+  "/(dashboard)/jogadores/page": "/jogadores",
+  "/(dashboard)/estatisticas/page": "/estatisticas",
+  "/(dashboard)/jogos/[eventId]/live/page": "/jogos/[eventId]/live",
+  "/(dashboard)/jogos/[eventId]/stats/page": "/jogos/[eventId]/stats",
+  "/(dashboard)/pagamentos/page": "/pagamentos",
+  "/(dashboard)/configuracoes/page": "/configuracoes",
+  "/(dashboard)/live/[id]/page": "/live/[id]",
+  "/(dashboard)/jogos/page": "/jogos",
+  "/(dashboard)/page": "/",
+  "/(dashboard)/temporadas/page": "/temporadas",
+  "/(dashboard)/dashboard/page": "/dashboard"
+}

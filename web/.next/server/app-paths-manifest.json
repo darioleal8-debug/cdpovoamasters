@@ -1,3 +1,15 @@
 {
-  "/(dashboard)/page": "app/(dashboard)/page.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/(dashboard)/jogadores/page": "app/(dashboard)/jogadores/page.js",
+  "/(dashboard)/estatisticas/page": "app/(dashboard)/estatisticas/page.js",
+  "/(dashboard)/jogos/[eventId]/live/page": "app/(dashboard)/jogos/[eventId]/live/page.js",
+  "/(dashboard)/jogos/[eventId]/stats/page": "app/(dashboard)/jogos/[eventId]/stats/page.js",
+  "/(dashboard)/pagamentos/page": "app/(dashboard)/pagamentos/page.js",
+  "/(dashboard)/configuracoes/page": "app/(dashboard)/configuracoes/page.js",
+  "/(dashboard)/live/[id]/page": "app/(dashboard)/live/[id]/page.js",
+  "/(dashboard)/jogos/page": "app/(dashboard)/jogos/page.js",
+  "/(dashboard)/page": "app/(dashboard)/page.js",
+  "/(dashboard)/temporadas/page": "app/(dashboard)/temporadas/page.js",
+  "/(dashboard)/dashboard/page": "app/(dashboard)/dashboard/page.js"
 }

@@ -173,6 +173,26 @@ export interface PositionCount {
 
 export type GameStatus = "scheduled" | "live" | "finished";
 
+export interface GameCurrentLineup {
+  game_session_id: string;
+  on_court_ids: string[];
+  updated_at: string;
+}
+
+export interface PlayerCourtStint {
+  id: string;
+  game_session_id: string;
+  player_id: string;
+  period: number;
+  entry_clock_secs: number;
+  exit_clock_secs: number | null;
+  entry_home_score: number;
+  entry_away_score: number;
+  exit_home_score: number | null;
+  exit_away_score: number | null;
+  created_at: string;
+}
+
 export type PlayEventType =
   | "2pt_made" | "2pt_miss"
   | "3pt_made" | "3pt_miss"
@@ -198,6 +218,13 @@ export interface GameSession {
   finished_at: string | null;
   created_at: string;
   updated_at: string;
+  // Clock control (migration 003)
+  clock_running: boolean;
+  clock_started_at: string | null;
+  clock_elapsed_secs: number;
+  period_duration_secs: number;
+  home_timeouts_left: number;
+  away_timeouts_left: number;
 }
 
 export interface PlayByPlay {
