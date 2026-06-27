@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["pdf-parse", "xlsx"],
+  serverExternalPackages: ["pdf-parse", "xlsx", "@anthropic-ai/sdk"],
   images: {
     remotePatterns: [
       {

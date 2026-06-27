@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "functions": {
+    "/api/import-calendar": {
+      "maxDuration": 120
+    }
+  }
+}

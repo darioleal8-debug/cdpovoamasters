@@ -1,0 +1,17 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/api/import-calendar/route": "/api/import-calendar",
+  "/(dashboard)/configuracoes/importar/page": "/configuracoes/importar",
+  "/(auth)/login/page": "/login",
+  "/(dashboard)/configuracoes/page": "/configuracoes",
+  "/(dashboard)/estatisticas/page": "/estatisticas",
+  "/(dashboard)/jogadores/page": "/jogadores",
+  "/(dashboard)/jogos/[eventId]/live/page": "/jogos/[eventId]/live",
+  "/(dashboard)/jogos/[eventId]/stats/page": "/jogos/[eventId]/stats",
+  "/(dashboard)/jogos/page": "/jogos",
+  "/(dashboard)/live/[id]/page": "/live/[id]",
+  "/(dashboard)/pagamentos/page": "/pagamentos",
+  "/(dashboard)/temporadas/page": "/temporadas",
+  "/(dashboard)/page": "/",
+  "/(dashboard)/dashboard/page": "/dashboard"
+}
