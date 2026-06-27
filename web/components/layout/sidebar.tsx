@@ -11,6 +11,7 @@ import {
   MessageSquare,
   Settings,
   Users,
+  FileUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
@@ -36,7 +37,8 @@ const communicationItems = [
 ];
 
 const accountItems = [
-  { label: "Configurações", href: "/configuracoes", icon: Settings },
+  { label: "Configurações",        href: "/configuracoes",          icon: Settings },
+  { label: "Importar Calendário",  href: "/configuracoes/importar", icon: FileUp   },
 ];
 
 function NavLink({

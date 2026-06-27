@@ -59,6 +59,12 @@
       "namedRegex": "^/configuracoes(?:/)?$"
     },
     {
+      "page": "/configuracoes/importar",
+      "regex": "^/configuracoes/importar(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/configuracoes/importar(?:/)?$"
+    },
+    {
       "page": "/dashboard",
       "regex": "^/dashboard(?:/)?$",
       "routeKeys": {},
