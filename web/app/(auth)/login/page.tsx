@@ -1,58 +1,125 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/toaster";
+import { PLATFORM_LOGO, PLATFORM_THEME as T } from "@/lib/platform-theme";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail]               = useState("");
+  const [password, setPassword]         = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const router = useRouter();
+  const [loading, setLoading]           = useState(false);
+  const [error, setError]               = useState("");
+  const [imgError, setImgError]         = useState(false);
+  const [justActivated, setJustActivated] = useState(false);
+
+  const router   = useRouter();
   const supabase = createClient();
+
+  // Mensagem de sucesso após ativação (via ?activated=1)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("activated") === "1") setJustActivated(true);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
-    });
+    try {
+      let data: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>["data"] | undefined;
+      let authError: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>["error"] | undefined;
 
-    if (authError) {
-      setError(
-        authError.message.includes("Invalid")
-          ? "Email ou password incorretos."
-          : "Não foi possível autenticar. Tenta novamente."
-      );
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const result = await supabase.auth.signInWithPassword({
+          email: email.trim().toLowerCase(),
+          password,
+        });
+        data = result.data;
+        authError = result.error;
+
+        const isNetworkError = authError && /network|fetch/i.test(authError.message);
+        if (!isNetworkError) break;
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+      }
+
+      if (authError || !data?.user) {
+        console.error("[login] signInWithPassword error:", authError);
+        setError(
+          authError?.message.includes("Invalid")
+            ? "Email ou password incorretos."
+            : `Não foi possível autenticar. Tenta novamente. (${authError?.message ?? "resposta inválida"})`
+        );
+        setLoading(false);
+        return;
+      }
+
+      // Verificar se a conta está ativa (jogadores precisam de ativar via email)
+      const { data: profile, error: profileError } = await supabase
+        .from("users")
+        .select("active")
+        .eq("id", data.user.id)
+        .single();
+
+      if (profileError) {
+        console.error("[login] profile fetch error:", profileError);
+      }
+
+      if (profile?.active === false) {
+        await supabase.auth.signOut();
+        setError("A tua conta ainda não está ativada. Verifica o teu email para o link de ativação.");
+        setLoading(false);
+        return;
+      }
+
+      toast({ title: "Bem-vindo de volta!" });
+      router.push("/");
+      router.refresh();
+    } catch (err) {
+      console.error("[login] unexpected error:", err);
+      setError(`Não foi possível autenticar. Tenta novamente. (${err instanceof Error ? err.message : "erro desconhecido"})`);
       setLoading(false);
-      return;
     }
-
-    toast({ title: "Bem-vindo de volta!" });
-    router.push("/");
-    router.refresh();
   }
 
   return (
     <Card className="w-full max-w-md shadow-2xl">
-      <CardHeader className="space-y-3 pb-6 text-center">
-        {/* Logótipo */}
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-red-600 to-red-800 text-base font-bold text-white shadow-lg ring-2 ring-white">
-          CDP
+      <CardHeader className="space-y-4 pb-6 text-center">
+
+        {/* Logótipo fixo da plataforma */}
+        <div className="mx-auto mb-1">
+          {!imgError ? (
+            <div className="relative mx-auto h-16 w-[160px]">
+              <Image
+                src={PLATFORM_LOGO}
+                alt="HoopHub"
+                fill
+                sizes="160px"
+                className="object-contain"
+                priority
+                onError={() => setImgError(true)}
+              />
+            </div>
+          ) : (
+            <div
+              className="mx-auto flex h-14 w-14 items-center justify-center rounded-full text-sm font-bold text-white shadow-lg ring-2 ring-white/20"
+              style={{ backgroundColor: T.button }}
+            >
+              CDP
+            </div>
+          )}
         </div>
+
         <div>
           <CardTitle className="text-xl">Área Privada</CardTitle>
           <CardDescription>
@@ -102,23 +169,32 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {justActivated && !error && (
+            <div className="flex items-center gap-2 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700 border border-green-200">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              Conta ativada com sucesso! Podes fazer login.
+            </div>
+          )}
+
           {error && (
             <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {error}
             </p>
           )}
 
-          <Button type="submit" className="w-full" disabled={loading || !email || !password}>
+          <Button
+            type="submit"
+            className="w-full font-semibold transition-opacity hover:opacity-90"
+            disabled={loading || !email || !password}
+            style={{ backgroundColor: T.button, color: T.buttonText }}
+          >
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
             {loading ? "A autenticar..." : "Entrar"}
           </Button>
         </form>
 
         <div className="mt-6 text-center text-sm text-muted-foreground">
-          <Link
-            href="/"
-            className="hover:text-foreground hover:underline"
-          >
+          <Link href="/" className="hover:text-foreground hover:underline">
             ← Voltar ao site público
           </Link>
         </div>

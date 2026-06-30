@@ -1,6 +1,8 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
+import type { UserRole } from "@/types/database";
 
 export default async function DashboardLayout({
   children,
@@ -26,14 +28,19 @@ export default async function DashboardLayout({
     .single();
 
   const userName  = profile?.name  ?? user.email ?? "Utilizador";
-  const userRole  = profile?.role  ?? "jogador";
+  const userRole  = (profile?.role ?? "admin") as UserRole;
   const userEmail = user.email     ?? "";
+
+  // Jogadores pertencem à área do jogador
+  if (userRole === "jogador") {
+    redirect("/player");
+  }
 
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Sidebar (só desktop) */}
       <div className="hidden lg:flex lg:shrink-0">
-        <Sidebar />
+        <Sidebar role={userRole} />
       </div>
 
       {/* Conteúdo principal */}

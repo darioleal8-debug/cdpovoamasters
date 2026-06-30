@@ -30,6 +30,35 @@ export function usePlayers(seasonId: string | null) {
 
   useEffect(() => { load(); }, [load]);
 
+  // Criar jogador via API route (usa service role para criar user + profile)
+  async function createPlayer(fd: FormData): Promise<boolean> {
+    try {
+      const res = await fetch("/api/players", { method: "POST", body: fd });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        toast({
+          title: "Erro ao criar jogador",
+          description: data.error ?? "Erro desconhecido",
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      toast({ title: "Jogador criado com sucesso!" });
+      await load();
+      return true;
+    } catch (e) {
+      toast({
+        title: "Erro de rede",
+        description: (e as Error).message,
+        variant: "destructive",
+      });
+      return false;
+    }
+  }
+
+  // Atualizar campos de perfil (jersey, position, height, age) de jogador existente
   async function upsertPlayer(data: PlayerFormData): Promise<boolean> {
     const { error } = await supabase
       .from("player_profiles")
@@ -54,6 +83,37 @@ export function usePlayers(seasonId: string | null) {
     return true;
   }
 
+  // Atualizar foto de jogador existente via API route (usa service role para Storage)
+  async function updatePlayerPhoto(profileId: string, photo: File): Promise<boolean> {
+    try {
+      const fd = new FormData();
+      fd.append("profile_id", profileId);
+      fd.append("photo", photo);
+
+      const res = await fetch("/api/players", { method: "PATCH", body: fd });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        toast({
+          title: "Erro ao atualizar foto",
+          description: data.error ?? "Erro desconhecido",
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      await load();
+      return true;
+    } catch (e) {
+      toast({
+        title: "Erro de rede ao atualizar foto",
+        description: (e as Error).message,
+        variant: "destructive",
+      });
+      return false;
+    }
+  }
+
   async function deletePlayer(profileId: string): Promise<boolean> {
     const { error } = await supabase
       .from("player_profiles")
@@ -69,5 +129,5 @@ export function usePlayers(seasonId: string | null) {
     return true;
   }
 
-  return { players, loading, upsertPlayer, deletePlayer, refresh: load };
+  return { players, loading, createPlayer, upsertPlayer, updatePlayerPhoto, deletePlayer, refresh: load };
 }

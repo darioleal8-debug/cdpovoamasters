@@ -1,6 +1,6 @@
 // Gerado a partir de database/schema.sql — actualizar sempre que o schema mudar.
 
-export type UserRole = "admin" | "treinador" | "jogador";
+export type UserRole = "admin" | "treinador" | "jogador" | "seccionista";
 export type UserStatus = "pendente" | "ativo" | "rejeitado" | "inativo";
 export type SeasonStatus = "ativa" | "arquivada";
 export type EventType = "jogo" | "treino" | "outro";
@@ -78,6 +78,29 @@ export interface ChatMessage {
   id: string;
   author_id: string;
   content: string;
+  created_at: string;
+}
+
+export type ChatType = "direct" | "group" | "team" | "announcement";
+export type ChatPostPolicy = "all" | "admin_only";
+
+export interface ChatThreadSummary {
+  id: string;
+  type: ChatType;
+  name: string | null;
+  post_policy: ChatPostPolicy;
+  last_message: { content: string; sender_id: string | null; created_at: string } | null;
+  unread_count: number;
+  updated_at: string;
+}
+
+export interface ChatThreadMessage {
+  id: string;
+  chat_id: string;
+  sender_id: string | null;
+  sender_name: string | null;
+  content: string;
+  attachment_url: string | null;
   created_at: string;
 }
 
@@ -168,6 +191,101 @@ export interface PositionCount {
   value: number;
   fill: string;
 }
+
+// ── Plantel (tabela players) ──────────────────────────────────────────────
+
+export interface Player {
+  id:         string;
+  season_id:  string;
+  team_id:    string | null;
+  user_id:    string | null;
+  name:       string;
+  number:     number | null;
+  position:   PlayerPosition | null;
+  height:     number | null;
+  weight:     number | null;
+  age:        number | null;
+  phone:      string | null;
+  birth_date: string | null;
+  photo_url:  string | null;
+  created_at: string;
+}
+
+// ── Cores de equipamento por equipa (tabela team_kits) ───────────────────────
+
+export interface TeamKit {
+  id:                string;
+  team_name:         string;
+  jersey_home_color: string;
+  shorts_home_color: string;
+  jersey_away_color: string;
+  shorts_away_color: string;
+  notes:             string | null;
+  updated_by:        string | null;
+  updated_at:        string;
+}
+
+export type TeamKitFormData = Omit<TeamKit, "id" | "updated_by" | "updated_at">;
+
+// ── Pagamentos avançados por jogador (tabela player_payments) ────────────────
+
+export type PlayerPaymentStatus = "paid" | "partial" | "late" | "exempt";
+export type PlayerPaymentMethod = "mbway" | "transferencia" | "numerario" | "cheque" | "outro";
+
+export interface PlayerPayment {
+  id: string;
+  season_id: string;
+  player_id: string;
+  month: number;
+  reference_year: number;
+  amount: number;
+  amount_due: number;
+  status: PlayerPaymentStatus;
+  method: PlayerPaymentMethod | null;
+  notes: string | null;
+  payment_date: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlayerPaymentWithPlayer extends PlayerPayment {
+  player: Pick<Player, "id" | "name" | "number">;
+}
+
+export interface PlayerPaymentSummary {
+  player_id: string;
+  season_id: string;
+  total_months: number;
+  months_paid: number;
+  months_partial: number;
+  months_late: number;
+  months_exempt: number;
+  total_paid: number;
+  total_due: number;
+  total_missing: number;
+  compliance_pct: number | null;
+}
+
+export const PLAYER_PAYMENT_STATUS_LABELS: Record<PlayerPaymentStatus, string> = {
+  paid:    "Pago",
+  partial: "Parcial",
+  late:    "Em atraso",
+  exempt:  "Isento",
+};
+
+export const PLAYER_PAYMENT_METHOD_LABELS: Record<PlayerPaymentMethod, string> = {
+  mbway:        "MB Way",
+  transferencia:"Transferência",
+  numerario:    "Numerário",
+  cheque:       "Cheque",
+  outro:        "Outro",
+};
+
+export const MONTH_NAMES_PT = [
+  "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+  "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro",
+];
 
 // ── Estatísticas de Jogo ───────────────────────────────────────────────────
 
@@ -291,7 +409,116 @@ export interface PlayByPlayWithPlayers extends PlayByPlay {
   secondary_player: Pick<User, "id" | "name"> | null;
 }
 
-// Evento a registar (input do treinador)
+// ── Treinos & Presenças ───────────────────────────────────────────────────────
+
+export type TrainingType =
+  | "tecnico" | "fisico" | "tatico"
+  | "recuperacao" | "coletivo" | "individual" | "geral";
+
+export type AttendanceStatus = "present" | "absent" | "justified" | "late";
+
+export type RecurrenceType = "weekly" | "monthly" | "unique";
+
+export interface TrainingRecurrenceRule {
+  id: string;
+  season_id: string;
+  recurrence_type: RecurrenceType;
+  day_of_week: number | null;
+  day_of_month: number | null;
+  start_date: string;
+  end_date: string | null;
+  start_time: string;
+  end_time: string | null;
+  location: string | null;
+  type: TrainingType;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface Training {
+  id: string;
+  season_id: string;
+  recurrence_id: string | null;
+  date: string;
+  start_time: string;
+  end_time: string | null;
+  location: string;
+  type: TrainingType;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface TrainingAttendance {
+  id: string;
+  training_id: string;
+  player_id: string;
+  status: AttendanceStatus;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export interface TrainingNote {
+  id: string;
+  training_id: string;
+  author_id: string | null;
+  note_text: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ── Convocatórias de jogo (tabela game_callups) ───────────────────────────
+
+export interface GameCallup {
+  id: string;
+  game_id: string;
+  player_id: string;
+  created_at: string;
+  player: Pick<Player, "id" | "name" | "number" | "position" | "photo_url">;
+}
+
+export interface ClubEvent {
+  id: string;
+  season_id: string;
+  title: string;
+  description: string | null;
+  date: string;
+  start_time: string | null;
+  location: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface PlayerAttendanceStat {
+  player_id: string;
+  season_id: string;
+  total_trainings: number;
+  present: number;
+  absent: number;
+  justified: number;
+  late: number;
+  attendance_pct: number;
+}
+
+export const TRAINING_TYPE_LABELS: Record<TrainingType, string> = {
+  tecnico:     "Técnico",
+  fisico:      "Físico",
+  tatico:      "Tático",
+  recuperacao: "Recuperação",
+  coletivo:    "Coletivo",
+  individual:  "Individual",
+  geral:       "Geral",
+};
+
+export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, string> = {
+  present:   "Presente",
+  absent:    "Falta",
+  justified: "Justificada",
+  late:      "Atraso",
+};
+
+// ── Evento a registar (input do treinador) ────────────────────────────────────
 export interface RecordPlayInput {
   event_type: PlayEventType;
   player_id?: string;

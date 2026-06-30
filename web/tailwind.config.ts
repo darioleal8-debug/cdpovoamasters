@@ -44,12 +44,12 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        /* Cores do CD Póvoa */
+        /* Cores da plataforma HoopHub */
         cdpovoa: {
-          blue: "#0a2647",
-          "blue-mid": "#16467a",
-          red: "#c8102e",
-          "red-dark": "#9c0c22",
+          blue: "#111111",
+          "blue-mid": "#1a1a1a",
+          red: "#F28C28",
+          "red-dark": "#d97706",
         },
       },
       borderRadius: {

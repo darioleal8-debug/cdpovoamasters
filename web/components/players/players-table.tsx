@@ -45,6 +45,32 @@ export function PlayersTable({
   const columns = useMemo<ColumnDef<PlayerWithUser>[]>(
     () => [
       {
+        id: "photo",
+        header: "",
+        cell: ({ row }) => {
+          const src = row.original.photo_path;
+          const name = row.original.user.name;
+          const initials = name
+            .split(" ")
+            .map((w) => w[0])
+            .join("")
+            .slice(0, 2)
+            .toUpperCase();
+          return src ? (
+            <img
+              src={src}
+              alt={name}
+              className="h-9 w-9 rounded-full object-cover"
+            />
+          ) : (
+            <div className="h-9 w-9 rounded-full bg-cdpovoa-blue/10 flex items-center justify-center">
+              <span className="text-xs font-bold text-cdpovoa-blue">{initials}</span>
+            </div>
+          );
+        },
+        size: 48,
+      },
+      {
         accessorKey: "jersey_number",
         header: ({ column }) => (
           <Button

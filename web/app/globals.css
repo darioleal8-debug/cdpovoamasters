@@ -10,7 +10,7 @@
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
 
-    --primary: 214 74% 16%;       /* azul-marinho CD Póvoa */
+    --primary: 0 0% 7%;            /* preto HoopHub */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 210 20% 95%;
@@ -22,18 +22,18 @@
     --accent: 210 20% 96%;
     --accent-foreground: 222 47% 11%;
 
-    --destructive: 349 84% 44%;   /* vermelho CD Póvoa */
+    --destructive: 349 84% 44%;   /* vermelho para erros (semântico) */
     --destructive-foreground: 0 0% 100%;
 
     --border: 214 20% 88%;
     --input: 214 20% 88%;
-    --ring: 214 74% 16%;
+    --ring: 29 91% 57%;            /* laranja HoopHub como cor de foco */
 
     --radius: 0.5rem;
 
     /* Chart colors */
-    --chart-1: 214 74% 27%;
-    --chart-2: 349 84% 44%;
+    --chart-1: 0 0% 7%;
+    --chart-2: 29 91% 57%;
     --chart-3: 214 60% 52%;
     --chart-4: 120 40% 48%;
     --chart-5: 38 92% 50%;

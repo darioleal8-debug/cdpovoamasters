@@ -10,7 +10,7 @@ import {
   type ColumnDef,
   type SortingState,
 } from "@tanstack/react-table";
-import { ArrowUpDown, Plus, Search, Trash2, Pencil, Radio, BarChart2 } from "lucide-react";
+import { ArrowUpDown, Plus, Search, Trash2, Pencil, Radio, BarChart2, Map, Users } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Event, EventType } from "@/types/database";
-import { EVENT_TYPE_LABELS, formatDateShort } from "@/lib/utils";
+import { EVENT_TYPE_LABELS, formatDateShort, buildMapsUrl } from "@/lib/utils";
 
 interface GamesTableProps {
   events: Event[];
@@ -26,6 +26,7 @@ interface GamesTableProps {
   onAdd?: () => void;
   onEdit?: (event: Event) => void;
   onDelete?: (event: Event) => void;
+  onCallups?: (event: Event) => void;
 }
 
 const TYPE_BADGE: Record<EventType, "default" | "secondary" | "outline"> = {
@@ -34,7 +35,7 @@ const TYPE_BADGE: Record<EventType, "default" | "secondary" | "outline"> = {
   outro:  "outline",
 };
 
-export function GamesTable({ events, loading, onAdd, onEdit, onDelete }: GamesTableProps) {
+export function GamesTable({ events, loading, onAdd, onEdit, onDelete, onCallups }: GamesTableProps) {
   const [sorting, setSorting] = useState<SortingState>([{ id: "event_date", desc: false }]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("todos");
@@ -99,6 +100,11 @@ export function GamesTable({ events, loading, onAdd, onEdit, onDelete }: GamesTa
           <div className="flex items-center justify-end gap-1">
             {row.original.type === "jogo" && (
               <>
+                <Button variant="ghost" size="sm" className="h-8 gap-1 text-cdpovoa-blue hover:bg-cdpovoa-blue/10 px-2"
+                  onClick={() => onCallups?.(row.original)}>
+                  <Users className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline text-xs">Convocados</span>
+                </Button>
                 <Link href={`/jogos/${row.original.id}/live`}>
                   <Button variant="ghost" size="sm" className="h-8 gap-1 text-green-700 hover:text-green-800 hover:bg-green-50 px-2">
                     <Radio className="h-3.5 w-3.5" />
@@ -111,6 +117,19 @@ export function GamesTable({ events, loading, onAdd, onEdit, onDelete }: GamesTa
                     <span className="hidden sm:inline text-xs">Stats</span>
                   </Button>
                 </Link>
+                {buildMapsUrl(row.original.location) && (
+                  <a
+                    href={buildMapsUrl(row.original.location)!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Abrir no Google Maps: ${row.original.location}`}
+                  >
+                    <Button variant="ghost" size="sm" className="h-8 gap-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50 px-2">
+                      <Map className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline text-xs">Mapa</span>
+                    </Button>
+                  </a>
+                )}
               </>
             )}
             <Button variant="ghost" size="icon" className="h-8 w-8"
@@ -127,7 +146,7 @@ export function GamesTable({ events, loading, onAdd, onEdit, onDelete }: GamesTa
         size: 140,
       },
     ],
-    [onEdit, onDelete]
+    [onEdit, onDelete, onCallups]
   );
 
   const table = useReactTable({

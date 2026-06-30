@@ -15,6 +15,104 @@
   "headers": [],
   "dynamicRoutes": [
     {
+      "page": "/api/chat/threads/[chatId]",
+      "regex": "^/api/chat/threads/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPchatId": "nxtPchatId"
+      },
+      "namedRegex": "^/api/chat/threads/(?<nxtPchatId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/chat/threads/[chatId]/messages",
+      "regex": "^/api/chat/threads/([^/]+?)/messages(?:/)?$",
+      "routeKeys": {
+        "nxtPchatId": "nxtPchatId"
+      },
+      "namedRegex": "^/api/chat/threads/(?<nxtPchatId>[^/]+?)/messages(?:/)?$"
+    },
+    {
+      "page": "/api/chat/threads/[chatId]/read",
+      "regex": "^/api/chat/threads/([^/]+?)/read(?:/)?$",
+      "routeKeys": {
+        "nxtPchatId": "nxtPchatId"
+      },
+      "namedRegex": "^/api/chat/threads/(?<nxtPchatId>[^/]+?)/read(?:/)?$"
+    },
+    {
+      "page": "/api/club-events/[id]",
+      "regex": "^/api/club\\-events/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/club\\-events/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/games/[id]/callups",
+      "regex": "^/api/games/([^/]+?)/callups(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/games/(?<nxtPid>[^/]+?)/callups(?:/)?$"
+    },
+    {
+      "page": "/api/games/[id]/callups/[callupId]",
+      "regex": "^/api/games/([^/]+?)/callups/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid",
+        "nxtPcallupId": "nxtPcallupId"
+      },
+      "namedRegex": "^/api/games/(?<nxtPid>[^/]+?)/callups/(?<nxtPcallupId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/player-payments/[id]",
+      "regex": "^/api/player\\-payments/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/player\\-payments/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/team-kits/[id]",
+      "regex": "^/api/team\\-kits/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/team\\-kits/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/trainings/[id]",
+      "regex": "^/api/trainings/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/trainings/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/trainings/[id]/attendance",
+      "regex": "^/api/trainings/([^/]+?)/attendance(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/trainings/(?<nxtPid>[^/]+?)/attendance(?:/)?$"
+    },
+    {
+      "page": "/api/trainings/[id]/notes",
+      "regex": "^/api/trainings/([^/]+?)/notes(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/trainings/(?<nxtPid>[^/]+?)/notes(?:/)?$"
+    },
+    {
+      "page": "/api/trainings/[id]/notes/[noteId]",
+      "regex": "^/api/trainings/([^/]+?)/notes/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid",
+        "nxtPnoteId": "nxtPnoteId"
+      },
+      "namedRegex": "^/api/trainings/(?<nxtPid>[^/]+?)/notes/(?<nxtPnoteId>[^/]+?)(?:/)?$"
+    },
+    {
       "page": "/jogos/[eventId]/live",
       "regex": "^/jogos/([^/]+?)/live(?:/)?$",
       "routeKeys": {
@@ -53,6 +151,18 @@
       "namedRegex": "^/_not\\-found(?:/)?$"
     },
     {
+      "page": "/activate",
+      "regex": "^/activate(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/activate(?:/)?$"
+    },
+    {
+      "page": "/chat",
+      "regex": "^/chat(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/chat(?:/)?$"
+    },
+    {
       "page": "/configuracoes",
       "regex": "^/configuracoes(?:/)?$",
       "routeKeys": {},
@@ -75,6 +185,12 @@
       "regex": "^/estatisticas(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/estatisticas(?:/)?$"
+    },
+    {
+      "page": "/gestao-contas",
+      "regex": "^/gestao\\-contas(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/gestao\\-contas(?:/)?$"
     },
     {
       "page": "/jogadores",
@@ -101,10 +217,58 @@
       "namedRegex": "^/pagamentos(?:/)?$"
     },
     {
+      "page": "/player",
+      "regex": "^/player(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/player(?:/)?$"
+    },
+    {
+      "page": "/player/chat",
+      "regex": "^/player/chat(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/player/chat(?:/)?$"
+    },
+    {
+      "page": "/player/meu-perfil",
+      "regex": "^/player/meu\\-perfil(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/player/meu\\-perfil(?:/)?$"
+    },
+    {
+      "page": "/player/meus-jogos",
+      "regex": "^/player/meus\\-jogos(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/player/meus\\-jogos(?:/)?$"
+    },
+    {
+      "page": "/player/meus-pagamentos",
+      "regex": "^/player/meus\\-pagamentos(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/player/meus\\-pagamentos(?:/)?$"
+    },
+    {
+      "page": "/player/meus-treinos",
+      "regex": "^/player/meus\\-treinos(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/player/meus\\-treinos(?:/)?$"
+    },
+    {
+      "page": "/player/minha-area",
+      "regex": "^/player/minha\\-area(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/player/minha\\-area(?:/)?$"
+    },
+    {
       "page": "/temporadas",
       "regex": "^/temporadas(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/temporadas(?:/)?$"
+    },
+    {
+      "page": "/treinos",
+      "regex": "^/treinos(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/treinos(?:/)?$"
     }
   ],
   "dataRoutes": [],

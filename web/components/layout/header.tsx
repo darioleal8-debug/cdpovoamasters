@@ -35,6 +35,7 @@ const ROLE_LABELS: Record<string, string> = {
   admin: "Administrador",
   treinador: "Treinador",
   jogador: "Jogador",
+  seccionista: "Seccionista",
 };
 
 export function Header({ userName, userEmail, userRole, onMenuToggle }: HeaderProps) {
@@ -69,7 +70,7 @@ export function Header({ userName, userEmail, userRole, onMenuToggle }: HeaderPr
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="flex h-auto items-center gap-3 px-2 py-1.5">
             <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-cdpovoa-blue text-xs text-white">
+              <AvatarFallback className="bg-cdpovoa-blue text-xs text-white" style={{ backgroundColor: "var(--club-primary, #111111)" }}>
                 {getInitials(userName)}
               </AvatarFallback>
             </Avatar>

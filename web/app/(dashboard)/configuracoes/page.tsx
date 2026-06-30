@@ -14,6 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toaster";
 import type { Season, SeasonFormData } from "@/types/database";
+import { LogoUpload }         from "@/components/settings/logo-upload";
+import { TeamKitsSettings }   from "@/components/settings/team-kits-settings";
 
 const EMPTY_SEASON: SeasonFormData = { name: "", year: "", start_date: "", end_date: "" };
 
@@ -106,6 +108,36 @@ export default function ConfiguracoesPage() {
         <h1 className="text-2xl font-bold tracking-tight">Configurações</h1>
         <p className="text-muted-foreground">Gerir perfil, conta e temporadas</p>
       </div>
+
+      {/* ── Logotipo do Clube ──────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Logotipo do Clube</CardTitle>
+          <CardDescription>
+            O logotipo é exibido na sidebar e em toda a aplicação. Formatos suportados: PNG, JPG, SVG, WEBP (máx. 2 MB).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <LogoUpload />
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      {/* ── Equipamentos ───────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Equipamentos</CardTitle>
+          <CardDescription>
+            Cores das camisolas e calções para jogos em casa e fora. As cores aparecem automaticamente ao lado dos nomes das equipas no calendário da liga.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TeamKitsSettings />
+        </CardContent>
+      </Card>
+
+      <Separator />
 
       {/* ── Temporadas ─────────────────────────────────────── */}
       <Card>

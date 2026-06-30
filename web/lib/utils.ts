@@ -55,3 +55,16 @@ export const EVENT_TYPE_LABELS: Record<string, string> = {
   treino: "Treino",
   outro: "Outro",
 };
+
+/**
+ * Constrói URL do Google Maps para um pavilhão / localidade.
+ * Usa o formato search para que o Google apresente "Obter direções".
+ * Espaços → "+"; acentos mantidos (Google Maps interpreta corretamente).
+ * Devolve null se não houver informação de localização.
+ */
+export function buildMapsUrl(pavilion?: string | null, locality?: string | null): string | null {
+  const parts = [pavilion?.trim(), locality?.trim()].filter(Boolean) as string[];
+  if (parts.length === 0) return null;
+  const query = parts.join(" ").replace(/\s{2,}/g, " ").replace(/\s/g, "+");
+  return `https://www.google.com/maps/search/?api=1&query=${query}`;
+}

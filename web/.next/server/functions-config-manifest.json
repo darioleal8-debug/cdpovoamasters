@@ -1,6 +1,31 @@
 {
   "version": 1,
   "functions": {
+    "/api/activate": {},
+    "/api/admin/users/reset-password": {},
+    "/api/admin/users/activation-link": {},
+    "/api/chat/contacts": {},
+    "/api/auth/me": {},
+    "/api/chat/threads/[chatId]/read": {},
+    "/api/chat/threads/[chatId]": {},
+    "/api/chat/threads/[chatId]/messages": {},
+    "/api/chat/unread-count": {},
+    "/api/club-events/[id]": {},
+    "/api/admin/users": {},
+    "/api/club-events": {},
+    "/api/club-settings/logo": {
+      "maxDuration": 30
+    },
+    "/api/games/[id]/callups/[callupId]": {},
+    "/api/club-settings": {},
+    "/api/chat/threads": {},
+    "/api/trainings/[id]/attendance": {},
+    "/api/players": {},
+    "/api/trainings/[id]/notes/[noteId]": {},
+    "/api/games/[id]/callups": {},
+    "/api/trainings/[id]/notes": {},
+    "/api/trainings/[id]": {},
+    "/api/trainings": {},
     "/api/import-calendar": {
       "maxDuration": 120
     }

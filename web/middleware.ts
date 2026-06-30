@@ -38,13 +38,15 @@ export async function middleware(request: NextRequest) {
 
   const isAuth = !!user;
   const path = request.nextUrl.pathname;
-  const isLoginPage = path.startsWith("/login");
-  const isDashboard = path === "/dashboard" || path.startsWith("/dashboard") ||
+  const isLoginPage  = path.startsWith("/login");
+  const isDashboard  = path === "/dashboard" || path.startsWith("/dashboard") ||
     path.startsWith("/jogadores") || path.startsWith("/jogos") ||
     path.startsWith("/pagamentos") || path.startsWith("/estatisticas") ||
-    path.startsWith("/configuracoes") || path.startsWith("/temporadas");
+    path.startsWith("/configuracoes") || path.startsWith("/temporadas") ||
+    path.startsWith("/treinos");
+  const isPlayerArea = path.startsWith("/player");
 
-  if (isDashboard && !isAuth) {
+  if ((isDashboard || isPlayerArea) && !isAuth) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
