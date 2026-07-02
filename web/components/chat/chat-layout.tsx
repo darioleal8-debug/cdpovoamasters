@@ -10,10 +10,16 @@ import { ChatWindow } from "./chat-window";
 
 export function ChatLayout() {
   const { user, loading: userLoading } = useCurrentUser();
-  const { threads, loading: threadsLoading, createDirect, createGroup, updatePostPolicy } = useChatThreads();
+  const { threads, loading: threadsLoading, createDirect, createGroup, updatePostPolicy, deleteThread } = useChatThreads();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
 
   const activeThread = threads.find((t) => t.id === activeChatId) ?? null;
+
+  async function handleDeleteThread(chatId: string): Promise<boolean> {
+    const ok = await deleteThread(chatId);
+    if (ok && activeChatId === chatId) setActiveChatId(null);
+    return ok;
+  }
 
   if (userLoading || !user) {
     return (
@@ -39,7 +45,12 @@ export function ChatLayout() {
       </div>
       <div className="flex-1">
         {activeThread ? (
-          <ChatWindow thread={activeThread} currentUser={user} onUpdatePostPolicy={updatePostPolicy} />
+          <ChatWindow
+            thread={activeThread}
+            currentUser={user}
+            onUpdatePostPolicy={updatePostPolicy}
+            onDeleteThread={handleDeleteThread}
+          />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
             <MessageSquare className="h-10 w-10" />

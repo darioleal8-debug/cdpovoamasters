@@ -410,10 +410,12 @@ export default function GestaoDeContasPage() {
                         ? <ShieldOff className="h-3.5 w-3.5 text-amber-600" />
                         : <ShieldCheck className="h-3.5 w-3.5 text-green-600" />}
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive"
-                      title="Eliminar conta" onClick={() => setDeleteUser(u)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    {u.email !== "darioleal8@gmail.com" && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive"
+                        title="Eliminar conta" onClick={() => setDeleteUser(u)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </div>
                 </td>
               </tr>

@@ -91,13 +91,71 @@ export function useLiveGame(
 
   // ── Load functions ──────────────────────────────────────
   const loadRoster = useCallback(async (sid: string) => {
-    const { data } = await supabase
-      .from("player_profiles")
-      .select("*, user:users(id, name, email, status)")
-      .eq("season_id", sid)
-      .order("jersey_number", { ascending: true, nullsFirst: false });
-    setRoster((data ?? []) as unknown as PlayerWithUser[]);
-  }, []);
+    // Step 1: get the player row IDs convoked for this game
+    const { data: callups } = await supabase
+      .from("game_callups")
+      .select("player_id")
+      .eq("game_id", eventId);
+
+    if (!callups || callups.length === 0) {
+      setRoster([]);
+      return;
+    }
+
+    const playerIds = callups.map((c) => c.player_id as string);
+
+    // Step 2: fetch players rows (name, jersey number, optional user_id)
+    const { data: playersData } = await supabase
+      .from("players")
+      .select("id, name, number, user_id")
+      .in("id", playerIds)
+      .order("number", { ascending: true });
+
+    if (!playersData || playersData.length === 0) {
+      setRoster([]);
+      return;
+    }
+
+    // Step 3: for players linked to an auth account, fetch extra data in parallel
+    const linkedUserIds = playersData
+      .map((p) => p.user_id as string | null)
+      .filter(Boolean) as string[];
+
+    const usersMap: Record<string, { id: string; name: string; email: string }> = {};
+    const profilesMap: Record<string, { jersey_number: number | null }> = {};
+
+    if (linkedUserIds.length > 0) {
+      const [{ data: usersData }, { data: profileData }] = await Promise.all([
+        supabase.from("users").select("id, name, email").in("id", linkedUserIds),
+        supabase.from("player_profiles").select("user_id, jersey_number").in("user_id", linkedUserIds),
+      ]);
+      for (const u of usersData ?? []) usersMap[u.id] = u;
+      for (const p of profileData ?? []) profilesMap[p.user_id] = p;
+    }
+
+    // Step 4: build a PlayerWithUser-compatible roster
+    const items = playersData.map((p) => {
+      const uid = (p.user_id as string | null) ?? p.id;
+      const userData = (p.user_id as string | null) ? usersMap[p.user_id as string] : undefined;
+      const profileEntry = (p.user_id as string | null) ? profilesMap[p.user_id as string] : undefined;
+      return {
+        user_id: uid,
+        season_id: sid,
+        jersey_number: profileEntry?.jersey_number ?? (p.number as number | null) ?? null,
+        position: null,
+        height_cm: null,
+        age: null,
+        user: {
+          id: uid,
+          name: userData?.name ?? (p.name as string),
+          email: userData?.email ?? "",
+          status: "ativo",
+        },
+      };
+    });
+
+    setRoster(items as unknown as PlayerWithUser[]);
+  }, [eventId]);
 
   const loadPlays = useCallback(async (sessionId: string) => {
     const { data } = await supabase
@@ -319,6 +377,7 @@ export function useLiveGame(
     player_id?: string;
     secondary_player_id?: string;
     game_clock?: string;
+    description?: string;
   }): Promise<boolean> {
     if (!session || recording) return false;
     setRecording(true);
@@ -340,6 +399,7 @@ export function useLiveGame(
         points_delta: pts,
         home_score_after: newHome,
         away_score_after: session.away_score,
+        description: input.description ?? null,
       });
 
       if (error) {
@@ -477,6 +537,57 @@ export function useLiveGame(
 
     setOnCourtIds(newLineup);
     await loadPlays(session.id);
+  }
+
+  // ── Set lineup (replaces on-court, managing stints) ─────
+
+  async function setLineup(userIds: string[]): Promise<boolean> {
+    if (!session) {
+      toast({ title: "Erro", description: "Sessão de jogo não encontrada.", variant: "destructive" });
+      return false;
+    }
+    const newIds = userIds.slice(0, 5);
+    const goingOff = onCourtIds.filter((id) => !newIds.includes(id));
+    const comingOn  = newIds.filter((id) => !onCourtIds.includes(id));
+
+    if (goingOff.length > 0) {
+      await supabase.from("player_court_stints")
+        .update({
+          exit_clock_secs:  Math.round(clockSecs),
+          exit_home_score:  session.home_score,
+          exit_away_score:  session.away_score,
+        })
+        .eq("game_session_id", session.id)
+        .in("player_id", goingOff)
+        .is("exit_clock_secs", null);
+    }
+
+    if (comingOn.length > 0) {
+      await supabase.from("player_court_stints").insert(
+        comingOn.map((pid) => ({
+          game_session_id:    session.id,
+          player_id:          pid,
+          period:             session.current_period,
+          entry_clock_secs:   Math.round(clockSecs),
+          entry_home_score:   session.home_score,
+          entry_away_score:   session.away_score,
+        }))
+      );
+    }
+
+    const { error } = await supabase.from("game_current_lineup").upsert(
+      { game_session_id: session.id, on_court_ids: newIds, updated_at: new Date().toISOString() },
+      { onConflict: "game_session_id" }
+    );
+
+    if (error) {
+      toast({ title: "Erro ao definir 5", description: error.message, variant: "destructive" });
+      return false;
+    }
+
+    setOnCourtIds(newIds);
+    toast({ title: "5 em campo atualizado!" });
+    return true;
   }
 
   // ── Timeout ─────────────────────────────────────────────
@@ -664,7 +775,7 @@ export function useLiveGame(
     loading, recording,
     startGame, startClock, stopClock, resetClock,
     recordPlay, recordOpponentPoints,
-    substitutePlayer, callTimeout, undoLastPlay,
+    substitutePlayer, setLineup, callTimeout, undoLastPlay,
     nextPeriod, finishGame,
   };
 }

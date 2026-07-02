@@ -81,7 +81,9 @@ export function GamesTable({ events, loading, onAdd, onEdit, onDelete, onCallups
           <div>
             <p className="font-medium">{row.original.title}</p>
             {row.original.opponent && (
-              <p className="text-xs text-muted-foreground">vs. {row.original.opponent}</p>
+              <p className="text-xs text-muted-foreground">
+                {row.original.title.includes("(Fora)") ? "@" : "vs."} {row.original.opponent}
+              </p>
             )}
           </div>
         ),

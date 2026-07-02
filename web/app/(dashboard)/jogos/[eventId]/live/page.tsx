@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Play, Pause, RotateCcw, Undo2, BarChart2,
-  ChevronRight, Flag, ArrowLeftRight, Eye,
+  ChevronRight, Flag, Eye, Pencil,
 } from "lucide-react";
 import type { PlayerWithUser, PlayEventType } from "@/types/database";
 
@@ -34,33 +34,37 @@ interface Action {
   event: PlayEventType;
   color: string;
   pts?: number;
+  description?: string;
 }
 
 const ACTIONS: Action[] = [
-  { label: "2P ✓", event: "2pt_made",       color: "bg-green-600 hover:bg-green-500",  pts: 2 },
-  { label: "2P ✗", event: "2pt_miss",        color: "bg-green-900 hover:bg-green-800" },
-  { label: "3P ✓", event: "3pt_made",        color: "bg-blue-600 hover:bg-blue-500",   pts: 3 },
-  { label: "3P ✗", event: "3pt_miss",        color: "bg-blue-900 hover:bg-blue-800"  },
-  { label: "LL ✓", event: "ft_made",         color: "bg-yellow-500 hover:bg-yellow-400", pts: 1 },
-  { label: "LL ✗", event: "ft_miss",         color: "bg-yellow-800 hover:bg-yellow-700" },
-  { label: "Res.O", event: "rebound_off",    color: "bg-purple-700 hover:bg-purple-600" },
-  { label: "Res.D", event: "rebound_def",    color: "bg-purple-900 hover:bg-purple-800" },
-  { label: "Assist", event: "assist",        color: "bg-teal-600 hover:bg-teal-500"   },
-  { label: "Roubo", event: "steal",          color: "bg-orange-600 hover:bg-orange-500" },
-  { label: "Desarme", event: "block",        color: "bg-orange-800 hover:bg-orange-700" },
-  { label: "Turnover", event: "turnover",    color: "bg-red-700 hover:bg-red-600"     },
-  { label: "F.Com.", event: "foul_committed", color: "bg-red-900 hover:bg-red-800"   },
-  { label: "F.Sof.", event: "foul_drawn",    color: "bg-red-500 hover:bg-red-400"    },
+  { label: "2P ✓",   event: "2pt_made",       color: "bg-green-600 hover:bg-green-500",    pts: 2 },
+  { label: "2P ✗",   event: "2pt_miss",        color: "bg-green-900 hover:bg-green-800" },
+  { label: "3P ✓",   event: "3pt_made",        color: "bg-blue-600 hover:bg-blue-500",      pts: 3 },
+  { label: "3P ✗",   event: "3pt_miss",        color: "bg-blue-900 hover:bg-blue-800" },
+  { label: "LL ✓",   event: "ft_made",         color: "bg-yellow-500 hover:bg-yellow-400",  pts: 1 },
+  { label: "LL ✗",   event: "ft_miss",         color: "bg-yellow-800 hover:bg-yellow-700" },
+  { label: "Res.Of.", event: "rebound_off",    color: "bg-purple-700 hover:bg-purple-600" },
+  { label: "Res.Def.", event: "rebound_def",   color: "bg-purple-900 hover:bg-purple-800" },
+  { label: "Assist", event: "assist",          color: "bg-teal-600 hover:bg-teal-500" },
+  { label: "Roubo",  event: "steal",           color: "bg-orange-600 hover:bg-orange-500" },
+  { label: "Bloco",  event: "block",           color: "bg-orange-800 hover:bg-orange-700" },
+  { label: "Perda",  event: "turnover",        color: "bg-red-700 hover:bg-red-600" },
+  { label: "F.Def.", event: "foul_committed",  color: "bg-rose-800 hover:bg-rose-700",  description: "Falta Defensiva" },
+  { label: "F.Of.",  event: "foul_committed",  color: "bg-rose-900 hover:bg-rose-800",  description: "Falta Ofensiva" },
+  { label: "F.Téc.", event: "foul_committed",  color: "bg-red-800 hover:bg-red-700",    description: "Falta Técnica" },
+  { label: "F.AD",   event: "foul_committed",  color: "bg-red-900 hover:bg-red-800",    description: "Falta Anti-Desportiva" },
+  { label: "F.Sof.", event: "foul_drawn",      color: "bg-red-500 hover:bg-red-400" },
 ];
 
 // ─── Player card ──────────────────────────────────────────
 function PlayerCard({
-  player, stats, selected, subMode, onSelect,
+  player, stats, selected, isOnCourt, onSelect,
 }: {
   player: PlayerWithUser;
   stats?: { pts: number; fouls_committed: number };
   selected: boolean;
-  subMode: boolean;
+  isOnCourt?: boolean;
   onSelect: () => void;
 }) {
   return (
@@ -71,9 +75,9 @@ function PlayerCard({
         transition-all active:scale-95
         ${selected
           ? "bg-white text-cdpovoa-blue border-white font-bold shadow-lg scale-105"
-          : subMode
-            ? "bg-orange-500/80 border-orange-400 text-white hover:bg-orange-400"
-            : "bg-white/10 border-white/20 hover:bg-white/20 text-white"
+          : isOnCourt
+            ? "bg-green-700/40 border-green-500/60 text-white hover:bg-green-600/50"
+            : "bg-white/10 border-white/20 hover:bg-white/20 text-white/60"
         }
       `}
     >
@@ -89,6 +93,9 @@ function PlayerCard({
           )}
         </span>
       )}
+      {isOnCourt && !selected && (
+        <span className="w-1 h-1 rounded-full bg-green-400 mt-0.5" />
+      )}
     </button>
   );
 }
@@ -99,20 +106,20 @@ export default function LiveGamePage() {
   const router = useRouter();
 
   const {
-    session, roster, onCourt, bench, plays, playerStats,
+    session, roster, onCourt, plays, playerStats,
     clockSecs, loading, recording,
     startGame, startClock, stopClock, resetClock,
     recordPlay, recordOpponentPoints,
-    substitutePlayer, callTimeout, undoLastPlay,
+    setLineup, callTimeout, undoLastPlay,
     nextPeriod, finishGame,
   } = useLiveGame(params.eventId);
 
   // ── UI state ─────────────────────────────────────────────
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerWithUser | null>(null);
-  const [subPending, setSubPending] = useState<PlayerWithUser | null>(null); // bench player to enter
   const [assistPlayer, setAssistPlayer] = useState<string | null>(null);
   const [showAssistBar, setShowAssistBar] = useState(false);
   const assistTimerRef = useState<ReturnType<typeof setTimeout> | null>(null);
+  const [homeScorePending, setHomeScorePending] = useState<1 | 2 | 3 | null>(null);
 
   // Dialogs
   const [startDialog, setStartDialog] = useState(false);
@@ -120,6 +127,8 @@ export default function LiveGamePage() {
   const [startingFive, setStartingFive] = useState<string[]>([]);
   const [periodDialog, setPeriodDialog] = useState(false);
   const [finishDialog, setFinishDialog] = useState(false);
+  const [lineupDialog, setLineupDialog] = useState(false);
+  const [lineupSel, setLineupSel] = useState<string[]>([]);
 
   useEffect(() => {
     if (!loading && !session) setStartDialog(true);
@@ -131,6 +140,7 @@ export default function LiveGamePage() {
     const ok = await recordPlay({
       event_type: action.event,
       player_id: selectedPlayer.user_id,
+      description: action.description,
     });
     if (!ok) return;
 
@@ -152,16 +162,10 @@ export default function LiveGamePage() {
     setShowAssistBar(false);
   }
 
-  // ── Substitution flow ─────────────────────────────────────
-  function handleBenchTap(p: PlayerWithUser) {
-    setSubPending((prev) => prev?.user_id === p.user_id ? null : p);
-    setSelectedPlayer(null);
-  }
-
-  async function handleCourtTapForSub(p: PlayerWithUser) {
-    if (!subPending) return;
-    await substitutePlayer(subPending.user_id, p.user_id);
-    setSubPending(null);
+  async function handleHomeScore(pts: 1 | 2 | 3, playerId: string | null) {
+    const eventType: PlayEventType = pts === 1 ? "ft_made" : pts === 2 ? "2pt_made" : "3pt_made";
+    await recordPlay({ event_type: eventType, player_id: playerId ?? undefined });
+    setHomeScorePending(null);
   }
 
   // ── Render ────────────────────────────────────────────────
@@ -256,16 +260,90 @@ export default function LiveGamePage() {
 
       {/* ── Finished state ────────────────────────────────── */}
       {isFinished && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
-          <span className="text-6xl">🏁</span>
-          <h2 className="text-2xl font-bold">Jogo Terminado</h2>
-          <p className="text-white/60">
-            CD Póvoa {session?.home_score} — {session?.away_score} {session?.opponent_name}
-          </p>
-          <Button className="bg-white text-cdpovoa-blue font-bold"
-            onClick={() => router.push(`/jogos/${params.eventId}/stats`)}>
-            <BarChart2 className="mr-2 h-4 w-4" /> Ver Box Score
-          </Button>
+        <div className="flex-1 overflow-y-auto">
+          {/* Final score */}
+          <div className="text-center py-5">
+            <div className="text-4xl mb-1">🏁</div>
+            <h2 className="text-lg font-bold">Jogo Terminado</h2>
+            <div className="flex items-center justify-center gap-6 mt-3">
+              <div className="text-center">
+                <p className="text-[0.6rem] text-white/40 uppercase tracking-widest">CD Póvoa</p>
+                <p className="text-5xl font-black tabular-nums">{session?.home_score ?? 0}</p>
+              </div>
+              <span className="text-white/20 text-2xl">—</span>
+              <div className="text-center">
+                <p className="text-[0.6rem] text-white/40 uppercase tracking-widest truncate max-w-[90px]">
+                  {session?.opponent_name ?? "Adversário"}
+                </p>
+                <p className="text-5xl font-black tabular-nums">{session?.away_score ?? 0}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Individual stats */}
+          {playerStats.length > 0 && (
+            <div className="px-2 pb-4">
+              <p className="text-[0.6rem] uppercase tracking-widest text-white/40 mb-2 px-1">
+                Estatísticas Individuais
+              </p>
+              <div className="overflow-x-auto rounded-xl bg-white/5">
+                <table className="w-full text-xs whitespace-nowrap">
+                  <thead>
+                    <tr className="text-[0.6rem] text-white/40 border-b border-white/10 uppercase tracking-wide">
+                      <th className="sticky left-0 bg-white/5 text-left px-3 py-2 min-w-[100px]">Jogador</th>
+                      <th className="text-center px-2 py-2 min-w-[38px]">T</th>
+                      <th className="text-center px-2 py-2 min-w-[28px] text-yellow-400">Pts</th>
+                      <th className="text-center px-2 py-2 min-w-[38px]">2P</th>
+                      <th className="text-center px-2 py-2 min-w-[38px]">3P</th>
+                      <th className="text-center px-2 py-2 min-w-[38px]">LL</th>
+                      <th className="text-center px-2 py-2 min-w-[28px]">Reb</th>
+                      <th className="text-center px-2 py-2 min-w-[28px]">Ass</th>
+                      <th className="text-center px-2 py-2 min-w-[28px]">Rou</th>
+                      <th className="text-center px-2 py-2 min-w-[28px]">Des</th>
+                      <th className="text-center px-2 py-2 min-w-[28px] text-red-400">FC</th>
+                      <th className="text-center px-2 py-2 min-w-[28px] text-orange-400">FS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...playerStats]
+                      .sort((a, b) => (b.pts ?? 0) - (a.pts ?? 0))
+                      .map((s) => {
+                        const player = roster.find((p) => p.user_id === s.player_id);
+                        if (!player) return null;
+                        const secs = s.seconds_played ?? 0;
+                        const timeStr = `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
+                        return (
+                          <tr key={s.player_id} className="border-b border-white/5 hover:bg-white/5">
+                            <td className="sticky left-0 bg-cdpovoa-blue px-3 py-2">
+                              <span className="text-white/30 mr-1 text-[0.6rem]">#{player.jersey_number}</span>
+                              <span className="font-semibold">{player.user.name.split(" ")[0]}</span>
+                            </td>
+                            <td className="text-center px-2 py-2 font-mono text-white/50">{timeStr}</td>
+                            <td className="text-center px-2 py-2 font-black text-yellow-400">{s.pts ?? 0}</td>
+                            <td className="text-center px-2 py-2 text-white/60">{s.fg2_made ?? 0}/{s.fg2_att ?? 0}</td>
+                            <td className="text-center px-2 py-2 text-white/60">{s.fg3_made ?? 0}/{s.fg3_att ?? 0}</td>
+                            <td className="text-center px-2 py-2 text-white/60">{s.ft_made ?? 0}/{s.ft_att ?? 0}</td>
+                            <td className="text-center px-2 py-2">{(s.reb_off ?? 0) + (s.reb_def ?? 0)}</td>
+                            <td className="text-center px-2 py-2">{s.ast ?? 0}</td>
+                            <td className="text-center px-2 py-2">{s.stl ?? 0}</td>
+                            <td className="text-center px-2 py-2">{s.blk ?? 0}</td>
+                            <td className="text-center px-2 py-2 text-red-400">{s.fouls_committed ?? 0}</td>
+                            <td className="text-center px-2 py-2 text-orange-400">{s.fouls_drawn ?? 0}</td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <div className="px-3 pb-8">
+            <Button className="w-full bg-white text-cdpovoa-blue font-bold"
+              onClick={() => router.push(`/jogos/${params.eventId}/stats`)}>
+              <BarChart2 className="mr-2 h-4 w-4" /> Ver Box Score Completo
+            </Button>
+          </div>
         </div>
       )}
 
@@ -301,51 +379,93 @@ export default function LiveGamePage() {
             </div>
           )}
 
-          {/* Sub pending banner */}
-          {subPending && (
-            <div className="bg-orange-600 px-3 py-2 text-sm font-semibold text-center">
-              #{subPending.jersey_number} {subPending.user.name.split(" ")[0]} vai entrar →
-              <span className="text-orange-200"> toca num jogador em campo para substituir</span>
+          {/* Home score player picker */}
+          {homeScorePending !== null && (
+            <div className="bg-green-900 px-3 py-2 flex items-center gap-2">
+              <span className="text-xs font-semibold text-white/80 shrink-0">
+                +{homeScorePending} — Quem marcou?
+              </span>
+              <div className="flex gap-1.5 flex-1 overflow-x-auto">
+                {roster.map((p) => (
+                  <button
+                    key={p.user_id}
+                    disabled={recording}
+                    onClick={() => handleHomeScore(homeScorePending, p.user_id)}
+                    className={`shrink-0 text-xs rounded px-2 py-0.5 border transition-all disabled:opacity-40 ${
+                      onCourt.some((c) => c.user_id === p.user_id)
+                        ? "border-green-400/70 text-white hover:bg-white/20"
+                        : "border-white/20 text-white/50 hover:bg-white/10"
+                    }`}>
+                    #{p.jersey_number}
+                  </button>
+                ))}
+              </div>
+              <button
+                disabled={recording}
+                onClick={() => handleHomeScore(homeScorePending, null)}
+                className="shrink-0 text-[0.65rem] bg-white/20 hover:bg-white/30 text-white rounded px-2 py-1 disabled:opacity-40">
+                Sem jogador
+              </button>
+              <button
+                onClick={() => setHomeScorePending(null)}
+                className="shrink-0 text-white/50 hover:text-white text-xs px-1">✕</button>
             </div>
           )}
 
-          {/* ON COURT players */}
+          {/* ALL players — tappable for stats, on-court players highlighted */}
           <section className="px-3 pt-3">
-            <p className="text-[0.6rem] uppercase tracking-widest text-white/40 mb-2">
-              Em Campo ({onCourt.length}/5)
-            </p>
+            <div className="flex items-center gap-2 mb-2">
+              <p className="text-[0.6rem] uppercase tracking-widest text-white/40">
+                Jogadores
+              </p>
+              <span className="text-[0.6rem] text-green-400/70">
+                {onCourt.length}/5 em campo
+              </span>
+              <button
+                onClick={() => { setLineupSel(onCourt.map((p) => p.user_id)); setLineupDialog(true); }}
+                className="text-white/30 hover:text-white/70 transition-colors ml-auto"
+                title="Definir 5 em campo">
+                <Pencil className="h-3 w-3" />
+              </button>
+            </div>
             <div className="flex gap-2 overflow-x-auto pb-2">
-              {onCourt.map((p) => {
+              {roster.length === 0 && (
+                <p className="text-white/30 text-xs italic py-2">
+                  Sem jogadores convocados.
+                </p>
+              )}
+              {roster.map((p) => {
                 const st = playerStats.find((s) => s.player_id === p.user_id);
+                const isOnCourt = onCourt.some((c) => c.user_id === p.user_id);
                 return (
                   <PlayerCard
                     key={p.user_id}
                     player={p}
-                    stats={st ? { pts: st.pts, fouls_committed: st.fouls_committed } : undefined}
+                    stats={st ? { pts: st.pts ?? 0, fouls_committed: st.fouls_committed ?? 0 } : undefined}
                     selected={selectedPlayer?.user_id === p.user_id}
-                    subMode={!!subPending}
+                    isOnCourt={isOnCourt}
                     onSelect={() => {
-                      if (subPending) {
-                        handleCourtTapForSub(p);
-                      } else {
-                        setSelectedPlayer((prev) =>
-                          prev?.user_id === p.user_id ? null : p
-                        );
-                      }
+                      setHomeScorePending(null);
+                      setSelectedPlayer((prev) =>
+                        prev?.user_id === p.user_id ? null : p
+                      );
                     }}
                   />
                 );
               })}
-              {onCourt.length === 0 && (
-                <p className="text-white/30 text-xs italic py-2">
-                  Seleciona 5 jogadores ao iniciar o jogo
-                </p>
-              )}
             </div>
+            {onCourt.length === 0 && roster.length > 0 && (
+              <button
+                onClick={() => { setLineupSel([]); setLineupDialog(true); }}
+                className="text-orange-400 hover:text-orange-300 text-xs flex items-center gap-1.5 py-1 transition-colors">
+                <Pencil className="h-3 w-3" />
+                Definir 5 inicial
+              </button>
+            )}
           </section>
 
           {/* ACTION PAD — only when player selected */}
-          {selectedPlayer && !subPending && (
+          {selectedPlayer && (
             <section className="px-3 pt-2 pb-1">
               <p className="text-[0.6rem] uppercase tracking-widest text-white/40 mb-2">
                 #{selectedPlayer.jersey_number} {selectedPlayer.user.name.split(" ")[0]}
@@ -353,7 +473,7 @@ export default function LiveGamePage() {
               <div className="grid grid-cols-4 gap-1.5">
                 {ACTIONS.map((action) => (
                   <button
-                    key={action.event}
+                    key={action.label}
                     disabled={recording}
                     onClick={() => handleAction(action)}
                     className={`${action.color} disabled:opacity-40 rounded-xl py-3 text-xs font-bold text-white text-center active:scale-95 transition-all`}
@@ -364,6 +484,30 @@ export default function LiveGamePage() {
               </div>
             </section>
           )}
+
+          {/* CD Póvoa quick scoring */}
+          <section className="px-3 pt-2 pb-1">
+            <p className="text-[0.6rem] uppercase tracking-widest text-white/40 mb-2">CD Póvoa</p>
+            <div className="flex gap-2">
+              {([1, 2, 3] as const).map((pts) => (
+                <button
+                  key={pts}
+                  disabled={recording}
+                  onClick={() => {
+                    setHomeScorePending(pts);
+                    setSelectedPlayer(null);
+                    setShowAssistBar(false);
+                  }}
+                  className={`flex-1 rounded-xl py-2.5 text-sm font-bold text-white active:scale-95 transition-all disabled:opacity-40 ${
+                    homeScorePending === pts
+                      ? "bg-green-600 ring-2 ring-green-400"
+                      : "bg-green-800/60 hover:bg-green-700/70"
+                  }`}>
+                  +{pts}
+                </button>
+              ))}
+            </div>
+          </section>
 
           {/* Opponent points */}
           <section className="px-3 pt-2 pb-1">
@@ -379,38 +523,6 @@ export default function LiveGamePage() {
             </div>
           </section>
 
-          {/* BENCH */}
-          {bench.length > 0 && (
-            <section className="px-3 pt-2 pb-1">
-              <div className="flex items-center gap-2 mb-2">
-                <p className="text-[0.6rem] uppercase tracking-widest text-white/40">Banco</p>
-                <ArrowLeftRight className="h-3 w-3 text-orange-400" />
-                <span className="text-[0.6rem] text-orange-400">Toca para substituir</span>
-              </div>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {bench.map((p) => {
-                  const st = playerStats.find((s) => s.player_id === p.user_id);
-                  return (
-                    <button
-                      key={p.user_id}
-                      onClick={() => handleBenchTap(p)}
-                      className={`shrink-0 flex flex-col items-center gap-0.5 rounded-xl px-2.5 py-1.5 min-w-[52px] border-2 transition-all active:scale-95 ${
-                        subPending?.user_id === p.user_id
-                          ? "bg-orange-500 border-orange-300 font-bold scale-105"
-                          : "bg-white/5 border-white/10 hover:bg-white/15"
-                      }`}
-                    >
-                      <span className="text-base font-black leading-none">{p.jersey_number ?? "–"}</span>
-                      <span className="text-[0.55rem] text-white/50 truncate max-w-[44px]">
-                        {p.user.name.split(" ")[0]}
-                      </span>
-                      {st && <span className="text-[0.5rem] text-white/30">{st.pts}pts</span>}
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          )}
 
           {/* PLAY LOG */}
           {plays.length > 0 && (
@@ -482,7 +594,7 @@ export default function LiveGamePage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Quinteto inicial (seleciona 5)</Label>
+              <Label>5 inicial (seleciona até 5)</Label>
               <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
                 {roster.map((p) => (
                   <button key={p.user_id}
@@ -529,6 +641,53 @@ export default function LiveGamePage() {
             <Button variant="outline" onClick={() => setPeriodDialog(false)}>Cancelar</Button>
             <Button onClick={async () => { await nextPeriod(); setPeriodDialog(false); }}>
               Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── DIALOG: 5 em Campo ────────────────── */}
+      <Dialog open={lineupDialog} onOpenChange={setLineupDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>🏀 5 em Campo</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Seleciona os jogadores atualmente em campo ({lineupSel.length}/5)
+            </p>
+            <div className="flex flex-wrap gap-1.5 max-h-52 overflow-y-auto">
+              {roster.map((p) => (
+                <button key={p.user_id}
+                  onClick={() => setLineupSel((prev) =>
+                    prev.includes(p.user_id)
+                      ? prev.filter((id) => id !== p.user_id)
+                      : prev.length < 5 ? [...prev, p.user_id] : prev
+                  )}
+                  className={`text-xs rounded-md px-2.5 py-1.5 border transition-all ${
+                    lineupSel.includes(p.user_id)
+                      ? "bg-cdpovoa-blue text-white border-cdpovoa-blue font-bold"
+                      : "border-border hover:border-cdpovoa-blue"
+                  }`}>
+                  #{p.jersey_number} {p.user.name.split(" ")[0]}
+                </button>
+              ))}
+              {roster.length === 0 && (
+                <p className="text-xs text-muted-foreground py-2">
+                  Não existem jogadores convocados para este jogo.
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLineupDialog(false)}>Cancelar</Button>
+            <Button
+              disabled={recording || lineupSel.length === 0}
+              onClick={async () => {
+                const ok = await setLineup(lineupSel);
+                if (ok) setLineupDialog(false);
+              }}>
+              Confirmar ({lineupSel.length}/5)
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -72,5 +72,13 @@ export function useChatThreads() {
     return true;
   }
 
-  return { threads, loading, refresh: load, createDirect, createGroup, updatePostPolicy };
+  async function deleteThread(chatId: string): Promise<boolean> {
+    const res = await fetch(`/api/chat/threads/${chatId}`, { method: "DELETE" });
+    if (res.ok) {
+      setThreads((prev) => prev.filter((t) => t.id !== chatId));
+    }
+    return res.ok;
+  }
+
+  return { threads, loading, refresh: load, createDirect, createGroup, updatePostPolicy, deleteThread };
 }

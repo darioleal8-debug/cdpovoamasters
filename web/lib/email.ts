@@ -36,16 +36,27 @@ async function sendWithResend(opts: {
   to: string; subject: string; html: string; text: string;
 }): Promise<SendResult> {
   const { Resend } = await import("resend");
-  const from = `${FROM_NAME} <${process.env.RESEND_FROM_EMAIL ?? "noreply@hoophub.app"}>`;
-  const resend = new Resend(process.env.RESEND_API_KEY);
+  const fromEmail = process.env.RESEND_FROM_EMAIL ?? "noreply@hoophub.pt";
+  const from = `${FROM_NAME} <${fromEmail}>`;
+  const apiKey = process.env.RESEND_API_KEY!;
+  console.log(`[email/resend] A enviar para ${opts.to} via ${fromEmail}`);
+  const resend = new Resend(apiKey);
   const { data, error } = await resend.emails.send({
     from,
-    to:      opts.to,
-    subject: opts.subject,
-    html:    opts.html,
-    text:    opts.text,
+    to:       opts.to,
+    replyTo:  fromEmail,
+    subject:  opts.subject,
+    html:     opts.html,
+    text:     opts.text,
+    headers: {
+      "X-Entity-Ref-ID": `hoophub-activation-${Date.now()}`,
+    },
   });
-  if (error) return { success: false, error: error.message };
+  if (error) {
+    console.error(`[email/resend] ERRO ao enviar para ${opts.to}:`, error);
+    return { success: false, error: error.message };
+  }
+  console.log(`[email/resend] Enviado com sucesso → id=${data?.id}`);
   return { success: true, messageId: data?.id };
 }
 

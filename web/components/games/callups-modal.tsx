@@ -50,7 +50,7 @@ export function CallupsModal({ game, open, onClose }: Props) {
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
             {formatDateShort(game.event_date)} · {game.event_time.slice(0, 5)}h
-            {game.opponent ? ` · vs. ${game.opponent}` : ""}
+            {game.opponent ? ` · ${game.title.includes("(Fora)") ? "@" : "vs."} ${game.opponent}` : ""}
           </p>
         </DialogHeader>
 

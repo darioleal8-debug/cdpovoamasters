@@ -11,7 +11,7 @@ export function buildActivationEmail(opts: {
   const logoUrl = `${appUrl}/assets/logo/hoophub.png`;
   const firstName = name.split(" ")[0];
 
-  const subject = "Ativa a tua conta HoopHub";
+  const subject = `${firstName}, a tua conta HoopHub está pronta`;
 
   const html = `<!DOCTYPE html>
 <html lang="pt">
@@ -82,9 +82,8 @@ export function buildActivationEmail(opts: {
               <p style="margin:0 0 20px;font-size:13px;color:#888;line-height:1.5;
                         padding:12px 16px;background:#f8f9fa;border-radius:6px;
                         border-left:3px solid #F28C28;">
-                ⚠️ Este link expira em <strong>${expiresHours} horas</strong>.
-                Se não ativares a conta dentro deste prazo, pede ao administrador que
-                envie um novo convite.
+                Este link é válido durante <strong>${expiresHours} horas</strong>.
+                Após esse prazo, pede ao administrador que envie um novo acesso.
               </p>
 
               <!-- Fallback URL -->
@@ -109,10 +108,13 @@ export function buildActivationEmail(opts: {
           <tr>
             <td style="padding:20px 40px 28px;text-align:center;">
               <p style="margin:0 0 4px;font-size:12px;color:#bbb;">
-                Recebeste este email porque a tua conta foi criada na plataforma HoopHub.
+                Recebeste este email porque o teu treinador criou uma conta para ti na plataforma HoopHub.
               </p>
-              <p style="margin:0;font-size:12px;color:#bbb;">
-                Se não reconheces este registo, ignora este email.
+              <p style="margin:0 0 8px;font-size:12px;color:#bbb;">
+                Se não reconheces este convite, podes ignorar este email em segurança.
+              </p>
+              <p style="margin:0;font-size:11px;color:#ccc;">
+                HoopHub · <a href="${appUrl}" style="color:#ccc;">hoophub.pt</a>
               </p>
             </td>
           </tr>

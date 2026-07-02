@@ -388,6 +388,7 @@ export interface PlayerGameStats {
   fouls_drawn: number;
   plus_minus: number;
   efficiency: number;
+  seconds_played: number;
   created_at: string;
   updated_at: string;
 }

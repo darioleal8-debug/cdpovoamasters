@@ -104,6 +104,34 @@ export async function GET(
   return NextResponse.json({ messages, has_more: hasMore });
 }
 
+// ─── DELETE /api/chat/threads/[chatId]/messages ──────────────
+// Apenas admin. Limpa todas as mensagens de um grupo/equipa.
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ chatId: string }> }
+) {
+  const authUser = await getAuthUser();
+  if (!authUser) return fail("Não autenticado", 401);
+
+  const { chatId } = await params;
+  const admin = adminClient();
+
+  const { data: caller } = await admin
+    .from("users").select("id, role").eq("id", authUser.id).single();
+  if (!caller) return fail("Perfil não encontrado", 404);
+  if (caller.role !== "admin") return fail("Sem permissão para limpar mensagens", 403);
+
+  const { data: chat } = await admin.from("chats").select("id, type").eq("id", chatId).single();
+  if (!chat) return fail("Conversa não encontrada", 404);
+
+  const { error } = await admin.from("chat_messages").delete().eq("chat_id", chatId);
+  if (error) return fail(error.message, 500);
+
+  await admin.from("chats").update({ updated_at: new Date().toISOString() }).eq("id", chatId);
+
+  return new NextResponse(null, { status: 204 });
+}
+
 // ─── POST /api/chat/threads/[chatId]/messages ────────────────
 // Body: { content: string }
 export async function POST(

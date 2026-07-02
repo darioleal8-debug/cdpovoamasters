@@ -29,6 +29,35 @@ function fail(msg: string, status = 400) {
   return NextResponse.json({ error: msg }, { status });
 }
 
+// ─── DELETE /api/chat/threads/[chatId] ────────────────────────
+// Apenas admin. Elimina um grupo (não permite eliminar DMs nem Comunicados).
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ chatId: string }> }
+) {
+  const authUser = await getAuthUser();
+  if (!authUser) return fail("Não autenticado", 401);
+
+  const { chatId } = await params;
+  const admin = adminClient();
+
+  const { data: caller } = await admin
+    .from("users").select("id, role").eq("id", authUser.id).single();
+  if (!caller) return fail("Perfil não encontrado", 404);
+  if (caller.role !== "admin") return fail("Sem permissão para eliminar conversa", 403);
+
+  const { data: chat } = await admin.from("chats").select("id, type").eq("id", chatId).single();
+  if (!chat) return fail("Conversa não encontrada", 404);
+  if (chat.type === "direct") return fail("Não é possível eliminar conversas diretas", 400);
+  if (chat.type === "announcement") return fail("Não é possível eliminar o canal de comunicados", 400);
+
+  // Cascade: mensagens e participantes são eliminados por FK ON DELETE CASCADE
+  const { error } = await admin.from("chats").delete().eq("id", chatId);
+  if (error) return fail(error.message, 500);
+
+  return new NextResponse(null, { status: 204 });
+}
+
 // ─── PATCH /api/chat/threads/[chatId] ─────────────────────────
 // Body: { post_policy: "all" | "admin_only" }
 // Apenas o admin gere as permissões de escrita de cada conversa

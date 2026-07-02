@@ -55,7 +55,11 @@ export default async function MeusJogosPage() {
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-semibold truncate">{game.title}</p>
-              {game.opponent && <Badge variant="outline" className="text-[10px]">vs {game.opponent}</Badge>}
+              {game.opponent && (
+                <Badge variant="outline" className="text-[10px]">
+                  {game.title.includes("(Fora)") ? "@" : "vs"} {game.opponent}
+                </Badge>
+              )}
               {isPast && <Badge variant="secondary" className="text-[10px]">Terminado</Badge>}
             </div>
             <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">

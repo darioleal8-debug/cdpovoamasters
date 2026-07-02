@@ -339,9 +339,15 @@ export async function DELETE(req: NextRequest) {
 
   // Verificar que o utilizador existe antes de tentar eliminar
   const { data: target } = await admin
-    .from("users").select("id").eq("id", userId).single();
+    .from("users").select("id, email").eq("id", userId).single();
 
   if (!target) return fail("Utilizador não encontrado", 404);
+
+  // Conta master — imutável, independentemente de quem pede
+  const MASTER_EMAIL = "darioleal8@gmail.com";
+  if ((target.email as string) === MASTER_EMAIL) {
+    return fail("Esta conta não pode ser eliminada.", 403);
+  }
 
   // ── Eliminação em cascata explícita ───────────────────────
   // Necessário porque public.users pode não ter ON DELETE CASCADE

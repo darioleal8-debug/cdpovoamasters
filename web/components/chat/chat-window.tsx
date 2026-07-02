@@ -9,7 +9,7 @@ import { useChatMessages } from "@/hooks/use-chat-messages";
 import { MessageBubble } from "./message-bubble";
 import { Composer } from "./composer";
 import { ChatSettingsDialog } from "./chat-settings-dialog";
-import { canPostInChat, canManageChatPermissions } from "@/lib/chat/permissions";
+import { canPostInChat } from "@/lib/chat/permissions";
 import type { AppUser } from "@/hooks/use-current-user";
 import type { ChatThreadSummary } from "@/types/database";
 
@@ -19,12 +19,14 @@ export function ChatWindow({
   thread,
   currentUser,
   onUpdatePostPolicy,
+  onDeleteThread,
 }: {
   thread: ChatThreadSummary;
   currentUser: AppUser;
   onUpdatePostPolicy: (chatId: string, postPolicy: "all" | "admin_only") => Promise<boolean>;
+  onDeleteThread: (chatId: string) => Promise<boolean>;
 }) {
-  const { messages, loading, hasMore, sending, send, loadOlder, markRead } = useChatMessages(thread.id);
+  const { messages, loading, hasMore, sending, send, loadOlder, markRead, deleteMessage, clearMessages } = useChatMessages(thread.id);
   const bottomRef = useRef<HTMLDivElement>(null);
   const nameCache = useRef(new Map<string, string>());
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -44,9 +46,11 @@ export function ChatWindow({
   }, [thread.id, messages.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const Icon = TYPE_ICON[thread.type];
+  const isAdmin = currentUser.role === "admin";
   const canPost = thread.type === "direct" || canPostInChat(currentUser.role, thread.post_policy);
   const showSenderNames = thread.type !== "direct";
-  const canManage = canManageChatPermissions(currentUser.role) && thread.type !== "direct" && thread.type !== "announcement";
+  // Admin pode gerir qualquer conversa não-direta (grupos, equipa, comunicados)
+  const canManage = isAdmin && thread.type !== "direct";
 
   const resolvedMessages = useMemo(
     () =>
@@ -85,14 +89,19 @@ export function ChatWindow({
           <p className="py-10 text-center text-sm text-muted-foreground">Ainda não há mensagens. Diz olá!</p>
         ) : (
           <div className="space-y-3">
-            {resolvedMessages.map((m, i) => (
-              <MessageBubble
-                key={m.id}
-                message={m}
-                isOwn={m.sender_id === currentUser.id}
-                showSenderName={showSenderNames && resolvedMessages[i - 1]?.sender_id !== m.sender_id}
-              />
-            ))}
+            {resolvedMessages.map((m, i) => {
+              const isOwn = m.sender_id === currentUser.id;
+              const canDelete = isAdmin || isOwn;
+              return (
+                <MessageBubble
+                  key={m.id}
+                  message={m}
+                  isOwn={isOwn}
+                  showSenderName={showSenderNames && resolvedMessages[i - 1]?.sender_id !== m.sender_id}
+                  onDelete={canDelete ? () => deleteMessage(m.id) : undefined}
+                />
+              );
+            })}
           </div>
         )}
         <div ref={bottomRef} />
@@ -114,7 +123,10 @@ export function ChatWindow({
           open={settingsOpen}
           onClose={() => setSettingsOpen(false)}
           thread={thread}
+          isAdmin={isAdmin}
           onSave={onUpdatePostPolicy}
+          onClearMessages={clearMessages}
+          onDeleteThread={onDeleteThread}
         />
       )}
     </div>

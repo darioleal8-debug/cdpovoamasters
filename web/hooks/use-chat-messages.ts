@@ -66,6 +66,22 @@ export function useChatMessages(chatId: string | null) {
     await fetch(`/api/chat/threads/${chatId}/read`, { method: "POST" });
   }
 
+  async function deleteMessage(messageId: string): Promise<boolean> {
+    if (!chatId) return false;
+    const res = await fetch(`/api/chat/threads/${chatId}/messages/${messageId}`, { method: "DELETE" });
+    if (res.ok) {
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    }
+    return res.ok;
+  }
+
+  async function clearMessages(): Promise<boolean> {
+    if (!chatId) return false;
+    const res = await fetch(`/api/chat/threads/${chatId}/messages`, { method: "DELETE" });
+    if (res.ok) setMessages([]);
+    return res.ok;
+  }
+
   useEffect(() => {
     if (!chatId) return;
     const supabase = createClient();
@@ -97,5 +113,5 @@ export function useChatMessages(chatId: string | null) {
     return () => { supabase.removeChannel(channel); };
   }, [chatId]);
 
-  return { messages, loading, hasMore, sending, send, loadOlder, markRead, refresh: load };
+  return { messages, loading, hasMore, sending, send, loadOlder, markRead, deleteMessage, clearMessages, refresh: load };
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { Trash2 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { ChatThreadMessage } from "@/types/database";
@@ -16,15 +17,17 @@ export function MessageBubble({
   message,
   isOwn,
   showSenderName,
+  onDelete,
 }: {
   message: ChatThreadMessage;
   isOwn: boolean;
   showSenderName: boolean;
+  onDelete?: () => void;
 }) {
   const senderLabel = message.sender_name ?? "Utilizador";
 
   return (
-    <div className={cn("flex items-end gap-2", isOwn && "flex-row-reverse")}>
+    <div className={cn("group flex items-end gap-2", isOwn && "flex-row-reverse")}>
       {!isOwn && (
         <Avatar className="h-7 w-7">
           <AvatarFallback className="text-[10px]">{initials(senderLabel)}</AvatarFallback>
@@ -34,15 +37,26 @@ export function MessageBubble({
         {showSenderName && !isOwn && (
           <p className="px-1 text-[11px] font-medium text-muted-foreground">{senderLabel}</p>
         )}
-        <div
-          className={cn(
-            "rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
-            isOwn ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
-          )}
-        >
-          <p className="whitespace-pre-wrap break-words">{message.content}</p>
-          {message.attachment_url && (
-            <p className="mt-1 truncate text-xs opacity-75">📎 anexo (disponível em breve)</p>
+        <div className={cn("flex items-end gap-1.5", isOwn && "flex-row-reverse")}>
+          <div
+            className={cn(
+              "rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
+              isOwn ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
+            )}
+          >
+            <p className="whitespace-pre-wrap break-words">{message.content}</p>
+            {message.attachment_url && (
+              <p className="mt-1 truncate text-xs opacity-75">📎 anexo (disponível em breve)</p>
+            )}
+          </div>
+          {onDelete && (
+            <button
+              onClick={onDelete}
+              className="mb-0.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+              title="Eliminar mensagem"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
           )}
         </div>
         <p className={cn("px-1 text-[10px] text-muted-foreground", isOwn && "text-right")}>

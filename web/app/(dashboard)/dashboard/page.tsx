@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 import { OverviewClient } from "../overview-client";
+import { NextGameCard } from "@/components/games/next-game-card";
 
 export const metadata: Metadata = { title: "Visão Geral" };
 
@@ -82,7 +83,9 @@ export default async function DashboardPage() {
   }));
 
   return (
-    <OverviewClient
+    <div className="space-y-6">
+      <NextGameCard showAdminLinks />
+      <OverviewClient
       activeSeason={activeSeason ?? null}
       totalPlayers={playersRes.count ?? 0}
       totalGames={gamesRes.count ?? 0}
@@ -91,5 +94,6 @@ export default async function DashboardPage() {
       paymentsChartData={paymentsChartData}
       positionsData={positionsData}
     />
+    </div>
   );
 }
