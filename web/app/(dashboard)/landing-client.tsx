@@ -21,7 +21,7 @@ export function LandingClient() {
       >
         {/* Logo header */}
         {!headerErr ? (
-          <div className="relative h-8 w-[120px]">
+          <div className="relative h-8 w-[120px] bg-white rounded-lg px-2 py-1">
             <Image
               src={PLATFORM_LOGO}
               alt="HoopHub"
@@ -52,13 +52,13 @@ export function LandingClient() {
         {/* Logo hero */}
         <div className="mb-10">
           {!heroErr ? (
-            <div className="relative mx-auto h-20 w-[260px]">
+            <div className="relative mx-auto h-24 w-[300px] bg-white rounded-2xl px-6 py-4 shadow-lg">
               <Image
                 src={PLATFORM_LOGO}
                 alt="HoopHub"
                 fill
-                sizes="260px"
-                className="object-contain"
+                sizes="300px"
+                className="object-contain p-4"
                 priority
                 onError={() => setHeroErr(true)}
               />
