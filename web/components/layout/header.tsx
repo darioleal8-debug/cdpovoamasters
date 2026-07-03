@@ -82,22 +82,28 @@ export function Header({ userName, userEmail, userRole, onMenuToggle }: HeaderPr
             </div>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel className="font-normal">
-            <div className="flex flex-col space-y-1">
-              <p className="text-sm font-medium">{userName}</p>
-              <p className="text-xs text-muted-foreground">{userEmail}</p>
+        <DropdownMenuContent
+          align="end"
+          className="w-64 bg-white border border-gray-200 shadow-xl rounded-xl p-1"
+        >
+          <DropdownMenuLabel className="font-normal px-3 py-2">
+            <div className="flex flex-col space-y-0.5">
+              <p className="text-sm font-semibold text-gray-900">{userName}</p>
+              <p className="text-xs text-gray-500">{userEmail}</p>
             </div>
           </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => router.push("/configuracoes")}>
-            <User className="mr-2 h-4 w-4" />
+          <DropdownMenuSeparator className="bg-gray-100 my-1" />
+          <DropdownMenuItem
+            onClick={() => router.push("/configuracoes")}
+            className="cursor-pointer rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 focus:bg-gray-100"
+          >
+            <User className="mr-2 h-4 w-4 text-gray-500" />
             Perfil
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
+          <DropdownMenuSeparator className="bg-gray-100 my-1" />
           <DropdownMenuItem
             onClick={handleLogout}
-            className="text-destructive focus:text-destructive"
+            className="cursor-pointer rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50 focus:bg-red-50 focus:text-red-600"
           >
             <LogOut className="mr-2 h-4 w-4" />
             Sair
