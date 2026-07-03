@@ -21,13 +21,13 @@ export function LandingClient() {
       >
         {/* Logo header */}
         {!headerErr ? (
-          <div className="relative h-8 w-[120px] bg-white rounded-lg px-2 py-1">
+          <div className="bg-white rounded-lg px-3 py-2">
             <Image
               src={PLATFORM_LOGO}
               alt="HoopHub"
-              fill
-              sizes="120px"
-              className="object-contain object-left"
+              width={160}
+              height={40}
+              className="object-contain"
               priority
               onError={() => setHeaderErr(true)}
             />
@@ -52,13 +52,13 @@ export function LandingClient() {
         {/* Logo hero */}
         <div className="mb-10">
           {!heroErr ? (
-            <div className="relative mx-auto h-24 w-[300px] bg-white rounded-2xl px-6 py-4 shadow-lg">
+            <div className="bg-white rounded-2xl px-10 py-6 shadow-lg inline-block">
               <Image
                 src={PLATFORM_LOGO}
                 alt="HoopHub"
-                fill
-                sizes="300px"
-                className="object-contain p-4"
+                width={240}
+                height={72}
+                className="object-contain"
                 priority
                 onError={() => setHeroErr(true)}
               />
