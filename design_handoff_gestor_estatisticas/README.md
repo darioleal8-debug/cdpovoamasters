@@ -130,3 +130,6 @@ Nenhum. Sem ícones externos: setas (↑ ↓), × e ✕ são texto.
 ## Ficheiros
 - `Gestor Estatisticas Ao Vivo.dc.html` — protótipo com as três variantes, tema claro/escuro e lógica completa (derivação de eventos, substituições, apagar registos).
 - `PROMPT.md` — prompt pronto a colar no Claude Code.
+- `screenshots/1c-folha-de-jogo-claro.png` — **referência visual principal** (variante a implementar).
+- `screenshots/1c-folha-de-jogo-escuro.png` — a mesma variante em tema escuro.
+- `screenshots/1a-jogador-para-acao-claro.png`, `screenshots/1b-acao-para-jogador-claro.png` — alternativas, apenas para contexto.

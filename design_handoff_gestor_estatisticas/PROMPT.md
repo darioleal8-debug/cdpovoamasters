@@ -6,7 +6,7 @@
 
 Vou redesenhar o ecrã de registo de estatísticas ao vivo de um jogo (`/jogos/:id/live`) desta aplicação.
 
-**Contexto:** o ficheiro `design/Gestor Estatisticas Ao Vivo.dc.html` é um **protótipo de referência em HTML** (não é código para copiar). O `design/README.md` tem a especificação completa: modelo de dados, regras de negócio, tokens de cor, tipografia e medidas. Lê os dois antes de escrever código.
+**Contexto:** o ficheiro `design/Gestor Estatisticas Ao Vivo.dc.html` é um **protótipo de referência em HTML** (não é código para copiar). O `design/README.md` tem a especificação completa: modelo de dados, regras de negócio, tokens de cor, tipografia e medidas. Em `design/screenshots/` estão as capturas — `1c-folha-de-jogo-claro.png` é a referência visual principal. Lê tudo antes de escrever código.
 
 **Tarefa:** reimplementar o ecrã live no stack já existente deste projeto (mesmos componentes, router, estado, estilos e convenções que o resto da app — não introduzas bibliotecas novas sem me perguntar). O protótipo tem três variantes lado a lado; implementa a variante **1c "Folha de jogo"** (uma linha por jogador, um toque = um registo). As 1a e 1b ficam documentadas como alternativas — ignora-as por agora.
 
