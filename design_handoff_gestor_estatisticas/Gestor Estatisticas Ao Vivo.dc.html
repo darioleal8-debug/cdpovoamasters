@@ -21,8 +21,15 @@
 </style>
 </helmet>
 
-<section style="padding:40px;display:flex;flex-direction:column;gap:22px">
-  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:oklch(1 0 0);border:1px solid oklch(0.86 0.008 250);border-radius:16px;padding:12px 14px;box-shadow:0 6px 18px oklch(0.4 0.02 250 / 0.08)">
+<section style="display:flex;flex-direction:column;gap:22px;{{ shellStyle }}">
+
+  <div style="display:flex;align-items:center;gap:10px;{{ visExit }}">
+    <button onClick="{{ toggleFull }}" style="cursor:pointer;min-height:48px;padding:0 18px;border-radius:12px;font-size:14px;font-weight:800;background:oklch(0.22 0.02 250);color:oklch(0.98 0 0);border:none">⤡ Sair do ecrã cheio</button>
+    <button onClick="{{ openSummary }}" style="cursor:pointer;min-height:48px;padding:0 18px;border-radius:12px;font-size:14px;font-weight:800;background:oklch(1 0 0);color:oklch(0.22 0.02 250);border:1px solid oklch(0.8 0.01 250)">▤ Resumo estatístico</button>
+    <div style="font-size:12px;color:oklch(0.45 0.012 250)">Ou tecla Esc</div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:oklch(1 0 0);border:1px solid oklch(0.86 0.008 250);border-radius:16px;padding:12px 14px;box-shadow:0 6px 18px oklch(0.4 0.02 250 / 0.08);{{ visPrefs }}">
     <div style="display:flex;flex-direction:column;gap:2px;margin-right:4px">
       <div style="font-size:10px;letter-spacing:0.14em;font-weight:800;color:oklch(0.5 0.015 250)">MODO DE REGISTO</div>
       <div style="font-size:15px;font-weight:800;color:oklch(0.22 0.02 250)">{{ layoutName }}</div>
@@ -40,18 +47,19 @@
         <button onClick="{{ o.pick }}" style="cursor:pointer;min-height:48px;padding:0 16px;border-radius:10px;font-size:14px;font-weight:800;{{ o.style }}">{{ o.label }}</button>
       </sc-for>
     </div>
-    <div style="font-size:12px;color:oklch(0.45 0.012 250);max-width:210px;text-wrap:pretty">A escolha fica guardada no dispositivo entre jogos.</div>
+    <button onClick="{{ openSummary }}" style="cursor:pointer;min-height:48px;padding:0 18px;border-radius:12px;font-size:14px;font-weight:800;background:oklch(1 0 0);color:oklch(0.22 0.02 250);border:1px solid oklch(0.8 0.01 250);white-space:nowrap">▤ Resumo estatístico</button>
+    <button onClick="{{ toggleFull }}" style="cursor:pointer;min-height:48px;padding:0 18px;border-radius:12px;font-size:14px;font-weight:800;background:oklch(0.22 0.02 250);color:oklch(0.98 0 0);border:none;white-space:nowrap">⤢ Ecrã cheio</button>
   </div>
 
   <div style="display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start">
 
     <div id="1a" style="display:flex;flex-direction:column;gap:12px;{{ visA }}">
-      <div style="display:flex;align-items:center;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px;{{ visPrefs }}">
         <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;background:oklch(0.22 0.02 250);color:oklch(0.98 0 0);padding:5px 10px;border-radius:7px">1a</div>
         <div style="font-size:18px;font-weight:700;color:oklch(0.22 0.02 250)">Jogador → ação</div>
         <div style="font-size:14px;color:oklch(0.45 0.012 250)">Cards grandes, painel de ações à direita</div>
       </div>
-      <div style="width:1180px;border-radius:20px;overflow:hidden;border:1px solid oklch(0.8 0.01 250);box-shadow:0 18px 44px oklch(0.4 0.02 250 / 0.16);background:var(--bg);color:var(--text);padding:20px;display:flex;flex-direction:column;gap:16px;box-sizing:border-box;{{ themeVars }}">
+      <div style="width:1180px;border-radius:20px;overflow:hidden;border:1px solid oklch(0.8 0.01 250);box-shadow:0 18px 44px oklch(0.4 0.02 250 / 0.16);background:var(--bg);color:var(--text);padding:20px;{{ frameStyle }}display:flex;flex-direction:column;gap:16px;box-sizing:border-box;{{ themeVars }}">
 
         <div style="display:flex;gap:14px;align-items:stretch">
           <div style="flex:1;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 18px;display:flex;align-items:center;gap:22px">
@@ -210,12 +218,12 @@
     </div>
 
     <div id="1b" style="display:flex;flex-direction:column;gap:12px;{{ visB }}">
-      <div style="display:flex;align-items:center;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px;{{ visPrefs }}">
         <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;background:oklch(0.22 0.02 250);color:oklch(0.98 0 0);padding:5px 10px;border-radius:7px">1b</div>
         <div style="font-size:18px;font-weight:700;color:oklch(0.22 0.02 250)">Ação → jogador</div>
         <div style="font-size:14px;color:oklch(0.45 0.012 250)">Barra de ações fixa, jogadores em fila</div>
       </div>
-      <div style="width:1180px;border-radius:20px;overflow:hidden;border:1px solid oklch(0.8 0.01 250);box-shadow:0 18px 44px oklch(0.4 0.02 250 / 0.16);background:var(--bg);color:var(--text);padding:20px;display:flex;flex-direction:column;gap:16px;box-sizing:border-box;{{ themeVars }}">
+      <div style="width:1180px;border-radius:20px;overflow:hidden;border:1px solid oklch(0.8 0.01 250);box-shadow:0 18px 44px oklch(0.4 0.02 250 / 0.16);background:var(--bg);color:var(--text);padding:20px;{{ frameStyle }}display:flex;flex-direction:column;gap:16px;box-sizing:border-box;{{ themeVars }}">
 
         <div style="background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 18px;display:flex;align-items:center;gap:20px">
           <div style="display:flex;align-items:baseline;gap:10px">
@@ -345,12 +353,12 @@
     </div>
 
     <div id="1c" style="display:flex;flex-direction:column;gap:12px;{{ visC }}">
-      <div style="display:flex;align-items:center;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px;{{ visPrefs }}">
         <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;background:oklch(0.22 0.02 250);color:oklch(0.98 0 0);padding:5px 10px;border-radius:7px">1c</div>
         <div style="font-size:18px;font-weight:700;color:oklch(0.22 0.02 250)">Folha de jogo · um toque</div>
         <div style="font-size:14px;color:oklch(0.45 0.012 250)">Cada linha é um jogador, sem seleção prévia</div>
       </div>
-      <div style="width:1180px;border-radius:20px;overflow:hidden;border:1px solid oklch(0.8 0.01 250);box-shadow:0 18px 44px oklch(0.4 0.02 250 / 0.16);background:var(--bg);color:var(--text);padding:20px;display:flex;flex-direction:column;gap:14px;box-sizing:border-box;{{ themeVars }}">
+      <div style="width:1180px;border-radius:20px;overflow:hidden;border:1px solid oklch(0.8 0.01 250);box-shadow:0 18px 44px oklch(0.4 0.02 250 / 0.16);background:var(--bg);color:var(--text);padding:20px;{{ frameStyle }}display:flex;flex-direction:column;gap:14px;box-sizing:border-box;{{ themeVars }}">
 
         <div style="display:flex;align-items:center;gap:18px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 18px">
           <div style="font-family:'IBM Plex Mono',monospace;font-size:48px;font-weight:700;line-height:1">{{ scoreLine }}</div>
@@ -480,6 +488,72 @@
   </div>
 </section>
 
+
+<div style="position:fixed;inset:0;z-index:50;background:oklch(0.2 0.02 250 / 0.55);padding:28px;box-sizing:border-box;{{ themeVars }};{{ visSummary }}">
+  <div style="max-width:1280px;margin:0 auto;max-height:100%;overflow:auto;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:14px;box-sizing:border-box">
+    <div style="display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <div style="font-size:11px;letter-spacing:0.12em;font-weight:800;color:var(--muted)">{{ summaryTitle }}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:34px;font-weight:700;line-height:1">{{ summaryScore }}</div>
+        <div style="font-size:13px;color:var(--muted)">{{ summaryAway }}</div>
+      </div>
+      <button onClick="{{ closeSummary }}" style="margin-left:auto;cursor:pointer;min-height:48px;padding:0 20px;border-radius:12px;font-size:15px;font-weight:800;background:var(--accent);color:var(--accentInk);border:none">Voltar ao jogo</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:200px 64px repeat(3,84px) 110px repeat(4,64px) 70px 108px;gap:8px;align-items:center;padding:0 6px">
+      <div style="font-size:10px;font-weight:800;letter-spacing:0.1em;color:var(--muted)">JOGADOR</div>
+      <div style="font-size:10px;font-weight:800;letter-spacing:0.1em;color:var(--muted);text-align:right">PTS</div>
+      <div style="font-size:10px;font-weight:800;letter-spacing:0.1em;color:var(--muted);text-align:right">2P M/T</div>
+      <div style="font-size:10px;font-weight:800;letter-spacing:0.1em;color:var(--muted);text-align:right">3P M/T</div>
+      <div style="font-size:10px;font-weight:800;letter-spacing:0.1em;color:var(--muted);text-align:right">LL M/T</div>
+      <div style="font-size:10px;font-weight:800;letter-spacing:0.1em;color:var(--muted);text-align:right">RES OF/DEF</div>
+      <div style="font-size:10px;font-weight:800;letter-spacing:0.1em;color:var(--muted);text-align:right">AST</div>
+      <div style="font-size:10px;font-weight:800;letter-spacing:0.1em;color:var(--muted);text-align:right">ROU</div>
+      <div style="font-size:10px;font-weight:800;letter-spacing:0.1em;color:var(--muted);text-align:right">PER</div>
+      <div style="font-size:10px;font-weight:800;letter-spacing:0.1em;color:var(--muted);text-align:right">BLO</div>
+      <div style="font-size:10px;font-weight:800;letter-spacing:0.1em;color:var(--muted);text-align:right">FALT</div>
+      <div style="font-size:10px;font-weight:800;letter-spacing:0.1em;color:var(--muted);text-align:right">D·O·T·A</div>
+    </div>
+
+    <sc-for list="{{ summaryRows }}" as="r" hint-placeholder-count="8">
+      <div style="display:grid;grid-template-columns:200px 64px repeat(3,84px) 110px repeat(4,64px) 70px 108px;gap:8px;align-items:center;border-radius:12px;padding:8px 6px;{{ r.rowStyle }}">
+        <div style="display:flex;align-items:center;gap:9px;min-width:0">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:700;color:var(--muted)">{{ r.num }}</div>
+          <div style="display:flex;flex-direction:column;min-width:0">
+            <div style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</div>
+            <div style="font-size:10px;font-weight:800;letter-spacing:0.08em;color:var(--muted)">{{ r.status }}</div>
+          </div>
+        </div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700;text-align:right">{{ r.pts }}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;text-align:right">{{ r.fg2 }}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;text-align:right">{{ r.fg3 }}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;text-align:right">{{ r.ft }}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;text-align:right">{{ r.reb }}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;text-align:right">{{ r.ast }}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;text-align:right">{{ r.stl }}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;text-align:right">{{ r.tov }}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;text-align:right">{{ r.blk }}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;text-align:right">{{ r.fouls }}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;text-align:right;color:var(--muted)">{{ r.foulBreak }}</div>
+      </div>
+    </sc-for>
+
+    <div style="display:grid;grid-template-columns:200px 64px repeat(3,84px) 110px repeat(4,64px) 70px 108px;gap:8px;align-items:center;border-radius:12px;padding:10px 6px;background:var(--accentSoft);border:1px solid var(--accent)">
+      <div style="font-size:12px;font-weight:800;letter-spacing:0.1em">TOTAL EQUIPA</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700;text-align:right">{{ summaryTotals.pts }}</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;text-align:right">{{ summaryTotals.fg2 }}</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;text-align:right">{{ summaryTotals.fg3 }}</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;text-align:right">{{ summaryTotals.ft }}</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;text-align:right">{{ summaryTotals.reb }}</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;text-align:right">{{ summaryTotals.ast }}</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;text-align:right">{{ summaryTotals.stl }}</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;text-align:right">{{ summaryTotals.tov }}</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;text-align:right">{{ summaryTotals.blk }}</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;text-align:right">{{ summaryTotals.fouls }}</div>
+      <div style="font-size:11px;text-align:right;color:var(--muted)">DEF·OF·TÉC·ANTI</div>
+    </div>
+  </div>
+</div>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{}">
 const LIGHT = "--bg:oklch(0.965 0.006 250);--panel:oklch(1 0 0);--line:oklch(0.88 0.008 250);--text:oklch(0.24 0.02 250);--muted:oklch(0.5 0.015 250);--accent:oklch(0.5 0.14 150);--accentSoft:oklch(0.95 0.045 150);--accentInk:oklch(1 0 0);--danger:oklch(0.53 0.19 25);--dangerSoft:oklch(0.955 0.04 25);--chip:oklch(0.95 0.006 250);--dim:oklch(0.86 0.008 250)";
@@ -507,7 +581,7 @@ const LAYOUTS = [
 const PREF_KEY = "stats-live-prefs";
 
 class Component extends DCLogic {
-  state = { events: [], nextId: 1, period: 1, seconds: 600, running: false, selA: null, pendingB: null, pendingIn: null, foulTypeC: "Def", dark: false, layout: "a", court: ["4", "7", "11", "14", "23"] };
+  state = { events: [], nextId: 1, period: 1, seconds: 600, running: false, selA: null, pendingB: null, pendingIn: null, foulTypeC: "Def", dark: false, layout: "a", full: false, summary: false, court: ["4", "7", "11", "14", "23"] };
 
   ev(kind, num, s) { return { id: s.nextId, kind, num, pts: 0, period: s.period, time: s.period + "P " + this.fmt(s.seconds) }; }
 
@@ -539,6 +613,17 @@ class Component extends DCLogic {
       localStorage.setItem(PREF_KEY, JSON.stringify({ ...cur, ...patch }));
     } catch (e) {}
   }
+  toggleFull() {
+    const next = !this.state.full;
+    this.setState({ full: next });
+    try {
+      const el = document.documentElement;
+      const swallow = p => { if (p && p.catch) p.catch(() => {}); };
+      if (next && !document.fullscreenElement && el.requestFullscreen) swallow(el.requestFullscreen());
+      else if (!next && document.fullscreenElement && document.exitFullscreen) swallow(document.exitFullscreen());
+    } catch (e) {}
+  }
+
   setLayout(key) { this.setState({ layout: key }); this.savePrefs({ layout: key }); }
   setTheme(dark) { this.setState({ dark }); this.savePrefs({ dark }); }
 
@@ -550,11 +635,23 @@ class Component extends DCLogic {
       if (typeof p.dark === "boolean") patch.dark = p.dark;
       if (Object.keys(patch).length) this.setState(patch);
     } catch (e) {}
+    this.onKey = e => {
+      if (e.key !== "Escape") return;
+      if (this.state.summary) this.setState({ summary: false });
+      else if (this.state.full) this.setState({ full: false });
+    };
+    this.onFs = () => { if (!document.fullscreenElement && this.state.full) this.setState({ full: false }); };
+    document.addEventListener("keydown", this.onKey);
+    document.addEventListener("fullscreenchange", this.onFs);
     this.timer = setInterval(() => {
       if (this.state.running && this.state.seconds > 0) this.setState(s => ({ seconds: s.seconds - 1 }));
     }, 1000);
   }
-  componentWillUnmount() { clearInterval(this.timer); }
+  componentWillUnmount() {
+    clearInterval(this.timer);
+    document.removeEventListener("keydown", this.onKey);
+    document.removeEventListener("fullscreenchange", this.onFs);
+  }
 
   fmt(sec) { return String(Math.floor(sec / 60)).padStart(2, "0") + ":" + String(sec % 60).padStart(2, "0"); }
 
@@ -575,7 +672,7 @@ class Component extends DCLogic {
 
   derive() {
     const stats = {};
-    roster.forEach(p => { stats[p.num] = { pts: 0, reb: 0, ast: 0, fouls: 0, miss: 0, other: 0 }; });
+    roster.forEach(p => { stats[p.num] = { pts: 0, reb: 0, ast: 0, fouls: 0, miss: 0, other: 0, m1: 0, a1: 0, m2: 0, a2: 0, m3: 0, a3: 0, rebOf: 0, rebDef: 0, stl: 0, tov: 0, blk: 0, fDef: 0, fOf: 0, fTec: 0, fAnti: 0 }; });
     let home = 0, away = 0, teamFouls = 0, awayReb = 0, awayTeamFouls = 0, awayFoulsTotal = 0;
     const ordered = this.state.events.slice().reverse();
     ordered.forEach(e => {
@@ -588,12 +685,30 @@ class Component extends DCLogic {
       }
       const st = stats[e.num];
       if (!st) return;
-      if (e.pts) { st.pts += e.pts; home += e.pts; }
-      else if (e.kind.indexOf("miss") === 0) st.miss += 1;
-      else if (e.kind === "rebOf" || e.kind === "rebDef") st.reb += 1;
+      if (e.pts) {
+        st.pts += e.pts; home += e.pts;
+        if (e.kind === "make1") { st.m1 += 1; st.a1 += 1; }
+        if (e.kind === "make2") { st.m2 += 1; st.a2 += 1; }
+        if (e.kind === "make3") { st.m3 += 1; st.a3 += 1; }
+      }
+      else if (e.kind.indexOf("miss") === 0) {
+        st.miss += 1;
+        if (e.kind === "miss1") st.a1 += 1;
+        if (e.kind === "miss2") st.a2 += 1;
+        if (e.kind === "miss3") st.a3 += 1;
+      }
+      else if (e.kind === "rebOf") { st.reb += 1; st.rebOf += 1; }
+      else if (e.kind === "rebDef") { st.reb += 1; st.rebDef += 1; }
       else if (e.kind === "ast") st.ast += 1;
+      else if (e.kind === "stl") st.stl += 1;
+      else if (e.kind === "tov") st.tov += 1;
+      else if (e.kind === "blk") st.blk += 1;
       else if (e.kind.indexOf("foul") === 0) {
         st.fouls += 1;
+        if (e.kind === "foulDef") st.fDef += 1;
+        if (e.kind === "foulOf") st.fOf += 1;
+        if (e.kind === "foulTec") st.fTec += 1;
+        if (e.kind === "foulAnti") st.fAnti += 1;
         if (e.period === this.state.period && e.kind !== "foulTec") teamFouls += 1;
       }
       else st.other += 1;
@@ -653,6 +768,43 @@ class Component extends DCLogic {
 
     return {
       themeVars: s.dark ? DARK : LIGHT,
+      toggleFull: () => this.toggleFull(),
+      openSummary: () => this.setState({ summary: true }),
+      closeSummary: () => this.setState({ summary: false }),
+      visSummary: s.summary ? "" : "display:none",
+      summaryTitle: "Resumo estatístico · " + s.period + "º período · " + this.fmt(s.seconds),
+      summaryScore: "CD Póvoa " + d.home + " — " + d.away + " PT",
+      summaryRows: roster.map(p => {
+        const st = d.stats[p.num];
+        return {
+          num: "#" + p.num, name: p.name,
+          status: s.court.includes(p.num) ? "EM CAMPO" : "BANCO",
+          pts: st.pts,
+          fg2: st.m2 + "/" + st.a2,
+          fg3: st.m3 + "/" + st.a3,
+          ft: st.m1 + "/" + st.a1,
+          reb: st.rebOf + " / " + st.rebDef,
+          ast: st.ast, stl: st.stl, tov: st.tov, blk: st.blk,
+          fouls: st.fouls,
+          foulBreak: st.fDef + "·" + st.fOf + "·" + st.fTec + "·" + st.fAnti,
+          rowStyle: s.court.includes(p.num)
+            ? "background:var(--panel);border:1px solid var(--line)"
+            : "background:transparent;border:1px dashed var(--line);opacity:0.75"
+        };
+      }),
+      summaryTotals: (() => {
+        const t = { pts: 0, m2: 0, a2: 0, m3: 0, a3: 0, m1: 0, a1: 0, rebOf: 0, rebDef: 0, ast: 0, stl: 0, tov: 0, blk: 0, fouls: 0 };
+        roster.forEach(p => { const st = d.stats[p.num]; Object.keys(t).forEach(k => { t[k] += st[k] || 0; }); });
+        return {
+          pts: t.pts, fg2: t.m2 + "/" + t.a2, fg3: t.m3 + "/" + t.a3, ft: t.m1 + "/" + t.a1,
+          reb: t.rebOf + " / " + t.rebDef, ast: t.ast, stl: t.stl, tov: t.tov, blk: t.blk, fouls: t.fouls
+        };
+      })(),
+      summaryAway: "Adversário · " + d.away + " pontos · " + d.awayReb + " ressaltos · " + d.awayFoulsTotal + " faltas",
+      shellStyle: s.full ? "padding:10px;gap:10px;min-height:100vh;background:var(--bg)" : "padding:40px",
+      visPrefs: s.full ? "display:none" : "",
+      visExit: s.full ? "" : "display:none",
+      frameStyle: s.full ? "width:100%;border:none;border-radius:0;box-shadow:none;padding:8px 10px" : "",
       layoutName: (LAYOUTS.find(l => l.key === s.layout) || LAYOUTS[0]).name,
       visA: s.layout === "a" ? "" : "display:none",
       visB: s.layout === "b" ? "" : "display:none",

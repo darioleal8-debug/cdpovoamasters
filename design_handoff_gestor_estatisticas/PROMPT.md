@@ -15,7 +15,11 @@ Vou redesenhar o ecrã de registo de estatísticas ao vivo de um jogo desta apli
 2. **Ação → jogador** — barra de ações fixa no topo; escolhe-se a ação e depois o jogador.
 3. **Folha de jogo** — uma linha por jogador do plantel com botões inline; um toque = um registo.
 
-A barra tem também alternância de **tema claro/escuro** (claro é o predefinido, para uso ao sol). Layout e tema são guardados por dispositivo (localStorage ou o mecanismo de preferências que a app já use) e restaurados no arranque. **Trocar de layout a meio do jogo não pode perder estado** — os três leem e escrevem no mesmo estado de jogo.
+A barra tem também alternância de **tema claro/escuro** (claro é o predefinido, para uso ao sol), um botão **ecrã cheio** e um botão **resumo estatístico**. Layout e tema são guardados por dispositivo (localStorage ou o mecanismo de preferências que a app já use) e restaurados no arranque. **Trocar de layout a meio do jogo não pode perder estado** — os três leem e escrevem no mesmo estado de jogo.
+
+**Modo ecrã cheio:** esconde a sidebar de navegação e o cabeçalho da app, esconde a própria barra de preferências, reduz o padding do conteúdo e faz o painel de estatísticas ocupar 100% da largura (sem borda nem sombra). Usa a Fullscreen API (`requestFullscreen` / `exitFullscreen`) — **encadeia sempre `.catch()` nas duas chamadas**, porque devolvem Promises que rejeitam quando a política de permissões nega o fullscreen; o modo compacto deve funcionar mesmo nesse caso. Sincroniza o estado com o evento `fullscreenchange`. Sair com **Esc** ou com um botão "Sair do ecrã cheio" sempre visível, ao lado de um atalho para o resumo estatístico.
+
+**Resumo estatístico:** botão acessível a qualquer momento (também em ecrã cheio) que abre um painel por cima do jogo, sem interromper o cronómetro nem perder estado; fecha com "Voltar ao jogo" ou **Esc**. Conteúdo: marcador e linha-resumo do adversário no topo; tabela com uma linha por jogador do plantel — pontos, 2P convertidos/tentados, 3P convertidos/tentados, lances livres convertidos/tentados, ressaltos ofensivos/defensivos, assistências, roubos, perdas, blocos, total de faltas e desdobramento por tipo (DEF·OF·TÉC·ANTI) — e uma linha final de **TOTAL EQUIPA**. Todos os valores derivados da lista de eventos (nada guardado em paralelo).
 
 **Antes de começar:**
 1. Explora o código atual do ecrã live e apresenta um plano curto: que ficheiros vais alterar, quais vais criar.
@@ -33,6 +37,7 @@ A barra tem também alternância de **tema claro/escuro** (claro é o predefinid
 - Linha temporal "Registado agora" sempre visível com os últimos registos, cada um com botão **×** que apaga esse evento e recalcula tudo.
 - Cronómetro por período (10:00), iniciar/parar, avançar período (reinicia relógio e faltas de equipa do período).
 - Alvos de toque com **mínimo 44px** de altura — o ecrã é usado num tablet no banco.
+- Modo ecrã cheio e painel de resumo estatístico, conforme descrito acima, disponíveis nos três layouts.
 
 Quando terminares, resume o que mudou e como testar um jogo de exemplo.
 

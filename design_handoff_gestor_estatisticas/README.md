@@ -17,7 +17,23 @@ O protótipo tem uma **barra de preferências** no topo (fora do ecrã de jogo) 
 - **1c — Folha de jogo**: uma linha por jogador do plantel com botões inline; **um toque = um registo**, sem seleção prévia. Inclui um seletor de "tipo de falta" acima da tabela que define o tipo aplicado pelo botão FALTA de cada linha.
 
 ### Barra de preferências
-Três botões de modo (Jogador → ação · Ação → jogador · Folha de jogo) e dois de tema (☀ Claro · ☾ Escuro), em grupos com fundo `oklch(0.94 0.006 250)`, radius 13px, padding 5px; botão ativo com fundo `oklch(0.22 0.02 250)` e texto branco; altura mínima 48px. À esquerda, o rótulo "MODO DE REGISTO" e o nome do modo ativo.
+Três botões de modo (Jogador → ação · Ação → jogador · Folha de jogo) e dois de tema (☀ Claro · ☾ Escuro), em grupos com fundo `oklch(0.94 0.006 250)`, radius 13px, padding 5px; botão ativo com fundo `oklch(0.22 0.02 250)` e texto branco; altura mínima 48px. À esquerda, o rótulo "MODO DE REGISTO" e o nome do modo ativo. À direita, dois botões de 48px: **▤ Resumo estatístico** (fundo branco, borda `oklch(0.8 0.01 250)`) e **⤢ Ecrã cheio** (fundo `oklch(0.22 0.02 250)`, texto branco).
+
+### Modo ecrã cheio
+Esconde a barra de preferências e os títulos, reduz o padding do ecrã de 40px para 10px e o do painel para 8px 10px, e o painel passa a `width:100%` sem borda, radius nem sombra. Aparece uma barra mínima com **⤡ Sair do ecrã cheio**, **▤ Resumo estatístico** e a nota "Ou tecla Esc".
+
+Usa a Fullscreen API sobre `document.documentElement`. **Importante:** `requestFullscreen()` e `exitFullscreen()` devolvem Promises que rejeitam quando a política de permissões nega o fullscreen (ex.: dentro de um iframe) — encadear `.catch(() => {})` nas duas. O estado de compactação é independente do fullscreen nativo, pelo que o modo continua útil mesmo quando este é negado. Ouvir `fullscreenchange` para sincronizar quando o utilizador sai pelo browser; `Esc` fecha primeiro o resumo (se aberto) e só depois o ecrã cheio.
+
+### Painel de resumo estatístico
+Acessível a qualquer momento, incluindo em ecrã cheio. Overlay `position:fixed; inset:0` com fundo `oklch(0.2 0.02 250 / 0.55)`, padding 28px; cartão centrado de `max-width:1280px`, `max-height:100%`, `overflow:auto`, fundo `--bg`, radius 20px, padding 20px. Os tokens de tema têm de ser aplicados no próprio overlay (está fora do contentor do ecrã).
+
+Topo: rótulo "Resumo estatístico · Nº período · MM:SS", marcador em mono 34px ("CD Póvoa 12 — 9 PT"), linha "Adversário · N pontos · N ressaltos · N faltas", e botão **Voltar ao jogo** (`--accent`, 48px) à direita.
+
+Tabela — cabeçalho, linhas e total partilham o mesmo grid:
+`grid-template-columns: 200px 64px repeat(3,84px) 110px repeat(4,64px) 70px 108px; gap: 8px`
+Colunas: JOGADOR · PTS · 2P M/T · 3P M/T · LL M/T · RES OF/DEF · AST · ROU · PER · BLO · FALT · D·O·T·A. Números todos em mono e alinhados à direita; PTS a 20px/700, restantes a 15px. Linhas de jogadores em campo com `--panel` + borda `--line`; jogadores no banco com borda tracejada e `opacity: .75`. Linha final **TOTAL EQUIPA** com fundo `--accentSoft` e borda `--accent`, somando todas as colunas; a última célula mostra a legenda "DEF·OF·TÉC·ANTI".
+
+O cronómetro continua a correr com o painel aberto e nenhum estado é perdido. Fecha com "Voltar ao jogo" ou Esc.
 
 **Persistência**: layout e tema são guardados por dispositivo (no protótipo, `localStorage` com a chave `stats-live-prefs`, `{ layout: "a"|"b"|"c", dark: boolean }`) e restaurados no arranque. Predefinição para utilizador novo: `layout: "a"`, `dark: false`. Trocar de layout a meio do jogo **não pode perder estado** — os três leem e escrevem a mesma lista de eventos.
 
@@ -82,7 +98,7 @@ Percorrer os eventos por ordem cronológica:
 - **Cronómetro**: decrementa 1s enquanto `running` e `seconds > 0`.
 
 ## Requisitos comuns aos três layouts
-Todos mostram, com a mesma lógica e os mesmos tokens: marcador das duas equipas; período e cronómetro com Iniciar/Parar e Período +; faltas de equipa em 5 pips; barra do adversário (pontos, ressaltos, quatro tipos de falta); ações completas por jogador; substituições em dois toques; e a linha temporal "Registado agora" com botão × por registo.
+Todos mostram, com a mesma lógica e os mesmos tokens: marcador das duas equipas; período e cronómetro com Iniciar/Parar e Período +; faltas de equipa em 5 pips; barra do adversário (pontos, ressaltos, quatro tipos de falta); ações completas por jogador; substituições em dois toques; a linha temporal "Registado agora" com botão × por registo; e acesso ao modo ecrã cheio e ao painel de resumo estatístico.
 
 ## Layout 1c — Folha de jogo (especificação detalhada)
 A especificação abaixo detalha o 1c porque é o mais denso. Os layouts 1a e 1b usam os mesmos tokens, alturas e copy — ver as capturas em `screenshots/` para a composição de cada um: 1a tem cards de jogador (min-height 104px, radius 14px, borda 2px, selecionado com `--accentSoft` + borda `--accent` + halo) e um painel de ações de 330px à direita com botões de 56px em grelha 2×N; 1b tem a barra de ações em grelha de 6 colunas (botões 62px) sobre uma fila de 5 cards de jogador (min-height 118px).
