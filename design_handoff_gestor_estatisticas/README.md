@@ -9,12 +9,19 @@ Redesenho do ecrã de registo de estatísticas durante um jogo de basquetebol (r
 ## Fidelidade
 **Alta fidelidade (hifi).** Cores, tipografia, espaçamentos, estados e copy são finais. Recriar com precisão, mas usando as primitivas do codebase.
 
-## As três variantes do protótipo
-O ficheiro mostra três fluxos lado a lado, todos ligados ao mesmo estado de jogo:
+## Três layouts alternáveis pelo utilizador
+O protótipo tem uma **barra de preferências** no topo (fora do ecrã de jogo) com três modos de registo e a alternância de tema. **Todos os três são para implementar** — o utilizador escolhe qual usa durante o jogo.
 
-- **1a — Jogador → ação**: grelha de cards dos 5 em campo; toca-se no jogador (fica selecionado) e depois na ação, num painel à direita.
+- **1a — Jogador → ação · PRINCIPAL e predefinido**: grelha de cards dos 5 em campo; toca-se no jogador (fica selecionado) e depois na ação, num painel à direita.
 - **1b — Ação → jogador**: barra de ações fixa no topo; escolhe-se a ação (fica ativa) e depois o jogador, numa fila de 5 cards.
-- **1c — Folha de jogo (recomendada, é esta a implementar)**: uma linha por jogador do plantel com botões inline; **um toque = um registo**, sem seleção prévia. Inclui um seletor de "tipo de falta" acima da tabela que define o tipo aplicado pelo botão FALTA de cada linha.
+- **1c — Folha de jogo**: uma linha por jogador do plantel com botões inline; **um toque = um registo**, sem seleção prévia. Inclui um seletor de "tipo de falta" acima da tabela que define o tipo aplicado pelo botão FALTA de cada linha.
+
+### Barra de preferências
+Três botões de modo (Jogador → ação · Ação → jogador · Folha de jogo) e dois de tema (☀ Claro · ☾ Escuro), em grupos com fundo `oklch(0.94 0.006 250)`, radius 13px, padding 5px; botão ativo com fundo `oklch(0.22 0.02 250)` e texto branco; altura mínima 48px. À esquerda, o rótulo "MODO DE REGISTO" e o nome do modo ativo.
+
+**Persistência**: layout e tema são guardados por dispositivo (no protótipo, `localStorage` com a chave `stats-live-prefs`, `{ layout: "a"|"b"|"c", dark: boolean }`) e restaurados no arranque. Predefinição para utilizador novo: `layout: "a"`, `dark: false`. Trocar de layout a meio do jogo **não pode perder estado** — os três leem e escrevem a mesma lista de eventos.
+
+No protótipo, apenas o layout ativo é renderizado (os outros ficam com `display:none`), o que preserva o estado dos três.
 
 ## Modelo de dados — o ponto central
 O estado do jogo é uma **lista de eventos append-only**. Todos os totais são derivados. É isto que permite apagar qualquer evento e recalcular.
@@ -74,7 +81,11 @@ Percorrer os eventos por ordem cronológica:
 - **Período +**: `period++`, `seconds = 600`, `running = false`. As faltas de equipa do período reiniciam por serem derivadas do período atual.
 - **Cronómetro**: decrementa 1s enquanto `running` e `seconds > 0`.
 
-## Layout da variante 1c (a implementar)
+## Requisitos comuns aos três layouts
+Todos mostram, com a mesma lógica e os mesmos tokens: marcador das duas equipas; período e cronómetro com Iniciar/Parar e Período +; faltas de equipa em 5 pips; barra do adversário (pontos, ressaltos, quatro tipos de falta); ações completas por jogador; substituições em dois toques; e a linha temporal "Registado agora" com botão × por registo.
+
+## Layout 1c — Folha de jogo (especificação detalhada)
+A especificação abaixo detalha o 1c porque é o mais denso. Os layouts 1a e 1b usam os mesmos tokens, alturas e copy — ver as capturas em `screenshots/` para a composição de cada um: 1a tem cards de jogador (min-height 104px, radius 14px, borda 2px, selecionado com `--accentSoft` + borda `--accent` + halo) e um painel de ações de 330px à direita com botões de 56px em grelha 2×N; 1b tem a barra de ações em grelha de 6 colunas (botões 62px) sobre uma fila de 5 cards de jogador (min-height 118px).
 Largura de referência 1180px (tablet landscape), `padding: 20px`, colunas empilhadas com `gap: 14px`. Tudo em flex/grid com `gap`.
 
 1. **Barra de marcador** (`--panel`, borda `--line`, radius 16px, padding 12px 18px, flex, gap 18px):
@@ -128,8 +139,8 @@ Nomes na linha temporal: "Cesto de 2", "Cesto de 3", "Lance livre convertido", "
 Nenhum. Sem ícones externos: setas (↑ ↓), × e ✕ são texto.
 
 ## Ficheiros
-- `Gestor Estatisticas Ao Vivo.dc.html` — protótipo com as três variantes, tema claro/escuro e lógica completa (derivação de eventos, substituições, apagar registos).
 - `PROMPT.md` — prompt pronto a colar no Claude Code.
-- `screenshots/1c-folha-de-jogo-claro.png` — **referência visual principal** (variante a implementar).
-- `screenshots/1c-folha-de-jogo-escuro.png` — a mesma variante em tema escuro.
-- `screenshots/1a-jogador-para-acao-claro.png`, `screenshots/1b-acao-para-jogador-claro.png` — alternativas, apenas para contexto.
+- `Gestor Estatisticas Ao Vivo.dc.html` — protótipo com os três layouts, barra de preferências, tema claro/escuro e lógica completa (derivação de eventos, substituições, apagar registos).
+- `screenshots/1a-jogador-para-acao-claro.png` — **layout principal e predefinido**.
+- `screenshots/1b-acao-para-jogador-claro.png` — layout alternativo.
+- `screenshots/1c-folha-de-jogo-claro.png` e `screenshots/1c-folha-de-jogo-escuro.png` — folha de jogo, em claro e escuro (a referência de tema escuro aplica-se aos três).

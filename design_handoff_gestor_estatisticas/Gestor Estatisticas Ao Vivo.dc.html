@@ -22,18 +22,30 @@
 </helmet>
 
 <section style="padding:40px;display:flex;flex-direction:column;gap:22px">
-  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;max-width:1100px">
-    <div style="display:flex;flex-direction:column;gap:8px">
-      <div style="font-size:12px;letter-spacing:0.16em;font-weight:700;color:oklch(0.45 0.01 250)">TURNO 1 · GESTOR DE ESTATÍSTICAS AO VIVO</div>
-      <div style="font-size:30px;font-weight:800;color:oklch(0.22 0.02 250);letter-spacing:-0.02em">Três fluxos de registo, para tablet no banco</div>
-      <div style="font-size:15px;line-height:1.5;color:oklch(0.42 0.012 250);max-width:820px;text-wrap:pretty">Todos partilham o mesmo jogo em tempo real: registas em <a href="#1a">1a</a> e vês o efeito nos outros. Todos resolvem os quatro problemas que apontaste — período e faltas grandes no topo, registo visível na linha temporal, cada entrada apagável com um toque, e contraste alto para sol.</div>
+  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:oklch(1 0 0);border:1px solid oklch(0.86 0.008 250);border-radius:16px;padding:12px 14px;box-shadow:0 6px 18px oklch(0.4 0.02 250 / 0.08)">
+    <div style="display:flex;flex-direction:column;gap:2px;margin-right:4px">
+      <div style="font-size:10px;letter-spacing:0.14em;font-weight:800;color:oklch(0.5 0.015 250)">MODO DE REGISTO</div>
+      <div style="font-size:15px;font-weight:800;color:oklch(0.22 0.02 250)">{{ layoutName }}</div>
     </div>
-    <button onClick="{{ toggleTheme }}" style="cursor:pointer;padding:14px 20px;border-radius:12px;font-size:14px;font-weight:700;background:oklch(0.22 0.02 250);color:oklch(0.98 0 0);border:none;white-space:nowrap">{{ themeBtn }}</button>
+    <div style="display:flex;gap:6px;background:oklch(0.94 0.006 250);border-radius:13px;padding:5px">
+      <sc-for list="{{ layoutOptions }}" as="o" hint-placeholder-count="3">
+        <button onClick="{{ o.pick }}" style="cursor:pointer;min-height:48px;padding:0 18px;border-radius:10px;font-size:14px;font-weight:800;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;{{ o.style }}">
+          <span>{{ o.label }}</span>
+          <span style="font-size:10px;font-weight:700;letter-spacing:0.06em;opacity:0.7">{{ o.sub }}</span>
+        </button>
+      </sc-for>
+    </div>
+    <div style="display:flex;gap:6px;background:oklch(0.94 0.006 250);border-radius:13px;padding:5px;margin-left:auto">
+      <sc-for list="{{ themeOptions }}" as="o" hint-placeholder-count="2">
+        <button onClick="{{ o.pick }}" style="cursor:pointer;min-height:48px;padding:0 16px;border-radius:10px;font-size:14px;font-weight:800;{{ o.style }}">{{ o.label }}</button>
+      </sc-for>
+    </div>
+    <div style="font-size:12px;color:oklch(0.45 0.012 250);max-width:210px;text-wrap:pretty">A escolha fica guardada no dispositivo entre jogos.</div>
   </div>
 
   <div style="display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start">
 
-    <div id="1a" style="display:flex;flex-direction:column;gap:12px">
+    <div id="1a" style="display:flex;flex-direction:column;gap:12px;{{ visA }}">
       <div style="display:flex;align-items:center;gap:12px">
         <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;background:oklch(0.22 0.02 250);color:oklch(0.98 0 0);padding:5px 10px;border-radius:7px">1a</div>
         <div style="font-size:18px;font-weight:700;color:oklch(0.22 0.02 250)">Jogador → ação</div>
@@ -197,7 +209,7 @@
       </div>
     </div>
 
-    <div id="1b" style="display:flex;flex-direction:column;gap:12px">
+    <div id="1b" style="display:flex;flex-direction:column;gap:12px;{{ visB }}">
       <div style="display:flex;align-items:center;gap:12px">
         <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;background:oklch(0.22 0.02 250);color:oklch(0.98 0 0);padding:5px 10px;border-radius:7px">1b</div>
         <div style="font-size:18px;font-weight:700;color:oklch(0.22 0.02 250)">Ação → jogador</div>
@@ -332,7 +344,7 @@
       </div>
     </div>
 
-    <div id="1c" style="display:flex;flex-direction:column;gap:12px">
+    <div id="1c" style="display:flex;flex-direction:column;gap:12px;{{ visC }}">
       <div style="display:flex;align-items:center;gap:12px">
         <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;background:oklch(0.22 0.02 250);color:oklch(0.98 0 0);padding:5px 10px;border-radius:7px">1c</div>
         <div style="font-size:18px;font-weight:700;color:oklch(0.22 0.02 250)">Folha de jogo · um toque</div>
@@ -487,8 +499,15 @@ const roster = [
 const NAMES = { make1: "Lance livre convertido", make2: "Cesto de 2", make3: "Cesto de 3", miss1: "Lance livre falhado", miss2: "Lançamento de 2 falhado", miss3: "Lançamento de 3 falhado", rebOf: "Ressalto ofensivo", rebDef: "Ressalto defensivo", ast: "Assistência", stl: "Roubo de bola", tov: "Perda de bola", blk: "Bloco", in: "Entrou em campo", out: "Saiu para o banco", foulDef: "Falta defensiva", foulOf: "Falta ofensiva", foulTec: "Falta técnica", foulAnti: "Falta antidesportiva", advRebOf: "Ressalto ofensivo", advRebDef: "Ressalto defensivo", advFoulDef: "Falta defensiva", advFoulOf: "Falta ofensiva", advFoulTec: "Falta técnica", advFoulAnti: "Falta antidesportiva" };
 const FOUL_TYPES = [{ key: "Def", label: "DEFENSIVA" }, { key: "Of", label: "OFENSIVA" }, { key: "Tec", label: "TÉCNICA" }, { key: "Anti", label: "ANTIDESP." }];
 
+const LAYOUTS = [
+  { key: "a", label: "Jogador → ação", sub: "PRINCIPAL", name: "Jogador → ação · cards grandes" },
+  { key: "b", label: "Ação → jogador", sub: "BARRA", name: "Ação → jogador · barra de ações" },
+  { key: "c", label: "Folha de jogo", sub: "UM TOQUE", name: "Folha de jogo · um toque por registo" }
+];
+const PREF_KEY = "stats-live-prefs";
+
 class Component extends DCLogic {
-  state = { events: [], nextId: 1, period: 1, seconds: 600, running: false, selA: null, pendingB: null, pendingIn: null, foulTypeC: "Def", dark: false, court: ["4", "7", "11", "14", "23"] };
+  state = { events: [], nextId: 1, period: 1, seconds: 600, running: false, selA: null, pendingB: null, pendingIn: null, foulTypeC: "Def", dark: false, layout: "a", court: ["4", "7", "11", "14", "23"] };
 
   ev(kind, num, s) { return { id: s.nextId, kind, num, pts: 0, period: s.period, time: s.period + "P " + this.fmt(s.seconds) }; }
 
@@ -514,7 +533,23 @@ class Component extends DCLogic {
     this.setState(st => ({ court: st.court.filter(x => x !== num), events: [this.ev("out", num, st), ...st.events], nextId: st.nextId + 1, selA: st.selA === num ? null : st.selA }));
   }
 
+  savePrefs(patch) {
+    try {
+      const cur = JSON.parse(localStorage.getItem(PREF_KEY) || "{}");
+      localStorage.setItem(PREF_KEY, JSON.stringify({ ...cur, ...patch }));
+    } catch (e) {}
+  }
+  setLayout(key) { this.setState({ layout: key }); this.savePrefs({ layout: key }); }
+  setTheme(dark) { this.setState({ dark }); this.savePrefs({ dark }); }
+
   componentDidMount() {
+    try {
+      const p = JSON.parse(localStorage.getItem(PREF_KEY) || "{}");
+      const patch = {};
+      if (p.layout === "a" || p.layout === "b" || p.layout === "c") patch.layout = p.layout;
+      if (typeof p.dark === "boolean") patch.dark = p.dark;
+      if (Object.keys(patch).length) this.setState(patch);
+    } catch (e) {}
     this.timer = setInterval(() => {
       if (this.state.running && this.state.seconds > 0) this.setState(s => ({ seconds: s.seconds - 1 }));
     }, 1000);
@@ -618,8 +653,27 @@ class Component extends DCLogic {
 
     return {
       themeVars: s.dark ? DARK : LIGHT,
-      themeBtn: s.dark ? "☀  Ver tema claro (sol)" : "☾  Ver tema escuro (pavilhão)",
-      toggleTheme: () => this.setState(st => ({ dark: !st.dark })),
+      layoutName: (LAYOUTS.find(l => l.key === s.layout) || LAYOUTS[0]).name,
+      visA: s.layout === "a" ? "" : "display:none",
+      visB: s.layout === "b" ? "" : "display:none",
+      visC: s.layout === "c" ? "" : "display:none",
+      layoutOptions: LAYOUTS.map(l => ({
+        label: l.label, sub: l.sub,
+        pick: () => this.setLayout(l.key),
+        style: s.layout === l.key
+          ? "background:oklch(0.22 0.02 250);border:none;color:oklch(0.98 0 0)"
+          : "background:transparent;border:none;color:oklch(0.35 0.015 250)"
+      })),
+      themeOptions: [
+        { key: false, label: "☀ Claro" },
+        { key: true, label: "☾ Escuro" }
+      ].map(t => ({
+        label: t.label,
+        pick: () => this.setTheme(t.key),
+        style: s.dark === t.key
+          ? "background:oklch(0.22 0.02 250);border:none;color:oklch(0.98 0 0)"
+          : "background:transparent;border:none;color:oklch(0.35 0.015 250)"
+      })),
 
       homeScore: d.home,
       awayScore: d.away,
