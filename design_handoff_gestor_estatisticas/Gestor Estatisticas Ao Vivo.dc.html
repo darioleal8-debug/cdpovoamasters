@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: oklch(0.91 0.004 250); font-family: Archivo, Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: oklch(0.5 0.15 150); text-decoration: none; border-bottom: 1px solid currentColor; }
+  a:hover { color: oklch(0.42 0.15 150); }
+  button { font-family: inherit; }
+  @keyframes flash { 0% { background: var(--accentSoft); } 100% { background: transparent; } }
+</style>
+</helmet>
+
+<section style="padding:40px;display:flex;flex-direction:column;gap:22px">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;max-width:1100px">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:12px;letter-spacing:0.16em;font-weight:700;color:oklch(0.45 0.01 250)">TURNO 1 · GESTOR DE ESTATÍSTICAS AO VIVO</div>
+      <div style="font-size:30px;font-weight:800;color:oklch(0.22 0.02 250);letter-spacing:-0.02em">Três fluxos de registo, para tablet no banco</div>
+      <div style="font-size:15px;line-height:1.5;color:oklch(0.42 0.012 250);max-width:820px;text-wrap:pretty">Todos partilham o mesmo jogo em tempo real: registas em <a href="#1a">1a</a> e vês o efeito nos outros. Todos resolvem os quatro problemas que apontaste — período e faltas grandes no topo, registo visível na linha temporal, cada entrada apagável com um toque, e contraste alto para sol.</div>
+    </div>
+    <button onClick="{{ toggleTheme }}" style="cursor:pointer;padding:14px 20px;border-radius:12px;font-size:14px;font-weight:700;background:oklch(0.22 0.02 250);color:oklch(0.98 0 0);border:none;white-space:nowrap">{{ themeBtn }}</button>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start">
+
+    <div id="1a" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;background:oklch(0.22 0.02 250);color:oklch(0.98 0 0);padding:5px 10px;border-radius:7px">1a</div>
+        <div style="font-size:18px;font-weight:700;color:oklch(0.22 0.02 250)">Jogador → ação</div>
+        <div style="font-size:14px;color:oklch(0.45 0.012 250)">Cards grandes, painel de ações à direita</div>
+      </div>
+      <div style="width:1180px;border-radius:20px;overflow:hidden;border:1px solid oklch(0.8 0.01 250);box-shadow:0 18px 44px oklch(0.4 0.02 250 / 0.16);background:var(--bg);color:var(--text);padding:20px;display:flex;flex-direction:column;gap:16px;box-sizing:border-box;{{ themeVars }}">
+
+        <div style="display:flex;gap:14px;align-items:stretch">
+          <div style="flex:1;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 18px;display:flex;align-items:center;gap:22px">
+            <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+              <div style="font-size:12px;letter-spacing:0.12em;font-weight:700;color:var(--muted)">CD PÓVOA</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:64px;font-weight:700;line-height:1">{{ homeScore }}</div>
+            </div>
+            <div style="width:1px;align-self:stretch;background:var(--line)"></div>
+            <div style="display:flex;flex-direction:column;gap:2px;align-items:center">
+              <div style="font-size:12px;letter-spacing:0.12em;font-weight:700;color:var(--muted)">PT (ADV.)</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:64px;font-weight:700;line-height:1;color:var(--muted)">{{ awayScore }}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:2px;margin-left:6px">
+              <div style="font-size:11px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">ADV. RESSALTOS</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:700">{{ awayRebLabel }}</div>
+              <div style="font-size:11px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">FALTAS {{ awayFoulLabel }}</div>
+            </div>
+          </div>
+
+          <div style="flex:0 0 360px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 18px;display:flex;flex-direction:column;gap:8px;align-items:center">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="font-size:20px;font-weight:800;letter-spacing:0.02em">{{ periodLabel }}</div>
+              <div style="display:flex;align-items:center;gap:6px;background:var(--accentSoft);color:var(--accent);border-radius:999px;padding:4px 10px;font-size:11px;font-weight:800;letter-spacing:0.08em">● AO VIVO</div>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:52px;font-weight:700;line-height:1">{{ clock }}</div>
+            <div style="display:flex;gap:8px;width:100%">
+              <button onClick="{{ toggleClock }}" style="flex:1;height:48px;border-radius:11px;border:none;cursor:pointer;font-size:15px;font-weight:800;background:var(--accent);color:var(--accentInk)">{{ clockBtn }}</button>
+              <button onClick="{{ nextPeriod }}" style="height:48px;padding:0 14px;border-radius:11px;cursor:pointer;font-size:14px;font-weight:700;background:transparent;border:1px solid var(--line);color:var(--text)">Período +</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;width:100%;margin-top:2px">
+              <div style="font-size:11px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">FALTAS DE EQUIPA</div>
+              <div style="display:flex;gap:5px">
+                <sc-for list="{{ teamFoulPips }}" as="pip" hint-placeholder-count="5">
+                  <div style="width:26px;height:10px;border-radius:5px;{{ pip.style }}"></div>
+                </sc-for>
+              </div>
+              <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:var(--muted)">{{ teamFoulLabel }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:10px 14px;display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;gap:3px;margin-right:2px">
+            <div style="font-size:12px;letter-spacing:0.12em;font-weight:800">ADVERSÁRIO · PT</div>
+            <div style="font-size:12px;color:var(--muted)">{{ awayFoulTotalLabel }} · sem registo individual</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="font-size:10px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">PONTOS</div>
+            <div style="display:flex;gap:6px">
+              <button onClick="{{ away1 }}" style="width:48px;height:46px;border-radius:10px;cursor:pointer;font-size:16px;font-weight:700;background:var(--chip);border:1px solid var(--line);color:var(--text)">+1</button>
+              <button onClick="{{ away2 }}" style="width:48px;height:46px;border-radius:10px;cursor:pointer;font-size:16px;font-weight:700;background:var(--chip);border:1px solid var(--line);color:var(--text)">+2</button>
+              <button onClick="{{ away3 }}" style="width:48px;height:46px;border-radius:10px;cursor:pointer;font-size:16px;font-weight:700;background:var(--chip);border:1px solid var(--line);color:var(--text)">+3</button>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="font-size:10px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">RESSALTOS</div>
+            <div style="display:flex;gap:6px">
+              <sc-for list="{{ advReb }}" as="a" hint-placeholder-count="2">
+                <button onClick="{{ a.fire }}" style="min-width:92px;height:46px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700;background:var(--chip);border:1px solid var(--line);color:var(--text)">{{ a.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="font-size:10px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">FALTAS DO ADVERSÁRIO</div>
+            <div style="display:flex;gap:6px">
+              <sc-for list="{{ advFouls }}" as="a" hint-placeholder-count="4">
+                <button onClick="{{ a.fire }}" style="min-width:104px;height:46px;border-radius:10px;cursor:pointer;font-size:12px;font-weight:800;letter-spacing:0.04em;background:var(--dangerSoft);border:1px solid var(--danger);color:var(--danger)">{{ a.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px;margin-left:auto">
+            <div style="font-size:10px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">FALTAS DE EQUIPA {{ awayFoulLabel }}</div>
+            <div style="display:flex;gap:5px">
+              <sc-for list="{{ awayFoulPips }}" as="pip" hint-placeholder-count="5">
+                <div style="width:26px;height:10px;border-radius:5px;{{ pip.style }}"></div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:16px;align-items:stretch">
+          <div style="flex:1;display:flex;flex-direction:column;gap:10px;min-width:0">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div style="font-size:12px;font-weight:800;letter-spacing:0.12em;color:var(--muted)">EM CAMPO · {{ courtCountLabel }}</div>
+              <div style="font-size:13px;color:var(--muted)">1 · toca no jogador &nbsp;→&nbsp; 2 · toca na ação</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <sc-for list="{{ courtA }}" as="p" hint-placeholder-count="6">
+                <button onClick="{{ p.select }}" style="text-align:left;cursor:pointer;border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;min-height:104px;{{ p.cardStyle }}">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:700;line-height:1;{{ p.numStyle }}">{{ p.num }}</div>
+                    <div style="font-size:16px;font-weight:700;color:var(--text)">{{ p.name }}</div>
+                    <div style="margin-left:auto;display:flex;gap:4px">
+                      <sc-for list="{{ p.foulPips }}" as="fp" hint-placeholder-count="5">
+                        <div style="width:9px;height:9px;border-radius:99px;{{ fp.style }}"></div>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="display:flex;gap:16px;margin-top:auto">
+                    <div style="display:flex;flex-direction:column"><div style="font-size:10px;letter-spacing:0.08em;font-weight:800;color:var(--muted)">PTS</div><div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700">{{ p.pts }}</div></div>
+                    <div style="display:flex;flex-direction:column"><div style="font-size:10px;letter-spacing:0.08em;font-weight:800;color:var(--muted)">RES</div><div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700">{{ p.reb }}</div></div>
+                    <div style="display:flex;flex-direction:column"><div style="font-size:10px;letter-spacing:0.08em;font-weight:800;color:var(--muted)">AST</div><div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700">{{ p.ast }}</div></div>
+                    <div style="display:flex;flex-direction:column"><div style="font-size:10px;letter-spacing:0.08em;font-weight:800;color:var(--muted)">FALT</div><div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700">{{ p.fouls }}</div></div>
+                  </div>
+                </button>
+              </sc-for>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+              <div style="font-size:12px;font-weight:800;letter-spacing:0.12em;color:var(--muted)">BANCO · SUBSTITUIÇÕES</div>
+              <div style="font-size:12px;color:var(--muted)">{{ subHint }}</div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              <sc-for list="{{ bench }}" as="b" hint-placeholder-count="3">
+                <button onClick="{{ b.sub }}" style="cursor:pointer;border-radius:999px;padding:0 16px;min-height:48px;display:flex;align-items:center;gap:9px;font-weight:700;{{ b.style }}">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700">{{ b.num }}</span>
+                  <span style="font-size:14px">{{ b.name }}</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;opacity:0.7">{{ b.line }}</span>
+                  <span style="font-size:15px;font-weight:800">↑</span>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="flex:0 0 330px;display:flex;flex-direction:column;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px">
+            <div style="display:flex;align-items:center;gap:10px;min-height:52px;border-radius:11px;padding:8px 12px;{{ selBannerStyle }}">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700">{{ selNum }}</div>
+              <div style="display:flex;flex-direction:column"><div style="font-size:14px;font-weight:700">{{ selName }}</div><div style="font-size:12px;opacity:0.8">{{ selHint }}</div></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
+              <sc-for list="{{ actionsA }}" as="a" hint-placeholder-count="12">
+                <button onClick="{{ a.fire }}" style="cursor:pointer;border-radius:11px;min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-weight:800;{{ a.style }}">
+                  <span style="font-size:16px">{{ a.label }}</span>
+                  <span style="font-size:10px;letter-spacing:0.08em;opacity:0.7">{{ a.sub }}</span>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="font-size:12px;font-weight:800;letter-spacing:0.12em;color:var(--muted)">REGISTADO AGORA · {{ eventCount }}</div>
+            <div style="font-size:12px;color:var(--muted)">Toca no × para apagar qualquer registo</div>
+          </div>
+          <sc-for list="{{ timeline }}" as="e" hint-placeholder-count="4">
+            <div style="display:flex;align-items:center;gap:12px;font-size:14px;padding:7px 0;border-top:1px solid var(--line);animation:flash 1.2s ease-out">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);min-width:70px">{{ e.time }}</span>
+              <span style="font-weight:700">{{ e.text }}</span>
+              <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted)">{{ e.score }}</span>
+              <button onClick="{{ e.remove }}" style="cursor:pointer;width:34px;height:34px;border-radius:9px;font-size:15px;font-weight:800;background:var(--dangerSoft);border:1px solid var(--danger);color:var(--danger)">×</button>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div id="1b" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;background:oklch(0.22 0.02 250);color:oklch(0.98 0 0);padding:5px 10px;border-radius:7px">1b</div>
+        <div style="font-size:18px;font-weight:700;color:oklch(0.22 0.02 250)">Ação → jogador</div>
+        <div style="font-size:14px;color:oklch(0.45 0.012 250)">Barra de ações fixa, jogadores em fila</div>
+      </div>
+      <div style="width:1180px;border-radius:20px;overflow:hidden;border:1px solid oklch(0.8 0.01 250);box-shadow:0 18px 44px oklch(0.4 0.02 250 / 0.16);background:var(--bg);color:var(--text);padding:20px;display:flex;flex-direction:column;gap:16px;box-sizing:border-box;{{ themeVars }}">
+
+        <div style="background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 18px;display:flex;align-items:center;gap:20px">
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <div style="font-size:12px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">PÓVOA</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:54px;font-weight:700;line-height:1">{{ homeScore }}</div>
+            <div style="font-size:20px;color:var(--muted);font-weight:700">:</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:54px;font-weight:700;line-height:1;color:var(--muted)">{{ awayScore }}</div>
+            <div style="font-size:12px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">PT</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;padding:0 8px">
+            <div style="font-size:11px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">{{ periodLabel }}</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:40px;font-weight:700;line-height:1.1">{{ clock }}</div>
+          </div>
+          <button onClick="{{ toggleClock }}" style="height:48px;padding:0 22px;border-radius:11px;border:none;cursor:pointer;font-size:15px;font-weight:800;background:var(--accent);color:var(--accentInk)">{{ clockBtn }}</button>
+          <div style="display:flex;flex-direction:column;gap:4px;margin-left:auto">
+            <div style="font-size:11px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">FALTAS DE EQUIPA {{ teamFoulLabel }}</div>
+            <div style="display:flex;gap:5px">
+              <sc-for list="{{ teamFoulPips }}" as="pip" hint-placeholder-count="5">
+                <div style="width:30px;height:12px;border-radius:6px;{{ pip.style }}"></div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:1px;align-items:flex-end">
+            <div style="font-size:10px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">ADV. RES {{ awayRebLabel }}</div>
+            <div style="font-size:10px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">ADV. FALTAS {{ awayFoulLabel }}</div>
+          </div>
+        </div>
+
+        <div style="background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:10px 14px;display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;gap:3px;margin-right:2px">
+            <div style="font-size:12px;letter-spacing:0.12em;font-weight:800">ADVERSÁRIO · PT</div>
+            <div style="font-size:12px;color:var(--muted)">{{ awayFoulTotalLabel }} · sem registo individual</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="font-size:10px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">PONTOS</div>
+            <div style="display:flex;gap:6px">
+              <button onClick="{{ away1 }}" style="width:48px;height:46px;border-radius:10px;cursor:pointer;font-size:16px;font-weight:700;background:var(--chip);border:1px solid var(--line);color:var(--text)">+1</button>
+              <button onClick="{{ away2 }}" style="width:48px;height:46px;border-radius:10px;cursor:pointer;font-size:16px;font-weight:700;background:var(--chip);border:1px solid var(--line);color:var(--text)">+2</button>
+              <button onClick="{{ away3 }}" style="width:48px;height:46px;border-radius:10px;cursor:pointer;font-size:16px;font-weight:700;background:var(--chip);border:1px solid var(--line);color:var(--text)">+3</button>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="font-size:10px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">RESSALTOS</div>
+            <div style="display:flex;gap:6px">
+              <sc-for list="{{ advReb }}" as="a" hint-placeholder-count="2">
+                <button onClick="{{ a.fire }}" style="min-width:92px;height:46px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700;background:var(--chip);border:1px solid var(--line);color:var(--text)">{{ a.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="font-size:10px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">FALTAS DO ADVERSÁRIO</div>
+            <div style="display:flex;gap:6px">
+              <sc-for list="{{ advFouls }}" as="a" hint-placeholder-count="4">
+                <button onClick="{{ a.fire }}" style="min-width:104px;height:46px;border-radius:10px;cursor:pointer;font-size:12px;font-weight:800;letter-spacing:0.04em;background:var(--dangerSoft);border:1px solid var(--danger);color:var(--danger)">{{ a.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px;margin-left:auto">
+            <div style="font-size:10px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">FALTAS DE EQUIPA {{ awayFoulLabel }}</div>
+            <div style="display:flex;gap:5px">
+              <sc-for list="{{ awayFoulPips }}" as="pip" hint-placeholder-count="5">
+                <div style="width:26px;height:10px;border-radius:5px;{{ pip.style }}"></div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="font-size:12px;font-weight:800;letter-spacing:0.12em;color:var(--muted)">1 · QUE ACONTECEU? <span style="font-weight:600;letter-spacing:0;text-transform:none">(faltas: def., of., técnica, antidesportiva)</span></div>
+          <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px">
+            <sc-for list="{{ actionsB }}" as="a" hint-placeholder-count="12">
+              <button onClick="{{ a.pick }}" style="cursor:pointer;border-radius:12px;min-height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-weight:800;{{ a.style }}">
+                <span style="font-size:16px">{{ a.label }}</span>
+                <span style="font-size:10px;letter-spacing:0.06em;opacity:0.7">{{ a.sub }}</span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="font-size:12px;font-weight:800;letter-spacing:0.12em;color:var(--muted)">2 · DE QUEM?</div>
+            <div style="font-size:13px;font-weight:700;{{ pendingHintStyle }}">{{ pendingHint }}</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">
+            <sc-for list="{{ courtB }}" as="p" hint-placeholder-count="5">
+              <button onClick="{{ p.assign }}" style="cursor:pointer;border-radius:14px;padding:12px;display:flex;flex-direction:column;align-items:center;gap:6px;min-height:118px;{{ p.cardStyle }}">
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:30px;font-weight:700;line-height:1;{{ p.numStyle }}">{{ p.num }}</div>
+                <div style="font-size:14px;font-weight:700;text-align:center;line-height:1.2;color:var(--text)">{{ p.name }}</div>
+                <div style="margin-top:auto;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--muted)">{{ p.line }}</div>
+                <div style="display:flex;gap:4px">
+                  <sc-for list="{{ p.foulPips }}" as="fp" hint-placeholder-count="5">
+                    <div style="width:9px;height:9px;border-radius:99px;{{ fp.style }}"></div>
+                  </sc-for>
+                </div>
+              </button>
+            </sc-for>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:2px">
+            <div style="font-size:12px;font-weight:800;letter-spacing:0.12em;color:var(--muted)">BANCO</div>
+            <sc-for list="{{ bench }}" as="b" hint-placeholder-count="3">
+              <button onClick="{{ b.sub }}" style="cursor:pointer;border-radius:999px;padding:0 14px;min-height:46px;display:flex;align-items:center;gap:8px;font-weight:700;{{ b.style }}">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:15px">{{ b.num }}</span>
+                <span style="font-size:14px">{{ b.name }}</span>
+                <span style="font-size:15px;font-weight:800">↑</span>
+              </button>
+            </sc-for>
+            <div style="font-size:12px;color:var(--muted);margin-left:auto">{{ subHint }}</div>
+          </div>
+        </div>
+
+        <div style="background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="font-size:12px;font-weight:800;letter-spacing:0.12em;color:var(--muted)">REGISTADO AGORA · {{ eventCount }}</div>
+            <div style="font-size:12px;color:var(--muted)">Toca no × para apagar qualquer registo</div>
+          </div>
+          <sc-for list="{{ timeline }}" as="e" hint-placeholder-count="4">
+            <div style="display:flex;align-items:center;gap:12px;font-size:14px;padding:7px 0;border-top:1px solid var(--line)">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);min-width:70px">{{ e.time }}</span>
+              <span style="font-weight:700">{{ e.text }}</span>
+              <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted)">{{ e.score }}</span>
+              <button onClick="{{ e.remove }}" style="cursor:pointer;width:34px;height:34px;border-radius:9px;font-size:15px;font-weight:800;background:var(--dangerSoft);border:1px solid var(--danger);color:var(--danger)">×</button>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div id="1c" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;background:oklch(0.22 0.02 250);color:oklch(0.98 0 0);padding:5px 10px;border-radius:7px">1c</div>
+        <div style="font-size:18px;font-weight:700;color:oklch(0.22 0.02 250)">Folha de jogo · um toque</div>
+        <div style="font-size:14px;color:oklch(0.45 0.012 250)">Cada linha é um jogador, sem seleção prévia</div>
+      </div>
+      <div style="width:1180px;border-radius:20px;overflow:hidden;border:1px solid oklch(0.8 0.01 250);box-shadow:0 18px 44px oklch(0.4 0.02 250 / 0.16);background:var(--bg);color:var(--text);padding:20px;display:flex;flex-direction:column;gap:14px;box-sizing:border-box;{{ themeVars }}">
+
+        <div style="display:flex;align-items:center;gap:18px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 18px">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:48px;font-weight:700;line-height:1">{{ scoreLine }}</div>
+          <div style="display:flex;flex-direction:column;gap:1px">
+            <div style="font-size:11px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">PÓVOA · PT</div>
+            <div style="font-size:11px;letter-spacing:0.06em;font-weight:800;color:var(--muted)">ADV. RES {{ awayRebLabel }} · FALTAS {{ awayFoulLabel }}</div>
+          </div>
+          <div style="width:1px;align-self:stretch;background:var(--line)"></div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <div style="font-size:11px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">{{ periodLabel }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:40px;font-weight:700;line-height:1.1">{{ clock }}</div>
+            </div>
+            <button onClick="{{ toggleClock }}" style="height:46px;padding:0 20px;border-radius:11px;border:none;cursor:pointer;font-size:15px;font-weight:800;background:var(--accent);color:var(--accentInk)">{{ clockBtn }}</button>
+            <button onClick="{{ nextPeriod }}" style="height:46px;padding:0 14px;border-radius:11px;cursor:pointer;font-size:14px;font-weight:700;background:transparent;border:1px solid var(--line);color:var(--text)">Período +</button>
+          </div>
+          <div style="margin-left:auto;display:flex;flex-direction:column;gap:5px;align-items:flex-end">
+            <div style="font-size:11px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">FALTAS DE EQUIPA {{ teamFoulLabel }}</div>
+            <div style="display:flex;gap:5px">
+              <sc-for list="{{ teamFoulPips }}" as="pip" hint-placeholder-count="5">
+                <div style="width:30px;height:12px;border-radius:6px;{{ pip.style }}"></div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:10px 14px;display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;gap:3px;margin-right:2px">
+            <div style="font-size:12px;letter-spacing:0.12em;font-weight:800">ADVERSÁRIO · PT</div>
+            <div style="font-size:12px;color:var(--muted)">{{ awayFoulTotalLabel }} · sem registo individual</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="font-size:10px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">PONTOS</div>
+            <div style="display:flex;gap:6px">
+              <button onClick="{{ away1 }}" style="width:48px;height:46px;border-radius:10px;cursor:pointer;font-size:16px;font-weight:700;background:var(--chip);border:1px solid var(--line);color:var(--text)">+1</button>
+              <button onClick="{{ away2 }}" style="width:48px;height:46px;border-radius:10px;cursor:pointer;font-size:16px;font-weight:700;background:var(--chip);border:1px solid var(--line);color:var(--text)">+2</button>
+              <button onClick="{{ away3 }}" style="width:48px;height:46px;border-radius:10px;cursor:pointer;font-size:16px;font-weight:700;background:var(--chip);border:1px solid var(--line);color:var(--text)">+3</button>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="font-size:10px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">RESSALTOS</div>
+            <div style="display:flex;gap:6px">
+              <sc-for list="{{ advReb }}" as="a" hint-placeholder-count="2">
+                <button onClick="{{ a.fire }}" style="min-width:92px;height:46px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700;background:var(--chip);border:1px solid var(--line);color:var(--text)">{{ a.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="font-size:10px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">FALTAS DO ADVERSÁRIO</div>
+            <div style="display:flex;gap:6px">
+              <sc-for list="{{ advFouls }}" as="a" hint-placeholder-count="4">
+                <button onClick="{{ a.fire }}" style="min-width:104px;height:46px;border-radius:10px;cursor:pointer;font-size:12px;font-weight:800;letter-spacing:0.04em;background:var(--dangerSoft);border:1px solid var(--danger);color:var(--danger)">{{ a.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px;margin-left:auto">
+            <div style="font-size:10px;letter-spacing:0.1em;font-weight:800;color:var(--muted)">FALTAS DE EQUIPA {{ awayFoulLabel }}</div>
+            <div style="display:flex;gap:5px">
+              <sc-for list="{{ awayFoulPips }}" as="pip" hint-placeholder-count="5">
+                <div style="width:26px;height:10px;border-radius:5px;{{ pip.style }}"></div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div style="font-size:11px;font-weight:800;letter-spacing:0.1em;color:var(--muted)">TIPO DE FALTA A REGISTAR NA FOLHA</div>
+          <div style="display:flex;gap:6px">
+            <sc-for list="{{ foulTypes }}" as="f" hint-placeholder-count="4">
+              <button onClick="{{ f.pick }}" style="cursor:pointer;height:44px;padding:0 16px;border-radius:10px;font-size:12px;font-weight:800;letter-spacing:0.06em;{{ f.style }}">{{ f.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:196px repeat(3,0.85fr) 1.5fr 0.95fr 0.95fr 0.95fr 70px;gap:8px;align-items:center;padding:0 4px">
+          <div style="font-size:11px;font-weight:800;letter-spacing:0.1em;color:var(--muted)">JOGADOR</div>
+          <div style="font-size:11px;font-weight:800;letter-spacing:0.1em;color:var(--muted);text-align:center">1 PONTO</div>
+          <div style="font-size:11px;font-weight:800;letter-spacing:0.1em;color:var(--muted);text-align:center">2 PONTOS</div>
+          <div style="font-size:11px;font-weight:800;letter-spacing:0.1em;color:var(--muted);text-align:center">3 PONTOS</div>
+          <div style="font-size:11px;font-weight:800;letter-spacing:0.1em;color:var(--muted);text-align:center">FALHOU 1P/2P/3P</div>
+          <div style="font-size:11px;font-weight:800;letter-spacing:0.1em;color:var(--muted);text-align:center">RESSALTO</div>
+          <div style="font-size:11px;font-weight:800;letter-spacing:0.1em;color:var(--muted);text-align:center">ASSIST.</div>
+          <div style="font-size:11px;font-weight:800;letter-spacing:0.1em;color:var(--muted);text-align:center">FALTA {{ foulTypeLabel }}</div>
+          <div style="font-size:11px;font-weight:800;letter-spacing:0.1em;color:var(--muted);text-align:right">TOTAL</div>
+        </div>
+
+        <sc-for list="{{ rowsC }}" as="r" hint-placeholder-count="8">
+          <div style="display:grid;grid-template-columns:196px repeat(3,0.85fr) 1.5fr 0.95fr 0.95fr 0.95fr 70px;gap:8px;align-items:center;border-radius:14px;padding:8px;{{ r.rowStyle }}">
+            <div style="display:flex;align-items:center;gap:10px;min-width:0">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:700;color:var(--muted)">{{ r.num }}</div>
+              <div style="display:flex;flex-direction:column;min-width:0">
+                <div style="font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</div>
+                <button onClick="{{ r.toggleCourt }}" style="cursor:pointer;align-self:flex-start;margin-top:2px;border-radius:999px;padding:5px 10px;font-size:10px;font-weight:800;letter-spacing:0.08em;{{ r.statusStyle }}">{{ r.status }}</button>
+              </div>
+            </div>
+            <button onClick="{{ r.p1 }}" style="cursor:pointer;height:52px;border-radius:10px;font-size:17px;font-weight:800;background:var(--accentSoft);border:1px solid var(--accent);color:var(--accent)">+1</button>
+            <button onClick="{{ r.p2 }}" style="cursor:pointer;height:52px;border-radius:10px;font-size:17px;font-weight:800;background:var(--accentSoft);border:1px solid var(--accent);color:var(--accent)">+2</button>
+            <button onClick="{{ r.p3 }}" style="cursor:pointer;height:52px;border-radius:10px;font-size:17px;font-weight:800;background:var(--accentSoft);border:1px solid var(--accent);color:var(--accent)">+3</button>
+            <div style="display:flex;gap:4px">
+              <button onClick="{{ r.miss1 }}" style="cursor:pointer;flex:1;height:52px;border-radius:10px;font-size:13px;font-weight:800;background:var(--chip);border:1px solid var(--line);color:var(--text)">✕1</button>
+              <button onClick="{{ r.miss2 }}" style="cursor:pointer;flex:1;height:52px;border-radius:10px;font-size:13px;font-weight:800;background:var(--chip);border:1px solid var(--line);color:var(--text)">✕2</button>
+              <button onClick="{{ r.miss3 }}" style="cursor:pointer;flex:1;height:52px;border-radius:10px;font-size:13px;font-weight:800;background:var(--chip);border:1px solid var(--line);color:var(--text)">✕3</button>
+            </div>
+            <button onClick="{{ r.reb }}" style="cursor:pointer;height:52px;border-radius:10px;font-size:14px;font-weight:700;background:var(--chip);border:1px solid var(--line);color:var(--text)">{{ r.rebLabel }}</button>
+            <button onClick="{{ r.ast }}" style="cursor:pointer;height:52px;border-radius:10px;font-size:14px;font-weight:700;background:var(--chip);border:1px solid var(--line);color:var(--text)">{{ r.astLabel }}</button>
+            <button onClick="{{ r.foul }}" style="cursor:pointer;height:52px;border-radius:10px;font-size:14px;font-weight:800;background:var(--dangerSoft);border:1px solid var(--danger);color:var(--danger)">{{ r.foulLabel }}</button>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:700;text-align:right">{{ r.pts }}</div>
+          </div>
+        </sc-for>
+
+        <div style="background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="font-size:12px;font-weight:800;letter-spacing:0.12em;color:var(--muted)">REGISTADO AGORA · {{ eventCount }}</div>
+            <div style="font-size:12px;color:var(--muted)">Toca no × para apagar qualquer registo</div>
+          </div>
+          <sc-for list="{{ timeline }}" as="e" hint-placeholder-count="4">
+            <div style="display:flex;align-items:center;gap:12px;font-size:14px;padding:7px 0;border-top:1px solid var(--line)">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);min-width:70px">{{ e.time }}</span>
+              <span style="font-weight:700">{{ e.text }}</span>
+              <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted)">{{ e.score }}</span>
+              <button onClick="{{ e.remove }}" style="cursor:pointer;width:34px;height:34px;border-radius:9px;font-size:15px;font-weight:800;background:var(--dangerSoft);border:1px solid var(--danger);color:var(--danger)">×</button>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+const LIGHT = "--bg:oklch(0.965 0.006 250);--panel:oklch(1 0 0);--line:oklch(0.88 0.008 250);--text:oklch(0.24 0.02 250);--muted:oklch(0.5 0.015 250);--accent:oklch(0.5 0.14 150);--accentSoft:oklch(0.95 0.045 150);--accentInk:oklch(1 0 0);--danger:oklch(0.53 0.19 25);--dangerSoft:oklch(0.955 0.04 25);--chip:oklch(0.95 0.006 250);--dim:oklch(0.86 0.008 250)";
+const DARK = "--bg:oklch(0.17 0.012 250);--panel:oklch(0.22 0.014 250);--line:oklch(0.33 0.014 250);--text:oklch(0.97 0.005 250);--muted:oklch(0.73 0.01 250);--accent:oklch(0.8 0.17 150);--accentSoft:oklch(0.33 0.075 150);--accentInk:oklch(0.16 0.02 150);--danger:oklch(0.72 0.16 25);--dangerSoft:oklch(0.32 0.08 25);--chip:oklch(0.27 0.014 250);--dim:oklch(0.3 0.014 250)";
+
+const roster = [
+  { num: "4", name: "Rui Antunes", court: true },
+  { num: "7", name: "Tomás Sá", court: true },
+  { num: "11", name: "Diogo Faria", court: true },
+  { num: "14", name: "Miguel Costa", court: true },
+  { num: "23", name: "Pedro Almeida", court: true },
+  { num: "5", name: "João Neves", court: false },
+  { num: "9", name: "Luís Braga", court: false },
+  { num: "21", name: "Nuno Reis", court: false }
+];
+
+const NAMES = { make1: "Lance livre convertido", make2: "Cesto de 2", make3: "Cesto de 3", miss1: "Lance livre falhado", miss2: "Lançamento de 2 falhado", miss3: "Lançamento de 3 falhado", rebOf: "Ressalto ofensivo", rebDef: "Ressalto defensivo", ast: "Assistência", stl: "Roubo de bola", tov: "Perda de bola", blk: "Bloco", in: "Entrou em campo", out: "Saiu para o banco", foulDef: "Falta defensiva", foulOf: "Falta ofensiva", foulTec: "Falta técnica", foulAnti: "Falta antidesportiva", advRebOf: "Ressalto ofensivo", advRebDef: "Ressalto defensivo", advFoulDef: "Falta defensiva", advFoulOf: "Falta ofensiva", advFoulTec: "Falta técnica", advFoulAnti: "Falta antidesportiva" };
+const FOUL_TYPES = [{ key: "Def", label: "DEFENSIVA" }, { key: "Of", label: "OFENSIVA" }, { key: "Tec", label: "TÉCNICA" }, { key: "Anti", label: "ANTIDESP." }];
+
+class Component extends DCLogic {
+  state = { events: [], nextId: 1, period: 1, seconds: 600, running: false, selA: null, pendingB: null, pendingIn: null, foulTypeC: "Def", dark: false, court: ["4", "7", "11", "14", "23"] };
+
+  ev(kind, num, s) { return { id: s.nextId, kind, num, pts: 0, period: s.period, time: s.period + "P " + this.fmt(s.seconds) }; }
+
+  sub(num) {
+    const s = this.state;
+    const on = s.court.includes(num);
+    if (!on) {
+      if (s.court.length >= 5) { this.setState({ pendingIn: s.pendingIn === num ? null : num }); return; }
+      this.setState(st => ({ court: st.court.concat(num), events: [this.ev("in", num, st), ...st.events], nextId: st.nextId + 1, pendingIn: null }));
+      return;
+    }
+    if (s.pendingIn) {
+      const inNum = s.pendingIn;
+      this.setState(st => ({
+        court: st.court.filter(x => x !== num).concat(inNum),
+        events: [this.ev("in", inNum, st), { ...this.ev("out", num, st), id: st.nextId + 1 }, ...st.events],
+        nextId: st.nextId + 2,
+        pendingIn: null,
+        selA: st.selA === num ? null : st.selA
+      }));
+      return;
+    }
+    this.setState(st => ({ court: st.court.filter(x => x !== num), events: [this.ev("out", num, st), ...st.events], nextId: st.nextId + 1, selA: st.selA === num ? null : st.selA }));
+  }
+
+  componentDidMount() {
+    this.timer = setInterval(() => {
+      if (this.state.running && this.state.seconds > 0) this.setState(s => ({ seconds: s.seconds - 1 }));
+    }, 1000);
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+
+  fmt(sec) { return String(Math.floor(sec / 60)).padStart(2, "0") + ":" + String(sec % 60).padStart(2, "0"); }
+
+  add(kind, num) {
+    const pts = kind === "make1" ? 1 : kind === "make2" ? 2 : kind === "make3" ? 3 : 0;
+    this.setState(s => ({
+      events: [{ id: s.nextId, kind, num, pts, period: s.period, time: s.period + "P " + this.fmt(s.seconds) }, ...s.events],
+      nextId: s.nextId + 1,
+      pendingB: null
+    }));
+  }
+  addAway(pts) {
+    this.setState(s => ({
+      events: [{ id: s.nextId, kind: "away", num: null, pts, period: s.period, time: s.period + "P " + this.fmt(s.seconds) }, ...s.events],
+      nextId: s.nextId + 1
+    }));
+  }
+
+  derive() {
+    const stats = {};
+    roster.forEach(p => { stats[p.num] = { pts: 0, reb: 0, ast: 0, fouls: 0, miss: 0, other: 0 }; });
+    let home = 0, away = 0, teamFouls = 0, awayReb = 0, awayTeamFouls = 0, awayFoulsTotal = 0;
+    const ordered = this.state.events.slice().reverse();
+    ordered.forEach(e => {
+      if (e.kind === "away") { away += e.pts; return; }
+      if (e.kind === "advRebOf" || e.kind === "advRebDef") { awayReb += 1; return; }
+      if (e.kind.indexOf("advFoul") === 0) {
+        awayFoulsTotal += 1;
+        if (e.period === this.state.period && e.kind !== "advFoulTec") awayTeamFouls += 1;
+        return;
+      }
+      const st = stats[e.num];
+      if (!st) return;
+      if (e.pts) { st.pts += e.pts; home += e.pts; }
+      else if (e.kind.indexOf("miss") === 0) st.miss += 1;
+      else if (e.kind === "rebOf" || e.kind === "rebDef") st.reb += 1;
+      else if (e.kind === "ast") st.ast += 1;
+      else if (e.kind.indexOf("foul") === 0) {
+        st.fouls += 1;
+        if (e.period === this.state.period && e.kind !== "foulTec") teamFouls += 1;
+      }
+      else st.other += 1;
+    });
+    return { stats, home, away, teamFouls, awayReb, awayTeamFouls, awayFoulsTotal };
+  }
+
+  runningScore(id) {
+    let home = 0, away = 0;
+    const ordered = this.state.events.slice().reverse();
+    for (const e of ordered) {
+      if (e.kind === "away") away += e.pts; else home += e.pts || 0;
+      if (e.id === id) break;
+    }
+    return home + "-" + away;
+  }
+
+  pips(count, total, color, dim) {
+    return Array.from({ length: total }, (_, i) => ({ style: "background:" + (i < count ? color : dim) }));
+  }
+
+  renderVals() {
+    const s = this.state;
+    const d = this.derive();
+    const selPlayer = roster.find(p => p.num === s.selA);
+    const armedA = !!selPlayer;
+    const pending = s.pendingB;
+    const pendingInPlayer = s.pendingIn ? roster.find(p => p.num === s.pendingIn) : null;
+
+    const actionDefs = [
+      { kind: "make2", label: "+2", sub: "CONVERTIDO", tone: "solid" },
+      { kind: "make3", label: "+3", sub: "CONVERTIDO", tone: "solid" },
+      { kind: "make1", label: "+1", sub: "LANCE LIVRE", tone: "solid" },
+      { kind: "miss1", label: "✕ 1P", sub: "LANCE LIVRE FALHADO", tone: "neutral" },
+      { kind: "miss2", label: "✕ 2P", sub: "FALHADO", tone: "neutral" },
+      { kind: "miss3", label: "✕ 3P", sub: "FALHADO", tone: "neutral" },
+      { kind: "rebOf", label: "RES OF.", sub: "", tone: "neutral" },
+      { kind: "rebDef", label: "RES DEF.", sub: "", tone: "neutral" },
+      { kind: "ast", label: "ASSIST.", sub: "", tone: "neutral" },
+      { kind: "stl", label: "ROUBO", sub: "", tone: "neutral" },
+      { kind: "tov", label: "PERDA DE BOLA", sub: "", tone: "neutral" },
+      { kind: "blk", label: "BLOCO", sub: "", tone: "neutral" },
+      { kind: "foulDef", label: "F. DEF.", sub: "FALTA", tone: "danger" },
+      { kind: "foulOf", label: "F. OF.", sub: "FALTA", tone: "danger" },
+      { kind: "foulTec", label: "TÉCNICA", sub: "FALTA", tone: "danger" },
+      { kind: "foulAnti", label: "ANTIDESP.", sub: "FALTA", tone: "danger" }
+    ];
+    const tone = (t, enabled, active) => {
+      if (active) return "background:var(--accent);border:2px solid var(--accent);color:var(--accentInk)";
+      if (!enabled) return "background:var(--dim);border:1px solid var(--line);color:var(--muted);cursor:not-allowed;opacity:0.75";
+      if (t === "solid") return "background:var(--accent);border:1px solid var(--accent);color:var(--accentInk)";
+      if (t === "danger") return "background:var(--dangerSoft);border:1px solid var(--danger);color:var(--danger)";
+      return "background:var(--chip);border:1px solid var(--line);color:var(--text)";
+    };
+
+    const foulPipsFor = num => this.pips(d.stats[num].fouls, 5, d.stats[num].fouls >= 4 ? "var(--danger)" : "var(--accent)", "var(--dim)");
+
+    return {
+      themeVars: s.dark ? DARK : LIGHT,
+      themeBtn: s.dark ? "☀  Ver tema claro (sol)" : "☾  Ver tema escuro (pavilhão)",
+      toggleTheme: () => this.setState(st => ({ dark: !st.dark })),
+
+      homeScore: d.home,
+      awayScore: d.away,
+      scoreLine: d.home + " : " + d.away,
+      clock: this.fmt(s.seconds),
+      clockBtn: s.running ? "❚❚ Parar" : "▶ Iniciar",
+      periodLabel: s.period + "º PERÍODO",
+      teamFoulLabel: d.teamFouls + "/5",
+      teamFoulPips: this.pips(d.teamFouls, 5, d.teamFouls >= 4 ? "var(--danger)" : "var(--accent)", "var(--dim)"),
+      toggleClock: () => this.setState(st => ({ running: !st.running })),
+      nextPeriod: () => this.setState(st => ({ period: st.period + 1, seconds: 600, running: false })),
+      away1: () => this.addAway(1), away2: () => this.addAway(2), away3: () => this.addAway(3),
+
+      awayRebLabel: String(d.awayReb),
+      awayFoulLabel: d.awayTeamFouls + "/5",
+      awayFoulTotalLabel: d.awayFoulsTotal + " no jogo",
+      awayFoulPips: this.pips(d.awayTeamFouls, 5, d.awayTeamFouls >= 4 ? "var(--danger)" : "var(--muted)", "var(--dim)"),
+      advReb: [
+        { label: "RES OF.", fire: () => this.add("advRebOf", null) },
+        { label: "RES DEF.", fire: () => this.add("advRebDef", null) }
+      ],
+      advFouls: FOUL_TYPES.map(f => ({ label: f.label, fire: () => this.add("advFoul" + f.key, null) })),
+
+      foulTypes: FOUL_TYPES.map(f => ({
+        label: f.label,
+        pick: () => this.setState({ foulTypeC: f.key }),
+        style: s.foulTypeC === f.key
+          ? "background:var(--danger);border:1px solid var(--danger);color:var(--bg)"
+          : "background:var(--chip);border:1px solid var(--line);color:var(--text)"
+      })),
+      foulTypeLabel: (FOUL_TYPES.find(f => f.key === s.foulTypeC) || FOUL_TYPES[0]).label,
+
+      courtCountLabel: s.court.length + "/5 em campo",
+      subHint: pendingInPlayer
+        ? "Entra #" + pendingInPlayer.num + " " + pendingInPlayer.name + " — toca em quem sai"
+        : (s.court.length < 5 ? "Falta escolher " + (5 - s.court.length) + " — toca num jogador do banco" : "Toca num jogador do banco para o fazer entrar"),
+      bench: roster.filter(p => !s.court.includes(p.num)).map(p => ({
+        num: "#" + p.num, name: p.name,
+        line: d.stats[p.num].pts + " pts · " + d.stats[p.num].fouls + " F",
+        sub: () => this.sub(p.num),
+        style: s.pendingIn === p.num
+          ? "background:var(--accent);border:2px solid var(--accent);color:var(--accentInk)"
+          : "background:var(--chip);border:1px solid var(--line);color:var(--text)"
+      })),
+      courtA: roster.filter(p => s.court.includes(p.num)).map(p => ({
+        num: "#" + p.num, name: p.name,
+        pts: d.stats[p.num].pts, reb: d.stats[p.num].reb, ast: d.stats[p.num].ast, fouls: d.stats[p.num].fouls,
+        foulPips: foulPipsFor(p.num),
+        select: () => { if (s.pendingIn) this.sub(p.num); else this.setState(st => ({ selA: st.selA === p.num ? null : p.num })); },
+        cardStyle: s.pendingIn
+          ? "background:var(--panel);border:2px dashed var(--danger)"
+          : s.selA === p.num
+            ? "background:var(--accentSoft);border:2px solid var(--accent);box-shadow:0 0 0 4px var(--accentSoft)"
+            : "background:var(--panel);border:2px solid var(--line)",
+        numStyle: s.selA === p.num ? "color:var(--accent)" : "color:var(--muted)"
+      })),
+      selNum: selPlayer ? "#" + selPlayer.num : "—",
+      selName: selPlayer ? selPlayer.name : "Nenhum jogador selecionado",
+      selHint: selPlayer ? "Escolhe a ação a registar" : "Toca num jogador em campo",
+      selBannerStyle: armedA
+        ? "background:var(--accentSoft);border:1px solid var(--accent);color:var(--text)"
+        : "background:var(--chip);border:1px dashed var(--line);color:var(--muted)",
+      actionsA: actionDefs.map(a => ({
+        label: a.label, sub: a.sub,
+        style: tone(a.tone, armedA, false),
+        fire: () => { if (armedA) this.add(a.kind, s.selA); }
+      })),
+
+      actionsB: actionDefs.map(a => ({
+        label: a.label, sub: a.sub,
+        style: tone(a.tone, true, pending === a.kind),
+        pick: () => this.setState(st => ({ pendingB: st.pendingB === a.kind ? null : a.kind }))
+      })),
+      pendingHint: pending ? NAMES[pending] + " — toca no jogador" : "Escolhe primeiro a ação acima",
+      pendingHintStyle: pending ? "color:var(--accent)" : "color:var(--muted)",
+      courtB: roster.filter(p => s.court.includes(p.num)).map(p => ({
+        num: "#" + p.num, name: p.name,
+        line: d.stats[p.num].pts + " pts · " + d.stats[p.num].reb + " res",
+        foulPips: foulPipsFor(p.num),
+        assign: () => { if (s.pendingIn) this.sub(p.num); else if (pending) this.add(pending, p.num); },
+        cardStyle: s.pendingIn
+          ? "background:var(--panel);border:2px dashed var(--danger)"
+          : pending
+          ? "background:var(--panel);border:2px solid var(--accent);box-shadow:0 0 0 3px var(--accentSoft)"
+          : "background:var(--panel);border:2px solid var(--line);opacity:0.85",
+        numStyle: pending ? "color:var(--accent)" : "color:var(--muted)"
+      })),
+
+      rowsC: roster.map(p => {
+        const st = d.stats[p.num];
+        return {
+          num: "#" + p.num, name: p.name, pts: st.pts,
+          status: s.court.includes(p.num) ? "EM CAMPO ↓" : "BANCO ↑",
+          statusStyle: s.court.includes(p.num)
+            ? "background:var(--accentSoft);border:1px solid var(--accent);color:var(--accent)"
+            : (s.court.length < 5 ? "background:var(--chip);border:1px solid var(--accent);color:var(--accent)" : "background:var(--chip);border:1px solid var(--line);color:var(--muted)"),
+          toggleCourt: () => this.sub(p.num),
+          rebLabel: "RES " + st.reb,
+          astLabel: "AST " + st.ast,
+          foulLabel: "F " + st.fouls,
+          rowStyle: s.court.includes(p.num)
+            ? "background:var(--panel);border:1px solid var(--line)"
+            : "background:transparent;border:1px dashed var(--line);opacity:0.72",
+          p1: () => this.add("make1", p.num),
+          p2: () => this.add("make2", p.num),
+          p3: () => this.add("make3", p.num),
+          miss1: () => this.add("miss1", p.num),
+          miss2: () => this.add("miss2", p.num),
+          miss3: () => this.add("miss3", p.num),
+          reb: () => this.add("rebDef", p.num),
+          ast: () => this.add("ast", p.num),
+          foul: () => this.add("foul" + (this.state.foulTypeC || "Def"), p.num)
+        };
+      }),
+
+      eventCount: s.events.length + (s.events.length === 1 ? " registo" : " registos"),
+      timeline: (s.events.length ? s.events.slice(0, 4) : []).map(e => {
+        const isAdv = e.kind === "away" || e.kind.indexOf("adv") === 0;
+        const who = isAdv ? "Adversário" : "#" + e.num + " " + (roster.find(p => p.num === e.num) || {}).name;
+        const what = e.kind === "away" ? e.pts + (e.pts > 1 ? " pontos" : " ponto") : NAMES[e.kind];
+        return { time: e.time, text: who + " · " + what, score: this.runningScore(e.id), remove: () => this.setState(st => ({ events: st.events.filter(x => x.id !== e.id) })) };
+      })
+    };
+  }
+}
+
+</script>
+</body>
+</html>
