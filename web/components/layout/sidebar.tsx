@@ -50,6 +50,7 @@ const playerAreaItems = [
 const seccionistaItems = [
   { label: "Jogos",        href: "/jogos",        icon: Calendar },
   { label: "Estatísticas", href: "/estatisticas", icon: BarChart3 },
+  { label: "Palmarés",     href: "/palmares",     icon: Trophy    },
 ];
 
 const communicationItems = [

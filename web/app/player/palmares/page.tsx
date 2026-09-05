@@ -1,5 +1,5 @@
 import { PalmaresView } from "@/components/palmares/palmares-view";
 
-export default function PalmaresPage() {
+export default function PlayerPalmaresPage() {
   return <PalmaresView />;
 }
