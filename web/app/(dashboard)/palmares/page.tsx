@@ -178,7 +178,7 @@ function TrophyCard({
             }}
           >
             <p style={{ color: "#6f6a5f", fontFamily: "inherit", fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5 }}>
-              Peça Nº {String(piece.pieceNo).padStart(2, "0")}
+              Troféu Nº {String(piece.pieceNo).padStart(2, "0")}
             </p>
             <p className="palmares-serif" style={{ color: tier.solid, fontSize: 22, fontWeight: 600, lineHeight: 1.15 }}>
               {tier.label}
@@ -251,7 +251,7 @@ function TrophyModal({ piece, onClose }: { piece: Piece; onClose: () => void }) 
         />
 
         <p style={{ color: "#6f6a5f", fontFamily: "inherit", fontSize: 9, letterSpacing: "0.25em", textTransform: "uppercase", marginBottom: 8 }}>
-          Peça Nº {String(piece.pieceNo).padStart(2, "0")}
+          Troféu Nº {String(piece.pieceNo).padStart(2, "0")}
         </p>
         <p className="palmares-serif" style={{ color: tier.solid, fontSize: 32, fontWeight: 600, lineHeight: 1.1, textAlign: "center" }}>
           {tier.label}
