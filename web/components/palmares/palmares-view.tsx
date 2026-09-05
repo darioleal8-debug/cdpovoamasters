@@ -302,7 +302,7 @@ function ConfirmDelete({ piece, onClose, onDeleted }: { piece: Piece; onClose: (
 }
 
 /* ─── Main view (shared between dashboard and player area) ──────────────── */
-export function PalmaresView() {
+export function PalmaresView({ allowAdmin = true }: { allowAdmin?: boolean }) {
   const [entries,    setEntries]    = useState<Entry[]>([]);
   const [loading,    setLoading]    = useState(true);
   const [isAdmin,    setIsAdmin]    = useState(false);
@@ -312,13 +312,14 @@ export function PalmaresView() {
   const [toDelete,   setToDelete]   = useState<Piece | null>(null);
 
   useEffect(() => {
+    if (!allowAdmin) return;
     const sb = createClient();
     sb.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
       const { data: profile } = await sb.from("users").select("role").eq("id", user.id).single();
       setIsAdmin(profile?.role === "admin");
     });
-  }, []);
+  }, [allowAdmin]);
 
   useEffect(() => {
     fetch("/api/palmares")
