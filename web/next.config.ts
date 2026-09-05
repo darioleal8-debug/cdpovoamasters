@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 
+// Build root: web/
 const nextConfig: NextConfig = {
   serverExternalPackages: ["pdf-parse", "xlsx", "@anthropic-ai/sdk"],
   images: {
