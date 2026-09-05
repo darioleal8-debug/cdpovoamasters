@@ -315,7 +315,7 @@ export function PalmaresView() {
     const sb = createClient();
     sb.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
-      const { data: profile } = await sb.from("users").select("role").eq("email", user.email!).single();
+      const { data: profile } = await sb.from("users").select("role").eq("id", user.id).single();
       setIsAdmin(profile?.role === "admin");
     });
   }, []);
