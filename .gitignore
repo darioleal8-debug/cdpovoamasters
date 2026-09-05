@@ -10,3 +10,20 @@ node_modules
 
 .vercel
 .env*
+
+# Root-level Next.js legacy app (the real app lives in web/)
+/app/
+/components/
+/hooks/
+/lib/
+/src/
+/types/
+/middleware.ts
+/next.config.ts
+/next-env.d.ts
+/package.json
+/package-lock.json
+/postcss.config.mjs
+/tailwind.config.ts
+/tsconfig.json
+/tsconfig.tsbuildinfo
