@@ -92,22 +92,24 @@ export default function JogadoresPage() {
     if (!editing) return;
     setSubmitting(true);
     try {
-      const ok = await updatePlayer(editing.player_id, editing.user_id, {
+      const result = await updatePlayer(editing.player_id, editing.user_id, {
         number:   formData.number   ? Number(formData.number)   : null,
         position: (formData.position as PlayerPosition) || null,
         height:   formData.height   ? Number(formData.height)   : null,
         weight:   formData.weight   ? Number(formData.weight)   : null,
         age:      formData.age      ? Number(formData.age)      : null,
       });
-      if (photoResult && photoResult.originalFile.size > 0) {
-        await updatePlayerPhoto(editing.player_id, editing.user_id, photoResult.originalFile, {
+      // Usa o ID real devolvido — essencial quando o perfil foi criado neste submit
+      // (editing.player_id seria null mas result.playerId tem o novo UUID)
+      if (result.ok && photoResult && photoResult.originalFile.size > 0) {
+        await updatePlayerPhoto(result.playerId, editing.user_id, photoResult.originalFile, {
           processedBlob:   photoResult.processedBlob ?? undefined,
           focalY:          photoResult.focalY,
           focalX:          photoResult.focalX,
           templateVersion: photoResult.templateVersion,
         });
       }
-      if (ok) setDialogOpen(false);
+      if (result.ok) setDialogOpen(false);
     } finally {
       setSubmitting(false);
     }

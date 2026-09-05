@@ -112,11 +112,13 @@ export function useRoster(seasonId: string | null) {
   }
 
   // Editar dados desportivos — cria o perfil se ainda não existir nesta época
+  // Devolve { ok, playerId } para que o chamador possa usar o ID real mesmo quando
+  // o perfil foi criado de raiz (o playerId original era null).
   async function updatePlayer(
     playerId: string | null,
     userId: string,
     data: UpdatePlayerData
-  ): Promise<boolean> {
+  ): Promise<{ ok: boolean; playerId: string | null }> {
     const patch: Record<string, unknown> = {
       number:   data.number   ?? null,
       position: data.position ?? null,
@@ -130,24 +132,25 @@ export function useRoster(seasonId: string | null) {
       const { error } = await supabase.from("players").update(patch).eq("id", playerId);
       if (error) {
         toast({ title: "Erro ao guardar", description: error.message, variant: "destructive" });
-        return false;
+        return { ok: false, playerId: null };
       }
     } else {
       // Criar perfil de jogador para esta época
-      const { error } = await supabase.from("players").insert({
-        ...patch,
-        user_id:   userId,
-        season_id: seasonId,
-      });
+      const { data: created, error } = await supabase
+        .from("players")
+        .insert({ ...patch, user_id: userId, season_id: seasonId })
+        .select("id")
+        .single();
       if (error) {
         toast({ title: "Erro ao criar perfil", description: error.message, variant: "destructive" });
-        return false;
+        return { ok: false, playerId: null };
       }
+      playerId = (created as { id: string }).id;
     }
 
     toast({ title: "Guardado com sucesso" });
     await load();
-    return true;
+    return { ok: true, playerId };
   }
 
   // Atualizar foto — vai ao API route (service role para Storage)

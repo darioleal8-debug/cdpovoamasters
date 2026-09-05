@@ -87,18 +87,19 @@ export async function POST(req: NextRequest) {
   }
 
   // Campos obrigatórios
-  const name      = (fd.get("name")      as string | null)?.trim() ?? "";
-  const seasonId  = (fd.get("season_id") as string | null)?.trim() ?? "";
+  const userId   = (fd.get("user_id")   as string | null)?.trim() ?? "";
+  const seasonId = (fd.get("season_id") as string | null)?.trim() ?? "";
 
   // Campos opcionais
-  const teamId    = (fd.get("team_id")       as string | null)?.trim() || null;
-  const numberRaw = (fd.get("number")        as string | null)?.trim();
-  const position  = (fd.get("position")      as string | null)?.trim() || null;
-  const heightRaw = (fd.get("height")        as string | null)?.trim();
-  const ageRaw    = (fd.get("age")           as string | null)?.trim();
+  const name      = (fd.get("name")      as string | null)?.trim() || "";  // só para slug da foto
+  const teamId    = (fd.get("team_id")   as string | null)?.trim() || null;
+  const numberRaw = (fd.get("number")    as string | null)?.trim();
+  const position  = (fd.get("position")  as string | null)?.trim() || null;
+  const heightRaw = (fd.get("height")    as string | null)?.trim();
+  const ageRaw    = (fd.get("age")       as string | null)?.trim();
   const photo     = fd.get("photo") as File | null;
 
-  if (!name)     return fail("O nome do jogador é obrigatório");
+  if (!userId)   return fail("user_id é obrigatório");
   if (!seasonId) return fail("Seleciona uma temporada");
 
   if (numberRaw && (isNaN(Number(numberRaw)) || Number(numberRaw) < 0 || Number(numberRaw) > 99))
@@ -108,10 +109,9 @@ export async function POST(req: NextRequest) {
   if (ageRaw && (isNaN(Number(ageRaw)) || Number(ageRaw) < 10 || Number(ageRaw) > 100))
     return fail("Idade inválida (10–100)");
 
-  console.log("[api/players] POST", { name, seasonId, position, numberRaw });
+  console.log("[api/players] POST", { userId, seasonId, position, numberRaw });
 
-  // Duplicate check via constraint (UNIQUE name + season_id)
-  // Pré-verificação para dar mensagem clara antes de tentar inserir
+  // Verificar duplicado: um utilizador só pode ter um perfil por época
   let admin: ReturnType<typeof adminClient>;
   try {
     admin = adminClient();
@@ -123,16 +123,17 @@ export async function POST(req: NextRequest) {
     .from("players")
     .select("id")
     .eq("season_id", seasonId)
-    .ilike("name", name)
+    .eq("user_id", userId)
     .maybeSingle();
 
   if (dup) {
-    return fail(`Já existe um jogador com o nome "${name}" nesta temporada`, 409);
+    return fail("Este jogador já tem perfil nesta temporada", 409);
   }
 
   // Upload da foto (opcional — não bloqueia criação se falhar)
+  const photoSlug = name ? slugify(name) : userId.slice(0, 8);
   const photoUrl = photo && photo.size > 0
-    ? await uploadPhoto(admin, photo, `${seasonId}/${Date.now()}-${slugify(name)}`)
+    ? await uploadPhoto(admin, photo, `${seasonId}/${Date.now()}-${photoSlug}`)
     : null;
 
   // Inserir na tabela players
@@ -141,7 +142,7 @@ export async function POST(req: NextRequest) {
     .insert({
       season_id:  seasonId,
       team_id:    teamId,
-      name,
+      user_id:    userId,
       number:     numberRaw ? Number(numberRaw) : null,
       position:   position  || null,
       height:     heightRaw ? Number(heightRaw) : null,
@@ -186,7 +187,9 @@ export async function PATCH(req: NextRequest) {
   const focalY          = parseFloat((fd.get("focal_y") as string | null) ?? "0.3") || 0.3;
   const templateVersion = parseInt((fd.get("template_version") as string | null) ?? "0") || 0;
 
-  if (!playerId) return fail("player_id é obrigatório");
+  console.log("[PATCH /api/players] player_id:", JSON.stringify(playerId), "photo size:", photo?.size ?? 0);
+
+  if (!playerId) return fail("player_id em falta ou vazio", 400);
   if (!photo || photo.size === 0) return NextResponse.json({ success: true, message: "Sem foto para atualizar" });
 
   let admin: ReturnType<typeof adminClient>;
@@ -196,12 +199,16 @@ export async function PATCH(req: NextRequest) {
     return fail((e as Error).message, 500);
   }
 
-  const { data: existing } = await admin
+  const { data: existing, error: findError } = await admin
     .from("players")
     .select("id, season_id")
     .eq("id", playerId)
     .maybeSingle();
 
+  if (findError) {
+    console.error("[api/players PATCH] DB lookup error:", findError.message);
+    return fail(`Erro na base de dados: ${findError.message}`, 500);
+  }
   if (!existing) return fail("Jogador não encontrado", 404);
 
   const seasonId = existing.season_id as string;
