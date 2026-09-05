@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { X } from "lucide-react";
+import { X, Plus, Trash2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
 interface Entry {
@@ -114,63 +115,84 @@ function buildRooms(entries: Entry[]): Room[] {
 }
 
 /* ─── Trophy card (pedestal) ────────────────────────────────────────────── */
-function TrophyCard({ piece, onClick }: { piece: Piece; onClick: () => void }) {
+function TrophyCard({
+  piece, isAdmin, onOpen, onDelete,
+}: {
+  piece: Piece;
+  isAdmin: boolean;
+  onOpen: () => void;
+  onDelete: () => void;
+}) {
   const tier = TIER[piece.colocacao];
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex flex-col items-center w-full focus:outline-none"
-      aria-label={`${tier.label} — ${piece.competicao} ${piece.epoca}`}
-    >
-      {/* Spotlight */}
-      <div
-        className="w-4/5 h-16 -mb-6 transition-all duration-300 rounded-full"
-        style={{
-          background: "radial-gradient(ellipse 80px 60px at 50% 20%, rgba(201,162,75,0.30) 0%, rgba(201,162,75,0.04) 60%, transparent 85%)",
-        }}
-      />
+    <div className="group relative flex flex-col items-center w-full">
+      {/* Delete button (admin only) */}
+      {isAdmin && (
+        <button
+          type="button"
+          onClick={e => { e.stopPropagation(); onDelete(); }}
+          className="absolute top-1 right-1 z-20 p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+          style={{ background: "rgba(0,0,0,0.55)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.35)" }}
+          aria-label="Eliminar troféu"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
 
-      {/* Trophy */}
-      <div
-        className="relative z-10 flex items-end justify-center h-32 transition-transform duration-300 group-hover:-translate-y-2"
-        style={{ filter: `drop-shadow(0 8px 16px ${tier.solid}40)` }}
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex flex-col items-center w-full focus:outline-none"
+        aria-label={`${tier.label} — ${piece.competicao} ${piece.epoca}`}
       >
-        <Cup competicao={piece.competicao} col={piece.colocacao} sz={84} uid={piece.id} />
-      </div>
-
-      {/* Pedestal */}
-      <div
-        className="w-full rounded-b"
-        style={{
-          background: "linear-gradient(to bottom, rgba(201,162,75,0.12), rgba(201,162,75,0.03))",
-          borderTop: `1px solid ${tier.solid}50`,
-          paddingTop: 10,
-        }}
-      >
-        {/* Museum plaque */}
+        {/* Spotlight */}
         <div
-          className="mx-3 mb-3 px-3 py-2.5 text-center rounded-sm"
+          className="w-4/5 h-16 -mb-6 transition-all duration-300 rounded-full"
           style={{
-            background: "linear-gradient(to bottom, #1c1a14, #131109)",
-            border: "1px solid rgba(201,162,75,0.22)",
+            background: "radial-gradient(ellipse 80px 60px at 50% 20%, rgba(201,162,75,0.30) 0%, rgba(201,162,75,0.04) 60%, transparent 85%)",
+          }}
+        />
+
+        {/* Trophy */}
+        <div
+          className="relative z-10 flex items-end justify-center h-32 transition-transform duration-300 group-hover:-translate-y-2"
+          style={{ filter: `drop-shadow(0 8px 16px ${tier.solid}40)` }}
+        >
+          <Cup competicao={piece.competicao} col={piece.colocacao} sz={84} uid={piece.id} />
+        </div>
+
+        {/* Pedestal */}
+        <div
+          className="w-full rounded-b"
+          style={{
+            background: "linear-gradient(to bottom, rgba(201,162,75,0.12), rgba(201,162,75,0.03))",
+            borderTop: `1px solid ${tier.solid}50`,
+            paddingTop: 10,
           }}
         >
-          <p style={{ color: "#6f6a5f", fontFamily: "inherit", fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 4 }}>
-            Peça Nº {String(piece.pieceNo).padStart(2, "0")}
-          </p>
-          <p className="palmares-serif" style={{ color: tier.solid, fontSize: 20, fontWeight: 600, lineHeight: 1.15 }}>
-            {tier.label}
-          </p>
-          <p className="palmares-serif" style={{ color: "#a8a296", fontSize: 13, marginTop: 2 }}>
-            {piece.competicao}
-          </p>
-          <p className="palmares-serif" style={{ color: "#6f6a5f", fontSize: 11, marginTop: 3, fontStyle: "italic" }}>
-            Época {piece.epoca}
-          </p>
+          <div
+            className="mx-3 mb-3 px-3 py-2.5 text-center rounded-sm"
+            style={{
+              background: "linear-gradient(to bottom, #1c1a14, #131109)",
+              border: "1px solid rgba(201,162,75,0.22)",
+            }}
+          >
+            <p style={{ color: "#6f6a5f", fontFamily: "inherit", fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 4 }}>
+              Peça Nº {String(piece.pieceNo).padStart(2, "0")}
+            </p>
+            <p className="palmares-serif" style={{ color: tier.solid, fontSize: 20, fontWeight: 600, lineHeight: 1.15 }}>
+              {tier.label}
+            </p>
+            <p className="palmares-serif" style={{ color: "#a8a296", fontSize: 13, marginTop: 2 }}>
+              {piece.competicao}
+            </p>
+            <p className="palmares-serif" style={{ color: "#6f6a5f", fontSize: 11, marginTop: 3, fontStyle: "italic" }}>
+              Época {piece.epoca}
+            </p>
+          </div>
         </div>
-      </div>
-    </button>
+      </button>
+    </div>
   );
 }
 
@@ -178,7 +200,6 @@ function TrophyCard({ piece, onClick }: { piece: Piece; onClick: () => void }) {
 function TrophyModal({ piece, onClose }: { piece: Piece; onClose: () => void }) {
   const tier = TIER[piece.colocacao];
 
-  // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
@@ -200,7 +221,6 @@ function TrophyModal({ piece, onClose }: { piece: Piece; onClose: () => void }) 
         }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Close button */}
         <button
           onClick={onClose}
           className="absolute top-3 right-3 p-1.5 rounded-full hover:bg-white/10 transition-colors"
@@ -210,7 +230,6 @@ function TrophyModal({ piece, onClose }: { piece: Piece; onClose: () => void }) 
           <X className="h-4 w-4" />
         </button>
 
-        {/* Spotlight top */}
         <div
           className="absolute top-0 left-0 right-0 rounded-t-lg pointer-events-none"
           style={{
@@ -219,7 +238,6 @@ function TrophyModal({ piece, onClose }: { piece: Piece; onClose: () => void }) 
           }}
         />
 
-        {/* Trophy */}
         <div
           className="relative z-10 mt-6"
           style={{ filter: `drop-shadow(0 12px 24px ${tier.solid}50)` }}
@@ -227,7 +245,6 @@ function TrophyModal({ piece, onClose }: { piece: Piece; onClose: () => void }) 
           <Cup competicao={piece.competicao} col={piece.colocacao} sz={150} uid={`modal-${piece.id}`} />
         </div>
 
-        {/* Divider */}
         <div
           className="w-full mt-6 mb-5"
           style={{ height: 1, background: `linear-gradient(to right, transparent, ${tier.solid}80, transparent)` }}
@@ -268,13 +285,282 @@ function TrophyModal({ piece, onClose }: { piece: Piece; onClose: () => void }) 
   );
 }
 
+/* ─── Add trophy modal ──────────────────────────────────────────────────── */
+function AddModal({ onClose, onSaved }: { onClose: () => void; onSaved: (e: Entry) => void }) {
+  const [epoca,      setEpoca]      = useState("");
+  const [competicao, setCompeticao] = useState<"Liga"|"Taça">("Liga");
+  const [colocacao,  setColocacao]  = useState<1|2|3>(1);
+  const [saving,     setSaving]     = useState(false);
+  const [err,        setErr]        = useState("");
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setErr("");
+    if (!epoca.trim()) { setErr("Indica a época (ex: 2023/24)"); return; }
+    setSaving(true);
+    try {
+      const res  = await fetch("/api/palmares", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ epoca: epoca.trim(), competicao, colocacao }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setErr(json.error ?? "Erro ao guardar"); return; }
+      onSaved(json.entry);
+    } catch {
+      setErr("Erro de rede");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const inputStyle: React.CSSProperties = {
+    background: "#0d0b08",
+    border: "1px solid rgba(201,162,75,0.28)",
+    borderRadius: 4,
+    color: "#f5f1e8",
+    padding: "8px 12px",
+    fontSize: 14,
+    width: "100%",
+    outline: "none",
+  };
+  const labelStyle: React.CSSProperties = {
+    color: "#6f6a5f",
+    fontSize: 9,
+    letterSpacing: "0.2em",
+    textTransform: "uppercase",
+    display: "block",
+    marginBottom: 6,
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.88)" }}
+      onClick={onClose}
+    >
+      <form
+        onSubmit={submit}
+        className="relative w-full max-w-sm rounded-lg p-8"
+        style={{
+          background: "linear-gradient(to bottom, #181610, #0d0b08)",
+          border: "1px solid rgba(201,162,75,0.28)",
+          boxShadow: "0 0 60px rgba(201,162,75,0.10), 0 24px 48px rgba(0,0,0,0.6)",
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-3 right-3 p-1.5 rounded-full hover:bg-white/10 transition-colors"
+          style={{ color: "#6f6a5f" }}
+          aria-label="Fechar"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        <p className="palmares-serif" style={{ color: "#c9a24b", fontSize: 22, fontWeight: 600, marginBottom: 24 }}>
+          Adicionar Troféu
+        </p>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={labelStyle}>Época</label>
+          <input
+            style={inputStyle}
+            placeholder="ex: 2023/24"
+            value={epoca}
+            onChange={e => setEpoca(e.target.value)}
+            autoFocus
+          />
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={labelStyle}>Competição</label>
+          <select
+            style={inputStyle}
+            value={competicao}
+            onChange={e => setCompeticao(e.target.value as "Liga"|"Taça")}
+          >
+            <option value="Liga">Liga</option>
+            <option value="Taça">Taça</option>
+          </select>
+        </div>
+
+        <div style={{ marginBottom: 24 }}>
+          <label style={labelStyle}>Colocação</label>
+          <select
+            style={inputStyle}
+            value={colocacao}
+            onChange={e => setColocacao(Number(e.target.value) as 1|2|3)}
+          >
+            <option value={1}>1.º lugar — Campeão</option>
+            <option value={2}>2.º lugar — Vice-Campeão</option>
+            <option value={3}>3.º lugar</option>
+          </select>
+        </div>
+
+        {err && (
+          <p style={{ color: "#f87171", fontSize: 13, marginBottom: 14 }}>{err}</p>
+        )}
+
+        <button
+          type="submit"
+          disabled={saving}
+          className="w-full py-2.5 rounded transition-all"
+          style={{
+            background: saving ? "rgba(201,162,75,0.15)" : "rgba(201,162,75,0.18)",
+            border: "1px solid rgba(201,162,75,0.45)",
+            color: "#c9a24b",
+            fontFamily: "'Cormorant Garamond', Georgia, serif",
+            fontSize: 14,
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+            cursor: saving ? "not-allowed" : "pointer",
+          }}
+        >
+          {saving ? "A guardar…" : "Guardar"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+/* ─── Delete confirmation modal ─────────────────────────────────────────── */
+function ConfirmDelete({ piece, onClose, onDeleted }: {
+  piece: Piece;
+  onClose: () => void;
+  onDeleted: (id: string) => void;
+}) {
+  const [deleting, setDeleting] = useState(false);
+  const [err,      setErr]      = useState("");
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  async function doDelete() {
+    setDeleting(true);
+    setErr("");
+    try {
+      const res = await fetch(`/api/palmares/${piece.id}`, { method: "DELETE" });
+      if (!res.ok) { const j = await res.json(); setErr(j.error ?? "Erro"); return; }
+      onDeleted(piece.id);
+    } catch {
+      setErr("Erro de rede");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const tier = TIER[piece.colocacao];
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.88)" }}
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-sm rounded-lg p-8 text-center"
+        style={{
+          background: "linear-gradient(to bottom, #181610, #0d0b08)",
+          border: "1px solid rgba(239,68,68,0.28)",
+          boxShadow: "0 0 60px rgba(239,68,68,0.08), 0 24px 48px rgba(0,0,0,0.6)",
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-3 right-3 p-1.5 rounded-full hover:bg-white/10 transition-colors"
+          style={{ color: "#6f6a5f" }}
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        <div style={{ marginBottom: 16, display: "flex", justifyContent: "center" }}>
+          <Cup competicao={piece.competicao} col={piece.colocacao} sz={64} uid={`del-${piece.id}`} />
+        </div>
+        <p className="palmares-serif" style={{ color: "#f5f1e8", fontSize: 20, fontWeight: 600, marginBottom: 6 }}>
+          Eliminar troféu?
+        </p>
+        <p className="palmares-serif" style={{ color: tier.solid, fontSize: 15, marginBottom: 4 }}>
+          {tier.label} · {piece.competicao}
+        </p>
+        <p className="palmares-serif" style={{ color: "#a8a296", fontSize: 13, fontStyle: "italic", marginBottom: 24 }}>
+          Época {piece.epoca}
+        </p>
+
+        {err && <p style={{ color: "#f87171", fontSize: 13, marginBottom: 12 }}>{err}</p>}
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-2 rounded transition-all"
+            style={{
+              border: "1px solid rgba(255,255,255,0.12)",
+              color: "#a8a296",
+              fontSize: 13,
+              letterSpacing: "0.1em",
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={doDelete}
+            disabled={deleting}
+            className="flex-1 py-2 rounded transition-all"
+            style={{
+              background: deleting ? "rgba(239,68,68,0.08)" : "rgba(239,68,68,0.15)",
+              border: "1px solid rgba(239,68,68,0.4)",
+              color: "#f87171",
+              fontSize: 13,
+              letterSpacing: "0.1em",
+              cursor: deleting ? "not-allowed" : "pointer",
+            }}
+          >
+            {deleting ? "A eliminar…" : "Eliminar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Page ──────────────────────────────────────────────────────────────── */
 export default function PalmaresPage() {
   const [entries,    setEntries]    = useState<Entry[]>([]);
   const [loading,    setLoading]    = useState(true);
+  const [isAdmin,    setIsAdmin]    = useState(false);
   const [activeRoom, setActiveRoom] = useState(0);
   const [selected,   setSelected]   = useState<Piece | null>(null);
+  const [showAdd,    setShowAdd]    = useState(false);
+  const [toDelete,   setToDelete]   = useState<Piece | null>(null);
 
+  /* Check admin role */
+  useEffect(() => {
+    const sb = createClient();
+    sb.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+      const { data: profile } = await sb
+        .from("users")
+        .select("role")
+        .eq("email", user.email!)
+        .single();
+      setIsAdmin(profile?.role === "admin");
+    });
+  }, []);
+
+  /* Load entries */
   useEffect(() => {
     fetch("/api/palmares")
       .then(r => r.json())
@@ -283,18 +569,28 @@ export default function PalmaresPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const rooms      = buildRooms(entries);
-  const roomIdx    = Math.min(activeRoom, Math.max(rooms.length - 1, 0));
-  const current    = rooms[roomIdx] ?? { label: "", items: [] };
-  const titulos    = entries.filter(e => e.colocacao === 1).length;
-  const podios     = entries.length;
-  const lastTitle  = entries.find(e => e.colocacao === 1);
+  const rooms     = buildRooms(entries);
+  const roomIdx   = Math.min(activeRoom, Math.max(rooms.length - 1, 0));
+  const current   = rooms[roomIdx] ?? { label: "", items: [] };
+  const titulos   = entries.filter(e => e.colocacao === 1).length;
+  const podios    = entries.length;
+  const lastTitle = entries.find(e => e.colocacao === 1);
 
   const closeModal = useCallback(() => setSelected(null), []);
 
+  function handleSaved(entry: Entry) {
+    setEntries(prev => [entry, ...prev].sort((a, b) => b.epoca.localeCompare(a.epoca)));
+    setShowAdd(false);
+  }
+
+  function handleDeleted(id: string) {
+    setEntries(prev => prev.filter(e => e.id !== id));
+    setToDelete(null);
+    if (selected?.id === id) setSelected(null);
+  }
+
   return (
     <>
-      {/* Fonts & page-scoped styles */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap');
         .palmares-serif { font-family: 'Cormorant Garamond', Georgia, serif; }
@@ -310,19 +606,13 @@ export default function PalmaresPage() {
           min-width: 140px;
           text-align: center;
         }
-        .palmares-door:hover    { border-color: rgba(201,162,75,0.38); color: #f5f1e8; background: rgba(201,162,75,0.05); }
-        .palmares-door.active   { border-color: #c9a24b; background: rgba(201,162,75,0.09); color: #c9a24b; }
-        .palmares-card-wrap:hover .palmares-spotlight {
-          background: radial-gradient(ellipse 110px 80px at 50% 20%, rgba(201,162,75,0.50) 0%, rgba(201,162,75,0.07) 60%, transparent 85%) !important;
-        }
+        .palmares-door:hover  { border-color: rgba(201,162,75,0.38); color: #f5f1e8; background: rgba(201,162,75,0.05); }
+        .palmares-door.active { border-color: #c9a24b; background: rgba(201,162,75,0.09); color: #c9a24b; }
       `}</style>
 
-      {/* Full-bleed museum wrapper */}
-      <div
-        className="palmares-root -mx-4 md:-mx-6 -mt-6 px-4 md:px-6 pb-20 pt-10 min-h-screen"
-      >
+      <div className="palmares-root -mx-4 md:-mx-6 -mt-6 px-4 md:px-6 pb-20 pt-10 min-h-screen">
 
-        {/* ── Entrance header ── */}
+        {/* ── Header ── */}
         <div className="text-center mb-10">
           <div style={{ height: 1, background: "linear-gradient(to right, transparent, #c9a24b80, transparent)", maxWidth: 160, margin: "0 auto 18px" }} />
           <p
@@ -350,8 +640,8 @@ export default function PalmaresPage() {
         {!loading && podios > 0 && (
           <div className="flex justify-center flex-wrap gap-8 md:gap-16 mb-10">
             {[
-              { val: titulos,         sub: "Títulos" },
-              { val: podios,          sub: "Pódios" },
+              { val: titulos,                 sub: "Títulos"          },
+              { val: podios,                  sub: "Pódios"           },
               { val: lastTitle?.epoca ?? "—", sub: "Última conquista" },
             ].map(s => (
               <div key={s.sub} className="text-center">
@@ -363,6 +653,28 @@ export default function PalmaresPage() {
                 </p>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* ── Admin: add button ── */}
+        {isAdmin && (
+          <div className="flex justify-center mb-8">
+            <button
+              type="button"
+              onClick={() => setShowAdd(true)}
+              className="flex items-center gap-2 px-5 py-2 rounded transition-all hover:bg-white/8"
+              style={{
+                border: "1px solid rgba(201,162,75,0.38)",
+                color: "#c9a24b",
+                fontFamily: "'Cormorant Garamond', Georgia, serif",
+                fontSize: 13,
+                letterSpacing: "0.2em",
+                textTransform: "uppercase",
+              }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Adicionar troféu
+            </button>
           </div>
         )}
 
@@ -379,21 +691,19 @@ export default function PalmaresPage() {
             <p className="palmares-serif" style={{ color: "#6f6a5f", fontSize: 24 }}>
               Nenhum título registado ainda.
             </p>
-            <p style={{ color: "#6f6a5f", fontSize: 13, marginTop: 8 }}>
-              Pede a um administrador para adicionar registos na tabela <code>palmares</code>.
-            </p>
+            {isAdmin && (
+              <p style={{ color: "#6f6a5f", fontSize: 13, marginTop: 8 }}>
+                Clica em "Adicionar troféu" para registar o primeiro.
+              </p>
+            )}
           </div>
         )}
 
         {/* ── Rooms + grid ── */}
         {!loading && !!entries.length && (
           <>
-            {/* Room selector (doors) */}
             {rooms.length > 1 && (
-              <div
-                className="flex justify-center gap-4 mb-12"
-                style={{ overflowX: "auto", padding: "0 4px 4px" }}
-              >
+              <div className="flex justify-center gap-4 mb-12" style={{ overflowX: "auto", padding: "0 4px 4px" }}>
                 {rooms.map((room, i) => (
                   <button
                     key={i}
@@ -412,23 +722,34 @@ export default function PalmaresPage() {
               </div>
             )}
 
-            {/* Trophy grid */}
             <div
               className="grid gap-5 max-w-3xl mx-auto"
               style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 220px), 1fr))" }}
             >
               {current.items.map(piece => (
-                <div key={piece.id} className="palmares-card-wrap">
-                  <TrophyCard piece={piece} onClick={() => setSelected(piece)} />
-                </div>
+                <TrophyCard
+                  key={piece.id}
+                  piece={piece}
+                  isAdmin={isAdmin}
+                  onOpen={() => setSelected(piece)}
+                  onDelete={() => setToDelete(piece)}
+                />
               ))}
             </div>
           </>
         )}
       </div>
 
-      {/* ── Modal ── */}
-      {selected && <TrophyModal piece={selected} onClose={closeModal} />}
+      {/* Modals */}
+      {selected && <TrophyModal   piece={selected} onClose={closeModal} />}
+      {showAdd  && <AddModal      onClose={() => setShowAdd(false)} onSaved={handleSaved} />}
+      {toDelete && (
+        <ConfirmDelete
+          piece={toDelete}
+          onClose={() => setToDelete(null)}
+          onDeleted={handleDeleted}
+        />
+      )}
     </>
   );
 }
