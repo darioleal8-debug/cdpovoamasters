@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   MessageSquare,
   Settings,
+  Trophy,
   Users,
   UserCog,
   FileUp,
@@ -38,6 +39,7 @@ const managementItems = [
   { label: "Pagamentos",       href: "/pagamentos",    icon: CreditCard },
   { label: "Estatísticas",     href: "/estatisticas",  icon: BarChart3 },
   { label: "Histórico",        href: "/historico",     icon: History   },
+  { label: "Palmarés",         href: "/palmares",      icon: Trophy    },
 ];
 
 const playerAreaItems = [
