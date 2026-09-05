@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { CheckCircle2, Copy, Check, ExternalLink, Loader2, Mail, UserPlus } from "lucide-react";
+import { ageLabel } from "@/lib/age";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -157,18 +158,19 @@ function SuccessScreen({
 export function CreatePlayerAccountModal({ open, onClose }: Props) {
   const { seasons, activeSeason, loading: seasonsLoading } = useSeasons();
 
-  const [role,      setRole]      = useState("jogador");
-  const [name,      setName]      = useState("");
-  const [email,     setEmail]     = useState("");
-  const [password,  setPassword]  = useState("");
-  const [phone,     setPhone]     = useState("");
-  const [birthDate, setBirthDate] = useState("");
-  const [seasonId,  setSeasonId]  = useState("");
-  const [jersey,    setJersey]    = useState("");
-  const [position,  setPosition]  = useState("");
-  const [height,    setHeight]    = useState("");
-  const [weight,    setWeight]    = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [role,       setRole]       = useState("jogador");
+  const [alsoPlayer, setAlsoPlayer] = useState(false);
+  const [name,       setName]       = useState("");
+  const [email,      setEmail]      = useState("");
+  const [password,   setPassword]   = useState("");
+  const [phone,      setPhone]      = useState("");
+  const [birthDate,  setBirthDate]  = useState("");
+  const [seasonId,   setSeasonId]   = useState("");
+  const [jersey,     setJersey]     = useState("");
+  const [position,   setPosition]   = useState("");
+  const [height,     setHeight]     = useState("");
+  const [weight,     setWeight]     = useState("");
+  const [submitting, setSubmitting]  = useState(false);
 
   // Resultado pós-criação
   const [created,     setCreated]     = useState<{ name: string; email: string } | null>(null);
@@ -180,9 +182,10 @@ export function CreatePlayerAccountModal({ open, onClose }: Props) {
   }, [open, activeSeason]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isPlayer = role === "jogador";
+  const needsPlayerFields = isPlayer || alsoPlayer;
 
   function reset() {
-    setRole("jogador"); setName(""); setEmail(""); setPassword("");
+    setRole("jogador"); setAlsoPlayer(false); setName(""); setEmail(""); setPassword("");
     setPhone(""); setBirthDate(""); setSeasonId("");
     setJersey(""); setPosition(""); setHeight(""); setWeight("");
     setCreated(null); setActivation(null); setPlayerError(null);
@@ -200,12 +203,12 @@ export function CreatePlayerAccountModal({ open, onClose }: Props) {
       toast({ title: "Telemóvel obrigatório para jogadores", variant: "destructive" });
       return;
     }
-    if (isPlayer && !birthDate.trim()) {
-      toast({ title: "Data de nascimento obrigatória para jogadores", variant: "destructive" });
+    if (needsPlayerFields && !birthDate.trim()) {
+      toast({ title: "Data de nascimento obrigatória", variant: "destructive" });
       return;
     }
-    if (isPlayer && !seasonId) {
-      toast({ title: "Temporada obrigatória para jogadores", variant: "destructive" });
+    if (needsPlayerFields && !seasonId) {
+      toast({ title: "Temporada obrigatória", variant: "destructive" });
       return;
     }
 
@@ -219,13 +222,14 @@ export function CreatePlayerAccountModal({ open, onClose }: Props) {
           email:         email.trim(),
           password:      password.trim(),
           role,
-          phone:         phone.trim()     || undefined,
-          birth_date:    birthDate.trim() || undefined,
-          season_id:     isPlayer ? seasonId     : undefined,
-          jersey_number: isPlayer && jersey.trim()   ? jersey.trim()   : undefined,
-          position:      isPlayer && position.trim() ? position.trim() : undefined,
-          height:        isPlayer && height.trim()   ? height.trim()   : undefined,
-          weight:        isPlayer && weight.trim()   ? weight.trim()   : undefined,
+          also_player:   alsoPlayer,
+          phone:         phone.trim()           || undefined,
+          birth_date:    birthDate.trim()        || undefined,
+          season_id:     needsPlayerFields ? seasonId : undefined,
+          jersey_number: needsPlayerFields && jersey.trim()   ? jersey.trim()   : undefined,
+          position:      needsPlayerFields && position.trim() ? position.trim() : undefined,
+          height:        needsPlayerFields && height.trim()   ? height.trim()   : undefined,
+          weight:        needsPlayerFields && weight.trim()   ? weight.trim()   : undefined,
         }),
       });
 
@@ -281,15 +285,29 @@ export function CreatePlayerAccountModal({ open, onClose }: Props) {
           {/* Tipo de conta */}
           <div className="space-y-1.5">
             <Label>Tipo de Conta</Label>
-            <Select value={role} onValueChange={setRole}>
+            <Select value={role} onValueChange={(v) => { setRole(v); if (v === "jogador") setAlsoPlayer(false); }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="jogador">Jogador</SelectItem>
                 <SelectItem value="treinador">Treinador</SelectItem>
+                <SelectItem value="seccionista">Seccionista</SelectItem>
                 <SelectItem value="admin">Administrador</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {/* Acumula função de jogador */}
+          {!isPlayer && (
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-border accent-primary"
+                checked={alsoPlayer}
+                onChange={(e) => setAlsoPlayer(e.target.checked)}
+              />
+              <span className="text-sm">Acumula função de jogador</span>
+            </label>
+          )}
 
           <Separator />
 
@@ -323,16 +341,19 @@ export function CreatePlayerAccountModal({ open, onClose }: Props) {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="acc-birth">
-              Data de Nascimento {isPlayer ? "*" : "(opcional)"}
+              Data de Nascimento {needsPlayerFields ? "*" : "(opcional)"}
             </Label>
             <Input id="acc-birth" type="date" value={birthDate}
               onChange={(e) => setBirthDate(e.target.value)}
-              max={maxBirthDate()} required={isPlayer} />
-            <p className="text-[11px] text-muted-foreground">Idade mínima: 16 anos</p>
+              max={maxBirthDate()} required={needsPlayerFields} />
+            <p className="text-[11px] text-muted-foreground">
+              Idade mínima: 16 anos
+              {birthDate && ageLabel(birthDate) ? ` · ${ageLabel(birthDate)}` : ""}
+            </p>
           </div>
 
           {/* Dados de jogador */}
-          {isPlayer && (
+          {needsPlayerFields && (
             <>
               <Separator />
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground pt-1">

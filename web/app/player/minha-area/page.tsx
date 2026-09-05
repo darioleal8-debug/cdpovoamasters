@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { Calendar, CreditCard, Dumbbell, User } from "lucide-react";
+import { AlertTriangle, Calendar, CreditCard, Dumbbell, User } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { NextGameCard } from "@/components/games/next-game-card";
 import Link from "next/link";
@@ -35,12 +35,29 @@ export default async function MinhaAreaPage() {
     .order("training_date", { ascending: true })
     .limit(3);
 
+  const { data: activeSeason } = await supabase
+    .from("seasons")
+    .select("id")
+    .eq("status", "ativa")
+    .maybeSingle();
+
   // Player profile vinculado a este utilizador (para destacar nas convocatórias)
   const { data: linkedPlayer } = await supabase
     .from("players")
     .select("id")
     .eq("user_id", user.id)
     .maybeSingle();
+
+  let isPaymentLate = false;
+  if (linkedPlayer?.id && activeSeason?.id) {
+    const { data: paymentSummary } = await supabase
+      .from("player_payment_summary")
+      .select("months_late")
+      .eq("player_id", linkedPlayer.id)
+      .eq("season_id", activeSeason.id)
+      .maybeSingle();
+    isPaymentLate = (paymentSummary?.months_late ?? 0) > 0;
+  }
 
   const name = profile?.name || user.email || "Jogador";
 
@@ -50,6 +67,26 @@ export default async function MinhaAreaPage() {
         <h1 className="text-2xl font-bold tracking-tight">Olá, {name.split(" ")[0]}!</h1>
         <p className="text-muted-foreground">Bem-vindo à tua área pessoal.</p>
       </div>
+
+      {/* ── Aviso de quotas em atraso ── */}
+      {isPaymentLate && (
+        <div className="rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 dark:border-amber-700/40 dark:bg-amber-950/20">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+            <div>
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                Quotas em atraso
+              </p>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                Tens quotas por pagar. Enquanto não regularizares a situação, não poderás ser convocado para jogos.{" "}
+                <Link href="/player/meus-pagamentos" className="underline font-medium">
+                  Ver pagamentos
+                </Link>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Próximo jogo em destaque ── */}
       <NextGameCard highlightPlayerId={linkedPlayer?.id ?? null} />

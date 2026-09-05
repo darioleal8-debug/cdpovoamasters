@@ -28,17 +28,24 @@ export default async function MeusJogosPage() {
   const pastList     = (past     ?? []) as Game[];
   const allGames     = [...upcomingList, ...pastList];
 
+  // players.name foi removido na migration 041 — enriquecer via v_roster
   const gameIds = allGames.map((g) => g.id);
   const { data: callupRows } = gameIds.length
-    ? await supabase.from("game_callups").select("game_id, player:players(id, name, number)")
-        .in("game_id", gameIds)
-    : { data: [] as { game_id: string; player: { id: string; name: string; number: number | null } | null }[] };
+    ? await supabase.from("game_callups").select("game_id, player_id").in("game_id", gameIds)
+    : { data: [] as { game_id: string; player_id: string }[] };
+
+  const callupPlayerIds = [...new Set((callupRows ?? []).map((r) => r.player_id as string))];
+  const { data: rosterRows } = callupPlayerIds.length > 0
+    ? await supabase.from("v_roster").select("player_id, name, number").in("player_id", callupPlayerIds)
+    : { data: [] };
+  const rosterById = new Map((rosterRows ?? []).map((r) => [r.player_id as string, r]));
 
   const callupsByGame = new Map<string, CalledUpPlayer[]>();
-  for (const row of (callupRows ?? []) as { game_id: string; player: { id: string; name: string; number: number | null } | null }[]) {
-    if (!row.player) continue;
+  for (const row of (callupRows ?? []) as { game_id: string; player_id: string }[]) {
+    const r = rosterById.get(row.player_id);
+    if (!r) continue;
     const list = callupsByGame.get(row.game_id) ?? [];
-    list.push({ id: row.player.id, game_id: row.game_id, name: row.player.name, number: row.player.number });
+    list.push({ id: r.player_id as string, game_id: row.game_id, name: r.name as string, number: r.number as number | null });
     callupsByGame.set(row.game_id, list);
   }
 

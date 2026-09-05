@@ -23,6 +23,7 @@ export interface LeagueGame {
   event_time: string;
   location: string;
   opponent: string;
+  competition: string;
   jornada: number;
   jogo_num: number;
   home_team: string;
@@ -71,6 +72,7 @@ function eventToLeagueGame(event: Event): LeagueGame | null {
     event_time:   event.event_time,
     location:     event.location,
     opponent:     event.opponent ?? "",
+    competition:  event.competition ?? "Liga",
     jornada:      meta.jornada,
     jogo_num:     meta.jogo_num,
     home_team:    meta.home_team,

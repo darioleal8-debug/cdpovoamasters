@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { Loader2, Plus, Zap, Pencil, CalendarRange, Check } from "lucide-react";
@@ -14,8 +14,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toaster";
 import type { Season, SeasonFormData } from "@/types/database";
-import { LogoUpload }         from "@/components/settings/logo-upload";
-import { TeamKitsSettings }   from "@/components/settings/team-kits-settings";
+import { LogoUpload }           from "@/components/settings/logo-upload";
+import { TeamKitsSettings }     from "@/components/settings/team-kits-settings";
+import { PhotoTemplateEditor }  from "@/components/admin/photo-template-editor";
 
 const EMPTY_SEASON: SeasonFormData = { name: "", year: "", start_date: "", end_date: "" };
 
@@ -139,6 +140,22 @@ export default function ConfiguracoesPage() {
 
       <Separator />
 
+      {/* ── Template de Foto de Jogador ────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Template de Foto de Jogador</CardTitle>
+          <CardDescription>
+            Define um template visual para as fotografias dos jogadores.
+            Quando activado, cada foto carregada é automaticamente composta com o fundo e logo do clube.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PhotoTemplateEditor />
+        </CardContent>
+      </Card>
+
+      <Separator />
+
       {/* ── Temporadas ─────────────────────────────────────── */}
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4">
@@ -171,12 +188,12 @@ export default function ConfiguracoesPage() {
                 <div
                   key={s.id}
                   className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${
-                    isActive ? "border-cdpovoa-blue/40 bg-cdpovoa-blue/5" : "bg-muted/30"
+                    isActive ? "border-cdpovoa-primary/40 bg-cdpovoa-primary/5" : "bg-muted/30"
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                      isActive ? "bg-cdpovoa-blue text-white" : "bg-muted text-muted-foreground"
+                      isActive ? "bg-cdpovoa-primary text-white" : "bg-muted text-muted-foreground"
                     }`}>
                       <CalendarRange className="h-4 w-4" />
                     </div>
@@ -184,7 +201,7 @@ export default function ConfiguracoesPage() {
                       <div className="flex items-center gap-2">
                         <span className="truncate text-sm font-semibold">{s.name}</span>
                         {isActive && (
-                          <Badge className="shrink-0 bg-cdpovoa-blue text-white text-[0.6rem] px-1.5 py-0">
+                          <Badge className="shrink-0 bg-cdpovoa-primary text-white text-[0.6rem] px-1.5 py-0">
                             Atual
                           </Badge>
                         )}
@@ -197,14 +214,14 @@ export default function ConfiguracoesPage() {
 
                   <div className="flex shrink-0 items-center gap-1.5">
                     {isActive ? (
-                      <span className="flex items-center gap-1 text-xs text-cdpovoa-blue font-medium">
+                      <span className="flex items-center gap-1 text-xs text-cdpovoa-primary font-medium">
                         <Check className="h-3.5 w-3.5" /> Ativa
                       </span>
                     ) : (
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-7 px-2 text-xs border-cdpovoa-blue text-cdpovoa-blue hover:bg-cdpovoa-blue hover:text-white"
+                        className="h-7 px-2 text-xs border-cdpovoa-primary text-cdpovoa-primary hover:bg-cdpovoa-primary hover:text-white"
                         disabled={isActivating !== null}
                         onClick={() => handleActivate(s.id)}
                       >

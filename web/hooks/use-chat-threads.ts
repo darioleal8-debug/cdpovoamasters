@@ -1,20 +1,25 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { ChatThreadSummary } from "@/types/database";
+import type { ChatThread } from "@/types/database";
 
 export function useChatThreads() {
-  const [threads, setThreads] = useState<ChatThreadSummary[]>([]);
+  const [threads, setThreads] = useState<ChatThread[]>([]);
   const [loading, setLoading] = useState(true);
+  // Debounce ref: evita recarregamentos em burst (ex.: 5 mensagens seguidas)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const loadingRef = useRef(false); // evita mostrar skeleton em reloads após carga inicial
   const load = useCallback(async () => {
-    setLoading(true);
+    // Skeleton só na primeira carga (loadingRef falso enquanto threads já tem dados)
+    if (!loadingRef.current) setLoading(true);
     try {
       const res = await fetch("/api/chat/threads", { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setThreads(data.threads ?? []);
+        loadingRef.current = true; // primeira carga concluída
       }
     } finally {
       setLoading(false);
@@ -23,14 +28,32 @@ export function useChatThreads() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Realtime: reagir a novas mensagens e participantes
+  // Debounce de 800ms para evitar reloads em burst quando chegam várias mensagens seguidas
   useEffect(() => {
     const supabase = createClient();
+    const reload = () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(load, 800);
+    };
     const channel = supabase
-      .channel("chat-threads")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, () => load())
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_participants" }, () => load())
+      .channel("chat-threads-v2")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, reload)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_participants" }, reload)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      supabase.removeChannel(channel);
+    };
+  }, [load]);
+
+  // Polling de backup — 60s (o Realtime cobre as atualizações em tempo real;
+  // o polling serve apenas como safety net se a ligação cair)
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (!document.hidden) load();
+    }, 60_000);
+    return () => clearInterval(id);
   }, [load]);
 
   async function createDirect(targetUserId: string): Promise<string | null> {
@@ -45,15 +68,11 @@ export function useChatThreads() {
     return data.chat_id as string;
   }
 
-  async function createGroup(
-    name: string,
-    participantIds: string[],
-    postPolicy: "all" | "admin_only" = "all"
-  ): Promise<string | null> {
-    const res = await fetch("/api/chat/threads", {
+  async function ensureEventThread(eventId: string): Promise<string | null> {
+    const res = await fetch("/api/chat/event-sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "group", name, participant_ids: participantIds, post_policy: postPolicy }),
+      body: JSON.stringify({ event_id: eventId }),
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -61,24 +80,24 @@ export function useChatThreads() {
     return data.chat_id as string;
   }
 
-  async function updatePostPolicy(chatId: string, postPolicy: "all" | "admin_only"): Promise<boolean> {
-    const res = await fetch(`/api/chat/threads/${chatId}`, {
-      method: "PATCH",
+  async function ensureTrainingThread(trainingId: string): Promise<string | null> {
+    const res = await fetch("/api/chat/event-sync", {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ post_policy: postPolicy }),
+      body: JSON.stringify({ training_id: trainingId }),
     });
-    if (!res.ok) return false;
+    if (!res.ok) return null;
+    const data = await res.json();
     await load();
-    return true;
+    return data.chat_id as string;
   }
 
-  async function deleteThread(chatId: string): Promise<boolean> {
-    const res = await fetch(`/api/chat/threads/${chatId}`, { method: "DELETE" });
-    if (res.ok) {
-      setThreads((prev) => prev.filter((t) => t.id !== chatId));
-    }
-    return res.ok;
-  }
-
-  return { threads, loading, refresh: load, createDirect, createGroup, updatePostPolicy, deleteThread };
+  return {
+    threads,
+    loading,
+    refresh: load,
+    createDirect,
+    ensureEventThread,
+    ensureTrainingThread,
+  };
 }

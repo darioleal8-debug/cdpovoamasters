@@ -1,5 +1,6 @@
 /**
  * Parser IA — Calendário Liga INATEL Porto
+ * Integração: DeepSeek V4-Flash via API OpenAI-compatible
  *
  * Processo:
  *   1. Normalização do texto / OCR
@@ -17,7 +18,6 @@
  *   - Nunca inventa jogos — devolve "linhas_ambíguas" para o ilegível
  */
 
-import Anthropic from "@anthropic-ai/sdk";
 import {
   slugTeamName,
   normalizeTeamName,
@@ -81,13 +81,91 @@ export type AIParseResult = ParseResult & {
 };
 
 // ═══════════════════════════════════════════════════════════
-// CLIENT
+// CLIENTE DEEPSEEK
 // ═══════════════════════════════════════════════════════════
 
-function getClient(apiKey?: string): Anthropic {
-  const key = apiKey ?? process.env.ANTHROPIC_API_KEY;
-  if (!key) throw new Error("ANTHROPIC_API_KEY não configurada no .env.local");
-  return new Anthropic({ apiKey: key });
+const DEEPSEEK_ENDPOINT = "https://api.deepseek.com/v1/chat/completions";
+const DEEPSEEK_MODEL    = "deepseek-chat";
+const DEEPSEEK_MAX_TOK  = 16384;
+
+interface DeepSeekChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+interface DeepSeekResponse {
+  choices: Array<{
+    message: { role: string; content: string };
+    finish_reason: string;
+  }>;
+  usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+}
+
+/**
+ * Chama a API DeepSeek (compatível com OpenAI chat/completions).
+ * Lança erro se a chave não estiver configurada ou a API devolver erro.
+ */
+async function callDeepSeek(
+  systemPrompt: string,
+  messages: Array<{ role: "user" | "assistant"; content: string }>,
+  apiKey?: string
+): Promise<{ content: string; finishReason: string }> {
+  const key = apiKey ?? process.env.DEEPSEEK_API_KEY;
+  if (!key) throw new Error("DEEPSEEK_API_KEY não configurada no .env.local");
+
+  const payload: { model: string; max_tokens: number; messages: DeepSeekChatMessage[] } = {
+    model:      DEEPSEEK_MODEL,
+    max_tokens: DEEPSEEK_MAX_TOK,
+    messages: [
+      { role: "system", content: systemPrompt },
+      ...messages,
+    ],
+  };
+
+  console.log(
+    `[deepseek] POST ${DEEPSEEK_ENDPOINT} model=${DEEPSEEK_MODEL}` +
+    ` msgs=${payload.messages.length} max_tokens=${DEEPSEEK_MAX_TOK}`
+  );
+
+  const res = await fetch(DEEPSEEK_ENDPOINT, {
+    method:  "POST",
+    headers: {
+      "Content-Type":  "application/json",
+      "Authorization": `Bearer ${key}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(
+      `DeepSeek API error ${res.status} ${res.statusText}: ${errBody.slice(0, 400)}`
+    );
+  }
+
+  const data = (await res.json()) as DeepSeekResponse;
+  const choice = data.choices?.[0];
+
+  if (!choice?.message?.content) {
+    throw new Error(
+      `DeepSeek: resposta inesperada — sem choices/content. ` +
+      `Raw: ${JSON.stringify(data).slice(0, 300)}`
+    );
+  }
+
+  if (data.usage) {
+    console.log(
+      `[deepseek] usage: prompt=${data.usage.prompt_tokens}` +
+      ` completion=${data.usage.completion_tokens}` +
+      ` total=${data.usage.total_tokens}` +
+      ` finish_reason=${choice.finish_reason}`
+    );
+  }
+
+  return {
+    content:      choice.message.content,
+    finishReason: choice.finish_reason ?? "stop",
+  };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -259,7 +337,6 @@ function fromINATEL(result: INATELCalendarResult, ourTeam: string): AIParseResul
       });
     }
   }
-  // Enriquecer com dados dos jogos
   for (const g of games) {
     const hSlug = slugTeamName(g.home_team);
     if (!teamMap.has(hSlug)) {
@@ -451,7 +528,6 @@ export async function parseExcelWithAI(
   ourTeam = "CD Póvoa Masters",
   apiKey?: string
 ): Promise<AIParseResult> {
-  const client = getClient(apiKey);
   const lines  = csvTable.split("\n").length;
   console.log(`[calendar-ai] parseExcelWithAI — ${lines} linhas, ${csvTable.length} chars`);
 
@@ -466,52 +542,44 @@ ${csvTable}
 Executa os 6 passos do sistema e devolve APENAS este JSON (sem markdown):
 ${INATEL_SCHEMA}`;
 
-  const msg = await client.messages.create({
-    model:      "claude-sonnet-4-6",
-    max_tokens: 16384,
-    system:     SYSTEM_INATEL,
-    messages:   [{ role: "user", content: userContent }],
-  });
+  const { content, finishReason } = await callDeepSeek(
+    SYSTEM_INATEL,
+    [{ role: "user", content: userContent }],
+    apiKey
+  );
 
-  const content = msg.content[0];
-  if (content.type !== "text") throw new Error("Resposta inesperada da IA");
-
-  if (msg.stop_reason === "max_tokens") {
+  if (finishReason === "length") {
     console.warn("[calendar-ai] max_tokens atingido — a reparar JSON...");
   }
 
-  let result = extractJSON(content.text);
+  let result = extractJSON(content);
 
   // Segunda passagem se 0 jogos
-  if (result.jornadas.length === 0 || result.jornadas.every(j => j.jogos.length === 0)) {
+  if (result.jornadas.length === 0 || result.jornadas.every((j) => j.jogos.length === 0)) {
     console.warn("[calendar-ai] 0 jogos na 1ª passagem, a tentar 2ª passagem...");
-    const retry = await client.messages.create({
-      model:      "claude-sonnet-4-6",
-      max_tokens: 16384,
-      system:     SYSTEM_INATEL,
-      messages: [
-        { role: "user",      content: userContent },
-        { role: "assistant", content: content.text },
-        {
-          role: "user",
-          content:
-            `A tua resposta tem 0 jogos em "jornadas[].jogos". ` +
-            `Cada linha da tabela CSV (exceto o cabeçalho) é UM jogo. ` +
-            `Extrai TODOS os jogos, agrupa por jornada, e devolve o JSON completo.`,
-        },
-      ],
-    });
-    const r2 = retry.content[0];
-    if (r2.type === "text") {
-      try {
-        const result2 = extractJSON(r2.text);
-        const count2 = result2.jornadas.reduce((n, j) => n + j.jogos.length, 0);
-        if (count2 > 0) {
-          console.log(`[calendar-ai] 2ª passagem: ${count2} jogos`);
-          result = result2;
-        }
-      } catch { /* manter 1ª passagem */ }
-    }
+    try {
+      const { content: content2 } = await callDeepSeek(
+        SYSTEM_INATEL,
+        [
+          { role: "user",      content: userContent },
+          { role: "assistant", content },
+          {
+            role: "user",
+            content:
+              `A tua resposta tem 0 jogos em "jornadas[].jogos". ` +
+              `Cada linha da tabela CSV (exceto o cabeçalho) é UM jogo. ` +
+              `Extrai TODOS os jogos, agrupa por jornada, e devolve o JSON completo.`,
+          },
+        ],
+        apiKey
+      );
+      const result2 = extractJSON(content2);
+      const count2  = result2.jornadas.reduce((n, j) => n + j.jogos.length, 0);
+      if (count2 > 0) {
+        console.log(`[calendar-ai] 2ª passagem: ${count2} jogos`);
+        result = result2;
+      }
+    } catch { /* manter 1ª passagem */ }
   }
 
   const count = result.jornadas.reduce((n, j) => n + j.jogos.length, 0);
@@ -552,8 +620,8 @@ function mergeINATEL(results: INATELCalendarResult[]): INATELCalendarResult {
   const ambiguas: string[] = [];
   const correccoes: string[] = [];
   const erros: string[] = [];
-  const seenJ  = new Set<number>();
-  const seenEq = new Set<string>();
+  const seenJ    = new Set<number>();
+  const seenEq   = new Set<string>();
   const seenJogo = new Set<string>();
 
   for (const r of results) {
@@ -588,12 +656,11 @@ export async function parseCalendarWithAI(
   ourTeam = "CD Póvoa Masters",
   apiKey?: string
 ): Promise<AIParseResult> {
-  const client = getClient(apiKey);
-  const chunks = chunkByJornada(rawText.trim());
+  const chunks  = chunkByJornada(rawText.trim());
   const results: INATELCalendarResult[] = [];
 
   for (let i = 0; i < chunks.length; i++) {
-    const chunkNote = chunks.length > 1 ? `[Fragmento ${i + 1}/${chunks.length}]\n` : "";
+    const chunkNote  = chunks.length > 1 ? `[Fragmento ${i + 1}/${chunks.length}]\n` : "";
     const userContent = `${chunkNote}ourTeam: "${ourTeam}"
 
 TEXTO DO DOCUMENTO (usa APENAS a secção Liga — ignora Taça, Contactos, Equipamentos):
@@ -604,20 +671,17 @@ ${chunks[i]}
 Executa os 6 passos e devolve APENAS este JSON (sem markdown):
 ${INATEL_SCHEMA}`;
 
-    const msg = await client.messages.create({
-      model:      "claude-sonnet-4-6",
-      max_tokens: 16384,
-      system:     SYSTEM_INATEL,
-      messages:   [{ role: "user", content: userContent }],
-    });
+    const { content, finishReason } = await callDeepSeek(
+      SYSTEM_INATEL,
+      [{ role: "user", content: userContent }],
+      apiKey
+    );
 
-    const content = msg.content[0];
-    if (content.type !== "text") throw new Error(`Chunk ${i + 1}: resposta inesperada`);
-    if (msg.stop_reason === "max_tokens") {
+    if (finishReason === "length") {
       console.warn(`[calendar-ai] Chunk ${i + 1}: max_tokens — a reparar...`);
     }
 
-    results.push(extractJSON(content.text));
+    results.push(extractJSON(content));
   }
 
   const merged = mergeINATEL(results);

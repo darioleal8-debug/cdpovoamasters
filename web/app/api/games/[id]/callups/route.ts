@@ -23,8 +23,38 @@ async function getSupabase() {
   return { supabase, user };
 }
 
+// Depois de migration 041, players.name foi removido — o nome vive em users.name.
+// v_roster (migration 042) expõe player_id, name, number, position, photo_url com o JOIN correto.
+async function enrichCallups(
+  supabase: Awaited<ReturnType<typeof getSupabase>>["supabase"],
+  callupRows: { id: string; game_id: string; player_id: string; created_at: string }[]
+) {
+  if (!callupRows.length) return [];
+
+  const playerIds = callupRows.map((c) => c.player_id);
+  const { data: roster } = await supabase
+    .from("v_roster")
+    .select("player_id, name, number, position, photo_url")
+    .in("player_id", playerIds);
+
+  const byId = new Map((roster ?? []).map((r) => [r.player_id as string, r]));
+
+  return callupRows.map((c) => {
+    const p = byId.get(c.player_id);
+    return {
+      ...c,
+      player: {
+        id:        c.player_id,
+        name:      p?.name      ?? "",
+        number:    p?.number    ?? null,
+        position:  p?.position  ?? null,
+        photo_url: p?.photo_url ?? null,
+      },
+    };
+  });
+}
+
 // ─── GET /api/games/[id]/callups ─────────────────────────
-// Leitura permitida a qualquer utilizador autenticado.
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: game_id } = await params;
   const { supabase, user } = await getSupabase();
@@ -32,17 +62,20 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 
   const { data, error } = await supabase
     .from("game_callups")
-    .select("id, game_id, player_id, created_at, player:players(id, name, number, position, photo_url)")
+    .select("id, game_id, player_id, created_at")
     .eq("game_id", game_id)
     .order("created_at", { ascending: true });
 
-  if (error) return fail(error.message, 500);
-  return ok({ callups: data ?? [] });
+  if (error) {
+    console.error("[callups GET]", error.message);
+    return fail("Não foi possível carregar os convocados.", 500);
+  }
+
+  const callups = await enrichCallups(supabase, (data ?? []) as Parameters<typeof enrichCallups>[1]);
+  return ok({ callups });
 }
 
 // ─── POST /api/games/[id]/callups ────────────────────────
-// Apenas admin/treinador podem convocar. O jogador tem de pertencer ao
-// plantel da mesma temporada do jogo (players.season_id = events.season_id).
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: game_id } = await params;
   const { supabase, user } = await getSupabase();
@@ -75,15 +108,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return fail("Este jogador não pertence ao plantel da temporada deste jogo", 400);
   }
 
-  const { data, error } = await supabase
+  const { data: inserted, error } = await supabase
     .from("game_callups")
     .insert({ game_id, player_id: body.player_id, created_by: user.id })
-    .select("id, game_id, player_id, created_at, player:players(id, name, number, position, photo_url)")
+    .select("id, game_id, player_id, created_at")
     .single();
 
   if (error) {
     if (error.code === "23505") return fail("Este jogador já está convocado", 409);
-    return fail(error.message, 500);
+    console.error("[callups POST] insert:", error.message);
+    return fail("Não foi possível convocar o jogador. Tenta novamente.", 500);
   }
-  return ok({ callup: data }, 201);
+
+  const [callup] = await enrichCallups(
+    supabase,
+    [inserted as { id: string; game_id: string; player_id: string; created_at: string }]
+  );
+  return ok({ callup }, 201);
 }

@@ -55,11 +55,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   let body: { note_text: string };
   try { body = await req.json(); } catch { return fail("JSON inválido"); }
 
-  if (!body.note_text?.trim()) return fail("Nota não pode ser vazia");
+  const trimmed = body.note_text?.trim() ?? "";
+  if (!trimmed) return fail("Nota não pode ser vazia");
+  if (trimmed.length > 300) return fail("Nota não pode exceder 300 caracteres");
+
+  // Limite de 10 notas por treino
+  const { count } = await supabase
+    .from("training_notes")
+    .select("id", { count: "exact", head: true })
+    .eq("training_id", training_id);
+  if ((count ?? 0) >= 10) return fail("Máximo de 10 notas por treino atingido", 422);
 
   const { data, error } = await supabase
     .from("training_notes")
-    .insert({ training_id, author_id: user.id, note_text: body.note_text.trim() })
+    .insert({ training_id, author_id: user.id, note_text: trimmed })
     .select()
     .single();
 

@@ -59,22 +59,20 @@ export default function ActivatePage() {
       <CardHeader className="space-y-4 pb-6 text-center">
 
         {/* Logo fixo HoopHub */}
-        <div className="mx-auto mb-1">
+        <div className="mx-auto mb-1 flex justify-center">
           {!imgError ? (
-            <div className="relative mx-auto h-16 w-[160px]">
-              <Image
-                src={PLATFORM_LOGO}
-                alt="HoopHub"
-                fill
-                sizes="160px"
-                className="object-contain"
-                priority
-                onError={() => setImgError(true)}
-              />
-            </div>
+            <Image
+              src={PLATFORM_LOGO}
+              alt="HoopHub"
+              width={200}
+              height={80}
+              className="object-contain"
+              priority
+              onError={() => setImgError(true)}
+            />
           ) : (
             <div
-              className="mx-auto flex h-14 w-14 items-center justify-center rounded-full text-sm font-bold text-white shadow-lg ring-2 ring-white/20"
+              className="flex h-14 w-14 items-center justify-center rounded-full text-sm font-bold text-white shadow-lg ring-2 ring-white/20"
               style={{ backgroundColor: T.button }}
             >
               CDP

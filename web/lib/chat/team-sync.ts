@@ -119,7 +119,7 @@ export async function syncAnnouncementChat(admin: SupabaseClient): Promise<strin
 
   if (!chat) throw new Error("Não foi possível criar o chat de Comunicados");
 
-  const { data: allUsers } = await admin.from("users").select("id").eq("active", true);
+  const { data: allUsers } = await admin.from("users").select("id").eq("status", "ativo");
   const { data: existingParticipants } = await admin
     .from("chat_participants")
     .select("user_id")

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -11,11 +11,33 @@ import { toast } from "@/components/ui/toaster";
 import {
   Upload, FileText, Table2, CheckCircle2, XCircle,
   AlertTriangle, ChevronDown, ChevronRight, History,
-  RefreshCw, Sparkles, Wrench, Copy, Check, Info,
+  RefreshCw, Sparkles, Wrench, Copy, Check, Info, Brain, Trash2, Shield, OctagonAlert,
 } from "lucide-react";
 import type { Season } from "@/types/database";
 
 // ─── Types ────────────────────────────────────────────────
+
+interface CleanupDuplicate {
+  round: number;
+  keep: string;
+  remove: string[];
+  reason: string;
+}
+
+interface CleanupResult {
+  success: boolean;
+  error?: string;
+  duplicates_found?: boolean;
+  duplicates: CleanupDuplicate[];
+  actions?: CleanupDuplicate[];
+  deleted: string[];
+  protected: string[];
+  residual_duplicates?: number;
+  summary: string;
+  games_analyzed: number;
+  rounds_affected: number;
+  iterations?: number;
+}
 
 interface PreviewGame {
   date: string;
@@ -60,9 +82,14 @@ interface ImportResult {
   games_found?: number;
   games_created?: number;
   games_updated?: number;
+  games_ignored?: number;
+  games_new?: number;
   games_skipped?: number;
   our_games?: number;
   preview_games?: PreviewGame[];
+  preview_ignored?: PreviewGame[];
+  created_list?: PreviewGame[];
+  ignored_list?: PreviewGame[];
   preview_teams?: string[];
   // report mode
   report?: {
@@ -82,7 +109,8 @@ interface ImportLog {
   filename: string;
   file_type: string;
   games_created: number;
-  games_updated: number;
+  games_updated?: number;
+  games_ignored?: number;
   teams_created: number;
   errors: string[];
   created_at: string;
@@ -139,6 +167,12 @@ export default function ImportarCalendarioPage() {
   const [showRaw, setShowRaw] = useState(false);
   const [sqlCopied, setSqlCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<"jogos" | "equipas" | "json">("jogos");
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState<CleanupResult | null>(null);
+  const [showCleanupModal, setShowCleanupModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -234,7 +268,11 @@ export default function ImportarCalendarioPage() {
         const msg = data.error ?? data.errors?.[0] ?? "Erro desconhecido";
         toast({ title: "Erro na importação", description: msg, variant: "destructive" });
       } else if (mode === "import") {
-        toast({ title: `✅ ${data.games_created ?? 0} jogos importados${data.used_ai ? " (com IA)" : ""}` });
+        const ignored = data.games_ignored ?? 0;
+        toast({
+          title: `✅ ${data.games_created ?? 0} jogo(s) importado(s)${data.used_ai ? " (com IA)" : ""}`,
+          description: ignored > 0 ? `${ignored} já existia(m) e foi(ram) ignorado(s)` : undefined,
+        });
         fetchHistory();
       }
     } catch (e) {
@@ -245,6 +283,61 @@ export default function ImportarCalendarioPage() {
     } finally {
       setLoading(false);
       setLoadingMode(null);
+    }
+  }
+
+  async function runCleanup() {
+    setCleanupLoading(true);
+    setCleanupResult(null);
+    try {
+      const res = await fetch("/api/deepseek/calendar-cleanup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ season_id: seasonId || undefined }),
+      });
+      const data: CleanupResult = await res.json();
+      setCleanupResult(data);
+      setShowCleanupModal(true);
+      if (!data.success) {
+        toast({ title: "Erro na análise", description: data.error ?? "Erro desconhecido", variant: "destructive" });
+      } else if (data.deleted.length > 0) {
+        toast({ title: `✅ ${data.deleted.length} duplicado(s) eliminado(s)`, description: data.summary });
+        fetchHistory();
+      } else {
+        toast({ title: "Base de dados limpa", description: data.summary });
+      }
+    } catch (e) {
+      const msg = (e as Error).message;
+      toast({ title: "Erro de rede", description: msg, variant: "destructive" });
+    } finally {
+      setCleanupLoading(false);
+    }
+  }
+
+  async function deleteAllGames() {
+    setDeleteLoading(true);
+    try {
+      const res = await fetch("/api/events/delete-season-games", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ season_id: seasonId }),
+      });
+      const data = await res.json();
+      setShowDeleteModal(false);
+      setDeleteConfirmText("");
+      if (data.success) {
+        toast({
+          title: data.deleted > 0 ? `🗑 ${data.deleted} jogo(s) eliminado(s)` : "Nenhum jogo eliminado",
+          description: data.message,
+        });
+        fetchHistory();
+      } else {
+        toast({ title: "Erro", description: data.error ?? "Erro desconhecido", variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Erro de rede", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setDeleteLoading(false);
     }
   }
 
@@ -266,6 +359,18 @@ export default function ImportarCalendarioPage() {
   const isReportMode = resultMode === "report" && !!result?.report;
   const reportGames = result?.report?.games ?? [];
   const reportTeams = result?.report?.teams ?? [];
+  const previewNew = result?.preview_games ?? [];
+  const previewIgnored = result?.preview_ignored ?? [];
+  const createdList = result?.created_list ?? [];
+  const ignoredList = result?.ignored_list ?? [];
+  const showGameLists = result?.success && !isReportMode && (
+    previewNew.length > 0 || previewIgnored.length > 0 ||
+    createdList.length > 0 || ignoredList.length > 0
+  );
+  const totalGameListItems =
+    isReportMode ? reportGames.length :
+    resultMode === "import" ? (createdList.length + ignoredList.length) :
+    (previewNew.length + previewIgnored.length);
 
   const statusColor =
     !result ? "" :
@@ -325,16 +430,16 @@ export default function ImportarCalendarioPage() {
                 aria-checked={useAI}
                 onClick={() => setUseAI((v) => !v)}
                 className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none
-                  ${useAI ? "bg-cdpovoa-blue" : "bg-muted-foreground/30"}`}
+                  ${useAI ? "bg-cdpovoa-primary" : "bg-muted-foreground/30"}`}
               >
                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform
                   ${useAI ? "translate-x-4" : "translate-x-0.5"}`} />
               </button>
               <span className="flex items-center gap-1.5 text-sm font-medium">
-                <Sparkles className={`h-3.5 w-3.5 ${useAI ? "text-cdpovoa-blue" : "text-muted-foreground"}`} />
-                Análise com IA (Claude Sonnet)
+                <Sparkles className={`h-3.5 w-3.5 ${useAI ? "text-cdpovoa-primary" : "text-muted-foreground"}`} />
+                Análise com IA (DeepSeek)
                 {useAI && (
-                  <Badge className="text-[0.6rem] bg-cdpovoa-blue/10 text-cdpovoa-blue border-cdpovoa-blue/20 ml-1">
+                  <Badge className="text-[0.6rem] bg-cdpovoa-primary/10 text-cdpovoa-primary border-cdpovoa-primary/20 ml-1">
                     Recomendado
                   </Badge>
                 )}
@@ -342,7 +447,7 @@ export default function ImportarCalendarioPage() {
             </div>
             {useAI && (
               <p className="text-xs text-muted-foreground ml-12">
-                Corrige OCR, tabelas partidas e inconsistências automaticamente. Requer ANTHROPIC_API_KEY no .env.local
+                Corrige OCR, tabelas partidas e inconsistências automaticamente. Requer DEEPSEEK_API_KEY no .env.local
               </p>
             )}
 
@@ -374,9 +479,9 @@ export default function ImportarCalendarioPage() {
             className={[
               "border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200",
               !file ? "cursor-pointer" : "",
-              dragging ? "border-cdpovoa-blue bg-cdpovoa-blue/5" :
+              dragging ? "border-cdpovoa-primary bg-cdpovoa-primary/5" :
               file ? "border-green-500 bg-green-50 dark:bg-green-950/20" :
-              "border-border hover:border-cdpovoa-blue/50 hover:bg-muted/30",
+              "border-border hover:border-cdpovoa-primary/50 hover:bg-muted/30",
             ].join(" ")}
           >
             <input
@@ -448,7 +553,7 @@ export default function ImportarCalendarioPage() {
             Pré-visualizar
           </Button>
           <Button
-            className="flex-1 bg-cdpovoa-blue hover:bg-cdpovoa-blue/90"
+            className="flex-1 bg-cdpovoa-primary hover:bg-cdpovoa-primary/90"
             disabled={loading || !seasonId}
             onClick={() => sendRequest("import")}
           >
@@ -460,12 +565,63 @@ export default function ImportarCalendarioPage() {
         </div>
       )}
 
+      {/* ── Análise DeepSeek ───────────────────────── */}
+      <div className="rounded-xl border border-amber-200 bg-amber-50/50 dark:bg-amber-950/10 p-4 space-y-2">
+        <div className="flex items-start gap-3">
+          <Brain className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Análise DeepSeek — Remover Jogos Duplicados</p>
+            <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">
+              Audita todas as jornadas da temporada selecionada, confirma duplicações com IA e elimina automaticamente os registos repetidos.
+            </p>
+          </div>
+        </div>
+        <Button
+          variant="outline"
+          className="w-full border-amber-300 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-950/30"
+          disabled={cleanupLoading || !seasonId}
+          onClick={runCleanup}
+        >
+          {cleanupLoading
+            ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" />A analisar com DeepSeek…</>
+            : <><Brain className="mr-2 h-4 w-4" />Executar Análise DeepSeek</>}
+        </Button>
+        {!seasonId && (
+          <p className="text-xs text-amber-600/70 dark:text-amber-500/70 text-center">Seleciona uma temporada acima para ativar</p>
+        )}
+      </div>
+
+      {/* ── Apagar calendário ──────────────────────── */}
+      <div className="rounded-xl border border-red-200 bg-red-50/50 dark:bg-red-950/10 p-4 space-y-2">
+        <div className="flex items-start gap-3">
+          <OctagonAlert className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-red-800 dark:text-red-300">Apagar Todos os Jogos da Temporada</p>
+            <p className="text-xs text-red-700/80 dark:text-red-400/80 mt-0.5">
+              Elimina permanentemente todos os jogos do calendário da temporada selecionada. Jogos com estatísticas ou convocatórias registadas ficam protegidos.
+            </p>
+          </div>
+        </div>
+        <Button
+          variant="outline"
+          className="w-full border-red-300 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/30"
+          disabled={!seasonId}
+          onClick={() => { setDeleteConfirmText(""); setShowDeleteModal(true); }}
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          Apagar Calendário da Temporada
+        </Button>
+        {!seasonId && (
+          <p className="text-xs text-red-500/70 text-center">Seleciona uma temporada acima para ativar</p>
+        )}
+      </div>
+
       {/* ── Loading indicator ──────────────────────── */}
       {loading && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground p-3 bg-muted/40 rounded-lg animate-pulse">
           <RefreshCw className="h-4 w-4 animate-spin" />
           {useAI
-            ? "A processar com IA (Claude Sonnet) — pode demorar 10-30 segundos..."
+            ? "A processar com IA (DeepSeek) — pode demorar 10-30 segundos..."
             : "A processar o ficheiro..."}
         </div>
       )}
@@ -490,7 +646,7 @@ export default function ImportarCalendarioPage() {
                 <Badge variant="outline" className="text-xs">Simulação — nada foi guardado</Badge>
               )}
               {result.used_ai && (
-                <Badge className="bg-cdpovoa-blue/10 text-cdpovoa-blue border-cdpovoa-blue/20 text-[0.6rem]">
+                <Badge className="bg-cdpovoa-primary/10 text-cdpovoa-primary border-cdpovoa-primary/20 text-[0.6rem]">
                   <Sparkles className="h-2.5 w-2.5 mr-1" /> IA
                 </Badge>
               )}
@@ -527,8 +683,8 @@ export default function ImportarCalendarioPage() {
                         value: resultMode === "import" ? result.teams_created : result.teams_found },
                       { label: resultMode === "import" ? "Jogos criados" : "Os nossos",
                         value: resultMode === "import" ? result.games_created : (result.our_games ?? result.games_found) },
-                      { label: resultMode === "import" ? "Atualizados" : "Total liga",
-                        value: resultMode === "import" ? result.games_updated : result.games_found },
+                      { label: resultMode === "import" ? "Ignorados" : "Total liga",
+                        value: resultMode === "import" ? (result.games_ignored ?? result.games_updated ?? 0) : result.games_found },
                     ].map((s) => (
                       <div key={s.label} className="bg-white/60 dark:bg-white/5 rounded-lg p-3 text-center">
                         <p className="text-xs text-muted-foreground">{s.label}</p>
@@ -597,7 +753,7 @@ export default function ImportarCalendarioPage() {
             )}
 
             {/* ── Tabs ── */}
-            {result.success && (isReportMode || result.preview_games || result.preview_teams) && (
+            {result.success && (isReportMode || showGameLists || result.preview_teams) && (
               <div>
                 <div className="flex gap-1 border-b mb-3">
                   {(["jogos", "equipas", "json"] as const).map((tab) => (
@@ -609,7 +765,7 @@ export default function ImportarCalendarioPage() {
                           ? "bg-white dark:bg-white/10 border border-b-white dark:border-b-background text-foreground"
                           : "text-muted-foreground hover:text-foreground"}`}
                     >
-                      {tab === "jogos" ? `Jogos (${isReportMode ? reportGames.length : (result.preview_games?.length ?? 0)})`
+                      {tab === "jogos" ? `Jogos (${totalGameListItems})`
                         : tab === "equipas" ? `Equipas (${isReportMode ? reportTeams.length : (result.preview_teams?.length ?? 0)})`
                         : "JSON / SQL"}
                     </button>
@@ -629,23 +785,42 @@ export default function ImportarCalendarioPage() {
                               {g.home_team} × {g.away_team}
                             </span>
                             {g.is_our_game && (
-                              <Badge className="shrink-0 text-[0.55rem] bg-cdpovoa-blue/10 text-cdpovoa-blue border-cdpovoa-blue/20">nosso</Badge>
+                              <Badge className="shrink-0 text-[0.55rem] bg-cdpovoa-primary/10 text-cdpovoa-primary border-cdpovoa-primary/20">nosso</Badge>
                             )}
                           </div>
                         ))
-                      : (result.preview_games ?? []).map((g, i) => (
-                          <div key={i} className="flex items-center gap-2 text-xs py-1.5 border-b last:border-0">
-                            <Badge variant="outline" className="shrink-0 text-[0.6rem] px-1.5">J{g.jornada}</Badge>
-                            <span className="shrink-0 w-14 text-muted-foreground tabular-nums">{fmtDate(g.date)}</span>
-                            <span className="shrink-0 w-10 text-muted-foreground tabular-nums">{g.time}</span>
-                            <span className="flex-1 font-semibold truncate">{g.title}</span>
-                            <span className="shrink-0 text-muted-foreground text-[0.6rem] max-w-[120px] truncate">{g.location}</span>
-                          </div>
-                        ))
+                      : (() => {
+                          const newGames = resultMode === "import" ? createdList : previewNew;
+                          const skipGames = resultMode === "import" ? ignoredList : previewIgnored;
+                          return (
+                            <>
+                              {newGames.map((g, i) => (
+                                <div key={`new-${i}`} className="flex items-center gap-2 text-xs py-1.5 border-b last:border-0 bg-green-50/60 dark:bg-green-950/20">
+                                  <Badge variant="outline" className="shrink-0 text-[0.6rem] px-1.5">J{g.jornada}</Badge>
+                                  <span className="shrink-0 w-14 text-muted-foreground tabular-nums">{fmtDate(g.date)}</span>
+                                  <span className="shrink-0 w-10 text-muted-foreground tabular-nums">{g.time}</span>
+                                  <span className="flex-1 font-semibold truncate text-green-700 dark:text-green-400">{g.title}</span>
+                                  <Badge className="shrink-0 text-[0.55rem] bg-green-100 text-green-700 border-green-300 dark:bg-green-950 dark:text-green-400">
+                                    {resultMode === "import" ? "adicionado" : "novo"}
+                                  </Badge>
+                                </div>
+                              ))}
+                              {skipGames.map((g, i) => (
+                                <div key={`skip-${i}`} className="flex items-center gap-2 text-xs py-1.5 border-b last:border-0 opacity-60">
+                                  <Badge variant="outline" className="shrink-0 text-[0.6rem] px-1.5">J{g.jornada}</Badge>
+                                  <span className="shrink-0 w-14 text-muted-foreground tabular-nums">{fmtDate(g.date)}</span>
+                                  <span className="shrink-0 w-10 text-muted-foreground tabular-nums">{g.time}</span>
+                                  <span className="flex-1 truncate">{g.title}</span>
+                                  <Badge variant="outline" className="shrink-0 text-[0.55rem]">Já existente</Badge>
+                                </div>
+                              ))}
+                              {newGames.length === 0 && skipGames.length === 0 && (
+                                <p className="text-xs text-muted-foreground text-center py-4">Nenhum jogo encontrado.</p>
+                              )}
+                            </>
+                          );
+                        })()
                     }
-                    {isReportMode && reportGames.length === 0 && (
-                      <p className="text-xs text-muted-foreground text-center py-4">Nenhum jogo encontrado.</p>
-                    )}
                   </div>
                 )}
 
@@ -733,7 +908,7 @@ export default function ImportarCalendarioPage() {
                 <Button
                   onClick={() => sendRequest("import")}
                   disabled={loading}
-                  className="flex-1 bg-cdpovoa-blue hover:bg-cdpovoa-blue/90"
+                  className="flex-1 bg-cdpovoa-primary hover:bg-cdpovoa-primary/90"
                 >
                   <Upload className="mr-2 h-4 w-4" />
                   Importar agora
@@ -745,7 +920,7 @@ export default function ImportarCalendarioPage() {
               <Button
                 onClick={() => sendRequest("import")}
                 disabled={loading}
-                className="w-full bg-cdpovoa-blue hover:bg-cdpovoa-blue/90"
+                className="w-full bg-cdpovoa-primary hover:bg-cdpovoa-primary/90"
               >
                 <Upload className="mr-2 h-4 w-4" />
                 Confirmar Importação
@@ -753,6 +928,196 @@ export default function ImportarCalendarioPage() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* ── Modal — Resultado Análise DeepSeek ─────── */}
+      {showCleanupModal && cleanupResult && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => setShowCleanupModal(false)}
+        >
+          <div
+            className="bg-background rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5 border-b flex items-center gap-3">
+              <Brain className="h-5 w-5 text-amber-600 shrink-0" />
+              <h2 className="text-base font-bold flex-1">Análise DeepSeek — Resultado</h2>
+              <button
+                onClick={() => setShowCleanupModal(false)}
+                className="text-muted-foreground hover:text-foreground text-lg leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Summary */}
+              <div className={`rounded-lg p-3 text-sm ${
+                !cleanupResult.success ? "bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200"
+                : cleanupResult.deleted.length > 0 ? "bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border border-green-200"
+                : "bg-muted text-muted-foreground border border-border"
+              }`}>
+                {cleanupResult.success
+                  ? <><CheckCircle2 className="inline h-4 w-4 mr-1.5 shrink-0" />{cleanupResult.summary}</>
+                  : <><XCircle className="inline h-4 w-4 mr-1.5 shrink-0" />{cleanupResult.error}</>
+                }
+              </div>
+
+              {/* Stats */}
+              {cleanupResult.success && (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { label: "Analisados", value: cleanupResult.games_analyzed },
+                      { label: "Jornadas", value: cleanupResult.rounds_affected },
+                      { label: "Eliminados", value: cleanupResult.deleted.length, color: cleanupResult.deleted.length > 0 ? "text-red-600 dark:text-red-400" : undefined },
+                      { label: "Protegidos", value: cleanupResult.protected.length, color: cleanupResult.protected.length > 0 ? "text-amber-600 dark:text-amber-400" : undefined },
+                    ].map(s => (
+                      <div key={s.label} className="bg-muted/50 rounded-lg p-2.5 text-center">
+                        <p className="text-[0.65rem] text-muted-foreground">{s.label}</p>
+                        <p className={`text-xl font-black ${s.color ?? ""}`}>{s.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {(cleanupResult.iterations ?? 0) > 1 && (
+                    <p className="text-[0.7rem] text-muted-foreground text-center">
+                      Concluído em {cleanupResult.iterations} iteração(ões)
+                    </p>
+                  )}
+                  {(cleanupResult.residual_duplicates ?? 0) > 0 && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50/50 dark:bg-amber-950/10 p-2.5 flex gap-2 text-xs text-amber-700 dark:text-amber-400">
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                      <span>{cleanupResult.residual_duplicates} grupo(s) residual(is) não eliminados — todos têm stats ou convocatórias associadas.</span>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Duplicates detail */}
+              {cleanupResult.duplicates.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Detalhes por jornada</p>
+                  {cleanupResult.duplicates.map((d, i) => (
+                    <div key={i} className="rounded-lg border p-3 space-y-1.5 text-xs">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[0.6rem] px-1.5 shrink-0">
+                          {d.round > 0 ? `J${d.round}` : "—"}
+                        </Badge>
+                        <span className="text-muted-foreground flex-1 truncate">{d.reason}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="flex items-center gap-1 text-green-700 dark:text-green-400">
+                          <CheckCircle2 className="h-3 w-3 shrink-0" />
+                          <span className="font-mono text-[0.6rem] truncate max-w-[140px]">{d.keep}</span>
+                          <Badge className="text-[0.5rem] bg-green-100 text-green-700 border-green-300 dark:bg-green-950 dark:text-green-400 shrink-0">mantido</Badge>
+                        </span>
+                      </div>
+                      {d.remove.map((rid) => (
+                        <div key={rid} className="flex items-center gap-1.5">
+                          {cleanupResult.protected.includes(rid) ? (
+                            <Shield className="h-3 w-3 text-amber-500 shrink-0" />
+                          ) : (
+                            <Trash2 className="h-3 w-3 text-red-500 shrink-0" />
+                          )}
+                          <span className="font-mono text-[0.6rem] text-muted-foreground truncate max-w-[160px]">{rid}</span>
+                          <Badge variant="outline" className={`text-[0.5rem] shrink-0 ${
+                            cleanupResult.protected.includes(rid)
+                              ? "border-amber-300 text-amber-600"
+                              : cleanupResult.deleted.includes(rid)
+                              ? "border-red-300 text-red-600"
+                              : "border-muted"
+                          }`}>
+                            {cleanupResult.protected.includes(rid) ? "protegido" : cleanupResult.deleted.includes(rid) ? "eliminado" : "—"}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Protected warning */}
+              {cleanupResult.protected.length > 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50/50 dark:bg-amber-950/10 p-3 flex gap-2 text-xs text-amber-700 dark:text-amber-400">
+                  <Shield className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  <span>{cleanupResult.protected.length} jogo(s) não foram eliminados porque têm estatísticas ou convocatórias associadas.</span>
+                </div>
+              )}
+
+              <Button
+                className="w-full"
+                variant="outline"
+                onClick={() => setShowCleanupModal(false)}
+              >
+                Fechar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal — Confirmação de eliminação ──────── */}
+      {showDeleteModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => !deleteLoading && setShowDeleteModal(false)}
+        >
+          <div
+            className="bg-background rounded-2xl shadow-2xl w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-red-200 dark:border-red-900 flex items-center gap-3 bg-red-50 dark:bg-red-950/30 rounded-t-2xl">
+              <OctagonAlert className="h-5 w-5 text-red-600 shrink-0" />
+              <h2 className="text-base font-bold text-red-800 dark:text-red-300 flex-1">Confirmar Eliminação</h2>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 p-3 space-y-1">
+                <p className="text-sm font-semibold text-red-800 dark:text-red-300">⚠ Esta ação é irreversível</p>
+                <p className="text-xs text-red-700/80 dark:text-red-400/80">
+                  Todos os jogos do calendário da temporada{" "}
+                  <strong>{seasons.find(s => s.id === seasonId)?.name ?? seasonId}</strong>{" "}
+                  serão permanentemente eliminados. Jogos com estatísticas ou convocatórias associadas ficam protegidos.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">
+                  Escreve <strong className="text-foreground">ELIMINAR</strong> para confirmar
+                </Label>
+                <Input
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="ELIMINAR"
+                  className="border-red-300 focus:border-red-500 focus:ring-red-500"
+                  autoFocus
+                  disabled={deleteLoading}
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  disabled={deleteLoading}
+                  onClick={() => setShowDeleteModal(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+                  disabled={deleteConfirmText !== "ELIMINAR" || deleteLoading}
+                  onClick={deleteAllGames}
+                >
+                  {deleteLoading
+                    ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" />A eliminar…</>
+                    : <><Trash2 className="mr-2 h-4 w-4" />Eliminar Todos</>}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Histórico ──────────────────────────────── */}
@@ -781,7 +1146,7 @@ export default function ImportarCalendarioPage() {
                       <p className="text-sm font-medium truncate">{log.filename}</p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(log.created_at).toLocaleString("pt-PT")} ·{" "}
-                        {log.games_created} criados · {log.games_updated} atualizados ·{" "}
+                        {log.games_created} criados · {log.games_ignored ?? log.games_updated ?? 0} ignorados ·{" "}
                         {log.teams_created} equipas
                       </p>
                     </div>

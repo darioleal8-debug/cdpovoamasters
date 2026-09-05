@@ -7,10 +7,16 @@ import { sendActivationEmail } from "@/lib/email";
 
 export const runtime = "nodejs";
 
+function stripBom(v: string | undefined): string {
+  const s = (v ?? "").trim();
+  return s.charCodeAt(0) === 0xFEFF ? s.slice(1) : s;
+}
+
 function adminClient() {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const key = stripBom(process.env.SUPABASE_SERVICE_ROLE_KEY);
   if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY não configurada");
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, {
+  return createClient(url, key, {
     auth: { persistSession: false },
   });
 }
@@ -64,29 +70,34 @@ export async function GET() {
     return fail("Sem permissão", 403);
   }
 
-  const { data: users, error } = await admin
+  // Tentar com roles_extra; se a coluna ainda não existir (migração 029
+  // não aplicada), retentar sem ela para não bloquear a listagem.
+  type RowResult = { data: Record<string, unknown>[] | null; error: { message: string } | null };
+
+  let usersResult: RowResult = await admin
     .from("users")
-    .select("id, email, name, role, phone, birth_date, photo_url, active, created_at")
-    .order("created_at", { ascending: false });
+    .select("id, email, name, role, roles_extra, phone, birth_date, active, created_at")
+    .order("created_at", { ascending: false }) as unknown as RowResult;
 
-  if (error) return fail(error.message, 500);
-
-  // Enriquecer com dados do jogador associado
-  const userIds = (users ?? []).map((u) => u.id as string);
-  let playerMap: Record<string, Record<string, unknown>> = {};
-  if (userIds.length > 0) {
-    const { data: playerRows } = await admin
-      .from("players")
-      .select("id, name, user_id, number, position, season_id")
-      .in("user_id", userIds);
-    for (const p of playerRows ?? []) {
-      if (p.user_id) playerMap[p.user_id as string] = p as Record<string, unknown>;
-    }
+  if (usersResult.error?.message?.includes("roles_extra")) {
+    console.warn("[GET /api/admin/users] roles_extra missing — retrying without it");
+    usersResult = await admin
+      .from("users")
+      .select("id, email, name, role, phone, birth_date, active, created_at")
+      .order("created_at", { ascending: false }) as unknown as RowResult;
   }
 
+  const { data: users, error } = usersResult;
+  if (error) {
+    console.error("[GET /api/admin/users]", error.message);
+    return fail(error.message, 500);
+  }
+
+  // Dados de jogador (number, position, etc.) são carregados no cliente
+  // via supabase browser client — mesmo padrão do use-roster.
   const enriched = (users ?? []).map((u) => ({
     ...u,
-    player: playerMap[u.id] ?? null,
+    roles_extra: u.roles_extra ?? [],
   }));
 
   return NextResponse.json({ users: enriched });
@@ -97,37 +108,57 @@ export async function POST(req: NextRequest) {
   const authUser = await getAuthUser();
   if (!authUser) return fail("Não autenticado", 401);
 
-  let body: Record<string, string>;
+  let body: Record<string, unknown>;
   try { body = await req.json(); }
   catch { return fail("JSON inválido"); }
 
-  const {
-    name, email, password,
-    role = "jogador",
-    phone, birth_date,
-    season_id, jersey_number, position, height, weight,
-  } = body;
+  const b = body as {
+    name?: string; email?: string; password?: string; role?: string;
+    phone?: string; birth_date?: string; also_player?: boolean | string;
+    season_id?: string; jersey_number?: string; position?: string;
+    height?: string; weight?: string;
+  };
+
+  const name         = String(b.name         ?? "").trim();
+  const email        = String(b.email        ?? "").trim();
+  const password     = String(b.password     ?? "").trim();
+  const role         = String(b.role         ?? "jogador");
+  const phone        = String(b.phone        ?? "").trim();
+  const birth_date   = String(b.birth_date   ?? "").trim();
+  const season_id    = b.season_id    ?? "";
+  const jersey_number = b.jersey_number ?? "";
+  const position     = String(b.position     ?? "").trim();
+  const height       = String(b.height       ?? "").trim();
+  const weight       = String(b.weight       ?? "").trim();
+
+  const alsoPlayer = b.also_player === true || String(b.also_player) === "true";
+  const needsPlayerProfile = role === "jogador" || alsoPlayer;
 
   // ── Validações base ──────────────────────────────────────
-  if (!name?.trim())     return fail("Nome é obrigatório");
-  if (!email?.trim())    return fail("Email é obrigatório");
-  if (!password?.trim()) return fail("Password é obrigatória");
+  if (!name)     return fail("Nome é obrigatório");
+  if (!email)    return fail("Email é obrigatório");
+  if (!password) return fail("Password é obrigatória");
   if (password.length < 6) return fail("Password deve ter pelo menos 6 caracteres");
-  if (!["admin", "treinador", "jogador"].includes(role)) return fail("Role inválido");
+  const VALID_ROLES = ["admin", "treinador", "jogador", "seccionista", "tesoureiro"];
+  if (!VALID_ROLES.includes(role)) return fail("Role inválido");
 
   // ── Validações para jogadores ────────────────────────────
   if (role === "jogador") {
-    if (!season_id)          return fail("Temporada é obrigatória para jogadores");
-    if (!phone?.trim())      return fail("Telemóvel é obrigatório para jogadores");
-    if (!birth_date?.trim()) return fail("Data de nascimento é obrigatória para jogadores");
+    if (!season_id)  return fail("Temporada é obrigatória para jogadores");
+    if (!phone)      return fail("Telemóvel é obrigatório para jogadores");
+    if (!birth_date) return fail("Data de nascimento é obrigatória para jogadores");
+  }
+  if (alsoPlayer && role !== "jogador") {
+    if (!season_id)  return fail("Temporada é obrigatória quando acumula função de jogador");
+    if (!birth_date) return fail("Data de nascimento é obrigatória quando acumula função de jogador");
   }
 
-  if (phone?.trim()) {
-    const err = validatePhone(phone.trim());
+  if (phone) {
+    const err = validatePhone(phone);
     if (err) return fail(err);
   }
-  if (birth_date?.trim()) {
-    const err = validateBirthDate(birth_date.trim());
+  if (birth_date) {
+    const err = validateBirthDate(birth_date);
     if (err) return fail(err);
   }
 
@@ -145,10 +176,10 @@ export async function POST(req: NextRequest) {
 
   // ── Criar utilizador Auth ────────────────────────────────
   const { data: newAuthUser, error: authError } = await admin.auth.admin.createUser({
-    email: email.trim(),
-    password: password.trim(),
+    email,
+    password,
     email_confirm: true,
-    user_metadata: { name: name.trim() },
+    user_metadata: { name },
   });
 
   if (authError) {
@@ -161,13 +192,14 @@ export async function POST(req: NextRequest) {
   const newUserId = newAuthUser.user.id;
 
   // ── Criar perfil em public.users ─────────────────────────
+  const rolesExtra = alsoPlayer && role !== "jogador" ? ["jogador"] : [];
   const profilePayload: Record<string, unknown> = {
-    id: newUserId, email: email.trim(), name: name.trim(), role,
-    // Jogadores começam inativos — precisam de ativar via email
+    id: newUserId, email, name, role,
+    roles_extra: rolesExtra,
     active: role === "jogador" ? false : true,
   };
-  if (phone?.trim())      profilePayload.phone      = phone.trim().replace(/\s+/g, "");
-  if (birth_date?.trim()) profilePayload.birth_date = birth_date.trim();
+  if (phone)      profilePayload.phone      = phone.replace(/\s+/g, "");
+  if (birth_date) profilePayload.birth_date = birth_date;
 
   const { error: profileError } = await admin.from("users").insert(profilePayload);
 
@@ -180,18 +212,18 @@ export async function POST(req: NextRequest) {
   let playerRecord = null;
   let playerCreationError: string | null = null;
 
-  if (role === "jogador" && season_id) {
+  if (needsPlayerProfile && season_id) {
+    // players.name e players.email foram removidos na migration 041
+    // (o nome e email vivem em public.users e auth.users)
     const playerPayload: Record<string, unknown> = {
-      name:     name.trim(),
-      season_id,
-      user_id:  newUserId,
+      season_id, user_id: newUserId,
     };
-    if (phone?.trim())          playerPayload.phone      = phone.trim().replace(/\s+/g, "");
-    if (birth_date?.trim())     playerPayload.birth_date = birth_date.trim();
-    if (jersey_number?.trim())  playerPayload.number     = Number(jersey_number);
-    if (position?.trim())       playerPayload.position   = position.trim();
-    if (height?.trim())         playerPayload.height     = Number(height);
-    if (weight?.trim())         playerPayload.weight     = Number(weight);
+    if (phone)         playerPayload.phone      = phone.replace(/\s+/g, "");
+    if (birth_date)    playerPayload.birth_date = birth_date;
+    if (jersey_number) playerPayload.number     = Number(jersey_number);
+    if (position)      playerPayload.position   = position;
+    if (height)        playerPayload.height     = Number(height);
+    if (weight)        playerPayload.weight     = Number(weight);
 
     const { data: newPlayer, error: playerError } = await admin
       .from("players")
@@ -208,10 +240,10 @@ export async function POST(req: NextRequest) {
           .from("players")
           .update({
             user_id: newUserId,
-            ...(jersey_number?.trim() ? { number: Number(jersey_number) } : {}),
-            ...(position?.trim()      ? { position: position.trim() }    : {}),
+            ...(jersey_number ? { number: Number(jersey_number) } : {}),
+            ...(position      ? { position }                      : {}),
           })
-          .eq("name", name.trim())
+          .eq("name", name)
           .eq("season_id", season_id)
           .is("user_id", null)
           .select()
@@ -260,22 +292,19 @@ export async function POST(req: NextRequest) {
     // Tentar enviar email — devolve o erro real se a configuração
     // existir mas falhar (ex: domínio não verificado no Resend)
     const emailResult = await sendActivationEmail({
-      to:              email.trim(),
-      name:            name.trim(),
-      activationToken: token,
+      to: email, name, activationToken: token,
     });
     emailDevFallback = emailResult.devFallback ?? false;
     emailSent        = emailResult.success && !emailDevFallback;
     emailError       = emailResult.error ?? null;
 
-    // Log do link sempre — admin pode ver no terminal mesmo sem email
-    console.log(`[api/admin/users] Link de ativação para ${email.trim()}:`);
+    console.log(`[api/admin/users] Link de ativação para ${email}:`);
     console.log(`  ${link}`);
   }
 
   return NextResponse.json({
     success: true,
-    user:    { id: newUserId, email: email.trim(), name: name.trim(), role },
+    user:    { id: newUserId, email, name, role },
     player:  playerRecord,
     playerError: playerCreationError,
     activation: role === "jogador"
@@ -309,7 +338,7 @@ export async function PATCH(req: NextRequest) {
   const updates: Record<string, unknown> = {};
   if (name  !== undefined && String(name).trim()) updates.name   = String(name).trim();
   if (role  !== undefined) {
-    if (!["admin", "treinador", "jogador"].includes(String(role))) return fail("Role inválido");
+    if (!["admin", "treinador", "jogador", "seccionista", "tesoureiro"].includes(String(role))) return fail("Role inválido");
     updates.role = role;
   }
   if (active !== undefined) updates.active = Boolean(active);

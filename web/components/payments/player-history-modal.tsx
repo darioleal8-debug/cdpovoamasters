@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo } from "react";
 import { Pencil } from "lucide-react";
@@ -8,7 +8,7 @@ import {
 import { Badge }   from "@/components/ui/badge";
 import { Button }  from "@/components/ui/button";
 import type {
-  Player, PlayerPaymentWithPlayer, PlayerPaymentSummary, Season,
+  RosterEntry, PlayerPaymentWithPlayer, PlayerPaymentSummary, Season,
 } from "@/types/database";
 import { MONTH_NAMES_PT } from "@/types/database";
 import {
@@ -19,7 +19,7 @@ import {
 interface Props {
   open:     boolean;
   onClose:  () => void;
-  player:   Player | null;
+  player:   RosterEntry | null;
   payments: PlayerPaymentWithPlayer[];
   summary:  PlayerPaymentSummary | undefined;
   season:   Season | null;
@@ -39,7 +39,7 @@ export function PlayerHistoryModal({ open, onClose, player, payments, summary, s
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             {player.number && (
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cdpovoa-blue text-xs font-bold text-white">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cdpovoa-primary text-xs font-bold text-white">
                 #{player.number}
               </span>
             )}
@@ -135,7 +135,7 @@ export function PlayerHistoryModal({ open, onClose, player, payments, summary, s
 function StatCard({ label, value, color }: { label: string; value: string; color: "green" | "blue" | "red" }) {
   const cls = {
     green: "border-t-green-500 text-green-700",
-    blue:  "border-t-cdpovoa-blue text-cdpovoa-blue",
+    blue:  "border-t-cdpovoa-primary text-cdpovoa-primary",
     red:   "border-t-red-500 text-red-700",
   }[color];
 

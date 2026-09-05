@@ -1,4 +1,4 @@
-import { type LucideIcon } from "lucide-react";
+﻿import { type LucideIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,7 @@ interface MetricCardProps {
 }
 
 const accentClasses = {
-  blue:  { icon: "bg-blue-50 text-cdpovoa-blue", border: "border-t-cdpovoa-blue" },
+  blue:  { icon: "bg-blue-50 text-cdpovoa-primary", border: "border-t-cdpovoa-primary" },
   red:   { icon: "bg-red-50 text-red-600",        border: "border-t-red-600" },
   green: { icon: "bg-green-50 text-green-700",    border: "border-t-green-600" },
   amber: { icon: "bg-amber-50 text-amber-700",    border: "border-t-amber-500" },

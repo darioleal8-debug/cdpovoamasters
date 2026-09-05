@@ -1,6 +1,7 @@
 "use client";
 
-import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { useState, useEffect } from "react";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { PositionCount } from "@/types/database";
@@ -10,9 +11,17 @@ interface PositionsChartProps {
   loading?: boolean;
 }
 
-const COLORS = ["#0a2647", "#c8102e", "#16467a"];
-
 export function PositionsChart({ data, loading }: PositionsChartProps) {
+  const [chartColors, setChartColors] = useState(["#111111", "#F28C28", "#555555", "#94a3b8"]);
+  const total = data.reduce((s, d) => s + d.value, 0);
+
+  useEffect(() => {
+    const s = getComputedStyle(document.documentElement);
+    const primary = s.getPropertyValue("--club-primary").trim()  || "#111111";
+    const accent  = s.getPropertyValue("--club-secondary").trim() || "#F28C28";
+    setChartColors([primary, accent, "#555555", "#94a3b8"]);
+  }, []);
+
   if (loading) {
     return (
       <Card>
@@ -20,8 +29,11 @@ export function PositionsChart({ data, loading }: PositionsChartProps) {
           <Skeleton className="h-5 w-36" />
           <Skeleton className="h-4 w-52" />
         </CardHeader>
-        <CardContent>
-          <Skeleton className="mx-auto h-[220px] w-[220px] rounded-full" />
+        <CardContent className="space-y-3">
+          <Skeleton className="mx-auto h-[180px] w-[180px] rounded-full" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
         </CardContent>
       </Card>
     );
@@ -39,38 +51,61 @@ export function PositionsChart({ data, loading }: PositionsChartProps) {
             Sem jogadores inscritos nesta temporada.
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie
-                data={data}
-                cx="50%"
-                cy="50%"
-                innerRadius={55}
-                outerRadius={90}
-                paddingAngle={3}
-                dataKey="value"
-              >
-                {data.map((_, index) => (
-                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip
-                formatter={(value: number, name: string) => [value, name]}
-                contentStyle={{
-                  borderRadius: "8px",
-                  border: "1px solid hsl(var(--border))",
-                  fontSize: "13px",
-                }}
-              />
-              <Legend
-                formatter={(value) => (
-                  <span style={{ fontSize: "13px", color: "hsl(var(--foreground))" }}>
-                    {value}
-                  </span>
-                )}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+          <div>
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={data}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={80}
+                  paddingAngle={3}
+                  dataKey="value"
+                >
+                  {data.map((_, index) => (
+                    <Cell key={index} fill={chartColors[index % chartColors.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(value: number, name: string) => [
+                    `${value} (${total > 0 ? Math.round((value / total) * 100) : 0}%)`,
+                    name,
+                  ]}
+                  contentStyle={{
+                    borderRadius: "8px",
+                    border: "1px solid hsl(var(--border))",
+                    fontSize: "13px",
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+
+            {/* Legenda com contagens e percentagens */}
+            <div className="mt-3 space-y-2">
+              {data.map((item, i) => (
+                <div key={item.name} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="h-3 w-3 shrink-0 rounded-full"
+                      style={{ backgroundColor: chartColors[i % chartColors.length] }}
+                    />
+                    <span>{item.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 tabular-nums">
+                    <span className="font-bold">{item.value}</span>
+                    <span className="w-9 text-right text-xs text-muted-foreground">
+                      {total > 0 ? `${Math.round((item.value / total) * 100)}%` : "—"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              <div className="flex items-center justify-between border-t pt-2 text-sm">
+                <span className="text-muted-foreground">Total</span>
+                <span className="font-bold tabular-nums">{total}</span>
+              </div>
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>

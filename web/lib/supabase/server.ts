@@ -34,12 +34,17 @@ export async function createClient() {
 }
 
 /** Cliente com service role — apenas para uso em Route Handlers com acesso admin */
+function stripBom(v: string | undefined): string {
+  const s = (v ?? "").trim();
+  return s.charCodeAt(0) === 0xFEFF ? s.slice(1) : s;
+}
+
 export async function createAdminClient() {
   const cookieStore = await cookies();
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL),
+    stripBom(process.env.SUPABASE_SERVICE_ROLE_KEY),
     {
       cookies: {
         getAll() {

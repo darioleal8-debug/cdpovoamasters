@@ -19,7 +19,7 @@
 //     SMTP_FROM=noreply@hoophub.app
 //     SMTP_SECURE=false          (true para porta 465)
 
-import { buildActivationEmail } from "./email-templates";
+import { buildActivationEmail, buildLatePaymentEmail, buildPaymentReceiptEmail, buildPasswordResetEmail } from "./email-templates";
 
 const APP_URL   = process.env.NEXT_PUBLIC_APP_URL  ?? "http://localhost:3000";
 const FROM_NAME = "HoopHub";
@@ -31,32 +31,49 @@ export interface SendResult {
   error?:       string;
 }
 
+// stripEnv: strip BOM + whitespace de variáveis de ambiente.
+// Necessário porque ficheiros .env.local gravados com BOM no Windows
+// prepõem U+FEFF invisível que corrompe HTTP headers (erro charCode 65279).
+function stripEnv(v: string | undefined, fallback = ""): string {
+  const s = (v ?? fallback).trim();
+  return s.charCodeAt(0) === 0xFEFF ? s.slice(1) : s;
+}
+
+// stripBomAll: remove BOM (U+FEFF) wherever it appears in a string.
+// Complementa stripEnv (que só remove BOM inicial) para casos em que o BOM
+// aparece no interior de uma string usada como valor de cabeçalho HTTP.
+function stripBomAll(v: string): string {
+  return v.replace(/﻿/g, "");
+}
+
 // ─── Resend ──────────────────────────────────────────────────
 async function sendWithResend(opts: {
-  to: string; subject: string; html: string; text: string;
+  to: string; subject: string; html: string; text: string; idPrefix?: string;
 }): Promise<SendResult> {
   const { Resend } = await import("resend");
-  const fromEmail = process.env.RESEND_FROM_EMAIL ?? "noreply@hoophub.pt";
-  const from = `${FROM_NAME} <${fromEmail}>`;
-  const apiKey = process.env.RESEND_API_KEY!;
-  console.log(`[email/resend] A enviar para ${opts.to} via ${fromEmail}`);
+  const fromEmail = stripEnv(process.env.RESEND_FROM_EMAIL, "noreply@hoophub.pt");
+  const from = stripBomAll(`${FROM_NAME} <${fromEmail}>`);
+  const subject = stripBomAll(opts.subject);
+  const apiKey = stripEnv(process.env.RESEND_API_KEY);
+  if (!apiKey) throw new Error("RESEND_API_KEY não configurada");
+  console.log(`[email/resend] A enviar para ${opts.to} via ${fromEmail} — "${subject}"`);
   const resend = new Resend(apiKey);
   const { data, error } = await resend.emails.send({
     from,
     to:       opts.to,
     replyTo:  fromEmail,
-    subject:  opts.subject,
+    subject,
     html:     opts.html,
     text:     opts.text,
     headers: {
-      "X-Entity-Ref-ID": `hoophub-activation-${Date.now()}`,
+      "X-Entity-Ref-ID": `hoophub-${opts.idPrefix ?? "email"}-${Date.now()}`,
     },
   });
   if (error) {
-    console.error(`[email/resend] ERRO ao enviar para ${opts.to}:`, error);
-    return { success: false, error: error.message };
+    console.error(`[email/resend] ERRO (${opts.to}):`, JSON.stringify(error));
+    return { success: false, error: typeof error === "object" && "message" in error ? (error as {message:string}).message : String(error) };
   }
-  console.log(`[email/resend] Enviado com sucesso → id=${data?.id}`);
+  console.log(`[email/resend] Enviado ✓ id=${data?.id}`);
   return { success: true, messageId: data?.id };
 }
 
@@ -126,7 +143,7 @@ export async function sendActivationEmail(opts: {
   if (hasResend) {
     let resendError: string | undefined;
     try {
-      const r = await sendWithResend({ to: opts.to, subject, html, text });
+      const r = await sendWithResend({ to: opts.to, subject, html, text, idPrefix: "activation" });
       if (r.success) return r;
       resendError = r.error;
       console.error("[email] Resend falhou:", r.error);
@@ -134,9 +151,6 @@ export async function sendActivationEmail(opts: {
       resendError = err instanceof Error ? err.message : String(err);
       console.error("[email] Resend erro:", resendError);
     }
-    // Resend está configurada mas falhou — não cair em devFallback
-    // silenciosamente, isso esconderia o erro real (domínio não
-    // verificado, API key inválida, etc.) do admin.
     if (!hasNodemailer) {
       return { success: false, error: resendError ?? "Erro desconhecido ao enviar via Resend" };
     }
@@ -165,6 +179,199 @@ export async function sendActivationEmail(opts: {
   console.log(`  Para:    ${opts.to}`);
   console.log(`  Assunto: ${subject}`);
   console.log(`  Link:    ${activationLink}`);
+  console.log("=".repeat(60) + "\n");
+  return { success: true, devFallback: true };
+}
+
+export async function sendPasswordResetEmail(opts: {
+  to:           string;
+  name:         string;
+  email:        string;
+  tempPassword: string;
+}): Promise<SendResult> {
+  const { subject, html, text } = buildPasswordResetEmail({
+    name:         opts.name,
+    email:        opts.email,
+    tempPassword: opts.tempPassword,
+    appUrl:       APP_URL,
+  });
+
+  const hasResend     = !!process.env.RESEND_API_KEY;
+  const hasNodemailer = !!(process.env.GMAIL_USER || process.env.SMTP_HOST);
+
+  if (hasResend) {
+    let resendError: string | undefined;
+    try {
+      const r = await sendWithResend({ to: opts.to, subject, html, text, idPrefix: "pwd-reset" });
+      if (r.success) return r;
+      resendError = r.error;
+      console.error("[email] Resend falhou (password reset):", r.error);
+    } catch (err) {
+      resendError = err instanceof Error ? err.message : String(err);
+      console.error("[email] Resend erro (password reset):", resendError);
+    }
+    if (!hasNodemailer) {
+      return { success: false, error: resendError ?? "Erro desconhecido ao enviar via Resend" };
+    }
+  }
+
+  if (hasNodemailer) {
+    try {
+      const r = await sendWithNodemailer({ to: opts.to, subject, html, text });
+      if (r.success) {
+        console.log(`[email] Password reset enviado via ${process.env.GMAIL_USER ? "Gmail" : "SMTP"} → ${opts.to}`);
+        return r;
+      }
+      console.error("[email] Nodemailer falhou (password reset):", r.error);
+      return r;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[email] Nodemailer erro (password reset):", msg);
+      return { success: false, error: msg };
+    }
+  }
+
+  // Dev fallback — nunca expõe a password em produção; aqui só para dev
+  console.log("\n" + "=".repeat(60));
+  console.log("[EMAIL DEV] Password reset (nenhum serviço configurado)");
+  console.log(`  Para:    ${opts.to}`);
+  console.log(`  Assunto: ${subject}`);
+  console.log(`  [password omitida dos logs]`);
+  console.log("=".repeat(60) + "\n");
+  return { success: true, devFallback: true };
+}
+
+export async function sendLatePaymentEmail(opts: {
+  to: string;
+  name: string;
+  monthsLate: number;
+  totalMissing: number;
+  seasonName?: string;
+}): Promise<SendResult> {
+  const { subject, html, text } = buildLatePaymentEmail({
+    name: opts.name,
+    monthsLate: opts.monthsLate,
+    totalMissing: opts.totalMissing,
+    appUrl: APP_URL,
+    seasonName: opts.seasonName,
+  });
+
+  const hasResend     = !!process.env.RESEND_API_KEY;
+  const hasNodemailer = !!(process.env.GMAIL_USER || process.env.SMTP_HOST);
+
+  if (hasResend) {
+    let resendError: string | undefined;
+    try {
+      const r = await sendWithResend({ to: opts.to, subject, html, text, idPrefix: "late-payment" });
+      if (r.success) return r;
+      resendError = r.error;
+      console.error("[email] Resend falhou (atraso):", r.error);
+    } catch (err) {
+      resendError = err instanceof Error ? err.message : String(err);
+      console.error("[email] Resend erro (atraso):", resendError);
+    }
+    if (!hasNodemailer) {
+      return { success: false, error: resendError ?? "Erro desconhecido ao enviar via Resend" };
+    }
+  }
+
+  if (hasNodemailer) {
+    try {
+      const r = await sendWithNodemailer({ to: opts.to, subject, html, text });
+      if (r.success) {
+        console.log(`[email] Enviado via ${process.env.GMAIL_USER ? "Gmail" : "SMTP"} → ${opts.to}`);
+        return r;
+      }
+      console.error("[email] Nodemailer falhou:", r.error);
+      return r;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[email] Nodemailer erro:", msg);
+      return { success: false, error: msg };
+    }
+  }
+
+  console.log("\n" + "=".repeat(60));
+  console.log("[EMAIL DEV] Aviso de quota em atraso (nenhum serviço configurado)");
+  console.log(`  Para:    ${opts.to}`);
+  console.log(`  Assunto: ${subject}`);
+  console.log("=".repeat(60) + "\n");
+  return { success: true, devFallback: true };
+}
+
+export async function sendPaymentReceiptEmail(opts: {
+  to:            string;
+  name:          string;
+  month:         number;
+  year:          number;
+  amount:        number;
+  paymentDate:   string | null;
+  method:        string | null;
+  receiptNumber: string;
+  clubName:      string;
+  temporada:     string;
+  pagos:         number;
+  totalMeses:    number;
+  proximaQuota:  string | null;
+}): Promise<SendResult> {
+  const { subject, html, text } = buildPaymentReceiptEmail({
+    name:          opts.name,
+    month:         opts.month,
+    year:          opts.year,
+    amount:        opts.amount,
+    paymentDate:   opts.paymentDate,
+    method:        opts.method,
+    appUrl:        APP_URL,
+    receiptNumber: opts.receiptNumber,
+    clubName:      opts.clubName,
+    temporada:     opts.temporada,
+    pagos:         opts.pagos,
+    totalMeses:    opts.totalMeses,
+    proximaQuota:  opts.proximaQuota,
+  });
+
+  const hasResend     = !!process.env.RESEND_API_KEY;
+  const hasNodemailer = !!(process.env.GMAIL_USER || process.env.SMTP_HOST);
+
+  if (hasResend) {
+    let resendError: string | undefined;
+    try {
+      const r = await sendWithResend({ to: opts.to, subject, html, text, idPrefix: "receipt" });
+      if (r.success) return r;
+      resendError = r.error;
+      console.error("[email] Resend falhou (recibo):", r.error);
+    } catch (err) {
+      resendError = err instanceof Error ? err.message : String(err);
+      console.error("[email] Resend erro (recibo):", resendError);
+    }
+    if (!hasNodemailer) {
+      return { success: false, error: resendError ?? "Erro desconhecido ao enviar via Resend" };
+    }
+  }
+
+  if (hasNodemailer) {
+    try {
+      const r = await sendWithNodemailer({ to: opts.to, subject, html, text });
+      if (r.success) {
+        console.log(`[email] Recibo enviado via ${process.env.GMAIL_USER ? "Gmail" : "SMTP"} → ${opts.to}`);
+        return r;
+      }
+      console.error("[email] Nodemailer falhou (recibo):", r.error);
+      return r;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[email] Nodemailer erro (recibo):", msg);
+      return { success: false, error: msg };
+    }
+  }
+
+  // Dev fallback
+  const MONTHS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+  console.log("\n" + "=".repeat(60));
+  console.log("[EMAIL DEV] Recibo de pagamento (nenhum serviço configurado)");
+  console.log(`  Para:    ${opts.to}`);
+  console.log(`  Assunto: ${subject}`);
+  console.log(`  Mês:     ${MONTHS[(opts.month - 1) % 12]} ${opts.year} — ${opts.amount}€`);
   console.log("=".repeat(60) + "\n");
   return { success: true, devFallback: true };
 }

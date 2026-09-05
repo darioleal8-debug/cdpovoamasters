@@ -1,14 +1,34 @@
+/* Fonts carregadas via next/font/google em layout.tsx */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
+    /* ── Paleta Balneário v2 ─────────────────────────────────── */
+    --ink:        #0A1220;
+    --navy:       #14213D;
+    --action:     #F97316;
+    --action-ink: #C2410C;
+    --highlight:  #F59E0B;
+    --paper:      #F6F7F9;
+    --line:       #E4E7EE;
+    --text:       #0F1729;
+    --muted-text: #5A6478;
+    --ok:         #12855B;
+    --warn:       #F59E0B;
+    --bad:        #D92D20;
+
+    /* ── Shadcn/ui tokens (HSL) ─────────────────────────────── */
     --background: 0 0% 100%;
     --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
 
     --primary: 0 0% 7%;            /* preto HoopHub */
     --primary-foreground: 0 0% 100%;
@@ -38,6 +58,36 @@
     --chart-4: 120 40% 48%;
     --chart-5: 38 92% 50%;
   }
+
+  .dark {
+    --background: 222 47% 8%;
+    --foreground: 210 20% 96%;
+
+    --card: 222 47% 11%;
+    --card-foreground: 210 20% 96%;
+
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 20% 96%;
+
+    --primary: 0 0% 96%;
+    --primary-foreground: 0 0% 7%;
+
+    --secondary: 217 20% 18%;
+    --secondary-foreground: 210 20% 96%;
+
+    --muted: 217 20% 18%;
+    --muted-foreground: 215 16% 60%;
+
+    --accent: 217 20% 18%;
+    --accent-foreground: 210 20% 96%;
+
+    --destructive: 349 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 217 20% 22%;
+    --input: 217 20% 22%;
+    --ring: 29 91% 57%;
+  }
 }
 
 @layer base {
@@ -47,7 +97,28 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: var(--font-barlow, system-ui, sans-serif);
   }
+}
+
+/* Tipografia condensada para títulos e números grandes */
+.font-condensed {
+  font-family: var(--font-barlow-condensed, system-ui, sans-serif);
+  letter-spacing: 0.02em;
+}
+.tracking-display { letter-spacing: 0.06em; }
+.tracking-label   { letter-spacing: 0.12em; }
+
+/* ── Shell responsivo ────────────────────────────────────── */
+:root {
+  --bottom-nav-h: calc(56px + env(safe-area-inset-bottom));
+  --header-h: 56px;
+  --rail-w: 88px;
+  --sidebar-w: 256px;
+}
+/* No tablet e desktop a barra inferior está escondida — padding de compensação a zero */
+@media (min-width: 768px) {
+  :root { --bottom-nav-h: 0px; }
 }
 
 /* Scrollbar minimalista */
@@ -55,3 +126,21 @@
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
+
+/* Sem scroll horizontal em qualquer breakpoint */
+html, body { max-width: 100%; overflow-x: hidden; }
+
+/* Tabelas dentro de .table-scroll ficam horizontalmente scrollable
+   mas nunca causam scroll no body */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* Input mínimo 16px para evitar zoom automático iOS */
+input, textarea, select { font-size: max(16px, 1rem); }
+
+/* ── Reduced motion ───────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

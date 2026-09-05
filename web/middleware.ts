@@ -1,64 +1,39 @@
-import type { SerializeOptions } from "cookie";
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-type SupabaseCookiesToSet = {
-  name: string;
-  value: string;
-  options: SerializeOptions;
-}[];
+// Rotas protegidas que requerem sessão activa
+const PROTECTED_PREFIXES = [
+  "/dashboard", "/jogadores", "/jogos", "/pagamentos", "/estatisticas",
+  "/configuracoes", "/temporadas", "/treinos", "/financeiro",
+  "/gestao-contas", "/historico", "/chat", "/mais", "/player",
+  "/alterar-password",
+];
 
-export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
+// Cookie de sessão Supabase — formato: sb-<project-ref>-auth-token
+// A presença do cookie indica sessão válida; a validação JWT real ocorre nos server components.
+const SESSION_COOKIE = "sb-uhszagzrhdfzpfztuati-auth-token";
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet: SupabaseCookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
+function isProtected(path: string) {
+  return PROTECTED_PREFIXES.some((p) => path === p || path.startsWith(p + "/"));
+}
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export function middleware(request: NextRequest) {
+  const path     = request.nextUrl.pathname;
+  const hasSession = !!request.cookies.get(SESSION_COOKIE)?.value;
 
-  const isAuth = !!user;
-  const path = request.nextUrl.pathname;
-  const isLoginPage  = path.startsWith("/login");
-  const isDashboard  = path === "/dashboard" || path.startsWith("/dashboard") ||
-    path.startsWith("/jogadores") || path.startsWith("/jogos") ||
-    path.startsWith("/pagamentos") || path.startsWith("/estatisticas") ||
-    path.startsWith("/configuracoes") || path.startsWith("/temporadas") ||
-    path.startsWith("/treinos");
-  const isPlayerArea = path.startsWith("/player");
-
-  if ((isDashboard || isPlayerArea) && !isAuth) {
+  if (isProtected(path) && !hasSession) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (isLoginPage && isAuth) {
+  if (path.startsWith("/login") && hasSession) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  return supabaseResponse;
+  return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Corre apenas em rotas de página; exclui assets estáticos, APIs e imagens
+    "/((?!_next/static|_next/image|favicon.ico|manifest.json|icons/|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
   ],
 };

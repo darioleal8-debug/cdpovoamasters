@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
   const {
     season_id, date, start_time, end_time, location, type = "geral",
     notes, recurrence_type = "unique", day_of_week, day_of_month, end_date,
+    location_lat, location_lng,
   } = body as Record<string, string>;
 
   if (!season_id || !date || !start_time) return fail("Campos obrigatórios em falta");
@@ -118,10 +119,15 @@ export async function POST(req: NextRequest) {
 
   if (dates.length === 0) return fail("Nenhuma data gerada com os parâmetros fornecidos");
 
+  const gpsLat = location_lat ? parseFloat(String(location_lat)) : null;
+  const gpsLng = location_lng ? parseFloat(String(location_lng)) : null;
+
   const rows = dates.map((d) => ({
     season_id, date: d, start_time, end_time: end_time || null,
     location: location || "", type, notes: notes || null,
     recurrence_id: recurrenceId, created_by: user.id,
+    location_lat: gpsLat && !isNaN(gpsLat) ? gpsLat : null,
+    location_lng: gpsLng && !isNaN(gpsLng) ? gpsLng : null,
   }));
 
   const { data: created, error: insErr } = await supabase

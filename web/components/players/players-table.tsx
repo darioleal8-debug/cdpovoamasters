@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo } from "react";
 import {
@@ -63,8 +63,8 @@ export function PlayersTable({
               className="h-9 w-9 rounded-full object-cover"
             />
           ) : (
-            <div className="h-9 w-9 rounded-full bg-cdpovoa-blue/10 flex items-center justify-center">
-              <span className="text-xs font-bold text-cdpovoa-blue">{initials}</span>
+            <div className="h-9 w-9 rounded-full bg-cdpovoa-primary/10 flex items-center justify-center">
+              <span className="text-xs font-bold text-cdpovoa-primary">{initials}</span>
             </div>
           );
         },
@@ -84,7 +84,7 @@ export function PlayersTable({
           </Button>
         ),
         cell: ({ row }) => (
-          <span className="font-mono text-base font-bold text-cdpovoa-blue">
+          <span className="font-mono text-base font-bold text-cdpovoa-primary">
             {row.original.jersey_number ?? "—"}
           </span>
         ),
@@ -136,13 +136,13 @@ export function PlayersTable({
           row.original.height_cm ? `${row.original.height_cm} cm` : "—",
       },
       {
-        accessorKey: "user.status",
+        accessorKey: "user.active",
         header: "Estado",
         cell: ({ row }) => {
-          const status = row.original.user.status;
+          const active = row.original.user.active;
           return (
-            <Badge variant={status === "ativo" ? "success" : "warning"}>
-              {status === "ativo" ? "Ativo" : "Pendente"}
+            <Badge variant={active ? "success" : "warning"}>
+              {active ? "Ativo" : "Pendente"}
             </Badge>
           );
         },

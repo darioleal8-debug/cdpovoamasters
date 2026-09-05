@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
-import { MapPin, Clock, Calendar, Shield, ChevronDown, ChevronRight, Trophy, Map } from "lucide-react";
+import { MapPin, Clock, Calendar, Shield, ChevronDown, ChevronRight, Trophy, Map, Swords } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -49,7 +49,7 @@ function GameRow({ game, expanded, kitsByTeam }: { game: LeagueGame; expanded: b
     >
       {/* Faixa lateral azul nos nossos jogos */}
       {isOurs && (
-        <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-lg bg-cdpovoa-blue" />
+        <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-lg bg-cdpovoa-primary" />
       )}
 
       {/* Data + hora */}
@@ -67,7 +67,7 @@ function GameRow({ game, expanded, kitsByTeam }: { game: LeagueGame; expanded: b
       <div className="flex flex-1 items-center gap-2 min-w-0">
         {/* Equipa casa (visitado) */}
         <span className="flex items-center justify-end gap-1.5 flex-1 min-w-0">
-          <span className={cn("truncate text-sm font-semibold", isOurs && isHome && "text-cdpovoa-blue")}>
+          <span className={cn("truncate text-sm font-semibold", isOurs && isHome && "text-cdpovoa-primary")}>
             {game.home_team}
           </span>
           {homeKit && (
@@ -92,7 +92,7 @@ function GameRow({ game, expanded, kitsByTeam }: { game: LeagueGame; expanded: b
               title={`${game.away_team} — Fora`}
             />
           )}
-          <span className={cn("truncate text-sm font-semibold", isOurs && !isHome && "text-cdpovoa-blue")}>
+          <span className={cn("truncate text-sm font-semibold", isOurs && !isHome && "text-cdpovoa-primary")}>
             {game.away_team}
           </span>
         </span>
@@ -109,6 +109,26 @@ function GameRow({ game, expanded, kitsByTeam }: { game: LeagueGame; expanded: b
         </div>
       )}
 
+      {/* Badge Competição */}
+      {isOurs && game.competition && (
+        <div className="shrink-0">
+          <Badge
+            variant="outline"
+            className={cn(
+              "gap-1 text-[10px] font-semibold uppercase tracking-wide",
+              game.competition === "Taça"
+                ? "border-purple-400/60 bg-purple-50 text-purple-700 dark:bg-purple-950/20 dark:text-purple-400"
+                : "border-cdpovoa-primary/30 bg-cdpovoa-primary/5 text-cdpovoa-primary/80"
+            )}
+          >
+            {game.competition === "Taça"
+              ? <Swords className="h-2.5 w-2.5" />
+              : <Trophy className="h-2.5 w-2.5" />}
+            {game.competition}
+          </Badge>
+        </div>
+      )}
+
       {/* Badge Casa / Fora */}
       {isOurs && (
         <div className="shrink-0">
@@ -117,8 +137,8 @@ function GameRow({ game, expanded, kitsByTeam }: { game: LeagueGame; expanded: b
             className={cn(
               "gap-1 text-[10px] font-semibold uppercase tracking-wide",
               isHome
-                ? "bg-cdpovoa-blue hover:bg-cdpovoa-blue/90"
-                : "border-cdpovoa-blue/50 text-cdpovoa-blue"
+                ? "bg-cdpovoa-primary hover:bg-cdpovoa-primary/90"
+                : "border-cdpovoa-primary/50 text-cdpovoa-primary"
             )}
           >
             <Shield className="h-2.5 w-2.5" />
@@ -176,7 +196,7 @@ function JornadaSection({
           className={cn(
             "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold",
             hasOurGame
-              ? "bg-cdpovoa-blue text-white"
+              ? "bg-cdpovoa-primary text-white"
               : "bg-muted text-muted-foreground"
           )}
         >
@@ -194,7 +214,7 @@ function JornadaSection({
           {hasOurGame && (
             <Badge
               variant="outline"
-              className="w-fit gap-1 border-cdpovoa-blue/40 bg-cdpovoa-blue/5 text-cdpovoa-blue text-[10px]"
+              className="w-fit gap-1 border-cdpovoa-primary/40 bg-cdpovoa-primary/5 text-cdpovoa-primary text-[10px]"
             >
               <Trophy className="h-2.5 w-2.5" />
               O nosso jogo
@@ -250,7 +270,7 @@ function StatsBar({ stats }: { stats: Stats }) {
           key={s.label}
           className="rounded-lg border bg-card p-3 text-center shadow-sm"
         >
-          <p className="text-xl font-bold text-cdpovoa-blue">{s.value}</p>
+          <p className="text-xl font-bold text-cdpovoa-primary">{s.value}</p>
           <p className="text-xs text-muted-foreground">{s.label}</p>
         </div>
       ))}
@@ -262,16 +282,16 @@ function StatsBar({ stats }: { stats: Stats }) {
 
 function NextGameBanner({ game }: { game: LeagueGame }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-cdpovoa-blue/30 bg-cdpovoa-blue/5 p-4">
+    <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-cdpovoa-primary/30 bg-cdpovoa-primary/5 p-4">
       <div className="flex items-center gap-2 shrink-0">
-        <Trophy className="h-5 w-5 text-cdpovoa-blue" />
-        <span className="text-sm font-semibold text-cdpovoa-blue">Próximo jogo</span>
-        <Badge className="bg-cdpovoa-blue text-white text-[10px]">J{game.jornada}</Badge>
+        <Trophy className="h-5 w-5 text-cdpovoa-primary" />
+        <span className="text-sm font-semibold text-cdpovoa-primary">Próximo jogo</span>
+        <Badge className="bg-cdpovoa-primary text-white text-[10px]">J{game.jornada}</Badge>
       </div>
       <div className="flex flex-1 flex-wrap items-center gap-2 text-sm">
-        <span className={cn("font-bold", game.is_home && "text-cdpovoa-blue")}>{game.home_team}</span>
+        <span className={cn("font-bold", game.is_home && "text-cdpovoa-primary")}>{game.home_team}</span>
         <span className="text-muted-foreground text-xs">vs</span>
-        <span className={cn("font-bold", !game.is_home && "text-cdpovoa-blue")}>{game.away_team}</span>
+        <span className={cn("font-bold", !game.is_home && "text-cdpovoa-primary")}>{game.away_team}</span>
         <span className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <Calendar className="h-3 w-3" />
@@ -294,8 +314,8 @@ function NextGameBanner({ game }: { game: LeagueGame }) {
         className={cn(
           "shrink-0",
           game.is_home
-            ? "bg-cdpovoa-blue hover:bg-cdpovoa-blue/90"
-            : "border-cdpovoa-blue/50 text-cdpovoa-blue"
+            ? "bg-cdpovoa-primary hover:bg-cdpovoa-primary/90"
+            : "border-cdpovoa-primary/50 text-cdpovoa-primary"
         )}
       >
         {game.is_home ? "Casa" : "Fora"}
@@ -394,7 +414,7 @@ export function LeagueCalendar({
             className={cn(
               "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
               showOnlyOurs
-                ? "border-cdpovoa-blue bg-cdpovoa-blue text-white"
+                ? "border-cdpovoa-primary bg-cdpovoa-primary text-white"
                 : "border-border bg-background hover:bg-muted"
             )}
           >

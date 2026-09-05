@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/late-payments",
+      "schedule": "0 9 * * *"
+    }
+  ]
+}

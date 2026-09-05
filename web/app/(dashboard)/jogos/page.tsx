@@ -8,53 +8,37 @@ import { useTeamKits } from "@/hooks/use-team-kits";
 import { GamesTable } from "@/components/games/games-table";
 import { CallupsModal } from "@/components/games/callups-modal";
 import { LeagueCalendar } from "@/components/games/league-calendar";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
 import { Trophy, CalendarDays } from "lucide-react";
 import type { Event } from "@/types/database";
 
-// ─── Tab switcher ─────────────────────────────────────────
-
-const TABS = [
-  { id: "liga",   label: "Calendário Liga", icon: Trophy },
-  { id: "agenda", label: "Agenda",          icon: CalendarDays },
-] as const;
-
-type TabId = typeof TABS[number]["id"];
-
-// ─── Página ───────────────────────────────────────────────
-
 export default function JogosPage() {
-  const [activeTab, setActiveTab] = useState<TabId>("liga");
-
   const { seasons, activeSeason, loading: seasonsLoading } = useSeasons();
   const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(null);
   const seasonId = selectedSeasonId ?? activeSeason?.id ?? null;
 
-  // Hook agenda (eventos todos)
-  const { events, loading: eventsLoading, createGame, createTraining, deleteEvent } =
-    useGames(seasonId);
+  const { events, loading: eventsLoading, createGame, createTraining, deleteEvent } = useGames(seasonId);
 
-  // Hook calendário liga
   const {
     jornadas, allJornadas, stats, loading: ligaLoading,
     showOnlyOurs, setShowOnlyOurs,
     selectedJornada, setSelectedJornada,
   } = useLeagueCalendar(seasonId);
 
-  // Kit colors for teams
   const { kitsByTeam } = useTeamKits();
 
-  // Modal de convocados
   const [callupsGame, setCallupsGame] = useState<Event | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Event | null>(null);
 
-  // Diálogo novo evento
   const [dialogOpen, setDialogOpen]   = useState(false);
   const [eventType, setEventType]     = useState<"jogo" | "treino">("jogo");
+  const [gameType, setGameType]       = useState<"official" | "friendly">("official");
   const [formData, setFormData]       = useState({
     title: "", location: "", event_date: "", event_time: "",
     opponent: "", training_kind: "", description: "",
@@ -63,12 +47,18 @@ export default function JogosPage() {
   function openAdd() {
     setFormData({ title: "", location: "", event_date: "", event_time: "",
                   opponent: "", training_kind: "", description: "" });
+    setGameType("official");
     setDialogOpen(true);
   }
 
-  async function handleDelete(event: Event) {
-    if (!confirm(`Remover "${event.title}"?`)) return;
-    await deleteEvent(event.id);
+  function handleDelete(event: Event) {
+    setPendingDelete(event);
+  }
+
+  async function confirmDeleteEvent() {
+    if (!pendingDelete) return;
+    await deleteEvent(pendingDelete.id);
+    setPendingDelete(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -83,7 +73,7 @@ export default function JogosPage() {
       description: formData.description || undefined,
     };
     const ok = eventType === "jogo"
-      ? await createGame({ ...base, opponent: formData.opponent || undefined })
+      ? await createGame({ ...base, opponent: formData.opponent || undefined, game_type: gameType })
       : await createTraining({ ...base, training_kind: formData.training_kind || undefined });
     if (ok) setDialogOpen(false);
   }
@@ -96,11 +86,7 @@ export default function JogosPage() {
           <h1 className="text-2xl font-bold tracking-tight">Jogos</h1>
           <p className="text-muted-foreground">Calendário da Liga e agenda de eventos</p>
         </div>
-        <Select
-          value={seasonId ?? ""}
-          onValueChange={setSelectedSeasonId}
-          disabled={seasonsLoading}
-        >
+        <Select value={seasonId ?? ""} onValueChange={setSelectedSeasonId} disabled={seasonsLoading}>
           <SelectTrigger className="w-52">
             <SelectValue placeholder="Selecionar temporada" />
           </SelectTrigger>
@@ -114,45 +100,31 @@ export default function JogosPage() {
         </Select>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 rounded-lg border bg-muted/40 p-1 w-fit">
-        {TABS.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all",
-                activeTab === tab.id
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+      <Tabs defaultValue="liga" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="liga" className="gap-2">
+            <Trophy className="h-4 w-4" />Calendário Liga
+          </TabsTrigger>
+          <TabsTrigger value="agenda" className="gap-2">
+            <CalendarDays className="h-4 w-4" />Agenda
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Conteúdo das tabs */}
-      {activeTab === "liga" && (
-        <LeagueCalendar
-          jornadas={jornadas}
-          allJornadas={allJornadas}
-          stats={stats}
-          loading={ligaLoading}
-          showOnlyOurs={showOnlyOurs}
-          onToggleOurs={setShowOnlyOurs}
-          selectedJornada={selectedJornada}
-          onSelectJornada={setSelectedJornada}
-          kitsByTeam={kitsByTeam}
-        />
-      )}
+        <TabsContent value="liga">
+          <LeagueCalendar
+            jornadas={jornadas}
+            allJornadas={allJornadas}
+            stats={stats}
+            loading={ligaLoading}
+            showOnlyOurs={showOnlyOurs}
+            onToggleOurs={setShowOnlyOurs}
+            selectedJornada={selectedJornada}
+            onSelectJornada={setSelectedJornada}
+            kitsByTeam={kitsByTeam}
+          />
+        </TabsContent>
 
-      {activeTab === "agenda" && (
-        <>
+        <TabsContent value="agenda" className="space-y-4">
           <GamesTable
             events={events}
             loading={eventsLoading}
@@ -176,10 +148,7 @@ export default function JogosPage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
                   <Label>Tipo de Evento</Label>
-                  <Select
-                    value={eventType}
-                    onValueChange={(v) => setEventType(v as "jogo" | "treino")}
-                  >
+                  <Select value={eventType} onValueChange={(v) => setEventType(v as "jogo" | "treino")}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="jogo">Jogo</SelectItem>
@@ -188,74 +157,100 @@ export default function JogosPage() {
                   </Select>
                 </div>
 
+                {/* Tipo de jogo — apenas visível quando o evento é um jogo */}
+                {eventType === "jogo" && (
+                  <div className="space-y-2">
+                    <Label>Tipo de Jogo</Label>
+                    <Select value={gameType} onValueChange={(v) => setGameType(v as "official" | "friendly")}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="official">Jogo Oficial (Liga / Taça)</SelectItem>
+                        <SelectItem value="friendly">Jogo de Treino / Amigável</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {gameType === "friendly" && (
+                      <p className="text-xs text-muted-foreground">
+                        Não conta para classificação. As estatísticas ficam registadas mas separadas dos jogos oficiais.
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="title">Título *</Label>
-                  <Input
-                    id="title" required value={formData.title}
+                  <Input id="title" required value={formData.title}
                     onChange={(e) => setFormData((p) => ({ ...p, title: e.target.value }))}
-                    placeholder={eventType === "jogo" ? "Jogo vs. Lions BC" : "Treino tático"}
-                  />
+                    placeholder={eventType === "jogo" ? "Jogo vs. Lions BC" : "Treino tático"} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="event_date">Data *</Label>
-                    <Input
-                      id="event_date" type="date" required value={formData.event_date}
-                      onChange={(e) => setFormData((p) => ({ ...p, event_date: e.target.value }))}
-                    />
+                    <Input id="event_date" type="date" required value={formData.event_date}
+                      onChange={(e) => setFormData((p) => ({ ...p, event_date: e.target.value }))} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="event_time">Hora *</Label>
-                    <Input
-                      id="event_time" type="time" required value={formData.event_time}
-                      onChange={(e) => setFormData((p) => ({ ...p, event_time: e.target.value }))}
-                    />
+                    <Input id="event_time" type="time" required value={formData.event_time}
+                      onChange={(e) => setFormData((p) => ({ ...p, event_time: e.target.value }))} />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="location">Local *</Label>
-                  <Input
-                    id="location" required value={formData.location}
+                  <Input id="location" required value={formData.location}
                     onChange={(e) => setFormData((p) => ({ ...p, location: e.target.value }))}
-                    placeholder="Pavilhão Municipal da Póvoa"
-                  />
+                    placeholder="Pavilhão Municipal da Póvoa" />
                 </div>
 
                 {eventType === "jogo" && (
                   <div className="space-y-2">
                     <Label htmlFor="opponent">Adversário</Label>
-                    <Input
-                      id="opponent" value={formData.opponent}
+                    <Input id="opponent" value={formData.opponent}
                       onChange={(e) => setFormData((p) => ({ ...p, opponent: e.target.value }))}
-                      placeholder="Lions BC"
-                    />
+                      placeholder="Lions BC" />
                   </div>
                 )}
 
                 {eventType === "treino" && (
                   <div className="space-y-2">
                     <Label htmlFor="training_kind">Tipo de Treino</Label>
-                    <Input
-                      id="training_kind" value={formData.training_kind}
+                    <Input id="training_kind" value={formData.training_kind}
                       onChange={(e) => setFormData((p) => ({ ...p, training_kind: e.target.value }))}
-                      placeholder="físico, tático, colectivo..."
-                    />
+                      placeholder="físico, tático, colectivo..." />
                   </div>
                 )}
 
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                    Cancelar
-                  </Button>
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
                   <Button type="submit">Criar Evento</Button>
                 </DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
-        </>
-      )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Confirmação de remoção de evento */}
+      <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover evento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              &ldquo;{pendingDelete?.title}&rdquo; será eliminado permanentemente. Esta ação não pode ser revertida.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteEvent}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo } from "react";
 import { format, parseISO, startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
 import { pt } from "date-fns/locale";
-import { Plus, Users, FileText, Pencil, Trash2, Clock, MapPin, BarChart } from "lucide-react";
+import { Plus, Users, FileText, Pencil, Trash2, Clock, MapPin, BarChart, Camera } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,7 +13,8 @@ import { AttendanceModal } from "./attendance-modal";
 import { NotesModal } from "./notes-modal";
 import { CreateTrainingModal } from "./create-training-modal";
 import { useTrainings, usePlayerAttendanceStats } from "@/hooks/use-trainings";
-import type { Training, Player, TrainingType } from "@/types/database";
+import { EventPhotoGallery } from "@/components/shared/event-photo-gallery";
+import type { Training, RosterEntry, TrainingType } from "@/types/database";
 import { TRAINING_TYPE_LABELS } from "@/types/database";
 
 // ── Cores por tipo de treino ──────────────────────────────
@@ -32,7 +33,7 @@ const TYPE_COLORS: Record<TrainingType, string> = {
 
 interface Props {
   seasonId: string;
-  players: Player[];
+  players: RosterEntry[];
   playersLoading: boolean;
 }
 
@@ -45,6 +46,8 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
   const [attendanceTraining, setAttendance] = useState<Training | null>(null);
   const [notesTraining, setNotes]           = useState<Training | null>(null);
   const [editTraining, setEdit]             = useState<Training | null>(null);
+  const [photosTraining, setPhotos]         = useState<Training | null>(null);
+  const [deleteConfirm, setDeleteConfirm]   = useState<Training | null>(null);
 
   // Filtros
   const [filterType, setFilterType]   = useState<string>("all");
@@ -85,8 +88,13 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
   }, [trainings, attendanceStats]);
 
   function handleDelete(t: Training) {
-    if (!confirm(`Eliminar treino de ${t.date}?`)) return;
-    deleteTraining(t.id);
+    setDeleteConfirm(t);
+  }
+
+  function confirmDelete() {
+    if (!deleteConfirm) return;
+    deleteTraining(deleteConfirm.id);
+    setDeleteConfirm(null);
   }
 
   return (
@@ -100,7 +108,7 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
           { label: "Jogadores no plantel", value: players.length },
         ].map((s) => (
           <div key={s.label} className="rounded-lg border bg-card p-3 text-center shadow-sm">
-            <p className="text-xl font-bold text-cdpovoa-blue">{s.value}</p>
+            <p className="text-xl font-bold text-cdpovoa-primary">{s.value}</p>
             <p className="text-xs text-muted-foreground">{s.label}</p>
           </div>
         ))}
@@ -178,7 +186,7 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
                   const presentCount = players.filter((p) => {
                     // Aproximação via attendanceStats: não é por treino, mas é útil para mostrar algo
                     // Para o detalhe real, usa o AttendanceModal
-                    return attendanceStats[p.id];
+                    return attendanceStats[p.player_id ?? ""];
                   }).length;
 
                   return (
@@ -232,6 +240,11 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
                             <FileText className="h-3.5 w-3.5" />
                             <span className="hidden sm:inline text-xs">Notas</span>
                           </Button>
+                          <Button variant="ghost" size="sm" className="h-7 px-2 gap-1"
+                            onClick={() => setPhotos(t)}>
+                            <Camera className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline text-xs">Fotos</span>
+                          </Button>
                           <Button variant="ghost" size="icon" className="h-7 w-7"
                             onClick={() => setEdit(t)}>
                             <Pencil className="h-3.5 w-3.5" />
@@ -267,12 +280,12 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
               </thead>
               <tbody className="divide-y">
                 {players
-                  .filter((p) => attendanceStats[p.id])
-                  .sort((a, b) => (attendanceStats[b.id]?.pct ?? 0) - (attendanceStats[a.id]?.pct ?? 0))
+                  .filter((p) => attendanceStats[p.player_id ?? ""])
+                  .sort((a, b) => (attendanceStats[b.player_id ?? ""]?.pct ?? 0) - (attendanceStats[a.player_id ?? ""]?.pct ?? 0))
                   .map((p) => {
-                    const s = attendanceStats[p.id];
+                    const s = attendanceStats[p.player_id ?? ""];
                     return (
-                      <tr key={p.id} className="hover:bg-muted/30">
+                      <tr key={p.user_id} className="hover:bg-muted/30">
                         <td className="px-3 py-2 font-medium">{p.name}</td>
                         <td className="px-3 py-2 text-muted-foreground">{p.number ?? "—"}</td>
                         <td className="px-3 py-2">{s.total}</td>
@@ -316,6 +329,24 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
         onClose={() => setNotes(null)}
       />
 
+      {/* Photos dialog */}
+      {photosTraining && (
+        <Dialog open onOpenChange={() => setPhotos(null)}>
+          <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Camera className="h-4 w-4" />
+                Fotografias — {format(parseISO(photosTraining.date), "EEE, d MMM yyyy", { locale: pt })}
+              </DialogTitle>
+            </DialogHeader>
+            <EventPhotoGallery
+              entityType="training"
+              entityId={photosTraining.id}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Edit inline (reutiliza CreateTrainingModal em modo edição) */}
       {editTraining && (
         <Dialog open onOpenChange={() => setEdit(null)}>
@@ -335,6 +366,31 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Confirmação de eliminação */}
+      <Dialog open={!!deleteConfirm} onOpenChange={(v) => { if (!v) setDeleteConfirm(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Eliminar Treino
+            </DialogTitle>
+          </DialogHeader>
+          {deleteConfirm && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Tens a certeza que queres eliminar o treino de{" "}
+                <strong>{format(parseISO(deleteConfirm.date), "EEEE, d 'de' MMMM yyyy", { locale: pt })}</strong>?
+                Esta ação é irreversível.
+              </p>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Cancelar</Button>
+                <Button variant="destructive" onClick={confirmDelete}>Eliminar</Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

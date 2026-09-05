@@ -104,7 +104,30 @@ export function useAttendance(trainingId: string | null) {
     return true;
   }
 
-  return { attendance, loading, saveAttendance, refresh: load };
+  async function validateAttendance(
+    attendanceId: string,
+    action: "approve" | "reject"
+  ): Promise<boolean> {
+    if (!trainingId) return false;
+    const res = await fetch(
+      `/api/trainings/${trainingId}/attendance/${attendanceId}/validate`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      }
+    );
+    const json = await res.json();
+    if (!res.ok) {
+      toast({ title: "Erro ao validar presença", description: json.error, variant: "destructive" });
+      return false;
+    }
+    toast({ title: action === "approve" ? "Presença aprovada" : "Presença rejeitada" });
+    await load();
+    return true;
+  }
+
+  return { attendance, loading, saveAttendance, validateAttendance, refresh: load };
 }
 
 // ─── Hook: notas de um treino ────────────────────────────

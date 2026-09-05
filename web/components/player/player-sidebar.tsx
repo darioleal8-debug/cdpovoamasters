@@ -9,6 +9,7 @@ import { useClubSettings } from "@/lib/club-context";
 import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
 import { toast } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
+import { NavLink } from "@/components/layout/nav-link";
 
 const PLAYER_NAV = [
   { href: "/player",                label: "Início",             icon: Home },
@@ -19,37 +20,6 @@ const PLAYER_NAV = [
   { href: "/player/chat",           label: "Chat",               icon: MessageSquare },
 ];
 
-function NavLink({ href, icon: Icon, label, exact = false, badge }: {
-  href: string; icon: React.ElementType; label: string; exact?: boolean; badge?: number;
-}) {
-  const pathname = usePathname();
-  const isActive = exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
-
-  return (
-    <Link
-      href={href}
-      className={cn(
-        "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
-        isActive
-          ? "bg-white/10 text-white"
-          : "text-white/65 hover:bg-white/7 hover:text-white/90"
-      )}
-    >
-      <Icon className="h-4 w-4 shrink-0" />
-      <span>{label}</span>
-      {!!badge && badge > 0 && (
-        <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-semibold text-white"
-          style={{ backgroundColor: "var(--club-secondary, #F28C28)" }}>
-          {badge}
-        </span>
-      )}
-      {isActive && !badge && (
-        <span className="ml-auto h-1.5 w-1.5 rounded-full"
-          style={{ backgroundColor: "var(--club-secondary, #F28C28)" }} />
-      )}
-    </Link>
-  );
-}
 
 export function PlayerSidebar({
   playerName,

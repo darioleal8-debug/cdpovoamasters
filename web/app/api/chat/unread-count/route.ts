@@ -51,13 +51,29 @@ export async function GET() {
   const chatIds = participation.map((p) => p.chat_id as string);
   const lastReadByChat = new Map(participation.map((p) => [p.chat_id as string, p.last_read_at as string | null]));
 
+  // Ponto mais antigo de last_read_at — só buscamos mensagens mais recentes
+  // Não lidas podem existir em chats onde last_read_at é NULL (jamais lidos)
+  // Para esses, usamos cutoff de 90 dias para não carregar o histórico todo.
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 86_400_000).toISOString();
+  const minLastRead = participation.reduce<string>((acc, p) => {
+    const lr = p.last_read_at as string | null;
+    if (!lr) return acc; // chat sem last_read — já temos cutoff de 90 dias
+    return lr < acc ? lr : acc;
+  }, ninetyDaysAgo);
+
   const { data: messages } = await admin
     .from("chat_messages")
-    .select("chat_id, created_at")
-    .in("chat_id", chatIds);
+    .select("chat_id, created_at, sender_id")
+    .in("chat_id", chatIds)
+    .gt("created_at", minLastRead)
+    .neq("is_system", true)
+    .order("created_at", { ascending: false })
+    .limit(500);
 
   let unread = 0;
   for (const m of messages ?? []) {
+    // Não contar mensagens enviadas pelo próprio utilizador
+    if ((m.sender_id as string | null) === caller.id) continue;
     const lastRead = lastReadByChat.get(m.chat_id as string);
     if (!lastRead || new Date(m.created_at as string) > new Date(lastRead)) unread++;
   }

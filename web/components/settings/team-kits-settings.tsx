@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { Plus, Loader2, ChevronDown, ChevronUp, Shirt } from "lucide-react";
@@ -73,9 +73,9 @@ export function TeamKitsSettings() {
       {ourKit && (
         <div className="space-y-3">
           <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <Shirt className="h-4 w-4 text-cdpovoa-blue" />
+            <Shirt className="h-4 w-4 text-cdpovoa-primary" />
             {settings.club_name}
-            <span className="ml-auto rounded-full bg-cdpovoa-blue/10 px-2 py-0.5 text-[11px] font-semibold text-cdpovoa-blue">
+            <span className="ml-auto rounded-full bg-cdpovoa-primary/10 px-2 py-0.5 text-[11px] font-semibold text-cdpovoa-primary">
               Nosso Clube
             </span>
           </h3>

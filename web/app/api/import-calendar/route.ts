@@ -361,6 +361,126 @@ function regexParseFromLiga(
   };
 }
 
+// ─── Detecção de competição (Liga vs Taça) ────────────────
+
+type Competition = "Liga" | "Taça";
+
+async function detectCompetitions(
+  events: Array<{ title: string; event_date: string; event_time?: string | null; location?: string | null; opponent?: string | null; jornada?: number }>,
+  rawText: string,
+  ligaSectionDetected: boolean,
+  useAI: boolean,
+  apiKey: string | undefined
+): Promise<Map<string, Competition>> {
+  const map = new Map<string, Competition>();
+
+  // Liga section detected cleanly → all games are Liga, skip DeepSeek
+  if (ligaSectionDetected) {
+    for (const evt of events) {
+      map.set(`${evt.event_date}|${evt.opponent ?? ""}`, "Liga");
+    }
+    return map;
+  }
+
+  // Local detection pass
+  const needsAI: number[] = [];
+  for (let i = 0; i < events.length; i++) {
+    const evt = events[i];
+    const key = `${evt.event_date}|${evt.opponent ?? ""}`;
+    const text = `${evt.title ?? ""}`
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "");
+
+    if (/tac[ao]|eliminat[oa]ria|copa|knockout|k\.o\./i.test(text)) {
+      map.set(key, "Taça");
+    } else if (/liga|jornada\s*\d|campeonato/i.test(text)) {
+      map.set(key, "Liga");
+    } else {
+      map.set(key, "Liga"); // safe default
+      needsAI.push(i);
+    }
+  }
+
+  // DeepSeek for ambiguous games (only when AI is enabled and there's ambiguity)
+  if (!useAI || !apiKey || needsAI.length === 0) return map;
+
+  const ambiguousGames = needsAI.slice(0, 30).map(i => {
+    const evt = events[i];
+    const match = evt.title?.match(/^(.+?)\s+vs\s+(.+?)(?:\s+\(|$)/i);
+    return {
+      game_index: i,
+      home_team: match?.[1]?.trim() ?? "",
+      away_team: match?.[2]?.trim() ?? evt.opponent ?? "",
+      date: evt.event_date,
+      round: `Jornada ${evt.jornada ?? "?"}`,
+      raw_text: evt.title ?? "",
+    };
+  });
+
+  try {
+    const resp = await fetch("https://api.deepseek.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        temperature: 0,
+        max_tokens: 600,
+        messages: [
+          {
+            role: "system",
+            content: "És um especialista em calendários de basquetebol português. Respondes sempre em JSON puro, sem markdown.",
+          },
+          {
+            role: "user",
+            content: `Analisa estes jogos e classifica cada um como "Liga" ou "Taça".
+
+Pistas:
+- "Jornada X" numerada, formato round-robin, calendário fixo → Liga
+- "Eliminatória", "Taça", "Fase", formato knockout → Taça
+- Sem pistas claras → Liga (padrão)
+
+Devolve APENAS este JSON:
+{
+  "results": [
+    { "game_index": <number>, "competition": "Liga" | "Taça", "reason": "<breve>" }
+  ]
+}
+
+Contexto do ficheiro (primeiras linhas):
+${rawText.slice(0, 300)}
+
+Jogos a classificar:
+${JSON.stringify({ operation: "competition_detection", games: ambiguousGames }, null, 2)}`,
+          },
+        ],
+      }),
+    });
+
+    if (resp.ok) {
+      const json = await resp.json();
+      console.log(`[import-calendar] competition detection tokens: ${json.usage?.prompt_tokens}+${json.usage?.completion_tokens}`);
+      const raw = (json.choices?.[0]?.message?.content ?? "") as string;
+      const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      const result = JSON.parse(cleaned) as { results: Array<{ game_index: number; competition: string }> };
+      for (const r of result.results ?? []) {
+        const idx = r.game_index;
+        if (idx >= 0 && idx < events.length) {
+          const evt = events[idx];
+          map.set(`${evt.event_date}|${evt.opponent ?? ""}`, r.competition === "Taça" ? "Taça" : "Liga");
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("[import-calendar] competition detection failed (non-fatal):", (e as Error).message);
+  }
+
+  return map;
+}
+
 // ─── POST /api/import-calendar ────────────────────────────
 export async function POST(req: NextRequest) {
   console.log("[import-calendar] POST received");
@@ -448,8 +568,8 @@ export async function POST(req: NextRequest) {
 
   try {
     if (useAI) {
-      if (!process.env.ANTHROPIC_API_KEY) {
-        warnings.push("ANTHROPIC_API_KEY não configurada — a usar parser de regex");
+      if (!process.env.DEEPSEEK_API_KEY) {
+        warnings.push("DEEPSEEK_API_KEY não configurada — a usar parser de regex");
         parseResult = ligaSection
           ? regexParseFromLiga(ligaSection, ourTeam)
           : fallbackRegex(ext, rawText, ourTeam);
@@ -527,8 +647,53 @@ export async function POST(req: NextRequest) {
 
   const payload = buildImportPayload(parseResult, seasonId!, ourTeam, !importAll);
 
+  // ── Detecção de competição (Liga vs Taça) ─────────────────────────
+  const competitionMap = await detectCompetitions(
+    payload.events_to_create,
+    rawText,
+    ligaSection !== null,
+    useAI,
+    process.env.DEEPSEEK_API_KEY
+  );
+
+  // ── Pré-carregar jogos existentes (1 query, deduplicação batch) ─
+  const { data: existingRaw } = await supabase
+    .from("events")
+    .select("event_date, opponent")
+    .eq("season_id", seasonId!)
+    .eq("type", "jogo");
+
+  const existingSet = new Set(
+    (existingRaw ?? []).map(
+      (e: { event_date: string; opponent: string | null }) =>
+        `${e.event_date}|${e.opponent ?? ""}`
+    )
+  );
+
   // ── Dry run ───────────────────────────────────────────
   if (dryRun) {
+    type DryEntry = { date: string; time: string; title: string; location: string; jornada: number; competition: string };
+    const previewNew: DryEntry[] = [];
+    const previewIgnored: DryEntry[] = [];
+
+    for (const e of payload.events_to_create) {
+      if (!e.event_date) continue;
+      const key = `${e.event_date}|${e.opponent ?? ""}`;
+      const item: DryEntry = {
+        date: e.event_date,
+        time: e.event_time ?? "",
+        title: e.title,
+        location: e.location ?? "",
+        jornada: e.jornada ?? 0,
+        competition: competitionMap.get(key) ?? "Liga",
+      };
+      if (existingSet.has(key)) {
+        previewIgnored.push(item);
+      } else {
+        previewNew.push(item);
+      }
+    }
+
     return ok({
       dry_run: true,
       used_ai: usedAI,
@@ -536,17 +701,14 @@ export async function POST(req: NextRequest) {
       teams_found: parseResult.all_teams.length,
       games_found: parseResult.games.length,
       our_games: payload.summary.our_games,
+      games_new: previewNew.length,
+      games_ignored: previewIgnored.length,
       parse_errors: parseResult.errors,
       warnings: [...warnings, ...validation.warnings],
       corrections: parseResult.corrections ?? [],
       liga_rows_found: ligaSection?.rows.length ?? null,
-      preview_games: payload.events_to_create.map((e) => ({
-        date: e.event_date,
-        time: e.event_time,
-        title: e.title,
-        location: e.location,
-        jornada: e.jornada,
-      })),
+      preview_games: previewNew,
+      preview_ignored: previewIgnored,
       preview_teams: payload.teams_to_create.map((t) => t.name),
     });
   }
@@ -574,40 +736,45 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Inserir eventos ───────────────────────────────────
+  type GameEntry = { date: string; time: string; title: string; location: string; jornada: number };
   let gamesCreated = 0;
+  let gamesIgnored = 0;
   let gamesSkipped = 0;
-  let gamesUpdated = 0;
   const gameErrors: string[] = [];
+  const createdList: GameEntry[] = [];
+  const ignoredList: GameEntry[] = [];
 
   for (const evt of payload.events_to_create) {
     if (!evt.event_date) { gamesSkipped++; continue; }
 
-    const { data: existing } = await supabase
-      .from("events")
-      .select("id")
-      .eq("season_id", evt.season_id)
-      .eq("type", "jogo")
-      .eq("event_date", evt.event_date)
-      .eq("opponent", evt.opponent)
-      .maybeSingle();
+    const key = `${evt.event_date}|${evt.opponent ?? ""}`;
+    const entry: GameEntry = {
+      date: evt.event_date,
+      time: evt.event_time ?? "",
+      title: evt.title,
+      location: evt.location ?? "",
+      jornada: evt.jornada ?? 0,
+    };
 
-    if (existing) {
-      const { error } = await supabase.from("events").update({
-        title: evt.title, location: evt.location,
-        event_time: evt.event_time, description: evt.description,
-      }).eq("id", existing.id);
-      if (error) gameErrors.push(`${evt.event_date} vs ${evt.opponent}: ${error.message}`);
-      else gamesUpdated++;
+    if (existingSet.has(key)) {
+      gamesIgnored++;
+      ignoredList.push(entry);
     } else {
       const { error } = await supabase.from("events").insert({
         season_id: evt.season_id, type: "jogo",
         title: evt.title, location: evt.location,
         event_date: evt.event_date, event_time: evt.event_time,
         opponent: evt.opponent, description: evt.description,
+        competition: competitionMap.get(key) ?? "Liga",
         created_by: user.id,
       });
-      if (error) gameErrors.push(`${evt.event_date} vs ${evt.opponent}: ${error.message}`);
-      else gamesCreated++;
+      if (error) {
+        gameErrors.push(`${evt.event_date} vs ${evt.opponent}: ${error.message}`);
+      } else {
+        gamesCreated++;
+        createdList.push(entry);
+        existingSet.add(key); // previne duplicados dentro do mesmo ficheiro
+      }
     }
   }
 
@@ -624,7 +791,7 @@ export async function POST(req: NextRequest) {
       games_found: parseResult.games.length,
       games_created: gamesCreated,
       games_skipped: gamesSkipped,
-      games_updated: gamesUpdated,
+      games_ignored: gamesIgnored,
       errors: allErrors,
       raw_games: parseResult.games as unknown as RawGame[],
       imported_by: user.id,
@@ -638,12 +805,14 @@ export async function POST(req: NextRequest) {
     teams_created: teamsCreated,
     games_found: parseResult.games.length,
     games_created: gamesCreated,
-    games_updated: gamesUpdated,
+    games_ignored: gamesIgnored,
     games_skipped: gamesSkipped,
     corrections: parseResult.corrections ?? [],
     errors: allErrors,
     warnings: [...warnings, ...validation.warnings],
     teams_created_list: payload.teams_to_create.map((t) => t.name),
+    created_list: createdList,
+    ignored_list: ignoredList,
   });
 }
 
@@ -654,7 +823,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("calendar_imports")
-    .select("id, filename, file_type, games_created, games_updated, teams_created, errors, created_at, season_id")
+    .select("id, filename, file_type, games_created, games_ignored, teams_created, errors, created_at, season_id")
     .order("created_at", { ascending: false })
     .limit(20);
 

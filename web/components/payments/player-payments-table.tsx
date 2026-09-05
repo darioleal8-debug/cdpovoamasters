@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo } from "react";
 import { CheckCircle2, ClipboardList, History, Loader2, SlidersHorizontal, Search } from "lucide-react";
@@ -196,7 +196,7 @@ export function PlayerPaymentsTable({
                   {/* Número */}
                   <td className="px-3 py-2.5 text-center">
                     {player.number ? (
-                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-cdpovoa-blue/10 text-[11px] font-bold text-cdpovoa-blue">
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-cdpovoa-primary/10 text-[11px] font-bold text-cdpovoa-primary">
                         {player.number}
                       </span>
                     ) : (
@@ -272,7 +272,7 @@ export function PlayerPaymentsTable({
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-7 px-2 text-xs text-cdpovoa-blue hover:text-cdpovoa-blue hover:bg-cdpovoa-blue/10"
+                        className="h-7 px-2 text-xs text-cdpovoa-primary hover:text-cdpovoa-primary hover:bg-cdpovoa-primary/10"
                         title="Ver histórico completo"
                         onClick={() => onHistory(player)}
                       >

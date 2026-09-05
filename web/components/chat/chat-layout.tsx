@@ -2,62 +2,111 @@
 
 import { useState } from "react";
 import { MessageSquare } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useChatThreads } from "@/hooks/use-chat-threads";
+import { useChatMessages } from "@/hooks/use-chat-messages";
 import { ThreadList } from "./thread-list";
 import { ChatWindow } from "./chat-window";
+import { EventPanel } from "./event-panel";
+import type { EventGameThread, EventTrainingThread } from "@/types/database";
 
 export function ChatLayout() {
   const { user, loading: userLoading } = useCurrentUser();
-  const { threads, loading: threadsLoading, createDirect, createGroup, updatePostPolicy, deleteThread } = useChatThreads();
+  const { threads, loading: threadsLoading, createDirect } = useChatThreads();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [showPanel, setShowPanel]       = useState(true);
 
   const activeThread = threads.find((t) => t.id === activeChatId) ?? null;
+  const msgHook      = useChatMessages(activeChatId);
 
-  async function handleDeleteThread(chatId: string): Promise<boolean> {
-    const ok = await deleteThread(chatId);
-    if (ok && activeChatId === chatId) setActiveChatId(null);
-    return ok;
-  }
+  const isEventThread =
+    activeThread?.type === "event_game" || activeThread?.type === "event_training";
 
-  if (userLoading || !user) {
-    return (
-      <div className="flex h-[calc(100vh-7rem)] gap-4">
-        <Skeleton className="h-full w-80" />
-        <Skeleton className="h-full flex-1" />
-      </div>
-    );
-  }
+  // Não bloqueamos o render inteiro enquanto o utilizador carrega.
+  // O chat shell aparece imediatamente; ThreadList mostra o seu próprio skeleton;
+  // o painel de mensagens só aparece quando o thread estiver selecionado.
 
   return (
-    <div className="flex h-[calc(100vh-7rem)] overflow-hidden rounded-lg border bg-background">
-      <div className="w-80 shrink-0">
+    /*
+     * Mobile (<md):   lista ocupa o ecrã; ao seleccionar, a lista esconde-se
+     *                 e o fio ocupa tudo com botão "← Conversas".
+     * Tablet (md+):   lista 340px | fio | painel lateral (lg+)
+     */
+    <div
+      className="flex overflow-hidden rounded-2xl"
+      style={{ height: "calc(100dvh - var(--header-h, 64px) - 32px)", background: "#0A1220" }}
+    >
+      {/* ── Lista de fios ───────────────────────────────────────────── */}
+      {/* Mobile: visível só quando não há thread seleccionado */}
+      <div className={[
+        "shrink-0",
+        activeChatId ? "hidden md:block" : "block w-full md:w-auto",
+      ].join(" ")}>
         <ThreadList
           currentUser={user}
           activeChatId={activeChatId}
-          onSelect={setActiveChatId}
+          onSelect={(id) => { setActiveChatId(id); setShowPanel(true); }}
           threads={threads}
-          loading={threadsLoading}
+          loading={threadsLoading || userLoading}
           createDirect={createDirect}
-          createGroup={createGroup}
         />
       </div>
-      <div className="flex-1">
-        {activeThread ? (
+
+      {/* ── Fio de mensagens ────────────────────────────────────────── */}
+      {activeThread ? (
+        <div className="flex flex-1 flex-col min-w-0">
+          {/* Botão "← Conversas" — só mobile */}
+          <button
+            type="button"
+            onClick={() => setActiveChatId(null)}
+            className="md:hidden flex items-center gap-2 shrink-0 px-4 py-3 text-[13px] font-semibold"
+            style={{
+              background: "#0A1220",
+              color: "rgba(169,180,199,.7)",
+              borderBottom: "1px solid rgba(169,180,199,.08)",
+              minHeight: 48,
+              touchAction: "manipulation",
+            }}
+            aria-label="Voltar às conversas"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.8"
+                strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Conversas
+          </button>
           <ChatWindow
             thread={activeThread}
-            currentUser={user}
-            onUpdatePostPolicy={updatePostPolicy}
-            onDeleteThread={handleDeleteThread}
+            msgHook={msgHook}
+            showPanel={showPanel && isEventThread}
+            onTogglePanel={() => setShowPanel((p) => !p)}
           />
-        ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
-            <MessageSquare className="h-10 w-10" />
-            <p className="text-sm">Seleciona uma conversa para começar.</p>
+        </div>
+      ) : (
+        /* Estado vazio — só tablet+ (em mobile não aparece, a lista ocupa o ecrã) */
+        <div className="hidden md:flex flex-1 flex-col items-center justify-center gap-3 text-center px-6">
+          <div className="h-14 w-14 rounded-2xl flex items-center justify-center"
+            style={{ background: "rgba(169,180,199,.06)" }}>
+            <MessageSquare className="h-6 w-6" style={{ color: "rgba(169,180,199,.3)" }} />
           </div>
-        )}
-      </div>
+          <p className="font-condensed font-bold text-lg uppercase" style={{ color: "rgba(169,180,199,.3)" }}>
+            Seleciona uma conversa
+          </p>
+          <p className="text-[13px]" style={{ color: "rgba(169,180,199,.25)" }}>
+            Cada jogo e treino abre um fio automático.
+          </p>
+        </div>
+      )}
+
+      {/* ── Painel direito (só lg+, só jogos/treinos) ───────────────── */}
+      {activeThread && isEventThread && showPanel && (
+        <div className="hidden lg:flex">
+          <EventPanel
+            thread={activeThread as EventGameThread | EventTrainingThread}
+            onClose={() => setShowPanel(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }

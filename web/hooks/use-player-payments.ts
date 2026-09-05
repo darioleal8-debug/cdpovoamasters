@@ -10,8 +10,9 @@ import type {
 } from "@/types/database";
 
 export interface UpsertPaymentData {
-  season_id: string;
-  player_id: string;
+  season_id:  string;
+  player_id?: string | null;
+  user_id?:   string | null;
   month: number;
   reference_year: number;
   amount: number;
@@ -20,6 +21,45 @@ export interface UpsertPaymentData {
   method?: PlayerPaymentMethod | null;
   notes?: string | null;
   payment_date?: string | null;
+}
+
+function receiptToast(
+  action: "registado" | "atualizado",
+  json: { receipt_sent?: boolean; receipt_note?: string; receipt_error?: string }
+) {
+  const { receipt_sent, receipt_note, receipt_error } = json;
+
+  if (receipt_sent && receipt_note !== "already_sent") {
+    toast({ title: `Pagamento ${action} e recibo enviado ao jogador.` });
+    return;
+  }
+
+  const base = `Pagamento ${action}`;
+
+  if (receipt_note === "sem_conta" || receipt_note === "sem_email") {
+    toast({
+      title:       base,
+      description: "O jogador não tem email associado — recibo não enviado.",
+    });
+    return;
+  }
+
+  if (receipt_note === "already_sent") {
+    toast({ title: base });
+    return;
+  }
+
+  if (receipt_note === "resend_error" || receipt_note === "error") {
+    toast({
+      title:       `${base}, mas o recibo não foi enviado. O sistema tentará novamente.`,
+      description: receipt_error ? `Erro: ${receipt_error}` : "Verifica os logs do servidor para mais detalhes.",
+      variant:     "destructive",
+    });
+    return;
+  }
+
+  // dev fallback ou sem status de recibo (status != "paid")
+  toast({ title: base });
 }
 
 export function usePlayerPayments(seasonId: string | null) {
@@ -57,7 +97,7 @@ export function usePlayerPayments(seasonId: string | null) {
       toast({ title: "Erro ao registar pagamento", description: json.error, variant: "destructive" });
       return false;
     }
-    toast({ title: "Pagamento registado com sucesso" });
+    receiptToast("registado", json);
     await loadPayments();
     return true;
   }
@@ -73,7 +113,7 @@ export function usePlayerPayments(seasonId: string | null) {
       toast({ title: "Erro ao atualizar pagamento", description: json.error, variant: "destructive" });
       return false;
     }
-    toast({ title: "Pagamento atualizado" });
+    receiptToast("atualizado", json);
     await loadPayments();
     return true;
   }

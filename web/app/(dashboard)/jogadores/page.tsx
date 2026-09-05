@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSeasons } from "@/hooks/use-seasons";
 import { useRoster } from "@/hooks/use-roster";
 import { RosterTable } from "@/components/players/roster-table";
+import { RosterCards } from "@/components/players/roster-cards";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -15,8 +16,13 @@ import { Input }     from "@/components/ui/input";
 import { Label }     from "@/components/ui/label";
 import { toast }     from "@/components/ui/toaster";
 import { Camera, RefreshCw, UserPlus } from "lucide-react";
-import type { Player, PlayerPosition } from "@/types/database";
+import type { RosterEntry, PlayerPosition } from "@/types/database";
 import { CreatePlayerAccountModal } from "@/components/admin/create-player-account-modal";
+import {
+  PhotoUploadWithTemplate,
+  type PhotoUploadResult,
+} from "@/components/players/photo-upload-with-template";
+import type { PhotoTemplateConfig } from "@/lib/photo-composite";
 
 interface EditForm {
   number:   string;
@@ -35,37 +41,25 @@ export default function JogadoresPage() {
 
   const { players, loading, updatePlayer, updatePlayerPhoto, deletePlayer } = useRoster(seasonId);
 
-  const [dialogOpen,  setDialogOpen]  = useState(false);
-  const [editing,     setEditing]     = useState<Player | null>(null);
-  const [formData,    setFormData]    = useState<EditForm>(EMPTY_EDIT);
-  const [photoFile,   setPhotoFile]   = useState<File | null>(null);
-  const [photoPreview,setPhotoPreview]= useState<string | null>(null);
-  const [submitting,  setSubmitting]  = useState(false);
-  const [accountModal,setAccountModal]= useState(false);
-  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [template,     setTemplate]     = useState<PhotoTemplateConfig | null>(null);
+  const [dialogOpen,   setDialogOpen]   = useState(false);
+  const [photoUpload,  setPhotoUpload]  = useState(false);   // mostrar PhotoUploadWithTemplate
+  const [editing,      setEditing]      = useState<RosterEntry | null>(null);
+  const [formData,     setFormData]     = useState<EditForm>(EMPTY_EDIT);
+  const [photoResult,  setPhotoResult]  = useState<PhotoUploadResult | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [submitting,   setSubmitting]   = useState(false);
+  const [accountModal, setAccountModal] = useState(false);
 
-  const handlePhotoChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      toast({ title: "Formato inválido", description: "Usa JPG, PNG ou WebP", variant: "destructive" });
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ title: "Ficheiro muito grande", description: "Máximo 5 MB", variant: "destructive" });
-      return;
-    }
-    setPhotoFile(file);
-    setPhotoPreview(URL.createObjectURL(file));
+  // Carregar template do clube uma vez
+  useEffect(() => {
+    fetch("/api/club-settings/photo-template")
+      .then((r) => r.json())
+      .then(({ template: t }) => { if (t) setTemplate(t); })
+      .catch(() => {});
   }, []);
 
-  function clearPhoto() {
-    setPhotoFile(null);
-    setPhotoPreview(null);
-    if (photoInputRef.current) photoInputRef.current.value = "";
-  }
-
-  function openEdit(player: Player) {
+  function openEdit(player: RosterEntry) {
     setEditing(player);
     setFormData({
       number:   player.number?.toString()  ?? "",
@@ -74,9 +68,23 @@ export default function JogadoresPage() {
       weight:   player.weight?.toString()  ?? "",
       age:      player.age?.toString()     ?? "",
     });
-    setPhotoFile(null);
-    setPhotoPreview(player.photo_url ?? null);
+    setPhotoResult(null);
+    setPhotoUpload(false);
+    const display = player.processed_photo_url ?? player.original_photo_url ?? player.photo_url ?? null;
+    setPhotoPreview(display);
     setDialogOpen(true);
+  }
+
+  function handlePhotoConfirm(result: PhotoUploadResult) {
+    setPhotoResult(result);
+    // Mostrar preview da foto processada ou original
+    const previewSrc = result.processedBlob
+      ? URL.createObjectURL(result.processedBlob)
+      : result.originalFile.size > 0
+        ? URL.createObjectURL(result.originalFile)
+        : photoPreview;
+    setPhotoPreview(previewSrc);
+    setPhotoUpload(false);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -84,41 +92,48 @@ export default function JogadoresPage() {
     if (!editing) return;
     setSubmitting(true);
     try {
-      const ok = await updatePlayer(editing.id, {
+      const ok = await updatePlayer(editing.player_id, editing.user_id, {
         number:   formData.number   ? Number(formData.number)   : null,
         position: (formData.position as PlayerPosition) || null,
         height:   formData.height   ? Number(formData.height)   : null,
         weight:   formData.weight   ? Number(formData.weight)   : null,
         age:      formData.age      ? Number(formData.age)      : null,
       });
-      if (photoFile) await updatePlayerPhoto(editing.id, photoFile);
+      if (photoResult && photoResult.originalFile.size > 0) {
+        await updatePlayerPhoto(editing.player_id, editing.user_id, photoResult.originalFile, {
+          processedBlob:   photoResult.processedBlob ?? undefined,
+          focalY:          photoResult.focalY,
+          focalX:          photoResult.focalX,
+          templateVersion: photoResult.templateVersion,
+        });
+      }
       if (ok) setDialogOpen(false);
     } finally {
       setSubmitting(false);
     }
   }
 
-  const avatarSrc = photoPreview ?? (editing?.photo_url ?? null);
+  const avatarSrc = photoPreview;
   const initials  = editing?.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase() ?? "";
 
   return (
-    <div className="space-y-6">
-      {/* Cabeçalho */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Jogadores</h1>
-          <p className="text-muted-foreground">Plantel por temporada</p>
+    <div className="space-y-4">
+      {/* Cabeçalho (1 linha mobile) */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-condensed font-bold text-2xl uppercase tracking-display"
+            style={{ color: "var(--ink,#0A1220)" }}>
+            Plantel
+          </h1>
+          <p className="text-[12px]" style={{ color: "var(--muted-text,#5A6478)" }}>
+            {players.length} jogador{players.length !== 1 ? "es" : ""}
+          </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setAccountModal(true)} className="gap-1.5">
-            <UserPlus className="h-4 w-4" />
-            Criar Conta de Jogador
-          </Button>
-
+        <div className="flex items-center gap-2 shrink-0">
           <Select value={seasonId ?? ""} onValueChange={setSelectedSeasonId} disabled={seasonsLoading}>
-            <SelectTrigger className="w-52">
-              <SelectValue placeholder="Selecionar temporada" />
+            <SelectTrigger className="w-36 md:w-48 h-9 text-sm">
+              <SelectValue placeholder="Temporada" />
             </SelectTrigger>
             <SelectContent>
               {seasons.map((s) => (
@@ -128,17 +143,51 @@ export default function JogadoresPage() {
               ))}
             </SelectContent>
           </Select>
+          <Button variant="outline" size="sm" onClick={() => setAccountModal(true)}
+            className="hidden md:flex gap-1.5 h-9">
+            <UserPlus className="h-4 w-4" />
+            Criar Conta
+          </Button>
         </div>
       </div>
 
-      {/* Tabela só-leitura para addPlayer — edit via RosterTable */}
-      <RosterTable
-        players={players}
-        loading={loading}
-        onEdit={openEdit}
-        onDelete={(p) => deletePlayer(p.id, p.name)}
-        onCreateAccount={() => setAccountModal(true)}
-      />
+      {/* Mobile: grelha de cartões 2×2 */}
+      <div className="md:hidden">
+        <RosterCards
+          players={players}
+          loading={loading}
+          onEdit={openEdit}
+          onDelete={(p) => deletePlayer(p.player_id ?? null, p.name)}
+        />
+      </div>
+
+      {/* Tablet+: tabela completa */}
+      <div className="hidden md:block">
+        <RosterTable
+          players={players}
+          loading={loading}
+          onEdit={openEdit}
+          onDelete={(p) => deletePlayer(p.player_id ?? null, p.name)}
+          onCreateAccount={() => setAccountModal(true)}
+        />
+      </div>
+
+      {/* FAB mobile — Criar conta de jogador */}
+      <button
+        type="button"
+        onClick={() => setAccountModal(true)}
+        aria-label="Criar conta de jogador"
+        className="md:hidden fixed right-4 z-40 flex items-center gap-2 h-14 px-5 rounded-full shadow-lg font-semibold text-sm"
+        style={{
+          bottom: "calc(var(--bottom-nav-h, 56px) + 12px)",
+          background: "var(--ink,#0A1220)",
+          color: "#fff",
+          touchAction: "manipulation",
+        }}
+      >
+        <UserPlus className="h-5 w-5" />
+        Conta
+      </button>
 
       {/* Diálogo Editar Jogador */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { if (!submitting) setDialogOpen(open); }}>
@@ -149,41 +198,42 @@ export default function JogadoresPage() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Foto */}
-            <div className="flex flex-col items-center gap-2">
-              <div className="relative group cursor-pointer" onClick={() => photoInputRef.current?.click()}>
-                {avatarSrc ? (
-                  <img src={avatarSrc} alt="Foto"
-                    className="h-24 w-24 rounded-full object-cover ring-2 ring-border" />
-                ) : (
-                  <div className="h-24 w-24 rounded-full bg-muted ring-2 ring-border flex items-center justify-center">
-                    {initials
-                      ? <span className="text-2xl font-bold text-muted-foreground">{initials}</span>
-                      : <Camera className="h-8 w-8 text-muted-foreground" />}
+            {photoUpload ? (
+              <PhotoUploadWithTemplate
+                template={template}
+                existingUrl={editing?.original_photo_url ?? editing?.photo_url}
+                onConfirm={handlePhotoConfirm}
+                onCancel={() => setPhotoUpload(false)}
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-2">
+                <div className="relative group cursor-pointer" onClick={() => setPhotoUpload(true)}>
+                  {avatarSrc ? (
+                    <img src={avatarSrc} alt="Foto"
+                      className="h-24 w-24 rounded-full object-cover ring-2 ring-border" />
+                  ) : (
+                    <div className="h-24 w-24 rounded-full bg-muted ring-2 ring-border flex items-center justify-center">
+                      {initials
+                        ? <span className="text-2xl font-bold text-muted-foreground">{initials}</span>
+                        : <Camera className="h-8 w-8 text-muted-foreground" />}
+                    </div>
+                  )}
+                  <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Camera className="h-6 w-6 text-white" />
                   </div>
-                )}
-                <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <Camera className="h-6 w-6 text-white" />
                 </div>
-              </div>
-              <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp"
-                className="sr-only" onChange={handlePhotoChange} />
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <button type="button" className="underline underline-offset-2 hover:text-foreground"
-                  onClick={() => photoInputRef.current?.click()}>
+                <button type="button"
+                  className="text-xs underline underline-offset-2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setPhotoUpload(true)}>
                   {avatarSrc ? "Alterar foto" : "Adicionar foto"}
                 </button>
-                {photoFile && (
-                  <>
-                    <span>·</span>
-                    <button type="button"
-                      className="underline underline-offset-2 text-destructive/70 hover:text-destructive"
-                      onClick={clearPhoto}>
-                      Remover
-                    </button>
-                  </>
+                {photoResult && (
+                  <span className="text-xs text-green-600 dark:text-green-400">
+                    Nova foto seleccionada {photoResult.processedBlob ? "(com template)" : ""}
+                  </span>
                 )}
               </div>
-            </div>
+            )}
 
             {/* Campos desportivos */}
             <div className="grid grid-cols-2 gap-4">
@@ -221,13 +271,20 @@ export default function JogadoresPage() {
                   onChange={(e) => setFormData((p) => ({ ...p, weight: e.target.value }))} />
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="p-age">Idade</Label>
-                <Input id="p-age" type="number" min={10} max={100} placeholder="35"
-                  value={formData.age}
-                  onChange={(e) => setFormData((p) => ({ ...p, age: e.target.value }))} />
-              </div>
+              {/* Idade calculada automaticamente de birth_date — campo manual apenas como fallback */}
+              {!editing?.birth_date && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="p-age">Idade (manual)</Label>
+                  <Input id="p-age" type="number" min={10} max={100} placeholder="35"
+                    value={formData.age}
+                    onChange={(e) => setFormData((p) => ({ ...p, age: e.target.value }))} />
+                  <p className="text-[11px] text-muted-foreground">
+                    Preenche a data de nascimento na conta do jogador para calcular automaticamente.
+                  </p>
+                </div>
+              )}
             </div>
+
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>

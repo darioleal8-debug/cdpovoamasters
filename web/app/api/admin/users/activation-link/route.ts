@@ -7,10 +7,16 @@ import { sendActivationEmail } from "@/lib/email";
 
 export const runtime = "nodejs";
 
+function stripBom(v: string | undefined): string {
+  const s = (v ?? "").trim();
+  return s.charCodeAt(0) === 0xFEFF ? s.slice(1) : s;
+}
+
 function adminClient() {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const key = stripBom(process.env.SUPABASE_SERVICE_ROLE_KEY);
   if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY não configurada");
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, {
+  return createClient(url, key, {
     auth: { persistSession: false },
   });
 }

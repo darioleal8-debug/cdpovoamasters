@@ -43,7 +43,12 @@ function statDeltaForEvent(type: PlayEventType): Partial<Record<string, number>>
     case "steal":          return { stl: 1 };
     case "block":          return { blk: 1 };
     case "turnover":       return { tov: 1 };
-    case "foul_committed": return { fouls_committed: 1 };
+    case "foul_committed":
+    case "foul_def":
+    case "foul_of":
+    case "foul_tec":
+    case "foul_anti":
+      return { fouls_committed: 1 };
     case "foul_drawn":     return { fouls_drawn: 1 };
     default: return {};
   }
@@ -134,8 +139,9 @@ export function useLiveGame(
     }
 
     // Step 4: build a PlayerWithUser-compatible roster
+    // Always use players.id as the stable key so it matches player_game_stats.player_id
     const items = playersData.map((p) => {
-      const uid = (p.user_id as string | null) ?? p.id;
+      const uid = p.id as string;
       const userData = (p.user_id as string | null) ? usersMap[p.user_id as string] : undefined;
       const profileEntry = (p.user_id as string | null) ? profilesMap[p.user_id as string] : undefined;
       return {
@@ -163,16 +169,60 @@ export function useLiveGame(
       .select("*")
       .eq("game_session_id", sessionId)
       .order("created_at", { ascending: false })
-      .limit(100);
+      .limit(500);
     setPlays(data ?? []);
   }, []);
 
   const loadPlayerStats = useCallback(async (sessionId: string) => {
-    const { data } = await supabase
-      .from("player_game_stats")
-      .select("*, user:users(id, name)")
-      .eq("game_session_id", sessionId);
-    setPlayerStats((data ?? []) as unknown as PlayerGameStatsWithUser[]);
+    // players.name foi removido na migration 041 — enriquecer via v_roster
+    const [statsRes, stintsRes] = await Promise.all([
+      supabase
+        .from("player_game_stats")
+        .select("*")
+        .eq("game_session_id", sessionId),
+      supabase
+        .from("player_court_stints")
+        .select("player_id, entry_clock_secs, exit_clock_secs, entry_home_score, entry_away_score, exit_home_score, exit_away_score")
+        .eq("game_session_id", sessionId),
+    ]);
+
+    const rawStats = (statsRes.data ?? []) as (PlayerGameStats & { player_id: string })[];
+    const playerIds = [...new Set(rawStats.map((s) => s.player_id))];
+    const { data: rosterRows } = playerIds.length > 0
+      ? await supabase.from("v_roster").select("player_id, name").in("player_id", playerIds)
+      : { data: [] };
+    const nameById = new Map((rosterRows ?? []).map((r) => [r.player_id as string, r.name as string]));
+    const stats: PlayerGameStatsWithUser[] = rawStats.map((s) => ({
+      ...s,
+      user: { id: s.player_id, name: nameById.get(s.player_id) ?? "?" },
+    }));
+    const stints = stintsRes.data ?? [];
+
+    // Compute seconds_played and plus_minus from court stints
+    if (stints.length > 0) {
+      const nowSecs = Math.round(computeClockSecs(sessionRef.current));
+      const nowHome = sessionRef.current?.home_score ?? 0;
+      const nowAway = sessionRef.current?.away_score ?? 0;
+      const secsMap: Record<string, number> = {};
+      const pmMap: Record<string, number> = {};
+      for (const s of stints) {
+        const isOpen = (s.exit_clock_secs as number | null) == null;
+        const exit = isOpen ? nowSecs : (s.exit_clock_secs as number);
+        secsMap[s.player_id as string] = (secsMap[s.player_id as string] ?? 0) + Math.max(0, (s.entry_clock_secs as number) - exit);
+        const exitHome = isOpen ? nowHome : ((s.exit_home_score as number | null) ?? nowHome);
+        const exitAway = isOpen ? nowAway : ((s.exit_away_score as number | null) ?? nowAway);
+        const entryHome = (s.entry_home_score as number | null) ?? 0;
+        const entryAway = (s.entry_away_score as number | null) ?? 0;
+        pmMap[s.player_id as string] = (pmMap[s.player_id as string] ?? 0) + (exitHome - exitAway) - (entryHome - entryAway);
+      }
+      for (const stat of stats) {
+        const pid = stat.player_id as string;
+        if (pid in secsMap) (stat as unknown as Record<string, unknown>).seconds_played = secsMap[pid];
+        if (pid in pmMap) (stat as unknown as Record<string, unknown>).plus_minus = pmMap[pid];
+      }
+    }
+
+    setPlayerStats(stats);
   }, []);
 
   const loadPeriodScores = useCallback(async (sessionId: string) => {
@@ -418,11 +468,14 @@ export function useLiveGame(
         const delta = statDeltaForEvent(input.event_type);
         if (Object.keys(delta).length > 0) {
           const existing = playerStats.find((s) => s.player_id === input.player_id);
-          const base: Partial<PlayerGameStats> = existing ?? {
-            game_session_id: session.id,
-            season_id: session.season_id,
-            player_id: input.player_id,
-          };
+          // Strip join fields (e.g. `user`) — not DB columns, cause PostgREST to reject the upsert
+          let base: Partial<PlayerGameStats>;
+          if (existing) {
+            const { user: _u, ...cols } = existing as unknown as Record<string, unknown>;
+            base = cols as Partial<PlayerGameStats>;
+          } else {
+            base = { game_session_id: session.id, season_id: session.season_id, player_id: input.player_id };
+          }
           const updated = { ...base };
           for (const [k, v] of Object.entries(delta)) {
             if (v !== undefined) {
@@ -431,27 +484,31 @@ export function useLiveGame(
             }
           }
           updated.efficiency = calcEfficiency(updated);
-          await supabase.from("player_game_stats").upsert(
+          const { error: upsertErr } = await supabase.from("player_game_stats").upsert(
             { ...updated, updated_at: new Date().toISOString() },
             { onConflict: "game_session_id,player_id" }
           );
+          if (upsertErr) console.error("[stats/upsert]", upsertErr.message);
         }
       }
 
       // Assist for secondary player (when shot is made)
       if (input.secondary_player_id && input.event_type.endsWith("_made")) {
         const existing = playerStats.find((s) => s.player_id === input.secondary_player_id);
-        const base: Partial<PlayerGameStats> = existing ?? {
-          game_session_id: session.id,
-          season_id: session.season_id,
-          player_id: input.secondary_player_id,
-        };
+        let base: Partial<PlayerGameStats>;
+        if (existing) {
+          const { user: _u, ...cols } = existing as unknown as Record<string, unknown>;
+          base = cols as Partial<PlayerGameStats>;
+        } else {
+          base = { game_session_id: session.id, season_id: session.season_id, player_id: input.secondary_player_id };
+        }
         const updated = { ...base, ast: ((base.ast ?? 0) + 1) };
         updated.efficiency = calcEfficiency(updated);
-        await supabase.from("player_game_stats").upsert(
+        const { error: assistErr } = await supabase.from("player_game_stats").upsert(
           { ...updated, updated_at: new Date().toISOString() },
           { onConflict: "game_session_id,player_id" }
         );
+        if (assistErr) console.error("[stats/upsert/assist]", assistErr.message);
       }
 
       await Promise.all([loadPlays(session.id), loadPlayerStats(session.id)]);
@@ -483,6 +540,85 @@ export function useLiveGame(
       description: `Adversário +${pts}`,
     });
     setSession((s) => s ? { ...s, away_score: newAway } : s);
+    await loadPlays(session.id);
+  }
+
+  // ── Opponent stat counters ──────────────────────────────
+
+  async function recordOpponentStat(
+    type: "reb_off" | "reb_def" | "foul",
+    delta: 1 | -1
+  ): Promise<void> {
+    if (!session) return;
+    const field = type === "reb_off" ? "away_reb_off" : type === "reb_def" ? "away_reb_def" : "away_fouls";
+    const next = Math.max(0, (session[field] ?? 0) + delta);
+    await supabase.from("game_sessions")
+      .update({ [field]: next, updated_at: new Date().toISOString() })
+      .eq("id", session.id);
+    setSession((s) => s ? { ...s, [field]: next } : s);
+  }
+
+  // ── Opponent typed foul ─────────────────────────────────
+
+  async function recordOpponentFoul(
+    type: "foul_def" | "foul_of" | "foul_tec" | "foul_anti"
+  ): Promise<void> {
+    if (!session) return;
+    // foul_tec does not count for team fouls; others do
+    const countsForTeam = type !== "foul_tec";
+    const newAwayFouls = countsForTeam ? session.away_fouls + 1 : session.away_fouls;
+
+    const foulDesc = type === "foul_def" ? "Falta defensiva" : type === "foul_of" ? "Falta ofensiva" : type === "foul_tec" ? "Falta técnica" : "Falta antidesportiva";
+    await supabase.from("play_by_play").insert({
+      game_session_id: session.id,
+      season_id: session.season_id,
+      period: session.current_period,
+      game_clock: formatClock(clockSecs),
+      clock_time_secs: Math.round(clockSecs),
+      event_type: type,
+      player_id: null,
+      is_home_team: false,
+      points_delta: 0,
+      home_score_after: session.home_score,
+      away_score_after: session.away_score,
+      description: `Adversário · ${foulDesc}`,
+    });
+
+    if (countsForTeam) {
+      await supabase.from("game_sessions")
+        .update({ away_fouls: newAwayFouls, updated_at: new Date().toISOString() })
+        .eq("id", session.id);
+    }
+    if (countsForTeam) setSession((s) => s ? { ...s, away_fouls: newAwayFouls } : s);
+    await loadPlays(session.id);
+  }
+
+  // ── Opponent rebounds (typed) ───────────────────────────
+
+  async function recordOpponentReb(type: "reb_off" | "reb_def"): Promise<void> {
+    if (!session) return;
+    const field = type === "reb_off" ? "away_reb_off" : "away_reb_def";
+    const next = (session[field] ?? 0) + 1;
+    await Promise.all([
+      supabase.from("game_sessions")
+        .update({ [field]: next, updated_at: new Date().toISOString() })
+        .eq("id", session.id),
+      supabase.from("play_by_play").insert({
+        game_session_id: session.id,
+        season_id: session.season_id,
+        period: session.current_period,
+        game_clock: formatClock(clockSecs),
+        clock_time_secs: Math.round(clockSecs),
+        event_type: type === "reb_off" ? "rebound_off" : "rebound_def",
+        player_id: null,
+        is_home_team: false,
+        points_delta: 0,
+        home_score_after: session.home_score,
+        away_score_after: session.away_score,
+        description: `Adversário · ${type === "reb_off" ? "Ressalto ofensivo" : "Ressalto defensivo"}`,
+      }),
+    ]);
+    setSession((s) => s ? { ...s, [field]: next } : s);
     await loadPlays(session.id);
   }
 
@@ -649,6 +785,106 @@ export function useLiveGame(
     }
   }
 
+  // ── Undo specific play ──────────────────────────────────
+
+  async function undoPlay(playId: string): Promise<boolean> {
+    if (!session || recording) return false;
+    const play = plays.find((p) => p.id === playId);
+    if (!play) return false;
+
+    const UNUNDOABLE = ["game_start", "period_end", "game_end", "substitution_in"];
+    if (UNUNDOABLE.includes(play.event_type)) {
+      toast({ title: "Esta ação não pode ser anulada", variant: "destructive" });
+      return false;
+    }
+
+    setRecording(true);
+    try {
+      // Reverse score delta
+      if ((play.points_delta ?? 0) > 0) {
+        const field = play.is_home_team ? "home_score" : "away_score";
+        const current = play.is_home_team
+          ? (sessionRef.current?.home_score ?? 0)
+          : (sessionRef.current?.away_score ?? 0);
+        const newScore = Math.max(0, current - (play.points_delta ?? 0));
+        await supabase.from("game_sessions")
+          .update({ [field]: newScore, updated_at: new Date().toISOString() })
+          .eq("id", session.id);
+        setSession((s) => s ? { ...s, [field]: newScore } : s);
+      }
+
+      // Restore timeout count
+      if (play.event_type === "timeout") {
+        const field = play.is_home_team ? "home_timeouts_left" : "away_timeouts_left";
+        const current = play.is_home_team
+          ? (sessionRef.current?.home_timeouts_left ?? 0)
+          : (sessionRef.current?.away_timeouts_left ?? 0);
+        await supabase.from("game_sessions")
+          .update({ [field]: current + 1, updated_at: new Date().toISOString() })
+          .eq("id", session.id);
+        setSession((s) => s ? { ...s, [field]: current + 1 } : s);
+      }
+
+      // Reverse player stat delta (home plays with player)
+      if (play.player_id && play.is_home_team) {
+        const delta = statDeltaForEvent(play.event_type as PlayEventType);
+        if (Object.keys(delta).length > 0) {
+          const existing = playerStats.find((s) => s.player_id === play.player_id);
+          if (existing) {
+            const { user: _u, ...cols } = existing as unknown as Record<string, unknown>;
+            const base = cols as Partial<PlayerGameStats>;
+            const updated = { ...base };
+            for (const [k, v] of Object.entries(delta)) {
+              if (v !== undefined) {
+                (updated as Record<string, number>)[k] = Math.max(
+                  0,
+                  ((updated as Record<string, number>)[k] ?? 0) - v
+                );
+              }
+            }
+            updated.efficiency = calcEfficiency(updated);
+            await supabase.from("player_game_stats").upsert(
+              { ...updated, updated_at: new Date().toISOString() },
+              { onConflict: "game_session_id,player_id" }
+            );
+          }
+        }
+
+        // Reverse assist on secondary player if a scored basket was undone
+        if (play.secondary_player_id && (play.event_type as string).endsWith("_made")) {
+          const assistPlayer = playerStats.find((s) => s.player_id === play.secondary_player_id);
+          if (assistPlayer) {
+            const { user: _u, ...cols } = assistPlayer as unknown as Record<string, unknown>;
+            const base = cols as Partial<PlayerGameStats>;
+            const updated = { ...base, ast: Math.max(0, (base.ast ?? 0) - 1) };
+            updated.efficiency = calcEfficiency(updated);
+            await supabase.from("player_game_stats").upsert(
+              { ...updated, updated_at: new Date().toISOString() },
+              { onConflict: "game_session_id,player_id" }
+            );
+          }
+        }
+      }
+
+      // Delete play record
+      const { error } = await supabase.from("play_by_play").delete().eq("id", playId);
+      if (error) {
+        toast({ title: "Erro ao anular jogada", description: error.message, variant: "destructive" });
+        return false;
+      }
+
+      await Promise.all([loadPlays(session.id), loadPlayerStats(session.id), loadSession()]);
+      toast({ title: "Jogada anulada" });
+      return true;
+    } catch (e) {
+      console.error("[undoPlay]", e);
+      toast({ title: "Erro ao anular jogada", variant: "destructive" });
+      return false;
+    } finally {
+      setRecording(false);
+    }
+  }
+
   // ── Next period ─────────────────────────────────────────
 
   async function nextPeriod(): Promise<void> {
@@ -686,6 +922,7 @@ export function useLiveGame(
       clock_running: false,
       clock_elapsed_secs: 0,
       clock_started_at: null,
+      away_fouls: 0,
       updated_at: new Date().toISOString(),
     }).eq("id", session.id);
 
@@ -703,7 +940,7 @@ export function useLiveGame(
       );
     }
 
-    setSession((s) => s ? { ...s, current_period: nextP, clock_running: false, clock_elapsed_secs: 0, clock_started_at: null } : s);
+    setSession((s) => s ? { ...s, current_period: nextP, clock_running: false, clock_elapsed_secs: 0, clock_started_at: null, away_fouls: 0 } : s);
     setClockSecs(session.period_duration_secs ?? 600);
     await Promise.all([loadPeriodScores(session.id), loadPlays(session.id)]);
   }
@@ -723,19 +960,29 @@ export function useLiveGame(
     // Update seconds_played for each player from stints
     const { data: stints } = await supabase
       .from("player_court_stints")
-      .select("player_id, entry_clock_secs, exit_clock_secs")
+      .select("player_id, entry_clock_secs, exit_clock_secs, entry_home_score, entry_away_score, exit_home_score, exit_away_score")
       .eq("game_session_id", session.id);
 
     if (stints && stints.length > 0) {
       const secsMap: Record<string, number> = {};
+      const pmMap: Record<string, number> = {};
       for (const stint of stints) {
-        const secs = stint.entry_clock_secs - (stint.exit_clock_secs ?? 0);
-        secsMap[stint.player_id] = (secsMap[stint.player_id] ?? 0) + Math.max(0, secs);
+        const secs = Math.max(0, stint.entry_clock_secs - (stint.exit_clock_secs ?? 0));
+        secsMap[stint.player_id] = (secsMap[stint.player_id] ?? 0) + secs;
+        const exitHome = (stint.exit_home_score as number | null) ?? session.home_score;
+        const exitAway = (stint.exit_away_score as number | null) ?? session.away_score;
+        const entryHome = (stint.entry_home_score as number | null) ?? 0;
+        const entryAway = (stint.entry_away_score as number | null) ?? 0;
+        pmMap[stint.player_id] = (pmMap[stint.player_id] ?? 0) + (exitHome - exitAway) - (entryHome - entryAway);
       }
       await Promise.all(
-        Object.entries(secsMap).map(([pid, secs]) =>
+        Object.keys(secsMap).map((pid) =>
           supabase.from("player_game_stats")
-            .update({ seconds_played: Math.round(secs), updated_at: new Date().toISOString() })
+            .update({
+              seconds_played: Math.round(secsMap[pid]),
+              plus_minus: Math.round(pmMap[pid] ?? 0),
+              updated_at: new Date().toISOString(),
+            })
             .eq("game_session_id", session.id)
             .eq("player_id", pid)
         )
@@ -774,8 +1021,9 @@ export function useLiveGame(
     plays, playerStats, periodScores, clockSecs,
     loading, recording,
     startGame, startClock, stopClock, resetClock,
-    recordPlay, recordOpponentPoints,
-    substitutePlayer, setLineup, callTimeout, undoLastPlay,
+    recordPlay, recordOpponentPoints, recordOpponentStat,
+    recordOpponentFoul, recordOpponentReb,
+    substitutePlayer, setLineup, callTimeout, undoLastPlay, undoPlay,
     nextPeriod, finishGame,
   };
 }

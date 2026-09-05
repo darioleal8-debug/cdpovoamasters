@@ -1,5 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { sendAndLogPaymentReceipt } from "@/lib/payment-receipt";
+
+// players.name foi removido na migration 041 — usar v_roster para obter nome
+async function enrichPayment(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  payment: { player_id: string; [key: string]: unknown }
+) {
+  const { data: r } = await supabase
+    .from("v_roster")
+    .select("player_id, name, number")
+    .eq("player_id", payment.player_id)
+    .maybeSingle();
+  return { ...payment, player: r ? { id: r.player_id, name: r.name, number: r.number } : null };
+}
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const supabase = await createClient();
@@ -10,12 +24,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   const { data, error } = await supabase
     .from("player_payments")
-    .select("*, player:players(id, name, number)")
+    .select("*")
     .eq("id", id)
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 404 });
-  return NextResponse.json({ payment: data });
+  const payment = await enrichPayment(supabase, data as { player_id: string; [key: string]: unknown });
+  return NextResponse.json({ payment });
 }
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -26,10 +41,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const body = await req.json();
 
-  // Buscar estado anterior para auditoria
+  // Buscar estado anterior para auditoria e lógica de recibo
   const { data: before } = await supabase
     .from("player_payments")
-    .select("amount, amount_due, status, method, notes, payment_date")
+    .select("amount, amount_due, status, method, notes, payment_date, player_id, month, reference_year")
     .eq("id", id)
     .single();
 
@@ -40,10 +55,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     .from("player_payments")
     .update(allowed)
     .eq("id", id)
-    .select("*, player:players(id, name, number)")
+    .select("*")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const payment = await enrichPayment(supabase, data as { player_id: string; [key: string]: unknown });
 
   // Registar histórico se houve alteração real
   if (before) {
@@ -75,7 +92,30 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
   }
 
-  return NextResponse.json({ payment: data });
+  // Enviar recibo se o status transitou para "pago"
+  let receipt_sent  = false;
+  let receipt_note  = "";
+  let receipt_error: string | undefined;
+  const newStatus = allowed.status ?? before?.status;
+
+  if (newStatus === "paid" && before?.status !== "paid") {
+    console.log(`[player-payments PUT] Pagamento ${id} marcado como pago — a enviar recibo`);
+    const r = await sendAndLogPaymentReceipt({
+      paymentId:     id,
+      playerId:      before!.player_id,
+      month:         Number(before!.month),
+      referenceYear: Number(before!.reference_year),
+      amount:        data.amount,
+      paymentDate:   data.payment_date ?? null,
+      method:        data.method ?? null,
+    });
+    receipt_sent  = r.sent;
+    receipt_note  = r.note;
+    receipt_error = r.error;
+    console.log(`[player-payments PUT] Resultado recibo: sent=${r.sent} note=${r.note}${r.error ? ` error=${r.error}` : ""}`);
+  }
+
+  return NextResponse.json({ payment, receipt_sent, receipt_note, receipt_error });
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

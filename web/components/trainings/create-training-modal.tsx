@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MapPin, Loader2, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react";
+import { useGeolocation } from "@/hooks/use-geolocation";
+import { googleMapsUrl } from "@/lib/geolocation";
 import { TRAINING_TYPE_LABELS, type TrainingType, type RecurrenceType } from "@/types/database";
 
 const DAYS_PT = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
@@ -19,17 +22,18 @@ interface Props {
 
 export function CreateTrainingModal({ open, onClose, seasonId, onSubmit }: Props) {
   const [loading, setLoading] = useState(false);
+  const { state: gps, capture: captureGps, reset: resetGps } = useGeolocation();
   const [form, setForm] = useState({
-    date:             "",
-    start_time:       "",
-    end_time:         "",
-    location:         "",
-    type:             "geral" as TrainingType,
-    notes:            "",
-    recurrence_type:  "unique" as RecurrenceType,
-    day_of_week:      "1",
-    day_of_month:     "1",
-    end_date:         "",
+    date:            "",
+    start_time:      "",
+    end_time:        "",
+    location:        "",
+    type:            "geral" as TrainingType,
+    notes:           "",
+    recurrence_type: "unique" as RecurrenceType,
+    day_of_week:     "1",
+    day_of_month:    "1",
+    end_date:        "",
   });
 
   function set(key: string, value: string) {
@@ -40,20 +44,25 @@ export function CreateTrainingModal({ open, onClose, seasonId, onSubmit }: Props
     e.preventDefault();
     setLoading(true);
     const ok = await onSubmit({
-      season_id: seasonId,
-      date:             form.date,
-      start_time:       form.start_time,
-      end_time:         form.end_time || undefined,
-      location:         form.location,
-      type:             form.type,
-      notes:            form.notes || undefined,
-      recurrence_type:  form.recurrence_type,
-      day_of_week:      form.recurrence_type === "weekly"  ? Number(form.day_of_week)  : undefined,
-      day_of_month:     form.recurrence_type === "monthly" ? Number(form.day_of_month) : undefined,
-      end_date:         form.end_date || undefined,
+      season_id:       seasonId,
+      date:            form.date,
+      start_time:      form.start_time,
+      end_time:        form.end_time || undefined,
+      location:        form.location,
+      type:            form.type,
+      notes:           form.notes || undefined,
+      recurrence_type: form.recurrence_type,
+      day_of_week:     form.recurrence_type === "weekly"  ? Number(form.day_of_week)  : undefined,
+      day_of_month:    form.recurrence_type === "monthly" ? Number(form.day_of_month) : undefined,
+      end_date:        form.end_date || undefined,
+      location_lat:    gps.status === "ok" ? gps.location.lat : undefined,
+      location_lng:    gps.status === "ok" ? gps.location.lng : undefined,
     });
     setLoading(false);
-    if (ok) onClose();
+    if (ok) {
+      resetGps();
+      onClose();
+    }
   }
 
   return (
@@ -86,8 +95,117 @@ export function CreateTrainingModal({ open, onClose, seasonId, onSubmit }: Props
           {/* Local */}
           <div className="space-y-1.5">
             <Label htmlFor="location">Local / Pavilhão *</Label>
-            <Input id="location" required placeholder="Pavilhão Municipal da Póvoa"
-              value={form.location} onChange={(e) => set("location", e.target.value)} />
+            <Input
+              id="location"
+              required
+              placeholder="Pavilhão Municipal da Póvoa de Varzim"
+              value={form.location}
+              onChange={(e) => set("location", e.target.value)}
+            />
+          </div>
+
+          {/* GPS para Auto-Presença */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-1.5">
+              <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+              GPS para Auto-Presença
+              <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
+            </Label>
+
+            {/* Botão — só aparece quando ainda não capturou */}
+            {gps.status !== "ok" && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={captureGps}
+                disabled={gps.status === "loading"}
+                className="flex items-center gap-1.5"
+              >
+                {gps.status === "loading" ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin" />A obter localização…</>
+                ) : (
+                  <><MapPin className="h-3.5 w-3.5" />📍 Localização Atual</>
+                )}
+              </Button>
+            )}
+
+            {/* Instrução */}
+            {gps.status === "idle" && (
+              <p className="text-[11px] text-muted-foreground/60 italic">
+                Clica enquanto estiveres no pavilhão para guardar as coordenadas GPS.
+                Os jogadores serão validados automaticamente quando registarem presença.
+              </p>
+            )}
+
+            {/* Resultado OK */}
+            {gps.status === "ok" && (
+              <div className="flex items-start gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2.5 dark:border-green-800 dark:bg-green-950/30">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600 mt-0.5" />
+                <div className="flex-1 min-w-0 space-y-0.5">
+                  <p className="text-xs font-medium text-green-800 dark:text-green-200">
+                    Localização capturada
+                    {gps.location.accuracy <= 20 && (
+                      <span className="ml-1.5 text-[10px] font-normal opacity-80">
+                        (precisão: {Math.round(gps.location.accuracy)}m)
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-[11px] text-green-700 dark:text-green-400 font-mono">
+                    {gps.location.lat.toFixed(6)}, {gps.location.lng.toFixed(6)}
+                  </p>
+                  <a
+                    href={googleMapsUrl(gps.location.lat, gps.location.lng)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] text-green-600 hover:underline dark:text-green-400"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    Ver no Google Maps
+                  </a>
+                </div>
+                <button
+                  type="button"
+                  onClick={resetGps}
+                  className="text-xs text-green-600 hover:text-green-900 dark:hover:text-green-200 shrink-0"
+                >
+                  Limpar
+                </button>
+              </div>
+            )}
+
+            {/* Erro */}
+            {gps.status === "error" && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-800/50 dark:bg-amber-950/30 space-y-2">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-amber-800 dark:text-amber-300">{gps.message}</p>
+                  </div>
+                  {gps.geoCode === 1 ? (
+                    <button type="button" onClick={resetGps} className="text-xs text-amber-600 hover:text-amber-900 shrink-0">
+                      Fechar
+                    </button>
+                  ) : (
+                    <button type="button" onClick={captureGps} className="text-xs text-amber-600 hover:text-amber-900 shrink-0">
+                      Tentar novamente
+                    </button>
+                  )}
+                </div>
+                {gps.geoCode === 1 && (
+                  <ol className="text-[11px] text-amber-700 dark:text-amber-400 space-y-0.5 pl-1 list-decimal list-inside">
+                    <li><strong>Chrome / Edge:</strong> clica no 🔒 ou ℹ️ na barra de endereço → <em>Permissões do site</em> → Localização → <strong>Permitir</strong></li>
+                    <li><strong>Firefox:</strong> clica no ícone de escudo ou 🔒 → <em>Ligar proteção</em> ou permissão de localização → <strong>Permitir</strong></li>
+                    <li>Recarrega a página e clica de novo em <em>📍 Localização Atual</em></li>
+                  </ol>
+                )}
+                {gps.geoCode === 1 && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-500 italic">
+                    O GPS é opcional — podes criar o treino sem ele; o treinador valida as presenças manualmente.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Tipo */}
@@ -116,7 +234,6 @@ export function CreateTrainingModal({ open, onClose, seasonId, onSubmit }: Props
             </Select>
           </div>
 
-          {/* Semanal: dia da semana */}
           {form.recurrence_type === "weekly" && (
             <div className="space-y-1.5">
               <Label>Dia da semana</Label>
@@ -131,7 +248,6 @@ export function CreateTrainingModal({ open, onClose, seasonId, onSubmit }: Props
             </div>
           )}
 
-          {/* Mensal: dia do mês */}
           {form.recurrence_type === "monthly" && (
             <div className="space-y-1.5">
               <Label>Dia do mês</Label>
@@ -146,7 +262,6 @@ export function CreateTrainingModal({ open, onClose, seasonId, onSubmit }: Props
             </div>
           )}
 
-          {/* Data de fim da recorrência */}
           {form.recurrence_type !== "unique" && (
             <div className="space-y-1.5">
               <Label htmlFor="end_date">Data de fim da recorrência</Label>

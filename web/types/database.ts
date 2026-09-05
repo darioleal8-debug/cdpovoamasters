@@ -1,6 +1,6 @@
 // Gerado a partir de database/schema.sql — actualizar sempre que o schema mudar.
 
-export type UserRole = "admin" | "treinador" | "jogador" | "seccionista";
+export type UserRole = "admin" | "treinador" | "jogador" | "seccionista" | "tesoureiro";
 export type UserStatus = "pendente" | "ativo" | "rejeitado" | "inativo";
 export type SeasonStatus = "ativa" | "arquivada";
 export type EventType = "jogo" | "treino" | "outro";
@@ -13,9 +13,13 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  password_hash: string;
   role: UserRole;
-  status: UserStatus;
+  roles_extra: UserRole[];          // papéis secundários, ex: ["jogador"]
+  active: boolean;
+  must_change_password: boolean;
+  birth_date: string | null;
+  phone: string | null;
+  photo_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -53,6 +57,8 @@ export interface Event {
   event_date: string;
   event_time: string;
   opponent: string | null;
+  competition: string | null;
+  game_type: string;            // 'official' | 'friendly'
   training_kind: string | null;
   description: string | null;
   created_by: string | null;
@@ -74,16 +80,68 @@ export interface Payment {
   updated_at: string;
 }
 
-export interface ChatMessage {
-  id: string;
-  author_id: string;
+export type ChatType = "direct" | "group" | "team" | "staff" | "announcement" | "event";
+export type ChatPostPolicy = "all" | "admin_only";
+export type CardType = "callup_response" | "poll" | "transport" | "attendance" | "quota_reminder";
+
+export interface ChatLastMessage {
   content: string;
+  sender_name: string | null;
   created_at: string;
+  is_system: boolean;
+  card_type: string | null;
 }
 
-export type ChatType = "direct" | "group" | "team" | "announcement";
-export type ChatPostPolicy = "all" | "admin_only";
+// Thread summary — union type por category
+interface ThreadBase {
+  id: string;
+  status: "active" | "archived";
+  last_message: ChatLastMessage | null;
+  unread_count: number;
+  participant_count: number;
+}
 
+export interface EventGameThread extends ThreadBase {
+  type: "event_game";
+  event_id: string;
+  event_date: string;
+  event_time: string | null;
+  event_title: string;
+  opponent: string | null;
+  competition: string | null;
+  location: string | null;
+  callup_count: number;
+  callup_total: number;
+  days_until: number | null;
+}
+
+export interface EventTrainingThread extends ThreadBase {
+  type: "event_training";
+  training_id: string;
+  event_date: string;
+  event_time: string | null;
+  event_title: string;
+  training_kind: string | null;
+  location: string | null;
+  days_until: number | null;
+}
+
+export interface ChannelThread extends ThreadBase {
+  type: "team" | "staff" | "announcement" | "group";
+  name: string;
+  post_policy: ChatPostPolicy;
+}
+
+export interface DirectThread extends ThreadBase {
+  type: "direct";
+  name: string;
+  other_user_id: string | null;
+  post_policy?: ChatPostPolicy;
+}
+
+export type ChatThread = EventGameThread | EventTrainingThread | ChannelThread | DirectThread;
+
+// Legacy — kept for backwards compat in existing components
 export interface ChatThreadSummary {
   id: string;
   type: ChatType;
@@ -94,20 +152,58 @@ export interface ChatThreadSummary {
   updated_at: string;
 }
 
-export interface ChatThreadMessage {
+export interface ChatMessage {
   id: string;
   chat_id: string;
   sender_id: string | null;
   sender_name: string | null;
-  content: string;
+  sender_role: string | null;
+  content: string | null;
+  card_type: CardType | null;
+  card_data: unknown;
+  is_system: boolean;
   attachment_url: string | null;
   created_at: string;
+  read_by_count: number;
+  is_mine: boolean;
+}
+
+// Legacy alias
+export type ChatThreadMessage = ChatMessage;
+
+// ── Vista v_roster: JOIN entre users e players (ver migration 042) ─────────
+
+export interface RosterEntry {
+  id:                   string;         // = user_id (identificador estável do utilizador)
+  user_id:              string;
+  player_id:            string | null;  // null se ainda não tem perfil de jogador nesta época
+  season_id:            string | null;
+  name:                 string;
+  email:                string;
+  phone:                string | null;
+  active:               boolean;
+  roles_extra:          UserRole[];
+  number:               number | null;
+  position:             PlayerPosition | null;
+  height:               number | null;
+  weight:               number | null;
+  age:                  number | null;
+  birth_date:           string | null;
+  photo_url:            string | null;
+  original_photo_url:   string | null;
+  processed_photo_url:  string | null;
+  photo_focal_x:        number | null;
+  photo_focal_y:        number | null;
+  photo_template_version: number | null;
+  team_id:              string | null;
+  created_at:           string;
 }
 
 // ── Joins frequentes (views/queries com relacionamentos) ───────────────────
 
+/** @deprecated Usa RosterEntry (v_roster view) ou Player. */
 export interface PlayerWithUser extends PlayerProfile {
-  user: Pick<User, "id" | "name" | "email" | "status">;
+  user: Pick<User, "id" | "name" | "email" | "active">;
 }
 
 export interface PaymentWithUser extends Payment {
@@ -137,6 +233,7 @@ export type GameFormData = {
   event_time: string;
   opponent?: string;
   description?: string;
+  game_type?: string;  // 'official' (default) | 'friendly'
 };
 
 export type TrainingFormData = {
@@ -195,20 +292,26 @@ export interface PositionCount {
 // ── Plantel (tabela players) ──────────────────────────────────────────────
 
 export interface Player {
-  id:         string;
-  season_id:  string;
-  team_id:    string | null;
-  user_id:    string | null;
-  name:       string;
-  number:     number | null;
-  position:   PlayerPosition | null;
-  height:     number | null;
-  weight:     number | null;
-  age:        number | null;
-  phone:      string | null;
-  birth_date: string | null;
-  photo_url:  string | null;
-  created_at: string;
+  id:                   string;
+  season_id:            string;
+  team_id:              string | null;
+  user_id:              string | null;
+  name:                 string;
+  number:               number | null;
+  position:             PlayerPosition | null;
+  height:               number | null;
+  weight:               number | null;
+  age:                  number | null;
+  phone:                string | null;
+  birth_date:           string | null;
+  email:                string | null;
+  photo_url:            string | null;
+  original_photo_url:   string | null;
+  processed_photo_url:  string | null;
+  photo_focal_x:        number | null;
+  photo_focal_y:        number | null;
+  photo_template_version: number | null;
+  created_at:           string;
 }
 
 // ── Cores de equipamento por equipa (tabela team_kits) ───────────────────────
@@ -318,6 +421,7 @@ export type PlayEventType =
   | "rebound_off" | "rebound_def"
   | "assist" | "steal" | "block" | "turnover"
   | "foul_committed" | "foul_drawn"
+  | "foul_def" | "foul_of" | "foul_tec" | "foul_anti"
   | "substitution_in" | "substitution_out"
   | "timeout"
   | "period_start" | "period_end"
@@ -343,6 +447,10 @@ export interface GameSession {
   period_duration_secs: number;
   home_timeouts_left: number;
   away_timeouts_left: number;
+  // Opponent team stats (migration 023)
+  away_reb_off: number;
+  away_reb_def: number;
+  away_fouls: number;
 }
 
 export interface PlayByPlay {
@@ -363,6 +471,10 @@ export interface PlayByPlay {
   shot_zone: string | null;
   description: string | null;
   created_at: string;
+  // Migration 034: idempotência + soft-delete + autor
+  client_id?:  string | null;
+  deleted_at?: string | null;
+  author_id?:  string | null;
 }
 
 export interface PlayerGameStats {
@@ -394,7 +506,7 @@ export interface PlayerGameStats {
 }
 
 export interface PlayerGameStatsWithUser extends PlayerGameStats {
-  user: Pick<User, "id" | "name">;
+  user: Pick<User, "id" | "name"> | null;
 }
 
 export interface GamePeriodScore {
@@ -416,7 +528,7 @@ export type TrainingType =
   | "tecnico" | "fisico" | "tatico"
   | "recuperacao" | "coletivo" | "individual" | "geral";
 
-export type AttendanceStatus = "present" | "absent" | "justified" | "late";
+export type AttendanceStatus = "present" | "absent" | "justified" | "late" | "auto_present";
 
 export type RecurrenceType = "weekly" | "monthly" | "unique";
 
@@ -449,6 +561,8 @@ export interface Training {
   notes: string | null;
   created_by: string | null;
   created_at: string;
+  location_lat: number | null;
+  location_lng: number | null;
 }
 
 export interface TrainingAttendance {
@@ -458,6 +572,17 @@ export interface TrainingAttendance {
   status: AttendanceStatus;
   updated_at: string;
   updated_by: string | null;
+  method: "manual" | "photo" | "gps";
+  // Auto-Presença
+  photo_url: string | null;
+  gps_lat: number | null;
+  gps_lng: number | null;
+  gps_validated: boolean;
+  gps_distance_m: number | null;
+  auto_timestamp: string | null;
+  validated_by: string | null;
+  validated_at: string | null;
+  photo_hash: string | null;
 }
 
 export interface TrainingNote {
@@ -513,11 +638,70 @@ export const TRAINING_TYPE_LABELS: Record<TrainingType, string> = {
 };
 
 export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, string> = {
-  present:   "Presente",
-  absent:    "Falta",
-  justified: "Justificada",
-  late:      "Atraso",
+  present:      "Presente",
+  absent:       "Falta",
+  justified:    "Justificada",
+  late:         "Atraso",
+  auto_present: "Auto-Presença",
 };
+
+// ── Módulo Financeiro ─────────────────────────────────────────────────────────
+
+export type FinanceSourceType = "manual" | "cota_jogador";
+export type CashMovementType  = "entrada" | "saida" | "transferencia";
+
+export interface FinancialEntry {
+  id:                string;
+  amount:            number;
+  description:       string;
+  category:          string;
+  source_type:       FinanceSourceType;
+  player_payment_id: string | null;
+  player_id:         string | null;
+  player_name:       string | null;
+  entry_date:        string;
+  season_id:         string | null;
+  created_by:        string | null;
+  notes:             string | null;
+  created_at:        string;
+  updated_at:        string;
+}
+
+export interface FinancialExpense {
+  id:           string;
+  amount:       number;
+  description:  string;
+  category:     string;
+  expense_date: string;
+  season_id:    string | null;
+  supplier:     string | null;
+  created_by:   string | null;
+  notes:        string | null;
+  created_at:   string;
+  updated_at:   string;
+}
+
+export interface FinancialCashMovement {
+  id:            string;
+  type:          CashMovementType;
+  amount:        number;
+  description:   string;
+  movement_date: string;
+  created_by:    string | null;
+  notes:         string | null;
+  created_at:    string;
+}
+
+export interface FinanceDashboardData {
+  totalBalance:    number;
+  cashBalance:     number;
+  monthEntries:    number;
+  monthExpenses:   number;
+  monthlyChart:    { month: string; entradas: number; saidas: number }[];
+  recentEntries:   FinancialEntry[];
+  recentExpenses:  FinancialExpense[];
+  cotasStats:      { totalPaid: number; totalPending: number; playersLate: number };
+}
 
 // ── Evento a registar (input do treinador) ────────────────────────────────────
 export interface RecordPlayInput {

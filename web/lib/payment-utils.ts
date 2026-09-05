@@ -1,4 +1,4 @@
-import type { Season, PlayerPaymentStatus } from "@/types/database";
+import type { Season, PlayerPaymentStatus, PlayerPaymentWithPlayer } from "@/types/database";
 
 export interface SeasonMonth {
   month: number;
@@ -69,4 +69,69 @@ export function formatCurrencyEUR(value: number): string {
     currency: "EUR",
     minimumFractionDigits: 2,
   }).format(value);
+}
+
+// ── Grid jogador × mês ────────────────────────────────────────────────────────
+
+export const MONTH_NAMES_SHORT = [
+  "Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez",
+];
+
+export type GridCellStatus = PlayerPaymentStatus | "unregistered" | "future";
+
+export const CELL_COLORS: Record<GridCellStatus, { bg: string; text: string; border: string }> = {
+  paid:         { bg: "#12855B", text: "#ffffff", border: "#0f6b49" },
+  partial:      { bg: "#DC9A1C", text: "#ffffff", border: "#b87e17" },
+  late:         { bg: "#D92D20", text: "#ffffff", border: "#b02418" },
+  exempt:       { bg: "#98A2B3", text: "#ffffff", border: "#7a8699" },
+  unregistered: { bg: "#FECDCA", text: "#D92D20", border: "#FDA29B" },
+  future:       { bg: "#F2F4F7", text: "#98A2B3", border: "#e4e7ec" },
+};
+
+export const CELL_STATUS_LABELS: Record<GridCellStatus, string> = {
+  paid:         "Pago",
+  partial:      "Parcial",
+  late:         "Em atraso",
+  exempt:       "Isento",
+  unregistered: "Por registar",
+  future:       "Mês futuro",
+};
+
+export interface GridCell {
+  key:        string;   // `${month}-${year}`
+  month:      number;
+  year:       number;
+  status:     GridCellStatus;
+  amountPaid: number;
+  amountDue:  number;
+  payment:    PlayerPaymentWithPlayer | null;
+  isFuture:   boolean;
+}
+
+export function deriveCellState(
+  month: number,
+  year: number,
+  payment: PlayerPaymentWithPlayer | null,
+  today: Date,
+  defaultAmountDue = 20,
+): GridCell {
+  const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const cellMonthStart = new Date(year, month - 1, 1);
+  const isFuture       = cellMonthStart > thisMonthStart;
+  const key            = `${month}-${year}`;
+
+  if (payment) {
+    return {
+      key, month, year,
+      status:     payment.status,
+      amountPaid: Number(payment.amount),
+      amountDue:  Number(payment.amount_due),
+      payment,
+      isFuture: false,
+    };
+  }
+  if (isFuture) {
+    return { key, month, year, status: "future",       amountPaid: 0, amountDue: 0,              payment: null, isFuture: true };
+  }
+  return   { key, month, year, status: "unregistered", amountPaid: 0, amountDue: defaultAmountDue, payment: null, isFuture: false };
 }

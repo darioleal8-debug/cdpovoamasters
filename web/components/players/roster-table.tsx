@@ -1,6 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import {
   useReactTable,
   getCoreRowModel,
@@ -15,14 +16,15 @@ import { Badge }     from "@/components/ui/badge";
 import { Button }    from "@/components/ui/button";
 import { Input }     from "@/components/ui/input";
 import { Skeleton }  from "@/components/ui/skeleton";
-import type { Player, PlayerPosition } from "@/types/database";
+import type { RosterEntry, PlayerPosition } from "@/types/database";
 import { POSITION_LABELS } from "@/lib/utils";
+import { calculateAge } from "@/lib/age";
 
 interface RosterTableProps {
-  players:         Player[];
+  players:         RosterEntry[];
   loading?:        boolean;
-  onEdit?:         (player: Player) => void;
-  onDelete?:       (player: Player) => void;
+  onEdit?:         (player: RosterEntry) => void;
+  onDelete?:       (player: RosterEntry) => void;
   onCreateAccount?:() => void;
 }
 
@@ -38,8 +40,8 @@ function PlayerAvatar({ name, photoUrl }: { name: string; photoUrl: string | nul
     return <img src={photoUrl} alt={name} className="h-9 w-9 rounded-full object-cover" />;
   }
   return (
-    <div className="h-9 w-9 rounded-full bg-cdpovoa-blue/10 flex items-center justify-center shrink-0">
-      <span className="text-xs font-bold text-cdpovoa-blue">{initials}</span>
+    <div className="h-9 w-9 rounded-full bg-cdpovoa-primary/10 flex items-center justify-center shrink-0">
+      <span className="text-xs font-bold text-cdpovoa-primary">{initials}</span>
     </div>
   );
 }
@@ -48,7 +50,7 @@ export function RosterTable({ players, loading, onEdit, onDelete, onCreateAccoun
   const [sorting,      setSorting]      = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
 
-  const columns = useMemo<ColumnDef<Player>[]>(
+  const columns = useMemo<ColumnDef<RosterEntry>[]>(
     () => [
       {
         id: "avatar",
@@ -66,7 +68,7 @@ export function RosterTable({ players, loading, onEdit, onDelete, onCreateAccoun
           </Button>
         ),
         cell: ({ row }) => (
-          <span className="font-mono text-base font-bold text-cdpovoa-blue">
+          <span className="font-mono text-base font-bold text-cdpovoa-primary">
             {row.original.number ?? "—"}
           </span>
         ),
@@ -82,11 +84,15 @@ export function RosterTable({ players, loading, onEdit, onDelete, onCreateAccoun
         ),
         cell: ({ row }) => (
           <div>
-            <span className="font-medium">{row.original.name}</span>
-            {!row.original.user_id && (
-              <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-                sem conta
-              </span>
+            {row.original.player_id ? (
+              <Link
+                href={`/jogadores/${row.original.player_id}`}
+                className="font-medium hover:text-cdpovoa-primary hover:underline underline-offset-2 transition-colors"
+              >
+                {row.original.name}
+              </Link>
+            ) : (
+              <span className="font-medium">{row.original.name}</span>
             )}
           </div>
         ),
@@ -115,7 +121,13 @@ export function RosterTable({ players, loading, onEdit, onDelete, onCreateAccoun
       {
         accessorKey: "age",
         header: "Idade",
-        cell: ({ row }) => row.original.age ? `${row.original.age} a` : "—",
+        cell: ({ row }) => {
+          const p = row.original;
+          const age = p.birth_date
+            ? calculateAge(p.birth_date)
+            : p.age ?? null;
+          return age != null ? `${age} a` : "—";
+        },
         size: 80,
       },
       {
@@ -153,14 +165,19 @@ export function RosterTable({ players, loading, onEdit, onDelete, onCreateAccoun
 
   return (
     <div className="space-y-4">
-      <div className="relative max-w-xs">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Pesquisar jogador..."
-          value={globalFilter}
-          onChange={(e) => setGlobalFilter(e.target.value)}
-          className="pl-9"
-        />
+      <div className="flex items-center gap-3 justify-between">
+        <div className="relative max-w-xs flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Pesquisar jogador..."
+            value={globalFilter}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <span className="text-sm text-muted-foreground whitespace-nowrap shrink-0">
+          {table.getFilteredRowModel().rows.length} de {players.length} jogador(es)
+        </span>
       </div>
 
       <div className="overflow-x-auto rounded-lg border">
@@ -196,13 +213,21 @@ export function RosterTable({ players, loading, onEdit, onDelete, onCreateAccoun
                     className="px-4 py-14 text-center text-muted-foreground">
                     <div className="flex flex-col items-center gap-3">
                       <UserPlus className="h-8 w-8 opacity-30" />
-                      <p>Nenhum jogador nesta temporada.</p>
-                      {onCreateAccount && (
+                      <p>
+                        {globalFilter
+                          ? `Nenhum jogador encontrado para "${globalFilter}".`
+                          : "Nenhum jogador nesta temporada."}
+                      </p>
+                      {globalFilter ? (
+                        <button onClick={() => setGlobalFilter("")} className="text-xs text-cdpovoa-primary hover:underline">
+                          Limpar pesquisa
+                        </button>
+                      ) : onCreateAccount ? (
                         <Button variant="outline" size="sm" onClick={onCreateAccount} className="gap-1.5">
                           <UserPlus className="h-4 w-4" />
                           Criar Conta de Jogador
                         </Button>
-                      )}
+                      ) : null}
                     </div>
                   </td>
                 </tr>
@@ -220,9 +245,6 @@ export function RosterTable({ players, loading, onEdit, onDelete, onCreateAccoun
         </table>
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        {table.getFilteredRowModel().rows.length} de {players.length} jogador(es)
-      </p>
     </div>
   );
 }

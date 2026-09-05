@@ -4,10 +4,16 @@ import { verifyActivationToken } from "@/lib/activation-token";
 
 export const runtime = "nodejs";
 
+function stripBom(v: string | undefined): string {
+  const s = (v ?? "").trim();
+  return s.charCodeAt(0) === 0xFEFF ? s.slice(1) : s;
+}
+
 function adminClient() {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const key = stripBom(process.env.SUPABASE_SERVICE_ROLE_KEY);
   if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY não configurada");
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, {
+  return createClient(url, key, {
     auth: { persistSession: false },
   });
 }
@@ -34,8 +40,15 @@ export async function POST(req: NextRequest) {
     req.headers.get("x-real-ip") ??
     "unknown";
 
-  const admin = adminClient();
-  const t     = token.trim();
+  let admin: ReturnType<typeof adminClient>;
+  try {
+    admin = adminClient();
+  } catch (e) {
+    console.error("[activate] Configuração inválida:", (e as Error).message);
+    return fail("Erro de configuração do servidor.", 500);
+  }
+
+  const t = token.trim();
 
   // ── 1. Tentar token HMAC (formato novo, sem BD) ──────────
   const hmac = verifyActivationToken(t);
@@ -47,7 +60,13 @@ export async function POST(req: NextRequest) {
       .eq("id", hmac.userId);
 
     if (error) {
-      console.error("[activate] Erro ao ativar conta:", error.message);
+      console.error("[activate] Erro ao ativar conta (HMAC):", {
+        message: error.message,
+        code:    (error as { code?: string }).code,
+        hint:    (error as { hint?: string }).hint,
+        details: (error as { details?: string }).details,
+        userId:  hmac.userId,
+      });
       return fail("Não foi possível ativar a conta. Tenta novamente.", 500);
     }
 
@@ -105,6 +124,11 @@ export async function POST(req: NextRequest) {
     .eq("id", record.user_id);
 
   if (activateError) {
+    console.error("[activate] Erro ao ativar conta (legado):", {
+      message: activateError.message,
+      code:    (activateError as { code?: string }).code,
+      userId:  record.user_id,
+    });
     return fail("Não foi possível ativar a conta.", 500);
   }
 

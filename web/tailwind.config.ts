@@ -44,13 +44,34 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
         /* Cores da plataforma HoopHub */
         cdpovoa: {
-          blue: "#111111",
-          "blue-mid": "#1a1a1a",
-          red: "#F28C28",
-          "red-dark": "#d97706",
+          primary: "#111111",
+          "primary-mid": "#1a1a1a",
+          accent: "#F28C28",
+          "accent-dark": "#d97706",
         },
+        /* Paleta Balneário v2 — tokens semânticos */
+        ink:       "#0A1220",
+        navy:      "#14213D",
+        action:    "#F97316",
+        "action-ink": "#C2410C",
+        highlight: "#F59E0B",
+        paper:     "#F6F7F9",
+        line:      "#E4E7EE",
+        "text-base": "#0F1729",
+        "muted-text": "#5A6478",
+        ok:        "#12855B",
+        warn:      "#F59E0B",
+        bad:       "#D92D20",
+      },
+      fontFamily: {
+        sans:      ["var(--font-barlow)", "system-ui", "sans-serif"],
+        condensed: ["var(--font-barlow-condensed)", "system-ui", "sans-serif"],
       },
       borderRadius: {
         lg: "var(--radius)",

@@ -161,6 +161,13 @@ export async function POST(req: NextRequest) {
 }
 
 // ─── PATCH /api/players ─── Atualizar foto ───────────────
+// Aceita:
+//   player_id        (obrigatório)
+//   photo            (File original — obrigatório)
+//   processed_photo  (Blob WebP composited — opcional, gerado pelo browser com o template)
+//   focal_x          (float 0-1, default 0.5)
+//   focal_y          (float 0-1, default 0.3)
+//   template_version (int)
 export async function PATCH(req: NextRequest) {
   const authUser = await getAuthUser();
   if (!authUser) return fail("Não autenticado", 401);
@@ -172,10 +179,14 @@ export async function PATCH(req: NextRequest) {
     return fail("Não foi possível ler o formulário");
   }
 
-  const playerId = (fd.get("player_id") as string | null)?.trim() ?? "";
-  const photo    = fd.get("photo") as File | null;
+  const playerId        = (fd.get("player_id")        as string | null)?.trim() ?? "";
+  const photo           = fd.get("photo")           as File | null;
+  const processedPhoto  = fd.get("processed_photo") as File | null;
+  const focalX          = parseFloat((fd.get("focal_x") as string | null) ?? "0.5") || 0.5;
+  const focalY          = parseFloat((fd.get("focal_y") as string | null) ?? "0.3") || 0.3;
+  const templateVersion = parseInt((fd.get("template_version") as string | null) ?? "0") || 0;
 
-  if (!playerId)              return fail("player_id é obrigatório");
+  if (!playerId) return fail("player_id é obrigatório");
   if (!photo || photo.size === 0) return NextResponse.json({ success: true, message: "Sem foto para atualizar" });
 
   let admin: ReturnType<typeof adminClient>;
@@ -185,7 +196,6 @@ export async function PATCH(req: NextRequest) {
     return fail((e as Error).message, 500);
   }
 
-  // Confirmar que o jogador existe
   const { data: existing } = await admin
     .from("players")
     .select("id, season_id")
@@ -194,22 +204,47 @@ export async function PATCH(req: NextRequest) {
 
   if (!existing) return fail("Jogador não encontrado", 404);
 
-  const photoUrl = await uploadPhoto(
-    admin,
-    photo,
-    `${existing.season_id}/${playerId}`
-  );
+  const seasonId = existing.season_id as string;
 
-  if (!photoUrl) return fail("Erro ao fazer upload da foto — verifica se o bucket 'player-photos' existe", 500);
+  // Upload da fotografia original (preservada para sempre)
+  const originalUrl = await uploadPhoto(
+    admin, photo,
+    `${seasonId}/original/${playerId}`
+  );
+  if (!originalUrl) return fail("Erro ao fazer upload da fotografia original", 500);
+
+  // Upload da fotografia processada (com template, se fornecida)
+  let processedUrl: string | null = null;
+  if (processedPhoto && processedPhoto.size > 0) {
+    processedUrl = await uploadPhoto(
+      admin, processedPhoto,
+      `${seasonId}/processed/${playerId}`
+    );
+  }
+
+  // photo_url = processada se existir, senão original (compatibilidade)
+  const displayUrl = processedUrl ?? originalUrl;
 
   const { error } = await admin
     .from("players")
-    .update({ photo_url: photoUrl })
+    .update({
+      photo_url:            displayUrl,
+      original_photo_url:   originalUrl,
+      processed_photo_url:  processedUrl,
+      photo_focal_x:        focalX,
+      photo_focal_y:        focalY,
+      photo_template_version: templateVersion,
+    })
     .eq("id", playerId);
 
   if (error) return fail(error.message, 500);
 
-  return NextResponse.json({ success: true, photo_url: photoUrl });
+  return NextResponse.json({
+    success: true,
+    photo_url:           displayUrl,
+    original_photo_url:  originalUrl,
+    processed_photo_url: processedUrl,
+  });
 }
 
 // ─── DELETE /api/players ─── Remover jogador ─────────────

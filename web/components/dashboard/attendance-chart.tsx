@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import {
   Bar,
   BarChart,
@@ -20,6 +21,17 @@ interface AttendanceChartProps {
 }
 
 export function AttendanceChart({ data, loading }: AttendanceChartProps) {
+  const [clubPrimary, setClubPrimary] = useState("#111111");
+  const [clubAccent,  setClubAccent]  = useState("#F28C28");
+
+  useEffect(() => {
+    const s = getComputedStyle(document.documentElement);
+    const p = s.getPropertyValue("--club-primary").trim();
+    const a = s.getPropertyValue("--club-secondary").trim();
+    if (p) setClubPrimary(p);
+    if (a) setClubAccent(a);
+  }, []);
+
   if (loading) {
     return (
       <Card>
@@ -71,8 +83,8 @@ export function AttendanceChart({ data, loading }: AttendanceChartProps) {
                 }}
               />
               <Legend wrapperStyle={{ fontSize: "13px", paddingTop: "12px" }} />
-              <Bar dataKey="jogos"   name="Jogos"   fill="#0a2647" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="treinos" name="Treinos" fill="#c8102e" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="jogos"   name="Jogos"   fill={clubPrimary} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="treinos" name="Treinos" fill={clubAccent}  radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}

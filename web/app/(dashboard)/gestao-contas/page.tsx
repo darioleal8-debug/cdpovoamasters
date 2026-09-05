@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
   UserPlus, Pencil, KeyRound, ShieldOff, ShieldCheck,
   Trash2, Users, Loader2, Copy, Check, Link2, ExternalLink, Mail,
+  AlertTriangle, RefreshCw,
 } from "lucide-react";
 import { Button }    from "@/components/ui/button";
 import { Input }     from "@/components/ui/input";
@@ -18,31 +20,44 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/toaster";
 import { CreatePlayerAccountModal } from "@/components/admin/create-player-account-modal";
+import { createClient } from "@/lib/supabase/client";
+
+import { ageLabel } from "@/lib/age";
 
 // ─── Tipos ────────────────────────────────────────────────
 
+interface PlayerInfo {
+  id: string;
+  number: number | null;
+  position: string | null;
+}
+
 interface UserRow {
-  id:         string;
-  name:       string;
-  email:      string;
-  role:       "admin" | "treinador" | "jogador";
-  active:     boolean;
-  created_at: string;
-  player:     { id: string; name: string; number: number | null; position: string | null } | null;
+  id:          string;
+  name:        string;
+  email:       string;
+  role:        "admin" | "treinador" | "jogador" | "seccionista";
+  roles_extra: string[];
+  birth_date:  string | null;
+  active:      boolean;
+  created_at:  string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────
 
 const ROLE_LABELS: Record<string, string> = {
-  admin:     "Admin",
-  treinador: "Treinador",
-  jogador:   "Jogador",
+  admin:       "Admin",
+  treinador:   "Treinador",
+  jogador:     "Jogador",
+  seccionista: "Seccionista",
+  tesoureiro:  "Tesoureiro",
 };
 
 const ROLE_COLORS: Record<string, string> = {
-  admin:     "bg-red-100 text-red-800",
-  treinador: "bg-blue-100 text-blue-800",
-  jogador:   "bg-green-100 text-green-800",
+  admin:       "bg-red-100 text-red-800",
+  treinador:   "bg-blue-100 text-blue-800",
+  jogador:     "bg-green-100 text-green-800",
+  seccionista: "bg-purple-100 text-purple-800",
 };
 
 function Avatar({ name }: { name: string }) {
@@ -59,7 +74,9 @@ function Avatar({ name }: { name: string }) {
 
 export default function GestaoDeContasPage() {
   const [users,       setUsers]      = useState<UserRow[]>([]);
+  const [playerMap,   setPlayerMap]  = useState<Record<string, PlayerInfo>>({});
   const [loading,     setLoading]    = useState(true);
+  const [loadError,   setLoadError]  = useState<string | null>(null);
   const [search,      setSearch]     = useState("");
   const [createModal, setCreateModal]= useState(false);
 
@@ -71,14 +88,20 @@ export default function GestaoDeContasPage() {
   const [editSaving,  setEditSaving] = useState(false);
 
   // reset password modal
-  const [resetUser,   setResetUser]  = useState<UserRow | null>(null);
-  const [tempPass,    setTempPass]   = useState<string | null>(null);
-  const [resetLoading,setResetLoading] = useState(false);
-  const [copied,      setCopied]     = useState(false);
+  const [resetUser,        setResetUser]        = useState<UserRow | null>(null);
+  const [tempPass,         setTempPass]         = useState<string | null>(null);
+  const [resetLoading,     setResetLoading]     = useState(false);
+  const [copied,           setCopied]           = useState(false);
+  const [resetEmailSent,   setResetEmailSent]   = useState(false);
+  const [resetEmailFallback, setResetEmailFallback] = useState(false);
+  const [resetEmailError,  setResetEmailError]  = useState<string | null>(null);
 
   // delete modal
   const [deleteUser,  setDeleteUser] = useState<UserRow | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // toggle active modal
+  const [toggleConfirm, setToggleConfirm] = useState<UserRow | null>(null);
 
   // activation link modal
   const [actUser,           setActUser]           = useState<UserRow | null>(null);
@@ -92,16 +115,43 @@ export default function GestaoDeContasPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
-      const res = await fetch("/api/admin/users");
+      // Contas de utilizador (via API com service role)
+      const res  = await fetch("/api/admin/users");
+      const json = await res.json().catch(() => ({}));
       if (res.ok) {
-        const json = await res.json();
         setUsers(json.users ?? []);
       } else {
-        toast({ title: "Erro ao carregar contas", variant: "destructive" });
+        const msg = json.error ?? "Erro ao carregar contas";
+        setLoadError(msg);
+        toast({ title: msg, variant: "destructive" });
       }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro inesperado";
+      setLoadError(msg);
+      toast({ title: msg, variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+
+    // Perfis desportivos — leitura directa via supabase client (mesmo padrão de use-roster)
+    try {
+      const supabase = createClient();
+      const { data: playerRows } = await supabase
+        .from("players")
+        .select("id, user_id, number, position, created_at")
+        .order("created_at", { ascending: false });
+      const map: Record<string, PlayerInfo> = {};
+      for (const p of playerRows ?? []) {
+        const uid = p.user_id as string;
+        if (uid && !map[uid]) {
+          map[uid] = { id: p.id as string, number: p.number as number | null, position: p.position as string | null };
+        }
+      }
+      setPlayerMap(map);
+    } catch {
+      // Não é bloqueante — a lista de contas já está disponível
     }
   }, []);
 
@@ -153,6 +203,10 @@ export default function GestaoDeContasPage() {
   async function handleResetPassword() {
     if (!resetUser) return;
     setResetLoading(true);
+    setResetEmailSent(false);
+    setResetEmailFallback(false);
+    setResetEmailError(null);
+    setTempPass(null);
     try {
       const res = await fetch("/api/admin/users/reset-password", {
         method:  "POST",
@@ -161,7 +215,11 @@ export default function GestaoDeContasPage() {
       });
       const json = await res.json();
       if (res.ok) {
-        setTempPass(json.temp_password);
+        setResetEmailSent(json.email_sent === true);
+        setResetEmailFallback(json.email_fallback === true);
+        setResetEmailError(json.email_error ?? null);
+        // Só mostra a password se o email não foi enviado (fallback manual)
+        setTempPass(json.temp_password ?? null);
       } else {
         toast({ title: "Erro ao repor password", description: json.error, variant: "destructive" });
         setResetUser(null);
@@ -169,6 +227,14 @@ export default function GestaoDeContasPage() {
     } finally {
       setResetLoading(false);
     }
+  }
+
+  function closeResetModal() {
+    setResetUser(null);
+    setTempPass(null);
+    setResetEmailSent(false);
+    setResetEmailFallback(false);
+    setResetEmailError(null);
   }
 
   function copyTempPass() {
@@ -277,8 +343,15 @@ export default function GestaoDeContasPage() {
     setTimeout(() => setActCopied(false), 2500);
   }
 
-  // ── Ativar / Desativar rápido ──────────────────────────────
-  async function toggleActive(u: UserRow) {
+  // ── Ativar / Desativar ────────────────────────────────────
+  function toggleActive(u: UserRow) {
+    setToggleConfirm(u);
+  }
+
+  async function confirmToggleActive() {
+    if (!toggleConfirm) return;
+    const u = toggleConfirm;
+    setToggleConfirm(null);
     const res = await fetch("/api/admin/users", {
       method:  "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -320,9 +393,11 @@ export default function GestaoDeContasPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-sm"
         />
-        <span className="text-sm text-muted-foreground">
-          {filtered.length} conta(s)
-        </span>
+        {!loadError && (
+          <span className="text-sm text-muted-foreground">
+            {loading ? "A carregar…" : `${filtered.length} conta(s)`}
+          </span>
+        )}
       </div>
 
       {/* Tabela */}
@@ -351,10 +426,23 @@ export default function GestaoDeContasPage() {
                   ))}
                 </tr>
               ))
+            ) : loadError ? (
+              <tr>
+                <td colSpan={8} className="px-4 py-12 text-center">
+                  <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                    <AlertTriangle className="h-8 w-8 text-destructive/60" />
+                    <p className="text-sm text-destructive">{loadError}</p>
+                    <Button variant="outline" size="sm" className="gap-1.5" onClick={load}>
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Tentar novamente
+                    </Button>
+                  </div>
+                </td>
+              </tr>
             ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
-                  Nenhuma conta encontrada.
+                  {search ? "Nenhuma conta encontrada com esse critério." : "Ainda não existem contas criadas."}
                 </td>
               </tr>
             ) : filtered.map((u) => (
@@ -362,22 +450,44 @@ export default function GestaoDeContasPage() {
                 <td className="px-4 py-3">
                   <Avatar name={u.name} />
                 </td>
-                <td className="px-4 py-3 font-medium">{u.name}</td>
+                <td className="px-4 py-3">
+                  <div className="font-medium">{u.name}</div>
+                  {u.birth_date && (
+                    <div className="text-[11px] text-muted-foreground">{ageLabel(u.birth_date)}</div>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
                 <td className="px-4 py-3">
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${ROLE_COLORS[u.role] ?? ""}`}>
-                    {ROLE_LABELS[u.role] ?? u.role}
-                  </span>
+                  <div className="flex flex-col gap-0.5">
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold w-fit ${ROLE_COLORS[u.role] ?? ""}`}>
+                      {ROLE_LABELS[u.role] ?? u.role}
+                    </span>
+                    {(u.roles_extra ?? []).includes("player") && (
+                      <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold w-fit bg-green-100 text-green-800">
+                        + Jogador
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3">
                   {u.active
                     ? <Badge variant="outline" className="border-green-600 text-green-700 text-[11px]">Ativo</Badge>
                     : <Badge variant="outline" className="border-red-500 text-red-600 text-[11px]">Inativo</Badge>}
                 </td>
-                <td className="px-4 py-3 text-muted-foreground text-xs">
-                  {u.player
-                    ? <span className="font-medium text-foreground">#{u.player.number ?? "—"} {u.player.name}</span>
-                    : "—"}
+                <td className="px-4 py-3 text-xs">
+                  {(() => {
+                    const p = playerMap[u.id];
+                    if (!p) return <span className="text-muted-foreground">—</span>;
+                    return (
+                      <Link
+                        href={`/jogadores/${p.id}`}
+                        className="font-medium text-foreground hover:text-orange-600 hover:underline underline-offset-2 transition-colors"
+                      >
+                        {p.number != null ? `#${p.number}` : "Sem nº"}
+                        {p.position ? ` · ${p.position}` : ""}
+                      </Link>
+                    );
+                  })()}
                 </td>
                 <td className="px-4 py-3 text-muted-foreground text-xs">
                   {new Date(u.created_at).toLocaleDateString("pt-PT")}
@@ -450,6 +560,8 @@ export default function GestaoDeContasPage() {
                   <SelectContent>
                     <SelectItem value="jogador">Jogador</SelectItem>
                     <SelectItem value="treinador">Treinador</SelectItem>
+                    <SelectItem value="seccionista">Seccionista</SelectItem>
+                    <SelectItem value="tesoureiro">Tesoureiro</SelectItem>
                     <SelectItem value="admin">Administrador</SelectItem>
                   </SelectContent>
                 </Select>
@@ -480,7 +592,7 @@ export default function GestaoDeContasPage() {
       </Dialog>
 
       {/* ── Modal: Repor Password ──────────────────────── */}
-      <Dialog open={!!resetUser} onOpenChange={(v) => { if (!v) { setResetUser(null); setTempPass(null); } }}>
+      <Dialog open={!!resetUser} onOpenChange={(v) => { if (!v) closeResetModal(); }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -490,40 +602,85 @@ export default function GestaoDeContasPage() {
           </DialogHeader>
           {resetUser && (
             <div className="space-y-4">
-              {!tempPass ? (
+              {/* Estado inicial — antes de gerar */}
+              {!resetEmailSent && !resetEmailFallback && !resetEmailError && !tempPass && (
                 <>
                   <p className="text-sm text-muted-foreground">
                     Vai ser gerada uma password temporária para <strong>{resetUser.name}</strong>.
-                    Partilha-a com o utilizador — ele deverá alterá-la após o primeiro login.
+                    Um email será enviado automaticamente com as instruções de acesso.
                   </p>
                   <DialogFooter>
-                    <Button variant="outline" onClick={() => setResetUser(null)}>Cancelar</Button>
+                    <Button variant="outline" onClick={closeResetModal}>Cancelar</Button>
                     <Button onClick={handleResetPassword} disabled={resetLoading} className="gap-1.5">
                       {resetLoading && <Loader2 className="h-4 w-4 animate-spin" />}
                       Gerar Password
                     </Button>
                   </DialogFooter>
                 </>
-              ) : (
+              )}
+
+              {/* Estado pós-reset: email enviado com sucesso */}
+              {(resetEmailSent || resetEmailFallback || resetEmailError !== null || tempPass) && (
                 <>
-                  <p className="text-sm text-muted-foreground">
-                    Password temporária gerada. Partilha com <strong>{resetUser.name}</strong>:
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 rounded-md border bg-muted px-3 py-2 text-sm font-mono tracking-widest">
-                      {tempPass}
-                    </code>
-                    <Button variant="outline" size="icon" onClick={copyTempPass}>
-                      {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
-                    </Button>
-                  </div>
+                  {/* Email enviado via Resend/SMTP */}
+                  {resetEmailSent && (
+                    <div className="flex items-center gap-2 rounded-md bg-green-50 border border-green-200 px-3 py-2 text-xs text-green-700">
+                      <Mail className="h-3.5 w-3.5 shrink-0" />
+                      Email enviado para <strong>{resetUser.email}</strong>. O utilizador deve verificar a caixa de entrada.
+                    </div>
+                  )}
+
+                  {/* Dev fallback — sem email real */}
+                  {resetEmailFallback && !resetEmailSent && (
+                    <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+                      Modo dev — email impresso no terminal do servidor. Partilha a password abaixo manualmente.
+                    </div>
+                  )}
+
+                  {/* Erro no email */}
+                  {resetEmailError && !resetEmailSent && (
+                    <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-800">
+                      <p className="font-medium mb-0.5">Erro ao enviar email</p>
+                      <p className="font-mono break-all">{resetEmailError}</p>
+                      <p className="mt-1">Partilha a password abaixo manualmente.</p>
+                    </div>
+                  )}
+
+                  {/* Password temporária — só mostrada se o email falhou */}
+                  {tempPass && (
+                    <>
+                      <p className="text-sm text-muted-foreground">
+                        Partilha esta password com <strong>{resetUser.name}</strong>:
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <code className="flex-1 rounded-md border bg-muted px-3 py-2 text-sm font-mono tracking-widest">
+                          {tempPass}
+                        </code>
+                        <Button variant="outline" size="icon" onClick={copyTempPass}>
+                          {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Esta password não voltará a ser mostrada.
+                      </p>
+                    </>
+                  )}
+
                   <p className="text-xs text-muted-foreground">
-                    Esta password não voltará a ser mostrada.
+                    O utilizador será obrigado a alterar a password no próximo login.
                   </p>
+
                   <DialogFooter>
-                    <Button onClick={() => { setResetUser(null); setTempPass(null); }}>Fechar</Button>
+                    <Button onClick={closeResetModal}>Fechar</Button>
                   </DialogFooter>
                 </>
+              )}
+
+              {/* Spinner enquanto carrega */}
+              {resetLoading && (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
               )}
             </div>
           )}
@@ -620,6 +777,38 @@ export default function GestaoDeContasPage() {
                   Reenviar email
                 </Button>
                 <Button onClick={closeActModal}>Fechar</Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Modal: Ativar / Desativar Conta ───────────── */}
+      <Dialog open={!!toggleConfirm} onOpenChange={(v) => { if (!v) setToggleConfirm(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {toggleConfirm?.active
+                ? <ShieldOff className="h-5 w-5 text-amber-600" />
+                : <ShieldCheck className="h-5 w-5 text-green-600" />}
+              {toggleConfirm?.active ? "Desativar Conta" : "Ativar Conta"}
+            </DialogTitle>
+          </DialogHeader>
+          {toggleConfirm && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                {toggleConfirm.active
+                  ? <>Tens a certeza que queres <strong>desativar</strong> a conta de <strong>{toggleConfirm.name}</strong>? O utilizador perderá acesso à plataforma imediatamente.</>
+                  : <>Tens a certeza que queres <strong>ativar</strong> a conta de <strong>{toggleConfirm.name}</strong>? O utilizador voltará a ter acesso à plataforma.</>}
+              </p>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setToggleConfirm(null)}>Cancelar</Button>
+                <Button
+                  variant={toggleConfirm.active ? "destructive" : "default"}
+                  onClick={confirmToggleActive}
+                >
+                  {toggleConfirm.active ? "Desativar" : "Ativar"}
+                </Button>
               </DialogFooter>
             </div>
           )}

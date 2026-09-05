@@ -13,7 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import type {
-  Player, PlayerPayment, PlayerPaymentStatus, PlayerPaymentMethod, Season,
+  RosterEntry, PlayerPayment, PlayerPaymentStatus, PlayerPaymentMethod, Season,
 } from "@/types/database";
 import {
   PLAYER_PAYMENT_STATUS_LABELS, PLAYER_PAYMENT_METHOD_LABELS, MONTH_NAMES_PT,
@@ -37,7 +37,7 @@ interface Props {
   onClose:    () => void;
   onSave:     (data: SavePaymentData) => Promise<boolean>;
   onDelete?:  () => Promise<boolean>;
-  players:    Player[];
+  players:    RosterEntry[];
   season:     Season | null;
   prefill?: {
     playerId?:        string;
@@ -118,7 +118,7 @@ export function RegisterPaymentModal({ open, onClose, onSave, onDelete, players,
       amount:         parseFloat(amount)    || 0,
       amount_due:     parseFloat(amountDue) || 20,
       status,
-      method:       (method as PlayerPaymentMethod) || null,
+      method:       method ? method as PlayerPaymentMethod : null,
       notes:        notes.trim() || null,
       payment_date: paymentDate || null,
     });
@@ -161,17 +161,18 @@ export function RegisterPaymentModal({ open, onClose, onSave, onDelete, players,
             <Label>Jogador *</Label>
             {playerFixed ? (
               <p className="rounded-md bg-muted/50 px-3 py-2 text-sm font-medium">
-                {players.find((p) => p.id === playerId)?.name ?? playerId}
+                {players.find((p) => p.player_id === playerId)?.name ?? playerId}
               </p>
             ) : (
               <Select value={playerId} onValueChange={setPlayerId} required>
                 <SelectTrigger><SelectValue placeholder="Selecionar jogador" /></SelectTrigger>
                 <SelectContent>
                   {players
+                    .filter((p) => !!p.player_id)
                     .slice()
                     .sort((a, b) => (a.number ?? 99) - (b.number ?? 99))
                     .map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
+                      <SelectItem key={p.player_id!} value={p.player_id!}>
                         {p.number ? `#${p.number} ` : ""}{p.name}
                       </SelectItem>
                     ))}
@@ -256,7 +257,7 @@ export function RegisterPaymentModal({ open, onClose, onSave, onDelete, players,
           {status !== "exempt" && (
             <div className="space-y-1.5">
               <Label>Método de Pagamento</Label>
-              <Select value={method} onValueChange={(v) => setMethod(v as PlayerPaymentMethod)}>
+              <Select value={method || "none"} onValueChange={(v) => setMethod(v === "none" ? "" : v as PlayerPaymentMethod)}>
                 <SelectTrigger><SelectValue placeholder="(opcional)" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">—</SelectItem>

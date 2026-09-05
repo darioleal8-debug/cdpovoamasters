@@ -8,12 +8,14 @@ import {
   CalendarRange,
   CreditCard,
   Dumbbell,
+  History,
   LayoutDashboard,
   MessageSquare,
   Settings,
   Users,
   UserCog,
   FileUp,
+  Landmark,
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -21,19 +23,21 @@ import { Separator } from "@/components/ui/separator";
 import { useClubSettings } from "@/lib/club-context";
 import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
 import type { UserRole } from "@/types/database";
+import { NavLink } from "@/components/layout/nav-link";
 
 const mainItems = [
-  { label: "Visão Geral", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Visão Geral", href: "/dashboard", icon: LayoutDashboard, exact: true as const },
 ];
 
 const managementItems = [
   { label: "Temporadas",       href: "/temporadas",    icon: CalendarRange },
-  { label: "Jogadores",        href: "/jogadores",     icon: Users },
+  { label: "Plantel",           href: "/jogadores",     icon: Users },
   { label: "Gestão de Contas", href: "/gestao-contas", icon: UserCog },
   { label: "Jogos",            href: "/jogos",         icon: Calendar },
   { label: "Treinos",          href: "/treinos",       icon: Dumbbell },
   { label: "Pagamentos",       href: "/pagamentos",    icon: CreditCard },
   { label: "Estatísticas",     href: "/estatisticas",  icon: BarChart3 },
+  { label: "Histórico",        href: "/historico",     icon: History   },
 ];
 
 const playerAreaItems = [
@@ -55,84 +59,48 @@ const accountItems = [
   { label: "Importar Calendário", href: "/configuracoes/importar", icon: FileUp },
 ];
 
-function NavLink({
-  href,
-  icon: Icon,
-  label,
-  badge,
-}: {
-  href: string;
-  icon: React.ElementType;
-  label: string;
-  badge?: number;
-}) {
-  const pathname = usePathname();
-  const isActive = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
-
-  return (
-    <Link
-      href={href}
-      className={cn(
-        "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
-        isActive
-          ? "bg-white/10 text-white"
-          : "text-white/65 hover:bg-white/7 hover:text-white/90"
-      )}
-    >
-      <Icon className="h-4 w-4 shrink-0" />
-      <span>{label}</span>
-      {!!badge && badge > 0 && (
-        <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-semibold text-white" style={{ backgroundColor: "var(--club-secondary, #F28C28)" }}>
-          {badge}
-        </span>
-      )}
-      {isActive && !badge && (
-        <span className="ml-auto h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "var(--club-secondary, #F28C28)" }} />
-      )}
-    </Link>
-  );
-}
-
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="px-3 pb-2 pt-5 text-[0.68rem] font-semibold uppercase tracking-widest text-white/30">
+    <p className="px-3 pb-1.5 pt-5 text-[10px] font-bold uppercase tracking-label" style={{ color: "rgba(255,255,255,.3)" }}>
       {children}
     </p>
   );
 }
 
-export function Sidebar({ role }: { role?: UserRole }) {
+export function Sidebar({ role, rolesExtra = [] }: { role?: UserRole; rolesExtra?: string[] }) {
   const { settings } = useClubSettings();
   const unreadChatCount = useUnreadChatCount();
 
-  const isSeccionista = role === "seccionista";
-  const isManager     = role === "admin" || role === "treinador";
+  const rolesAll = [role, ...rolesExtra].filter(Boolean) as string[];
+  const isSeccionista    = role === "seccionista";
+  const isManager        = rolesAll.includes("admin") || rolesAll.includes("treinador");
+  const hasFinanceAccess = rolesAll.includes("admin") || rolesAll.includes("tesoureiro");
 
   return (
     <aside
       className="flex h-full w-64 flex-col"
-      style={{ backgroundColor: "var(--club-primary, #111111)" }}
+      style={{ backgroundColor: "var(--ink, #0A1220)" }}
     >
       {/* Logo */}
-      <div className="flex h-[72px] shrink-0 items-center gap-3 border-b border-white/10 px-5">
+      <div className="flex h-[72px] shrink-0 items-center gap-3 border-b px-5" style={{ borderColor: "rgba(255,255,255,.08)" }}>
         {settings.logo_url ? (
-          <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg ring-2 ring-white/20">
-            <Image src={settings.logo_url} alt={settings.club_name} fill sizes="36px" className="object-contain" />
+          <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl bg-white">
+            <Image src={settings.logo_url} alt={settings.club_name} fill sizes="36px" className="object-contain p-0.5" />
           </div>
         ) : (
           <div
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-xs font-bold text-white ring-2 ring-white/20"
-            style={{ backgroundColor: "var(--club-secondary, #F28C28)" }}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-xs font-bold text-white"
+            style={{ background: "var(--action, #F97316)" }}
           >
             CDP
           </div>
         )}
         <div className="flex flex-col leading-tight">
-          <span className="text-sm font-bold uppercase tracking-wide text-white">
+          <span className="font-condensed text-sm font-bold uppercase tracking-display text-white">
             CD Póvoa
           </span>
-          <span className="text-[0.65rem] font-semibold uppercase tracking-widest opacity-75" style={{ color: "var(--club-secondary, #F28C28)" }}>
-            Masters
+          <span className="text-[10px] font-semibold uppercase tracking-label" style={{ color: "rgba(255,255,255,.4)" }}>
+            Masters · Basquetebol
           </span>
         </div>
       </div>
@@ -162,7 +130,7 @@ export function Sidebar({ role }: { role?: UserRole }) {
               ))}
             </div>
 
-            <Separator className="my-3 bg-white/10" />
+            <Separator className="my-3" style={{ background: "rgba(255,255,255,.08)" }} />
 
             <SectionLabel>Gestão</SectionLabel>
             <div className="space-y-0.5">
@@ -170,6 +138,15 @@ export function Sidebar({ role }: { role?: UserRole }) {
                 <NavLink key={item.href} {...item} />
               ))}
             </div>
+
+            {hasFinanceAccess && (
+              <>
+                <SectionLabel>Financeiro</SectionLabel>
+                <div className="space-y-0.5">
+                  <NavLink href="/financeiro" icon={Landmark} label="Gestão Financeira" />
+                </div>
+              </>
+            )}
 
             {isManager && (
               <>
@@ -190,7 +167,7 @@ export function Sidebar({ role }: { role?: UserRole }) {
             </div>
 
             <div className="mt-auto pt-4">
-              <Separator className="mb-3 bg-white/10" />
+              <Separator className="mb-3" style={{ background: "rgba(255,255,255,.08)" }} />
               <SectionLabel>Conta</SectionLabel>
               <div className="space-y-0.5">
                 {accountItems.map((item) => (

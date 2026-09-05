@@ -5,12 +5,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const metadata = { title: "Os Meus Pagamentos" };
 
-const STATUS_LABELS: Record<string, string> = { pago: "Pago", pendente: "Pendente", isento: "Isento", atrasado: "Atrasado" };
+const STATUS_LABELS: Record<string, string> = {
+  paid:    "Pago",
+  partial: "Parcial",
+  late:    "Em atraso",
+  exempt:  "Isento",
+};
 const STATUS_COLORS: Record<string, string> = {
-  pago:     "bg-green-100 text-green-800",
-  pendente: "bg-yellow-100 text-yellow-800",
-  isento:   "bg-gray-100 text-gray-600",
-  atrasado: "bg-red-100 text-red-800",
+  paid:    "bg-green-100 text-green-800",
+  partial: "bg-amber-100 text-amber-800",
+  late:    "bg-red-100 text-red-800",
+  exempt:  "bg-gray-100 text-gray-600",
 };
 const MONTH_NAMES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
@@ -41,8 +46,13 @@ export default async function MeusPagamentosPage() {
     payments = (data ?? []) as Payment[];
   }
 
-  const totalPaid    = payments.filter((p) => p.status === "pago").reduce((s, p) => s + (p.amount ?? 0), 0);
-  const totalPending = payments.filter((p) => p.status === "pendente" || p.status === "atrasado").reduce((s, p) => s + (p.amount_due ?? 0), 0);
+  const totalPaid    = payments.filter((p) => p.status === "paid" || p.status === "partial").reduce((s, p) => s + (p.amount ?? 0), 0);
+  const totalPending = payments
+    .filter((p) => p.status !== "paid" && p.status !== "exempt")
+    .reduce((s, p) => {
+      if (p.status === "partial") return s + Math.max(0, (p.amount_due ?? 0) - (p.amount ?? 0));
+      return s + (p.amount_due ?? 0);
+    }, 0);
 
   return (
     <div className="space-y-6">

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { PlayerSidebar } from "@/components/player/player-sidebar";
+import { PlayerShell } from "@/components/player/player-shell";
 
 export default async function PlayerLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -25,13 +25,8 @@ export default async function PlayerLayout({ children }: { children: React.React
   const userRole   = profile.role as "admin" | "treinador" | "jogador";
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <div className="hidden lg:flex lg:shrink-0">
-        <PlayerSidebar playerName={playerName} userRole={userRole} />
-      </div>
-      <main className="flex-1 overflow-y-auto bg-background p-6">
-        {children}
-      </main>
-    </div>
+    <PlayerShell playerName={playerName} userRole={userRole}>
+      {children}
+    </PlayerShell>
   );
 }

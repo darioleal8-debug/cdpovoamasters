@@ -49,14 +49,26 @@ export async function NextGameCard({
 
   if (!game) return null;
 
+  // players.name foi removido na migration 041 — enriquecer via v_roster
   const { data: callupsRaw } = await supabase
     .from("game_callups")
-    .select("id, player:players(id, name, number, position, photo_url)")
+    .select("id, player_id")
     .eq("game_id", game.id);
+
+  const callupPlayerIds = (callupsRaw ?? []).map((c) => c.player_id as string);
+  const { data: rosterRows } = callupPlayerIds.length > 0
+    ? await supabase.from("v_roster").select("player_id, name, number, position, photo_url").in("player_id", callupPlayerIds)
+    : { data: [] };
+  const rosterById = new Map((rosterRows ?? []).map((r) => [r.player_id as string, r]));
 
   type PlayerRow = { id: string; name: string; number: number | null; position: string | null; photo_url: string | null };
   type CallupRow = { id: string; player: PlayerRow | null };
-  const callups = ((callupsRaw ?? []) as unknown as CallupRow[]).filter((c) => c.player !== null);
+  const callups = (callupsRaw ?? [])
+    .map((c) => {
+      const r = rosterById.get(c.player_id as string);
+      return r ? { id: c.id as string, player: { id: r.player_id as string, name: r.name as string, number: r.number as number | null, position: r.position as string | null, photo_url: r.photo_url as string | null } } : null;
+    })
+    .filter((c): c is CallupRow & { player: PlayerRow } => c !== null);
 
   const label   = dateLabel(game.event_date);
   const isToday = label === "Hoje";
