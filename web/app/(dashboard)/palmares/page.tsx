@@ -177,16 +177,16 @@ function TrophyCard({
               border: "1px solid rgba(201,162,75,0.22)",
             }}
           >
-            <p style={{ color: "#6f6a5f", fontFamily: "inherit", fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 4 }}>
+            <p style={{ color: "#6f6a5f", fontFamily: "inherit", fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5 }}>
               Peça Nº {String(piece.pieceNo).padStart(2, "0")}
             </p>
-            <p className="palmares-serif" style={{ color: tier.solid, fontSize: 20, fontWeight: 600, lineHeight: 1.15 }}>
+            <p className="palmares-serif" style={{ color: tier.solid, fontSize: 22, fontWeight: 600, lineHeight: 1.15 }}>
               {tier.label}
             </p>
-            <p className="palmares-serif" style={{ color: "#a8a296", fontSize: 13, marginTop: 2 }}>
+            <p className="palmares-serif" style={{ color: "#a8a296", fontSize: 16, marginTop: 3 }}>
               {piece.competicao}
             </p>
-            <p className="palmares-serif" style={{ color: "#6f6a5f", fontSize: 11, marginTop: 3, fontStyle: "italic" }}>
+            <p className="palmares-serif" style={{ color: "#c9b87a", fontSize: 15, marginTop: 4, fontStyle: "italic" }}>
               Época {piece.epoca}
             </p>
           </div>
