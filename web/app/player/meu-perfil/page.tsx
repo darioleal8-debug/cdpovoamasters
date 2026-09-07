@@ -38,7 +38,8 @@ export default function MeuPerfilPage() {
 
   useEffect(() => {
     if (user) {
-      setName(user.name ?? "");
+      // If name equals email, it's a sign-up placeholder — leave blank so user enters their real name
+      setName(user.name && user.name !== user.email ? user.name : "");
       setPhone(user.phone ?? "");
       setBirthDate(user.birth_date ?? "");
     }
@@ -79,6 +80,8 @@ export default function MeuPerfilPage() {
     </div>
   );
 
+  const displayName = user?.name && user.name !== user.email ? user.name : null;
+
   return (
     <div className="max-w-lg space-y-6">
       <div>
@@ -89,10 +92,10 @@ export default function MeuPerfilPage() {
       <div className="flex items-center gap-4">
         <div className="flex h-16 w-16 items-center justify-center rounded-full text-xl font-black text-white shadow"
           style={{ backgroundColor: "var(--club-primary, #111111)" }}>
-          {user?.name?.[0]?.toUpperCase() ?? <User className="h-7 w-7" />}
+          {displayName?.[0]?.toUpperCase() ?? <User className="h-7 w-7" />}
         </div>
         <div>
-          <p className="font-semibold">{user?.name}</p>
+          {displayName && <p className="font-semibold">{displayName}</p>}
           <p className="text-sm text-muted-foreground">{user?.email}</p>
         </div>
       </div>
