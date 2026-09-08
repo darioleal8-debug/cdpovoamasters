@@ -138,12 +138,12 @@ function TrophyCard({ piece, isAdmin, onOpen, onDelete }: {
         </div>
         <div className="w-full rounded-b" style={{ background: "linear-gradient(to bottom, rgba(201,162,75,0.12), rgba(201,162,75,0.03))", borderTop: `1px solid ${tier.solid}50`, paddingTop: 10 }}>
           <div className="mx-3 mb-3 px-3 py-2.5 text-center rounded-sm" style={{ background: "linear-gradient(to bottom, #1c1a14, #131109)", border: "1px solid rgba(201,162,75,0.22)" }}>
-            <p style={{ color: "#6f6a5f", fontFamily: "inherit", fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5 }}>
+            <p className="palmares-sans" style={{ color: "#6f6a5f", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 5 }}>
               Troféu Nº {String(piece.pieceNo).padStart(2, "0")}
             </p>
             <p className="palmares-serif" style={{ color: tier.solid, fontSize: 22, fontWeight: 600, lineHeight: 1.15 }}>{tier.label}</p>
-            <p className="palmares-serif" style={{ color: "#a8a296", fontSize: 16, marginTop: 3 }}>{piece.competicao}</p>
-            <p className="palmares-serif" style={{ color: "#c9b87a", fontSize: 15, marginTop: 4, fontStyle: "italic" }}>Época {piece.epoca}</p>
+            <p className="palmares-sans" style={{ color: "#a8a296", fontSize: 14, marginTop: 4 }}>{piece.competicao}</p>
+            <p className="palmares-sans" style={{ color: "#c9b87a", fontSize: 13, marginTop: 3 }}>Época {piece.epoca}</p>
           </div>
         </div>
       </button>
@@ -173,13 +173,13 @@ function TrophyModal({ piece, onClose }: { piece: Piece; onClose: () => void }) 
           <Cup competicao={piece.competicao} col={piece.colocacao} sz={150} uid={`modal-${piece.id}`} />
         </div>
         <div className="w-full mt-6 mb-5" style={{ height: 1, background: `linear-gradient(to right, transparent, ${tier.solid}80, transparent)` }} />
-        <p style={{ color: "#6f6a5f", fontFamily: "inherit", fontSize: 9, letterSpacing: "0.25em", textTransform: "uppercase", marginBottom: 8 }}>
+        <p className="palmares-sans" style={{ color: "#6f6a5f", fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 8 }}>
           Troféu Nº {String(piece.pieceNo).padStart(2, "0")}
         </p>
         <p className="palmares-serif" style={{ color: tier.solid, fontSize: 32, fontWeight: 600, lineHeight: 1.1, textAlign: "center" }}>{tier.label}</p>
-        <p className="palmares-serif" style={{ color: "#f5f1e8", fontSize: 22, marginTop: 4, textAlign: "center" }}>{piece.competicao}</p>
-        <p className="palmares-serif" style={{ color: "#a8a296", fontSize: 16, marginTop: 3, fontStyle: "italic", textAlign: "center" }}>Época {piece.epoca}</p>
-        <p className="palmares-serif" style={{ color: "#6f6a5f", fontSize: 12, marginTop: 4, textAlign: "center" }}>Liga Amadora INATEL Porto</p>
+        <p className="palmares-sans" style={{ color: "#f5f1e8", fontSize: 18, marginTop: 6, textAlign: "center", fontWeight: 500 }}>{piece.competicao}</p>
+        <p className="palmares-sans" style={{ color: "#a8a296", fontSize: 15, marginTop: 4, textAlign: "center" }}>Época {piece.epoca}</p>
+        <p className="palmares-sans" style={{ color: "#6f6a5f", fontSize: 12, marginTop: 5, textAlign: "center" }}>Liga Amadora INATEL Porto</p>
         <button onClick={onClose} className="mt-7 px-8 py-2 rounded transition-all hover:bg-white/8"
           style={{ border: "1px solid rgba(201,162,75,0.38)", color: "#c9a24b", fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 12, letterSpacing: "0.25em", textTransform: "uppercase" }}>
           Fechar
@@ -286,8 +286,8 @@ function ConfirmDelete({ piece, onClose, onDeleted }: { piece: Piece; onClose: (
         <button type="button" onClick={onClose} className="absolute top-3 right-3 p-1.5 rounded-full hover:bg-white/10 transition-colors" style={{ color: "#6f6a5f" }}><X className="h-4 w-4" /></button>
         <div style={{ marginBottom: 16, display: "flex", justifyContent: "center" }}><Cup competicao={piece.competicao} col={piece.colocacao} sz={64} uid={`del-${piece.id}`} /></div>
         <p className="palmares-serif" style={{ color: "#f5f1e8", fontSize: 20, fontWeight: 600, marginBottom: 6 }}>Eliminar troféu?</p>
-        <p className="palmares-serif" style={{ color: tier.solid, fontSize: 15, marginBottom: 4 }}>{tier.label} · {piece.competicao}</p>
-        <p className="palmares-serif" style={{ color: "#a8a296", fontSize: 13, fontStyle: "italic", marginBottom: 24 }}>Época {piece.epoca}</p>
+        <p className="palmares-sans" style={{ color: tier.solid, fontSize: 15, fontWeight: 500, marginBottom: 4 }}>{tier.label} · {piece.competicao}</p>
+        <p className="palmares-sans" style={{ color: "#a8a296", fontSize: 13, marginBottom: 24 }}>Época {piece.epoca}</p>
         {err && <p style={{ color: "#f87171", fontSize: 13, marginBottom: 12 }}>{err}</p>}
         <div className="flex gap-3">
           <button type="button" onClick={onClose} className="flex-1 py-2 rounded" style={{ border: "1px solid rgba(255,255,255,0.12)", color: "#a8a296", fontSize: 13 }}>Cancelar</button>
@@ -350,8 +350,9 @@ export function PalmaresView({ allowAdmin = true }: { allowAdmin?: boolean }) {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500&display=swap');
         .palmares-serif { font-family: 'Cormorant Garamond', Georgia, serif; }
+        .palmares-sans  { font-family: 'DM Sans', system-ui, sans-serif; }
         .palmares-root  { background: #0b0d0a; background-image: radial-gradient(ellipse 1100px 500px at 50% 0%, rgba(230,200,120,0.09), transparent 65%); }
         .palmares-door  { border-radius: 60px 60px 6px 6px; border: 1.5px solid rgba(201,162,75,0.18); background: rgba(201,162,75,0.03); color: #a8a296; padding: 16px 28px 14px; cursor: pointer; transition: border-color .2s, color .2s, background .2s; min-width: 140px; text-align: center; }
         .palmares-door:hover  { border-color: rgba(201,162,75,0.38); color: #f5f1e8; background: rgba(201,162,75,0.05); }
@@ -381,7 +382,7 @@ export function PalmaresView({ allowAdmin = true }: { allowAdmin?: boolean }) {
             ].map(s => (
               <div key={s.sub} className="text-center">
                 <p className="palmares-serif" style={{ color: "#c9a24b", fontSize: 34, fontWeight: 600, lineHeight: 1 }}>{s.val}</p>
-                <p style={{ color: "#6f6a5f", fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", marginTop: 4 }}>{s.sub}</p>
+                <p className="palmares-sans" style={{ color: "#6f6a5f", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", marginTop: 4 }}>{s.sub}</p>
               </div>
             ))}
           </div>
@@ -405,7 +406,7 @@ export function PalmaresView({ allowAdmin = true }: { allowAdmin?: boolean }) {
         {!loading && !entries.length && (
           <div className="text-center py-28">
             <p className="palmares-serif" style={{ color: "#6f6a5f", fontSize: 24 }}>Nenhum título registado ainda.</p>
-            {isAdmin && <p style={{ color: "#6f6a5f", fontSize: 13, marginTop: 8 }}>Clica em "Adicionar troféu" para registar o primeiro.</p>}
+            {isAdmin && <p className="palmares-sans" style={{ color: "#6f6a5f", fontSize: 14, marginTop: 8 }}>Clica em "Adicionar troféu" para registar o primeiro.</p>}
           </div>
         )}
 
@@ -417,7 +418,7 @@ export function PalmaresView({ allowAdmin = true }: { allowAdmin?: boolean }) {
                 {rooms.map((room, i) => (
                   <button key={i} className={`palmares-door${i === roomIdx ? " active" : ""}`} onClick={() => setActiveRoom(i)} type="button">
                     <p className="palmares-serif" style={{ fontSize: 18, fontWeight: 600, lineHeight: 1.2 }}>{room.label}</p>
-                    <p style={{ fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", marginTop: 5, opacity: 0.7 }}>
+                    <p className="palmares-sans" style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 5, opacity: 0.7 }}>
                       {room.items.length} {room.items.length === 1 ? "peça" : "peças"}
                     </p>
                   </button>
