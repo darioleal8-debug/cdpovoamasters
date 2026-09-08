@@ -4,19 +4,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  Calendar,
   MessageSquare,
   User,
   MoreHorizontal,
+  Users,
 } from "lucide-react";
 import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
 
 const NAV_ITEMS = [
-  { label: "Início",  href: "/player/minha-area",    icon: LayoutDashboard, exact: true  },
-  { label: "Jogos",   href: "/player/jogos",          icon: Calendar,        exact: false },
-  { label: "Chat",    href: "/player/chat",           icon: MessageSquare,   exact: false },
-  { label: "Conta",   href: "/player/conta",          icon: User,            exact: false },
-  { label: "Mais",    href: "/player/mais",           icon: MoreHorizontal,  exact: false },
+  { label: "Início",  href: "/player/minha-area", icon: LayoutDashboard, exact: true  },
+  { label: "Plantel", href: "/player/plantel",    icon: Users,           exact: false },
+  { label: "Chat",    href: "/player/chat",        icon: MessageSquare,   exact: false },
+  { label: "Conta",   href: "/player/conta",       icon: User,            exact: false },
+  { label: "Mais",    href: "/player/mais",        icon: MoreHorizontal,  exact: false },
 ] as const;
 
 export function PlayerBottomNav() {
