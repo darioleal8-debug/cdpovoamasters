@@ -2,7 +2,6 @@ import type { NextConfig } from "next";
 
 // Build root: web/
 const nextConfig: NextConfig = {
-  experimental: { instrumentationHook: true },
   serverExternalPackages: ["pdf-parse", "xlsx", "@anthropic-ai/sdk"],
   images: {
     remotePatterns: [
