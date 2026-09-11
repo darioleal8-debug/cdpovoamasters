@@ -200,11 +200,18 @@ function JornadaSection({
               : "bg-muted text-muted-foreground"
           )}
         >
-          {jornada.number}
+          {jornada.jornada}
         </div>
 
         <div className="flex flex-1 flex-col sm:flex-row sm:items-center sm:gap-4 min-w-0">
-          <span className="font-semibold text-sm">Jornada {jornada.number}</span>
+          <span className="font-semibold text-sm">
+            Jornada {jornada.jornada}
+            {jornada.volta > 1 && (
+              <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                {jornada.volta}ª Volta
+              </span>
+            )}
+          </span>
           {dateLabel && (
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
               <Calendar className="h-3 w-3" />
@@ -343,6 +350,7 @@ function NextGameBanner({ game }: { game: LeagueGame }) {
 interface LeagueCalendarProps {
   jornadas: LeagueJornada[];
   allJornadas: number[];
+  jornadaMeta?: Record<number, { jornada: number; volta: number }>;
   stats: Stats;
   loading: boolean;
   showOnlyOurs: boolean;
@@ -355,6 +363,7 @@ interface LeagueCalendarProps {
 export function LeagueCalendar({
   jornadas,
   allJornadas,
+  jornadaMeta,
   stats,
   loading,
   showOnlyOurs,
@@ -434,11 +443,19 @@ export function LeagueCalendar({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas as jornadas</SelectItem>
-              {allJornadas.map((n) => (
-                <SelectItem key={n} value={String(n)}>
-                  Jornada {n}
-                </SelectItem>
-              ))}
+              {allJornadas.map((n) => {
+                const meta = jornadaMeta?.[n];
+                const label = meta
+                  ? meta.volta > 1
+                    ? `J${meta.jornada} — ${meta.volta}ª Volta`
+                    : `Jornada ${meta.jornada}`
+                  : `Jornada ${n}`;
+                return (
+                  <SelectItem key={n} value={String(n)}>
+                    {label}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
 

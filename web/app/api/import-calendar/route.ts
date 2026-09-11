@@ -340,6 +340,7 @@ function regexParseFromLiga(
       locality:  r.locality,
       is_our_game: isOurGame,
       is_home: isHome,
+      volta: 1,
     });
 
     allTeams.add(homeTeam);

@@ -26,7 +26,7 @@ export default function JogosPage() {
   const { events, loading: eventsLoading, createGame, createTraining, updateEvent, deleteEvent } = useGames(seasonId);
 
   const {
-    jornadas, allJornadas, stats, loading: ligaLoading,
+    jornadas, allJornadas, jornadaMeta, stats, loading: ligaLoading,
     showOnlyOurs, setShowOnlyOurs,
     selectedJornada, setSelectedJornada,
   } = useLeagueCalendar(seasonId);
@@ -147,6 +147,7 @@ export default function JogosPage() {
           <LeagueCalendar
             jornadas={jornadas}
             allJornadas={allJornadas}
+            jornadaMeta={jornadaMeta}
             stats={stats}
             loading={ligaLoading}
             showOnlyOurs={showOnlyOurs}

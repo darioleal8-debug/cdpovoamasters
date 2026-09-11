@@ -15,6 +15,7 @@
 
 export interface RawGame {
   jornada: number;
+  volta: number;         // 1 = 1ª volta, 2 = 2ª volta, etc.
   jogo_num: number;
   home_team: string;
   away_team: string;
@@ -169,13 +170,21 @@ export function parseTime(raw: string): string | null {
   return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
 }
 
-// ─── Jornada Detection ────────────────────────────────────
+// ─── Jornada / Volta Detection ────────────────────────────
 
 const JORNADA_RE =
   /(?:JORNADA|Jornada|ROUND|RONDA)\s+(\d+)|(\d+)[ªºa-z]*\s+JORNADA/i;
 
+const VOLTA_RE = /(\d+)[ªº]\s*VOLTA|VOLTA\s+(\d+)/i;
+
 export function detectJornada(line: string): number | null {
   const m = line.match(JORNADA_RE);
+  if (!m) return null;
+  return parseInt(m[1] ?? m[2], 10);
+}
+
+export function detectVolta(line: string): number | null {
+  const m = line.match(VOLTA_RE);
   if (!m) return null;
   return parseInt(m[1] ?? m[2], 10);
 }
@@ -256,6 +265,7 @@ export function parseGameLine(
 
   return {
     jornada,
+    volta: 1, // overridden by caller (parsePDFText sets game.volta = currentVolta)
     jogo_num: jogoNum,
     home_team: homeTeam,
     away_team: awayTeam,
@@ -286,12 +296,17 @@ export function parsePDFText(
   const allTeamsSet = new Set<string>();
 
   let currentJornada = 0;
+  let currentVolta = 1;
   let lineNum = 0;
 
   for (const rawLine of lines) {
     lineNum++;
     const line = rawLine.trim();
     if (!line) continue;
+
+    // Detect volta header (before jornada — "2ª VOLTA" may appear alone)
+    const v = detectVolta(line);
+    if (v !== null) { currentVolta = v; continue; }
 
     // Detect jornada header
     const j = detectJornada(line);
@@ -309,6 +324,7 @@ export function parsePDFText(
     if (currentJornada > 0) {
       const game = parseGameLine(line, currentJornada, ourTeamPattern);
       if (game) {
+        (game as RawGame).volta = currentVolta;
         games.push(game);
         allTeamsSet.add(game.home_team);
         allTeamsSet.add(game.away_team);
@@ -399,6 +415,7 @@ export function parseExcelRows(
   const errors: string[] = [];
   const allTeamsSet = new Set<string>();
   let currentJornada = 0;
+  let currentVolta = 1;
 
   const dataRows = headerRowIdx >= 0 ? rows.slice(headerRowIdx + 1) : rows;
   const colKeys = Object.keys(dataRows[0] ?? {});
@@ -407,6 +424,10 @@ export function parseExcelRows(
     const row = dataRows[i];
     const values = colKeys.map((k) => String(row[k] ?? "").trim());
     const rowStr = values.join(" ");
+
+    // Check for volta marker (before jornada)
+    const v = detectVolta(rowStr);
+    if (v !== null) { currentVolta = v; continue; }
 
     // Check for jornada marker
     const j = detectJornada(rowStr);
@@ -445,6 +466,7 @@ export function parseExcelRows(
 
     const game: RawGame = {
       jornada: isNaN(currentJornada) ? 0 : currentJornada,
+      volta: currentVolta,
       jogo_num: isNaN(jogoNum) ? i + 1 : jogoNum,
       home_team: homeTeam,
       away_team: awayTeam,
@@ -583,6 +605,7 @@ export function buildImportPayload(
         opponent,
         description: JSON.stringify({
           jornada: g.jornada,
+          volta: g.volta ?? 1,
           jogo_num: g.jogo_num,
           home_team: g.home_team,
           away_team: g.away_team,

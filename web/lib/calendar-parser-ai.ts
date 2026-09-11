@@ -317,6 +317,7 @@ function fromINATEL(result: INATELCalendarResult, ourTeam: string): AIParseResul
         locality:    jogo.local      ?? "",
         is_our_game: Boolean(isOurGame),
         is_home:     Boolean(isHome),
+        volta:       1,
       });
     }
   }
