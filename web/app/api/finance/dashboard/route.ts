@@ -14,14 +14,26 @@ export async function GET() {
   const monthStart = `${thisYear}-${String(thisMonth).padStart(2, "0")}-01`;
   const monthEnd   = new Date(thisYear, thisMonth, 0).toISOString().split("T")[0];
 
+  // Active season — filter cota stats to avoid cross-season contamination
+  const { data: activeSeason } = await admin
+    .from("seasons").select("id").eq("status", "ativa").maybeSingle();
+  const activeSeasonId = activeSeason?.id ?? null;
+
+  const cotasPaidQ = activeSeasonId
+    ? admin.from("player_payments").select("amount").eq("status", "paid").eq("season_id", activeSeasonId)
+    : admin.from("player_payments").select("amount").eq("status", "paid");
+  const cotasLateQ = activeSeasonId
+    ? admin.from("player_payments").select("id").in("status", ["late", "partial"]).eq("season_id", activeSeasonId)
+    : admin.from("player_payments").select("id").in("status", ["late", "partial"]);
+
   const [entriesAll, expensesAll, monthEntries, monthExpenses, cotasPaid, cotasLate] =
     await Promise.all([
       admin.from("financial_entries").select("amount, entry_date, description, category, source_type, id, player_name, created_at").order("entry_date", { ascending: false }),
       admin.from("financial_expenses").select("amount, expense_date, description, category, id, created_at").order("expense_date", { ascending: false }),
       admin.from("financial_entries").select("amount").gte("entry_date", monthStart).lte("entry_date", monthEnd),
       admin.from("financial_expenses").select("amount").gte("expense_date", monthStart).lte("expense_date", monthEnd),
-      admin.from("player_payments").select("amount").eq("status", "paid"),
-      admin.from("player_payments").select("id").in("status", ["late", "partial"]),
+      cotasPaidQ,
+      cotasLateQ,
     ]);
 
   const totalEntries  = (entriesAll.data ?? []).reduce((s, e) => s + Number(e.amount), 0);

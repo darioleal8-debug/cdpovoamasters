@@ -259,7 +259,6 @@ export default async function PlayerPublicProfilePage({
             style={{
               border:      "1px solid var(--line,#E4E7EE)",
               background:  "var(--paper,#F6F7F9)",
-              divideColor: "var(--line,#E4E7EE)",
             }}
           >
             {gameStats.map((g) => {

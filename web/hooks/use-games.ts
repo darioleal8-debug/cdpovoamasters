@@ -58,6 +58,20 @@ export function useGames(seasonId: string | null) {
     return true;
   }
 
+  async function updateEvent(id: string, data: Partial<{
+    title: string; location: string; event_date: string; event_time: string;
+    opponent: string | null; game_type: string; training_kind: string | null; description: string | null;
+  }>): Promise<boolean> {
+    const { error } = await supabase.from("events").update(data).eq("id", id);
+    if (error) {
+      toast({ title: "Erro ao atualizar evento", description: error.message, variant: "destructive" });
+      return false;
+    }
+    toast({ title: "Evento atualizado" });
+    await load();
+    return true;
+  }
+
   async function deleteEvent(id: string): Promise<boolean> {
     const { error } = await supabase.from("events").delete().eq("id", id);
     if (error) {
@@ -69,5 +83,5 @@ export function useGames(seasonId: string | null) {
     return true;
   }
 
-  return { events, loading, createGame, createTraining, deleteEvent, refresh: load };
+  return { events, loading, createGame, createTraining, updateEvent, deleteEvent, refresh: load };
 }

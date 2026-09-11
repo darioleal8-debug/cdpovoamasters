@@ -23,7 +23,7 @@ export default function JogosPage() {
   const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(null);
   const seasonId = selectedSeasonId ?? activeSeason?.id ?? null;
 
-  const { events, loading: eventsLoading, createGame, createTraining, deleteEvent } = useGames(seasonId);
+  const { events, loading: eventsLoading, createGame, createTraining, updateEvent, deleteEvent } = useGames(seasonId);
 
   const {
     jornadas, allJornadas, stats, loading: ligaLoading,
@@ -36,18 +36,37 @@ export default function JogosPage() {
   const [callupsGame, setCallupsGame] = useState<Event | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Event | null>(null);
 
-  const [dialogOpen, setDialogOpen]   = useState(false);
-  const [eventType, setEventType]     = useState<"jogo" | "treino">("jogo");
-  const [gameType, setGameType]       = useState<"official" | "friendly">("official");
-  const [formData, setFormData]       = useState({
+  const [dialogOpen, setDialogOpen]       = useState(false);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [eventType, setEventType]         = useState<"jogo" | "treino">("jogo");
+  const [gameType, setGameType]           = useState<"official" | "friendly">("official");
+  const [formData, setFormData]           = useState({
     title: "", location: "", event_date: "", event_time: "",
     opponent: "", training_kind: "", description: "",
   });
 
   function openAdd() {
+    setEditingEventId(null);
     setFormData({ title: "", location: "", event_date: "", event_time: "",
                   opponent: "", training_kind: "", description: "" });
+    setEventType("jogo");
     setGameType("official");
+    setDialogOpen(true);
+  }
+
+  function openEdit(event: Event) {
+    setEditingEventId(event.id);
+    setEventType(event.type as "jogo" | "treino");
+    setGameType((event.game_type as "official" | "friendly") ?? "official");
+    setFormData({
+      title:         event.title ?? "",
+      location:      event.location ?? "",
+      event_date:    event.event_date ?? "",
+      event_time:    (event.event_time ?? "").slice(0, 5),
+      opponent:      event.opponent ?? "",
+      training_kind: (event as unknown as { training_kind?: string }).training_kind ?? "",
+      description:   event.description ?? "",
+    });
     setDialogOpen(true);
   }
 
@@ -72,10 +91,24 @@ export default function JogosPage() {
       event_time: formData.event_time + ":00",
       description: formData.description || undefined,
     };
-    const ok = eventType === "jogo"
-      ? await createGame({ ...base, opponent: formData.opponent || undefined, game_type: gameType })
-      : await createTraining({ ...base, training_kind: formData.training_kind || undefined });
-    if (ok) setDialogOpen(false);
+    if (editingEventId) {
+      const ok = await updateEvent(editingEventId, {
+        title:         base.title,
+        location:      base.location,
+        event_date:    base.event_date,
+        event_time:    base.event_time,
+        description:   formData.description || null,
+        ...(eventType === "jogo"
+          ? { opponent: formData.opponent || null, game_type: gameType }
+          : { training_kind: formData.training_kind || null }),
+      });
+      if (ok) { setDialogOpen(false); setEditingEventId(null); }
+    } else {
+      const ok = eventType === "jogo"
+        ? await createGame({ ...base, opponent: formData.opponent || undefined, game_type: gameType })
+        : await createTraining({ ...base, training_kind: formData.training_kind || undefined });
+      if (ok) setDialogOpen(false);
+    }
   }
 
   return (
@@ -129,6 +162,7 @@ export default function JogosPage() {
             events={events}
             loading={eventsLoading}
             onAdd={openAdd}
+            onEdit={openEdit}
             onDelete={handleDelete}
             onCallups={setCallupsGame}
           />
@@ -143,7 +177,7 @@ export default function JogosPage() {
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogContent className="sm:max-w-lg">
               <DialogHeader>
-                <DialogTitle>Novo Evento</DialogTitle>
+                <DialogTitle>{editingEventId ? "Editar Evento" : "Novo Evento"}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
@@ -222,8 +256,8 @@ export default function JogosPage() {
                 )}
 
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-                  <Button type="submit">Criar Evento</Button>
+                  <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); setEditingEventId(null); }}>Cancelar</Button>
+                  <Button type="submit">{editingEventId ? "Guardar" : "Criar Evento"}</Button>
                 </DialogFooter>
               </form>
             </DialogContent>
