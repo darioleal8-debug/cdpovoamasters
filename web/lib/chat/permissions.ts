@@ -3,7 +3,7 @@ export type ChatRole = "admin" | "treinador" | "jogador" | "seccionista";
 export function canDirectMessage(callerRole: ChatRole, targetRole: ChatRole): boolean {
   if (callerRole === "admin") return true;
   if (callerRole === "treinador") return targetRole === "jogador" || targetRole === "admin";
-  if (callerRole === "jogador") return targetRole === "treinador" || targetRole === "admin";
+  if (callerRole === "jogador") return targetRole === "treinador" || targetRole === "admin" || targetRole === "jogador";
   // seccionista não pode iniciar DMs
   return false;
 }

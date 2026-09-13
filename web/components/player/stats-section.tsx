@@ -71,11 +71,7 @@ export function StatsSection({ seasonId }: { seasonId: string | null }) {
         {METRICS.map(({ key, label }) => (
           <div key={key} className="flex flex-col items-center justify-center gap-1 px-2">
             <span className="text-2xl font-bold leading-none">
-              {loading
-                ? "…"
-                : stats
-                  ? fmt(key, stats[key])
-                  : "—"}
+              {loading ? "…" : stats ? fmt(key, stats[key]) : "—"}
             </span>
             <span className="text-[10px] text-muted-foreground text-center leading-tight">
               {label}
@@ -83,6 +79,13 @@ export function StatsSection({ seasonId }: { seasonId: string | null }) {
           </div>
         ))}
       </div>
+
+      {/* Empty state */}
+      {!loading && !stats && (
+        <p className="text-center text-[11px] text-muted-foreground pb-3 -mt-2">
+          Ainda sem jogos disputados esta época
+        </p>
+      )}
     </div>
   );
 }

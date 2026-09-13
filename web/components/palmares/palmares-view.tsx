@@ -305,6 +305,7 @@ function ConfirmDelete({ piece, onClose, onDeleted }: { piece: Piece; onClose: (
 export function PalmaresView({ allowAdmin = true }: { allowAdmin?: boolean }) {
   const [entries,    setEntries]    = useState<Entry[]>([]);
   const [loading,    setLoading]    = useState(true);
+  const [loadError,  setLoadError]  = useState(false);
   const [isAdmin,    setIsAdmin]    = useState(false);
   const [activeRoom, setActiveRoom] = useState(0);
   const [selected,   setSelected]   = useState<Piece | null>(null);
@@ -321,13 +322,20 @@ export function PalmaresView({ allowAdmin = true }: { allowAdmin?: boolean }) {
     });
   }, [allowAdmin]);
 
-  useEffect(() => {
+  const loadPalmares = useCallback(() => {
+    setLoading(true);
+    setLoadError(false);
     fetch("/api/palmares")
-      .then(r => r.json())
-      .then(({ palmares }) => setEntries(palmares ?? []))
-      .catch(() => {})
+      .then(async (r) => {
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.error ?? "Erro ao carregar");
+        setEntries(json.palmares ?? []);
+      })
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { loadPalmares(); }, [loadPalmares]);
 
   const rooms     = buildRooms(entries);
   const roomIdx   = Math.min(activeRoom, Math.max(rooms.length - 1, 0));
@@ -373,7 +381,7 @@ export function PalmaresView({ allowAdmin = true }: { allowAdmin?: boolean }) {
         </div>
 
         {/* Stats bar */}
-        {!loading && podios > 0 && (
+        {!loading && !loadError && podios > 0 && (
           <div className="flex justify-center flex-wrap gap-8 md:gap-16 mb-10">
             {[
               { val: titulos,                 sub: "Títulos"          },
@@ -402,8 +410,22 @@ export function PalmaresView({ allowAdmin = true }: { allowAdmin?: boolean }) {
         {/* Loading */}
         {loading && <p className="palmares-serif text-center py-24" style={{ color: "#6f6a5f", fontSize: 20 }}>A carregar…</p>}
 
+        {/* Error state */}
+        {!loading && loadError && (
+          <div className="text-center py-28">
+            <p className="palmares-serif" style={{ color: "#f87171", fontSize: 20 }}>Erro ao carregar o palmarés.</p>
+            <button
+              onClick={loadPalmares}
+              className="mt-6 px-6 py-2 rounded transition-all hover:bg-white/8"
+              style={{ border: "1px solid rgba(201,162,75,0.38)", color: "#c9a24b", fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 12, letterSpacing: "0.22em", textTransform: "uppercase" }}
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
+
         {/* Empty state */}
-        {!loading && !entries.length && (
+        {!loading && !loadError && !entries.length && (
           <div className="text-center py-28">
             <p className="palmares-serif" style={{ color: "#6f6a5f", fontSize: 24 }}>Nenhum título registado ainda.</p>
             {isAdmin && <p className="palmares-sans" style={{ color: "#6f6a5f", fontSize: 14, marginTop: 8 }}>Clica em "Adicionar troféu" para registar o primeiro.</p>}
@@ -411,7 +433,7 @@ export function PalmaresView({ allowAdmin = true }: { allowAdmin?: boolean }) {
         )}
 
         {/* Rooms + grid */}
-        {!loading && !!entries.length && (
+        {!loading && !loadError && !!entries.length && (
           <>
             {rooms.length > 1 && (
               <div className="flex justify-center gap-4 mb-12" style={{ overflowX: "auto", padding: "0 4px 4px" }}>

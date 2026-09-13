@@ -222,6 +222,43 @@ export async function syncGameEventChats(admin: SupabaseClient): Promise<void> {
   }
 }
 
+// ── Sincronizar threads para treinos próximos ─────────────────
+//
+// Chamado no GET /api/chat/threads para todos os utilizadores. Garante que
+// todos os treinos dos próximos 60 dias (e dos últimos 3 dias) têm fio.
+export async function syncTrainingEventChats(admin: SupabaseClient): Promise<void> {
+  const { data: season } = await admin
+    .from("seasons").select("id").eq("status", "ativa").single();
+  if (!season) return;
+
+  const cutoffPast   = new Date(Date.now() - 3  * 86_400_000).toISOString().slice(0, 10);
+  const cutoffFuture = new Date(Date.now() + 60 * 86_400_000).toISOString().slice(0, 10);
+
+  const { data: trainings } = await admin
+    .from("trainings")
+    .select("id")
+    .eq("season_id", season.id)
+    .gte("date", cutoffPast)
+    .lte("date", cutoffFuture);
+
+  if (!trainings || trainings.length === 0) return;
+
+  const trainingIds = trainings.map((t: { id: string }) => t.id);
+
+  const { data: existing } = await admin
+    .from("chats")
+    .select("training_id")
+    .in("training_id", trainingIds)
+    .not("training_id", "is", null);
+
+  const withThread = new Set((existing ?? []).map((c: { training_id: string }) => c.training_id));
+  const missing = trainingIds.filter((id) => !withThread.has(id));
+
+  for (const trainingId of missing) {
+    await ensureTrainingThread(admin, trainingId).catch(() => {/* ignora erros individuais */});
+  }
+}
+
 // ── Arquivar fios com +3 dias após o evento ──────────────────
 
 export async function archiveOldEventThreads(

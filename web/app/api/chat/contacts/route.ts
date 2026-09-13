@@ -47,7 +47,7 @@ export async function GET() {
     .neq("id", caller.id);
 
   if (caller.role === "jogador") {
-    query = query.in("role", ["treinador", "admin"]);
+    query = query.in("role", ["jogador", "treinador", "admin"]);
   } else if (caller.role === "treinador") {
     query = query.in("role", ["jogador", "admin"]);
   }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 
 function fail(msg: string, status = 400) {
   return NextResponse.json({ error: msg }, { status });
@@ -12,14 +12,15 @@ async function requireAdmin() {
   const { data: profile } = await supabase
     .from("users")
     .select("role")
-    .eq("email", user.email!)
+    .eq("id", user.id)
     .single();
   return { supabase, user, isAdmin: profile?.role === "admin" };
 }
 
 export async function GET() {
-  const supabase = await createClient();
-  const { data, error } = await supabase
+  // Usa admin client para contornar RLS — palmares é informação pública do clube
+  const admin = await createAdminClient();
+  const { data, error } = await admin
     .from("palmares")
     .select("id, epoca, competicao, colocacao, created_at")
     .order("epoca", { ascending: false });

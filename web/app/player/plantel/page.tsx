@@ -4,6 +4,7 @@ import { User } from "lucide-react";
 import { POSITION_LABELS } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
+export const metadata = { title: "Plantel" };
 
 export default async function PlayerPlantelPage() {
   const admin = await createAdminClient();
