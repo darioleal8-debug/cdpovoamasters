@@ -282,7 +282,7 @@ CREATE POLICY "p1_events_write" ON public.events
   WITH CHECK (is_staff());
 
 -- game_callups: player sees own callup; staff see all + write
--- VERIFY: column name is 'player_id' linking to players.id
+-- player_id column verified via OpenAPI
 CREATE POLICY "p1_game_callups_select" ON public.game_callups
   FOR SELECT TO authenticated
   USING (
@@ -380,7 +380,7 @@ CREATE POLICY "p1_training_recurrence_rules" ON public.training_recurrence_rules
   WITH CHECK (is_trainer_or_above());
 
 -- training_attendance: staff full; player reads+updates own
--- VERIFY: column 'player_id' links to players.id
+-- player_id column verified via OpenAPI
 CREATE POLICY "p1_training_attendance_staff" ON public.training_attendance
   FOR ALL TO authenticated
   USING (is_trainer_or_above())
@@ -436,7 +436,7 @@ CREATE POLICY "p1_event_photos_write" ON public.event_photos
 -- ── PAYMENTS & FINANCE ────────────────────────────────────────
 
 -- player_payments: CRITICAL — player sees own rows only; staff full
--- VERIFY: column 'player_id' links to players.id
+-- player_id column verified via OpenAPI
 CREATE POLICY "p1_player_payments_staff" ON public.player_payments
   FOR ALL TO authenticated
   USING (is_staff())
@@ -453,27 +453,26 @@ CREATE POLICY "p1_player_payments_own" ON public.player_payments
   );
 
 -- player_payments_history: player sees own; staff read; admin full
--- VERIFY: column linking back to players (may be via player_payments.player_id)
--- Using a two-level join as a safe approach:
+-- payment_id (FK → player_payments.id) verified via OpenAPI; two-level join to reach player:
 CREATE POLICY "p1_player_payments_history_staff" ON public.player_payments_history
   FOR ALL TO authenticated
   USING (is_staff())
   WITH CHECK (is_staff());
 
--- NOTE: if player_payments_history has a direct player_id column, simplify below:
+-- payment_id is the FK column linking to player_payments.id (verified via OpenAPI)
 CREATE POLICY "p1_player_payments_history_own" ON public.player_payments_history
   FOR SELECT TO authenticated
   USING (
     EXISTS (
       SELECT 1 FROM public.player_payments pp
       JOIN public.players p ON p.id = pp.player_id
-      WHERE pp.id = player_payment_id  -- VERIFY: column name
+      WHERE pp.id = payment_id
         AND p.user_id = (SELECT auth.uid())
     )
   );
 
 -- payment_receipts: player sees own; staff full
--- VERIFY: column 'player_payment_id' or similar FK
+-- payment_id is the FK column linking to player_payments.id (verified via OpenAPI)
 CREATE POLICY "p1_payment_receipts_staff" ON public.payment_receipts
   FOR ALL TO authenticated
   USING (is_staff())
@@ -485,7 +484,7 @@ CREATE POLICY "p1_payment_receipts_own" ON public.payment_receipts
     EXISTS (
       SELECT 1 FROM public.player_payments pp
       JOIN public.players p ON p.id = pp.player_id
-      WHERE pp.id = player_payment_id  -- VERIFY: column name
+      WHERE pp.id = payment_id
         AND p.user_id = (SELECT auth.uid())
     )
   );
@@ -536,7 +535,7 @@ CREATE POLICY "p1_chat_participants_own" ON public.chat_participants
   USING (user_id = (SELECT auth.uid()));
 
 -- chat_messages: trainer+ full; player reads in own threads; can insert in own threads
--- VERIFY: column names (chat_id, sender_id)
+-- chat_id and sender_id column names verified via OpenAPI
 CREATE POLICY "p1_chat_messages_staff" ON public.chat_messages
   FOR ALL TO authenticated
   USING (is_trainer_or_above())
@@ -555,7 +554,7 @@ CREATE POLICY "p1_chat_messages_participant_select" ON public.chat_messages
 CREATE POLICY "p1_chat_messages_participant_insert" ON public.chat_messages
   FOR INSERT TO authenticated
   WITH CHECK (
-    sender_id = (SELECT auth.uid()) AND  -- VERIFY: column name
+    sender_id = (SELECT auth.uid()) AND
     EXISTS (
       SELECT 1 FROM public.chat_participants cp
       WHERE cp.chat_id = chat_id
@@ -677,19 +676,14 @@ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables
              WHERE table_schema = 'public' AND table_name = 'payments'
              AND table_type = 'BASE TABLE') THEN
+    -- payments.user_id links directly to auth.uid() (no players join needed)
     EXECUTE $pol$
       CREATE POLICY "p1_payments_staff" ON public.payments
         FOR ALL TO authenticated
         USING (is_staff()) WITH CHECK (is_staff());
       CREATE POLICY "p1_payments_own" ON public.payments
         FOR SELECT TO authenticated
-        USING (
-          EXISTS (
-            SELECT 1 FROM public.players p
-            WHERE p.id = player_id
-              AND p.user_id = (SELECT auth.uid())
-          )
-        );
+        USING (user_id = (SELECT auth.uid()));
     $pol$;
   END IF;
 
@@ -721,8 +715,7 @@ BEGIN
     'player_profiles',
     'player_payment_summary',
     'player_attendance_stats',
-    'player_stats',
-    'player_payment_summary'
+    'player_stats'
   ] LOOP
     IF EXISTS (
       SELECT 1 FROM information_schema.views
