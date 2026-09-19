@@ -126,12 +126,12 @@ export function useLiveGame(
       .map((p) => p.user_id as string | null)
       .filter(Boolean) as string[];
 
-    const usersMap: Record<string, { id: string; name: string; email: string }> = {};
+    const usersMap: Record<string, { id: string; name: string }> = {};
     const profilesMap: Record<string, { jersey_number: number | null }> = {};
 
     if (linkedUserIds.length > 0) {
       const [{ data: usersData }, { data: profileData }] = await Promise.all([
-        supabase.from("users").select("id, name, email").in("id", linkedUserIds),
+        supabase.from("users").select("id, name").in("id", linkedUserIds),
         supabase.from("player_profiles").select("user_id, jersey_number").in("user_id", linkedUserIds),
       ]);
       for (const u of usersData ?? []) usersMap[u.id] = u;
@@ -154,7 +154,7 @@ export function useLiveGame(
         user: {
           id: uid,
           name: userData?.name ?? (p.name as string),
-          email: userData?.email ?? "",
+          email: "",
           status: "ativo",
         },
       };

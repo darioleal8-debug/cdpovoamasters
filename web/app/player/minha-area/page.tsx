@@ -256,7 +256,7 @@ export default async function MinhaAreaPage() {
         ];
 
         const { data: senders } = senderIds.length > 0
-          ? await supabase.from("users").select("id, name, role").in("id", senderIds)
+          ? await supabase.from("user_display_names").select("id, name, role").in("id", senderIds)
           : { data: [] };
 
         const senderById = new Map(
