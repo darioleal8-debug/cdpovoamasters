@@ -23,7 +23,8 @@
 --   -- Then drop all p1_users_* policies and re-enable old open policy.
 -- =================================================================
 
-BEGIN;
+-- Sem BEGIN/COMMIT: cada statement auto-commit para facilitar diagnóstico.
+-- Todos os statements são idempotentes (OR REPLACE / IF NOT EXISTS / IF EXISTS).
 
 -- -----------------------------------------------------------------
 -- 1. Helper functions
@@ -287,5 +288,3 @@ BEGIN
     RAISE WARNING 'Menos de 5 políticas p1_users_* criadas — verificar';
   END IF;
 END $$;
-
-COMMIT;
