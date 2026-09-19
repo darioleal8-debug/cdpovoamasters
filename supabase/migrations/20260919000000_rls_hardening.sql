@@ -183,7 +183,7 @@ ALTER TABLE public.financial_cash_movements  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chats                     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chat_participants         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chat_messages             ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.chat_message_reads        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.game_substitutions        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.club_settings             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.club_events               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.team_kits                 ENABLE ROW LEVEL SECURITY;
@@ -562,19 +562,13 @@ CREATE POLICY "p1_chat_messages_participant_insert" ON public.chat_messages
     )
   );
 
--- chat_message_reads: trainer+ full; player reads/inserts own
-CREATE POLICY "p1_chat_message_reads_staff" ON public.chat_message_reads
+-- game_substitutions: trainer+ only (live game management)
+CREATE POLICY "p1_game_substitutions" ON public.game_substitutions
   FOR ALL TO authenticated
   USING (is_trainer_or_above())
   WITH CHECK (is_trainer_or_above());
 
-CREATE POLICY "p1_chat_message_reads_own_select" ON public.chat_message_reads
-  FOR SELECT TO authenticated
-  USING (user_id = (SELECT auth.uid()));
-
-CREATE POLICY "p1_chat_message_reads_own_insert" ON public.chat_message_reads
-  FOR INSERT TO authenticated
-  WITH CHECK (user_id = (SELECT auth.uid()));
+-- chat_message_reads: handled conditionally below (table not yet in DB)
 
 -- ── CLUB & CONTENT ────────────────────────────────────────────
 
@@ -697,6 +691,24 @@ BEGIN
       CREATE POLICY "p1_training_photos_write" ON public.training_photos
         FOR ALL TO authenticated
         USING (is_trainer_or_above()) WITH CHECK (is_trainer_or_above());
+    $pol$;
+  END IF;
+
+  -- chat_message_reads (table exists in code but not yet in DB schema)
+  IF EXISTS (SELECT 1 FROM information_schema.tables
+             WHERE table_schema = 'public' AND table_name = 'chat_message_reads'
+             AND table_type = 'BASE TABLE') THEN
+    EXECUTE 'ALTER TABLE public.chat_message_reads ENABLE ROW LEVEL SECURITY';
+    EXECUTE $pol$
+      CREATE POLICY "p1_chat_message_reads_staff" ON public.chat_message_reads
+        FOR ALL TO authenticated
+        USING (is_trainer_or_above()) WITH CHECK (is_trainer_or_above());
+      CREATE POLICY "p1_chat_message_reads_own_select" ON public.chat_message_reads
+        FOR SELECT TO authenticated
+        USING (user_id = (SELECT auth.uid()));
+      CREATE POLICY "p1_chat_message_reads_own_insert" ON public.chat_message_reads
+        FOR INSERT TO authenticated
+        WITH CHECK (user_id = (SELECT auth.uid()));
     $pol$;
   END IF;
 END $$;
