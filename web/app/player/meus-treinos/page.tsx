@@ -1,9 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { Clock, Dumbbell, MapPin, BookOpen, Pin, CalendarDays, CheckCircle2, XCircle } from "lucide-react";
+import { Clock, Dumbbell, MapPin, BookOpen, Pin, CalendarDays, CheckCircle2, XCircle, MessageSquare } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AutoAttendanceButton } from "@/components/trainings/auto-attendance-button";
+import { RsvpButtons } from "@/components/trainings/rsvp-buttons";
 
 export const metadata = { title: "Os Meus Treinos" };
 
@@ -15,6 +16,7 @@ type TrainingRow = {
   location?: string;
   type?: string;
   notes?: string;
+  rsvp_deadline_hours: number;
 };
 type CoachNote = { id: string; training_id: string; note_text: string };
 type AttendanceRow = {
@@ -23,6 +25,12 @@ type AttendanceRow = {
   photo_url: string | null;
   gps_validated: boolean;
   gps_distance_m: number | null;
+};
+type RsvpRow = {
+  training_id: string;
+  status: "going" | "not_going";
+  reason_code: string | null;
+  reason_text: string | null;
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -62,11 +70,11 @@ export default async function MeusTreinosPage() {
   const [{ data: upcoming }, { data: past }] = season
     ? await Promise.all([
         supabase.from("trainings")
-          .select("id, date, start_time, end_time, location, type, notes")
+          .select("id, date, start_time, end_time, location, type, notes, rsvp_deadline_hours")
           .eq("season_id", season.id).gte("date", today)
           .order("date", { ascending: true }).limit(20),
         supabase.from("trainings")
-          .select("id, date, start_time, end_time, location, type, notes")
+          .select("id, date, start_time, end_time, location, type, notes, rsvp_deadline_hours")
           .eq("season_id", season.id).lt("date", today)
           .order("date", { ascending: false }).limit(10),
       ])
@@ -75,17 +83,14 @@ export default async function MeusTreinosPage() {
   const allTrainings = [...(upcoming ?? []), ...(past ?? [])] as TrainingRow[];
   const trainingIds = allTrainings.map((t) => t.id);
 
-  // Buscar o registo de jogador do utilizador atual
+  // Registo de jogador
   const { data: playerRecord } = season
     ? await supabase
-        .from("players")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("season_id", season.id)
-        .maybeSingle()
+        .from("players").select("id")
+        .eq("user_id", user.id).eq("season_id", season.id).maybeSingle()
     : { data: null };
 
-  // Buscar presenças do jogador
+  // Presenças
   const { data: attendanceRows } =
     playerRecord && trainingIds.length
       ? await supabase
@@ -100,6 +105,21 @@ export default async function MeusTreinosPage() {
     attendanceByTraining.set(a.training_id, a);
   }
 
+  // RSVPs do jogador
+  const { data: rsvpRows } =
+    playerRecord && trainingIds.length
+      ? await supabase
+          .from("training_rsvps")
+          .select("training_id, status, reason_code, reason_text")
+          .eq("player_id", playerRecord.id)
+          .in("training_id", trainingIds)
+      : { data: [] as RsvpRow[] };
+
+  const rsvpByTraining = new Map<string, RsvpRow>();
+  for (const r of (rsvpRows ?? []) as RsvpRow[]) {
+    rsvpByTraining.set(r.training_id, r);
+  }
+
   // Notas do treinador
   const { data: coachNotes } = trainingIds.length
     ? await supabase.from("training_notes").select("id, training_id, note_text")
@@ -111,6 +131,11 @@ export default async function MeusTreinosPage() {
     const list = notesByTraining.get(n.training_id) ?? [];
     list.push(n);
     notesByTraining.set(n.training_id, list);
+  }
+
+  function computeDeadline(t: TrainingRow): string {
+    const startMs = new Date(`${t.date}T${t.start_time ?? "00:00"}`).getTime();
+    return new Date(startMs - (t.rsvp_deadline_hours ?? 3) * 3_600_000).toISOString();
   }
 
   function TrainingCard({ t, isPast = false }: { t: TrainingRow; isPast?: boolean }) {
@@ -132,8 +157,12 @@ export default async function MeusTreinosPage() {
 
     const showAutoButton = isToday && playerRecord !== null && !myAttendance;
     const showFutureNotice = !isPast && !isToday && playerRecord !== null && !myAttendance;
-    // Badge de estado para passados ou já registados
     const showAttendanceBadge = isPast || (myAttendance && myAttendance.status !== null);
+
+    const deadlineIso = computeDeadline(t);
+    const deadlinePast = new Date() > new Date(deadlineIso);
+    const myRsvp = rsvpByTraining.get(t.id);
+    const showRsvp = playerRecord !== null && !isPast && (!deadlinePast || myRsvp);
 
     return (
       <Card className={`overflow-hidden transition-opacity ${isPast ? "opacity-60" : ""}`}>
@@ -196,6 +225,28 @@ export default async function MeusTreinosPage() {
               </div>
             </div>
 
+            {/* RSVP */}
+            {showRsvp && (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Confirmação de Presença
+                  </span>
+                  {!myRsvp && !deadlinePast && (
+                    <span className="text-[10px] font-bold rounded-full bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 leading-none dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700">
+                      Pendente
+                    </span>
+                  )}
+                </div>
+                <RsvpButtons
+                  trainingId={t.id}
+                  deadlineIso={deadlineIso}
+                  initialStatus={myRsvp?.status ?? null}
+                />
+              </div>
+            )}
+
             {/* Auto-Presença */}
             {!playerRecord && !isPast && (
               <p className="text-xs text-muted-foreground/70 italic">
@@ -204,10 +255,7 @@ export default async function MeusTreinosPage() {
             )}
 
             {showAutoButton && (
-              <AutoAttendanceButton
-                trainingId={t.id}
-                currentStatus={null}
-              />
+              <AutoAttendanceButton trainingId={t.id} currentStatus={null} />
             )}
 
             {showFutureNotice && (

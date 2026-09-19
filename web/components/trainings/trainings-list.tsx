@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { format, parseISO, startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
 import { pt } from "date-fns/locale";
-import { Plus, Users, FileText, Pencil, Trash2, Clock, MapPin, BarChart, Camera } from "lucide-react";
+import { Plus, Users, FileText, Pencil, Trash2, Clock, MapPin, BarChart, Camera, MessageSquare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { AttendanceModal } from "./attendance-modal";
 import { NotesModal } from "./notes-modal";
 import { CreateTrainingModal } from "./create-training-modal";
+import { RsvpPlayerList } from "./rsvp-player-list";
 import { useTrainings, usePlayerAttendanceStats } from "@/hooks/use-trainings";
 import { EventPhotoGallery } from "@/components/shared/event-photo-gallery";
 import type { Training, RosterEntry, TrainingType } from "@/types/database";
@@ -47,6 +48,7 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
   const [notesTraining, setNotes]           = useState<Training | null>(null);
   const [editTraining, setEdit]             = useState<Training | null>(null);
   const [photosTraining, setPhotos]         = useState<Training | null>(null);
+  const [rsvpsTraining, setRsvps]           = useState<Training | null>(null);
   const [deleteConfirm, setDeleteConfirm]   = useState<Training | null>(null);
 
   // Filtros
@@ -160,7 +162,7 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
         <table className="w-full text-sm">
           <thead className="bg-muted/40 text-muted-foreground">
             <tr>
-              {["Data", "Hora", "Local", "Tipo", "Assiduidade", ""].map((h) => (
+              {["Data", "Hora", "Local", "Tipo", "RSVPs", "Assiduidade", ""].map((h) => (
                 <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>
               ))}
             </tr>
@@ -216,6 +218,17 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
                           {TRAINING_TYPE_LABELS[t.type]}
                         </Badge>
                       </td>
+                      {/* RSVPs */}
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => setRsvps(t)}
+                          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                          title="Ver RSVPs"
+                        >
+                          <MessageSquare className="h-3.5 w-3.5" />
+                          <span>Ver</span>
+                        </button>
+                      </td>
                       {/* Assiduidade */}
                       <td className="px-4 py-3">
                         <button
@@ -230,6 +243,11 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
                       {/* Ações */}
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-0.5">
+                          <Button variant="ghost" size="sm" className="h-7 px-2 gap-1"
+                            onClick={() => setRsvps(t)}>
+                            <MessageSquare className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline text-xs">RSVPs</span>
+                          </Button>
                           <Button variant="ghost" size="sm" className="h-7 px-2 gap-1"
                             onClick={() => setAttendance(t)}>
                             <Users className="h-3.5 w-3.5" />
@@ -343,6 +361,21 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
               entityType="training"
               entityId={photosTraining.id}
             />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Dialog RSVPs */}
+      {rsvpsTraining && (
+        <Dialog open onOpenChange={() => setRsvps(null)}>
+          <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                RSVPs — {format(parseISO(rsvpsTraining.date), "EEE, d MMM yyyy", { locale: pt })}
+              </DialogTitle>
+            </DialogHeader>
+            <RsvpPlayerList trainingId={rsvpsTraining.id} />
           </DialogContent>
         </Dialog>
       )}

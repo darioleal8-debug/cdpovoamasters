@@ -563,6 +563,8 @@ export interface Training {
   created_at: string;
   location_lat: number | null;
   location_lng: number | null;
+  rsvp_deadline_hours: number;
+  min_players: number;
 }
 
 export interface TrainingAttendance {
@@ -626,6 +628,50 @@ export interface PlayerAttendanceStat {
   late: number;
   attendance_pct: number;
 }
+
+// ── RSVP ─────────────────────────────────────────────────────────────────────
+
+export type RsvpStatus = "going" | "not_going";
+export type RsvpReasonCode = "lesao" | "trabalho" | "viagem" | "outro";
+
+export interface TrainingRsvp {
+  id: string;
+  training_id: string;
+  player_id: string;
+  status: RsvpStatus;
+  reason_code: RsvpReasonCode | null;
+  reason_text: string | null;
+  responded_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export interface TrainingRsvpSummary {
+  training_id: string;
+  going_count: number;
+  not_going_count: number;
+  no_response_count: number;
+  total_players: number;
+  rsvp_deadline_hours: number;
+  min_players: number;
+}
+
+export interface TrainingRsvpPlayerRow {
+  player_id: string;
+  name: string;
+  jersey_number: number | null;
+  status: RsvpStatus | null;
+  reason_code: RsvpReasonCode | null;
+  reason_text: string | null;
+  responded_at: string | null;
+}
+
+export const RSVP_REASON_LABELS: Record<RsvpReasonCode, string> = {
+  lesao:     "Lesão",
+  trabalho:  "Trabalho",
+  viagem:    "Viagem",
+  outro:     "Outro motivo",
+};
 
 export const TRAINING_TYPE_LABELS: Record<TrainingType, string> = {
   tecnico:     "Técnico",
