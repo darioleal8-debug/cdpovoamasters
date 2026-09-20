@@ -9,7 +9,7 @@ export default function PlayerChatError({ error, reset }: { error: Error & { dig
   }, [error]);
 
   return (
-    <div className="flex h-[calc(100vh-7rem)] flex-col items-center justify-center gap-3 rounded-lg border bg-background p-6 text-center">
+    <div className="flex h-[calc(100dvh-7rem)] flex-col items-center justify-center gap-3 rounded-lg border bg-background p-6 text-center">
       <p className="font-semibold text-destructive">Erro no chat interno</p>
       <p className="max-w-xl text-sm text-muted-foreground">{error.message || "Erro desconhecido"}</p>
       {error.digest && <p className="text-xs text-muted-foreground">digest: {error.digest}</p>}
