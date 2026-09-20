@@ -1,6 +1,7 @@
 import type { SerializeOptions } from "cookie";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { cache } from "react";
 
 type SupabaseCookiesToSet = {
   name: string;
@@ -8,7 +9,9 @@ type SupabaseCookiesToSet = {
   options: SerializeOptions;
 }[];
 
-export async function createClient() {
+// cache() deduplicates calls within the same React render tree so concurrent
+// RSC requests share one client and avoid simultaneous token-refresh races.
+export const createClient = cache(async () => {
   const cookieStore = await cookies();
 
   return createServerClient(
