@@ -178,19 +178,19 @@ function PlayerRow({
         ) : (
           <>
             {onSetGoing && (
-              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Marcar como 'Vai'"
+              <Button size="sm" variant="ghost" className="h-11 w-11 md:h-7 md:w-7 p-0" title="Marcar como 'Vai'"
                 onClick={onSetGoing}>
                 <Check className="h-3.5 w-3.5 text-green-600" />
               </Button>
             )}
             {onSetNotGoing && (
-              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Marcar como 'Não vai'"
+              <Button size="sm" variant="ghost" className="h-11 w-11 md:h-7 md:w-7 p-0" title="Marcar como 'Não vai'"
                 onClick={onSetNotGoing}>
                 <X className="h-3.5 w-3.5 text-red-500" />
               </Button>
             )}
             {onReset && (
-              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Remover resposta"
+              <Button size="sm" variant="ghost" className="h-11 w-11 md:h-7 md:w-7 p-0" title="Remover resposta"
                 onClick={onReset}>
                 <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
               </Button>
