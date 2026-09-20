@@ -34,7 +34,7 @@ export const createClient = cache(async () => {
       },
     }
   );
-}
+});
 
 /** Cliente com service role — apenas para uso em Route Handlers com acesso admin */
 function stripBom(v: string | undefined): string {
