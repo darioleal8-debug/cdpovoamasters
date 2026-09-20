@@ -98,7 +98,7 @@ export function RsvpButtons({ trainingId, deadlineIso, initialStatus = null }: P
           variant={currentStatus === "going" ? "default" : "outline"}
           disabled={saving || currentStatus === "going"}
           onClick={handleGoing}
-          className="h-7 px-3 gap-1.5 text-xs"
+          className="min-h-[44px] px-3 gap-1.5 text-xs"
         >
           {saving && !showReason
             ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -111,7 +111,7 @@ export function RsvpButtons({ trainingId, deadlineIso, initialStatus = null }: P
           variant={currentStatus === "not_going" && !showReason ? "destructive" : "outline"}
           disabled={saving}
           onClick={showReason ? handleNotGoing : () => setShowReason(true)}
-          className="h-7 px-3 gap-1.5 text-xs"
+          className="min-h-[44px] px-3 gap-1.5 text-xs"
         >
           {saving && showReason
             ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -151,7 +151,7 @@ export function RsvpButtons({ trainingId, deadlineIso, initialStatus = null }: P
               value={reasonText}
               onChange={(e) => setReasonText(e.target.value)}
               placeholder="Descreve brevemente (opcional)"
-              className="w-full text-xs rounded-md border bg-background px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full text-base md:text-xs rounded-md border bg-background px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-ring"
             />
           )}
 
@@ -161,7 +161,7 @@ export function RsvpButtons({ trainingId, deadlineIso, initialStatus = null }: P
               variant="destructive"
               disabled={saving}
               onClick={handleNotGoing}
-              className="h-7 px-3 text-xs gap-1"
+              className="min-h-[44px] px-3 text-xs gap-1"
             >
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
               Confirmar falta
@@ -170,7 +170,7 @@ export function RsvpButtons({ trainingId, deadlineIso, initialStatus = null }: P
               size="sm"
               variant="ghost"
               onClick={cancelReason}
-              className="h-7 px-3 text-xs"
+              className="min-h-[44px] px-3 text-xs"
             >
               Cancelar
             </Button>
