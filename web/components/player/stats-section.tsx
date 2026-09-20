@@ -73,7 +73,7 @@ export function StatsSection({ seasonId }: { seasonId: string | null }) {
             <span className="text-2xl font-bold leading-none">
               {loading ? "…" : stats ? fmt(key, stats[key]) : "—"}
             </span>
-            <span className="text-[10px] text-muted-foreground text-center leading-tight">
+            <span className="text-[11px] text-muted-foreground text-center leading-tight">
               {label}
             </span>
           </div>

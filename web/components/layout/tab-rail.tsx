@@ -71,7 +71,7 @@ function RailLink({ item, badge }: { item: RailItem; badge?: number }) {
         />
         {!!badge && badge > 0 && (
           <span
-            className="absolute -top-1 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[10px] font-bold"
+            className="absolute -top-1 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[11px] font-bold"
             style={{ background: "#F97316", color: "#fff" }}
           >
             {badge > 99 ? "99+" : badge}
@@ -79,7 +79,7 @@ function RailLink({ item, badge }: { item: RailItem; badge?: number }) {
         )}
       </div>
       <span
-        className="text-[10px] font-semibold text-center leading-tight"
+        className="text-[11px] font-semibold text-center leading-tight"
         style={{ color: active ? "#F97316" : "rgba(255,255,255,.4)" }}
       >
         {label}

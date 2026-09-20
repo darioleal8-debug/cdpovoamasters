@@ -228,7 +228,7 @@ export function AttendanceModal({ training, players, open, onClose }: Props) {
 
                       {/* Badge auto-presença */}
                       {isAuto && (
-                        <Badge variant="outline" className={cn("text-[10px] shrink-0", STATUS_CONFIG.auto_present.color)}>
+                        <Badge variant="outline" className={cn("text-[11px] shrink-0", STATUS_CONFIG.auto_present.color)}>
                           <Camera className="h-2.5 w-2.5 mr-1" />
                           Auto
                         </Badge>

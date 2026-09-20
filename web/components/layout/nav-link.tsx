@@ -33,7 +33,7 @@ export function NavLink({ href, icon: Icon, label, badge, exact = false }: NavLi
       <span>{label}</span>
       {!!badge && badge > 0 && (
         <span
-          className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold"
+          className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-bold"
           style={isActive
             ? { background: "rgba(255,255,255,.25)", color: "#ffffff" }
             : { background: "var(--action, #F97316)", color: "#ffffff" }}

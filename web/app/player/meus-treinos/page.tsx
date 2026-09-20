@@ -180,12 +180,12 @@ export default async function MeusTreinosPage() {
                   <Dumbbell className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm font-semibold">Treino</span>
                   {typeLabel && (
-                    <Badge variant="outline" className={`text-[10px] capitalize ${typeColor}`}>
+                    <Badge variant="outline" className={`text-[11px] capitalize ${typeColor}`}>
                       {typeLabel}
                     </Badge>
                   )}
                   {isToday && (
-                    <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/30">
+                    <Badge variant="outline" className="text-[11px] bg-primary/10 text-primary border-primary/30">
                       Hoje
                     </Badge>
                   )}
@@ -211,10 +211,10 @@ export default async function MeusTreinosPage() {
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {isPast && (
-                  <Badge variant="secondary" className="text-[10px]">Terminado</Badge>
+                  <Badge variant="secondary" className="text-[11px]">Terminado</Badge>
                 )}
                 {showAttendanceBadge && attendanceInfo && (
-                  <Badge variant="outline" className={`text-[10px] ${attendanceInfo.badge}`}>
+                  <Badge variant="outline" className={`text-[11px] ${attendanceInfo.badge}`}>
                     {myAttendance?.status === "present" && myAttendance.photo_url && (
                       <CheckCircle2 className="h-3 w-3 mr-1 inline" />
                     )}
@@ -234,7 +234,7 @@ export default async function MeusTreinosPage() {
                     Confirmação de Presença
                   </span>
                   {!myRsvp && !deadlinePast && (
-                    <span className="text-[10px] font-bold rounded-full bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 leading-none dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700">
+                    <span className="text-[11px] font-bold rounded-full bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 leading-none dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700">
                       Pendente
                     </span>
                   )}
@@ -272,7 +272,7 @@ export default async function MeusTreinosPage() {
                   Notas do Treinador
                 </span>
                 {allNotes.length > 0 && (
-                  <span className="text-[10px] font-bold rounded-full bg-primary/10 text-primary px-1.5 py-0.5 leading-none">
+                  <span className="text-[11px] font-bold rounded-full bg-primary/10 text-primary px-1.5 py-0.5 leading-none">
                     {allNotes.length}
                   </span>
                 )}

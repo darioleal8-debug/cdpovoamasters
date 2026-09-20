@@ -279,7 +279,7 @@ function ScreenConvocatoria() {
           <div key={n} className="flex items-center justify-between py-1">
             <span className="text-[12px]" style={{ color: i < 3 ? BLACK : GRAY }}>{n}</span>
             <span
-              className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+              className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
               style={{
                 background: i < 3 ? "#DCFCE7" : "#F3F4F6",
                 color: i < 3 ? "#15803D" : GRAY,
@@ -305,7 +305,7 @@ function ScreenLive() {
       {/* Score bar */}
       <div className="px-4 py-3 flex items-center justify-between">
         <div className="text-center">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">Póvoa</p>
+          <p className="text-[11px] font-bold uppercase tracking-widest text-white/50">Póvoa</p>
           <p className="text-[36px] font-black tabular-nums leading-none text-white">34</p>
         </div>
         <div className="flex flex-col items-center gap-1">
@@ -320,7 +320,7 @@ function ScreenLive() {
           </span>
         </div>
         <div className="text-center">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">Rival</p>
+          <p className="text-[11px] font-bold uppercase tracking-widest text-white/50">Rival</p>
           <p className="text-[36px] font-black tabular-nums leading-none text-white">29</p>
         </div>
       </div>
@@ -371,7 +371,7 @@ function ScreenQuotas() {
             { label: "Em falta", value: "€ 360",   color: "#D92D20" },
           ].map(({ label, value, color }) => (
             <div key={label} className="rounded-xl p-3" style={{ background: LIGHT }}>
-              <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: GRAY }}>{label}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: GRAY }}>{label}</p>
               <p className="text-[18px] font-black mt-0.5" style={{ color }}>{value}</p>
             </div>
           ))}
@@ -385,7 +385,7 @@ function ScreenQuotas() {
           <div key={name} className="flex items-center justify-between py-1 border-b last:border-0" style={{ borderColor: BORDER }}>
             <span className="text-[12px]" style={{ color: BLACK }}>{name}</span>
             <span
-              className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+              className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
               style={{
                 background: ok ? "#DCFCE7" : "#FEE2E2",
                 color: ok ? "#15803D" : "#B91C1C",

@@ -100,7 +100,7 @@ export function PaymentsPlayerList({ players, payments, summary, loading, season
               style={{ minWidth: 28 }}
             >
               <span
-                className="text-[10px] font-bold uppercase"
+                className="text-[11px] font-bold uppercase"
                 style={{ color: isCurrent ? "var(--action,#F97316)" : "rgba(0,0,0,.3)" }}
               >
                 {MONTH_NAMES_SHORT[m.month - 1]}

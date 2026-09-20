@@ -279,19 +279,19 @@ export default async function PlayerPublicProfilePage({
                       <p className="text-base font-black tabular-nums" style={{ color: "var(--ink,#0A1220)" }}>
                         {g.pts}
                       </p>
-                      <p className="text-[10px] font-medium" style={{ color: "var(--muted-text,#5A6478)" }}>PTS</p>
+                      <p className="text-[11px] font-medium" style={{ color: "var(--muted-text,#5A6478)" }}>PTS</p>
                     </div>
                     <div>
                       <p className="text-base font-black tabular-nums" style={{ color: "var(--ink,#0A1220)" }}>
                         {reb}
                       </p>
-                      <p className="text-[10px] font-medium" style={{ color: "var(--muted-text,#5A6478)" }}>REB</p>
+                      <p className="text-[11px] font-medium" style={{ color: "var(--muted-text,#5A6478)" }}>REB</p>
                     </div>
                     <div>
                       <p className="text-base font-black tabular-nums" style={{ color: "var(--ink,#0A1220)" }}>
                         {g.ast}
                       </p>
-                      <p className="text-[10px] font-medium" style={{ color: "var(--muted-text,#5A6478)" }}>AST</p>
+                      <p className="text-[11px] font-medium" style={{ color: "var(--muted-text,#5A6478)" }}>AST</p>
                     </div>
                   </div>
                 </div>

@@ -29,7 +29,7 @@ function initials(name: string): string {
 // ── Section label ─────────────────────────────────────────────
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="px-4 pt-5 pb-2 text-[10px] font-bold uppercase tracking-widest" style={{ color: "rgba(169,180,199,.45)" }}>
+    <p className="px-4 pt-5 pb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: "rgba(169,180,199,.45)" }}>
       {children}
     </p>
   );
@@ -60,7 +60,7 @@ function ChannelRow({ thread, active, onClick }: { thread: ChannelThread; active
             {thread.name}
           </p>
           {thread.last_message && (
-            <span className="shrink-0 text-[10px]" style={{ color: "rgba(169,180,199,.5)" }}>
+            <span className="shrink-0 text-[11px]" style={{ color: "rgba(169,180,199,.5)" }}>
               {fmtRelTime(thread.last_message.created_at)}
             </span>
           )}
@@ -68,7 +68,7 @@ function ChannelRow({ thread, active, onClick }: { thread: ChannelThread; active
         <p className="text-[11px] truncate" style={{ color: "rgba(169,180,199,.6)" }}>{preview || "Sem mensagens"}</p>
       </div>
       {thread.unread_count > 0 && (
-        <span className="h-5 min-w-5 flex items-center justify-center rounded-full text-[10px] font-bold px-1 shrink-0"
+        <span className="h-5 min-w-5 flex items-center justify-center rounded-full text-[11px] font-bold px-1 shrink-0"
           style={{ background: "var(--action,#F97316)", color: "#fff" }}>
           {thread.unread_count}
         </span>
@@ -97,7 +97,7 @@ function DirectRow({ thread, active, onClick }: { thread: DirectThread; active: 
         <div className="flex items-center justify-between gap-1">
           <p className="text-[13px] font-semibold truncate" style={{ color: "#E6EBF3" }}>{thread.name}</p>
           {thread.last_message && (
-            <span className="shrink-0 text-[10px]" style={{ color: "rgba(169,180,199,.5)" }}>
+            <span className="shrink-0 text-[11px]" style={{ color: "rgba(169,180,199,.5)" }}>
               {fmtRelTime(thread.last_message.created_at)}
             </span>
           )}
@@ -107,7 +107,7 @@ function DirectRow({ thread, active, onClick }: { thread: DirectThread; active: 
         </p>
       </div>
       {thread.unread_count > 0 && (
-        <span className="h-5 min-w-5 flex items-center justify-center rounded-full text-[10px] font-bold px-1 shrink-0"
+        <span className="h-5 min-w-5 flex items-center justify-center rounded-full text-[11px] font-bold px-1 shrink-0"
           style={{ background: "var(--action,#F97316)", color: "#fff" }}>
           {thread.unread_count}
         </span>

@@ -93,7 +93,7 @@ export default async function MeusPagamentosPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-semibold">{p.amount != null ? fmt(p.amount) : fmt(p.amount_due ?? 0)}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_COLORS[p.status ?? "pendente"] ?? "bg-gray-100 text-gray-600"}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_COLORS[p.status ?? "pendente"] ?? "bg-gray-100 text-gray-600"}`}>
                       {STATUS_LABELS[p.status ?? "pendente"] ?? p.status}
                     </span>
                   </div>

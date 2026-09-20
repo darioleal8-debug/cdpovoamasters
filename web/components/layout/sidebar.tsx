@@ -64,7 +64,7 @@ const accountItems = [
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="px-3 pb-1.5 pt-5 text-[10px] font-bold uppercase tracking-label" style={{ color: "rgba(255,255,255,.3)" }}>
+    <p className="px-3 pb-1.5 pt-5 text-[11px] font-bold uppercase tracking-label" style={{ color: "rgba(255,255,255,.3)" }}>
       {children}
     </p>
   );
@@ -102,7 +102,7 @@ export function Sidebar({ role, rolesExtra = [] }: { role?: UserRole; rolesExtra
           <span className="font-condensed text-sm font-bold uppercase tracking-display text-white">
             CD Póvoa
           </span>
-          <span className="text-[10px] font-semibold uppercase tracking-label" style={{ color: "rgba(255,255,255,.4)" }}>
+          <span className="text-[11px] font-semibold uppercase tracking-label" style={{ color: "rgba(255,255,255,.4)" }}>
             Masters · Basquetebol
           </span>
         </div>
