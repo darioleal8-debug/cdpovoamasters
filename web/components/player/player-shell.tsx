@@ -24,10 +24,11 @@ export function PlayerShell({ playerName, userRole, children }: Props) {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Mobile header — brand bar, no hamburger */}
         <header
-          className="md:hidden flex h-14 shrink-0 items-center px-4 border-b"
+          className="md:hidden flex shrink-0 items-center px-4 border-b"
           style={{
             background: "#0A1220",
             borderColor: "rgba(255,255,255,.08)",
+            minHeight: "calc(3.5rem + env(safe-area-inset-top))",
             paddingTop: "env(safe-area-inset-top)",
           }}
         >
@@ -40,7 +41,7 @@ export function PlayerShell({ playerName, userRole, children }: Props) {
         </header>
 
         <main
-          className="flex-1 overflow-y-auto p-4 md:p-6"
+          className="flex-1 overflow-y-auto overscroll-y-contain p-4 md:p-6"
           style={{
             paddingBottom: "calc(var(--bottom-nav-h, 56px) + 16px)",
             background: "var(--background)",

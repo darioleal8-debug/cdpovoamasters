@@ -108,7 +108,7 @@ export function Header({ userName, userEmail, userRole }: HeaderProps) {
       style={{
         background:   "#ffffff",
         borderBottom: "1px solid var(--line, #E4E7EE)",
-        height:       scrolled ? 52 : 64,
+        height:       `calc(${scrolled ? 52 : 64}px + env(safe-area-inset-top))`,
         paddingTop:   `env(safe-area-inset-top)`,
       }}
     >
