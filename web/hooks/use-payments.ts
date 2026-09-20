@@ -16,7 +16,7 @@ export function usePayments(seasonId: string | null) {
 
     const { data, error } = await supabase
       .from("payments")
-      .select("*, user:users(id, name, email)")
+      .select("*, user:users!payments_user_id_fkey(id, name, email)")
       .eq("season_id", seasonId)
       .order("reference_year", { ascending: false })
       .order("month", { ascending: false });
