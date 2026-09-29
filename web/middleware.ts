@@ -5,7 +5,7 @@ const PROTECTED_PREFIXES = [
   "/dashboard", "/jogadores", "/jogos", "/pagamentos", "/estatisticas",
   "/configuracoes", "/temporadas", "/treinos", "/financeiro",
   "/gestao-contas", "/historico", "/chat", "/mais", "/player",
-  "/alterar-password",
+  "/alterar-password", "/resultados",
 ];
 
 // Cookie de sessão Supabase — formato: sb-<project-ref>-auth-token
