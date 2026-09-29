@@ -12,7 +12,7 @@ interface Props {
   mode?: "calendar" | "results"; // calendar = future first; results = past with results first
 }
 
-type Filter = "all" | "our_games" | "with_result" | "no_result";
+type Filter = "all" | "with_result" | "no_result";
 
 export function GamesCalendarClient({ games, ourTeamName, competitionSlug, mode = "calendar" }: Props) {
   const [filter, setFilter] = useState<Filter>("all");
@@ -34,7 +34,6 @@ export function GamesCalendarClient({ games, ourTeamName, competitionSlug, mode 
       result.sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime());
     }
 
-    if (filter === "our_games") result = result.filter((g) => g.is_our_game);
     if (filter === "with_result") result = result.filter((g) => g.result_status === "approved");
     if (filter === "no_result") result = result.filter((g) => g.result_status === "no_result");
     if (selectedJornada !== "all") result = result.filter((g) => g.syntheticJornada === selectedJornada);
@@ -58,7 +57,6 @@ export function GamesCalendarClient({ games, ourTeamName, competitionSlug, mode 
 
   const FILTER_LABELS: Record<Filter, string> = {
     all: "Todos",
-    our_games: `CD Póvoa`,
     with_result: "Com resultado",
     no_result: "Sem resultado",
   };
@@ -67,7 +65,7 @@ export function GamesCalendarClient({ games, ourTeamName, competitionSlug, mode 
     <div>
       {/* Filter chips */}
       <div className="flex gap-2 flex-wrap mb-4">
-        {(["all", "our_games", "with_result", "no_result"] as Filter[]).map((f) => (
+        {(["all", "with_result", "no_result"] as Filter[]).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
