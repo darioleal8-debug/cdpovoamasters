@@ -168,6 +168,42 @@ export async function getStandings(competitionId: string): Promise<StandingRow[]
   return computeStandings(data ?? []);
 }
 
+export type StandingRowWithForm = StandingRow & { form: ("V" | "D")[] };
+
+export async function getStandingsWithForm(competitionId: string): Promise<StandingRowWithForm[]> {
+  const supabase = await createAdminClient();
+  const { data } = await supabase
+    .from("league_game_results")
+    .select("home_team_name, away_team_name, home_score, away_score, approved_at")
+    .eq("competition_id", competitionId)
+    .order("approved_at", { ascending: false });
+
+  const results = (data ?? []) as (StandingRow extends never ? never : {
+    home_team_name: string; away_team_name: string;
+    home_score: number; away_score: number; approved_at: string;
+  })[];
+
+  const standings = computeStandings(results);
+
+  return standings.map((s) => ({
+    ...s,
+    form: (results as { home_team_name: string; away_team_name: string; home_score: number; away_score: number }[])
+      .filter((r) => r.home_team_name === s.team_name || r.away_team_name === s.team_name)
+      .slice(0, 5)
+      .map((r) => {
+        const isHome = r.home_team_name === s.team_name;
+        const homeWon = r.home_score > r.away_score;
+        return ((isHome ? homeWon : !homeWon) ? "V" : "D") as "V" | "D";
+      }),
+  }));
+}
+
+export async function getTeamNames(): Promise<string[]> {
+  const supabase = await createAdminClient();
+  const { data } = await supabase.from("league_teams").select("name").order("name");
+  return (data ?? []).map((t) => t.name);
+}
+
 // ─── Admin: pending submissions ───────────────────────────────────────────────
 
 export type AdminSubmission = {

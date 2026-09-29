@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { getCompetitionBySlug, getCompetitionGames, getOurTeamName } from "@/lib/competitions-data";
+import { getCompetitionBySlug, getCompetitionGames } from "@/lib/competitions-data";
+import { CourtBg } from "@/components/competitions/court-bg";
 import { GamesCalendarClient } from "@/components/competitions/games-calendar-client";
 
 export const metadata: Metadata = {
   title: "Resultados",
-  description: "Resultados da Liga INATEL de basquetebol.",
+  description: "Resultados dos jogos da Liga INATEL de basquetebol.",
 };
 
 export const revalidate = 60;
@@ -14,50 +14,73 @@ export default async function ResultadosPage() {
   const competition = await getCompetitionBySlug("liga-inatel");
 
   if (!competition || !competition.season_id) {
-    return <p className="text-center text-muted-foreground py-12">Competição não disponível.</p>;
+    return (
+      <p style={{ textAlign: "center", padding: "60px 20px", color: "#6F675F" }}>
+        Competição não disponível.
+      </p>
+    );
   }
 
-  const [games, ourTeam] = await Promise.all([
-    getCompetitionGames(competition.competition_key ?? "Liga", competition.season_id),
-    getOurTeamName(),
-  ]);
-
-  const gamesWithResultOrPending = games.filter(
-    (g) => g.result_status === "approved" || g.result_status === "pending"
+  const games = await getCompetitionGames(
+    competition.competition_key ?? "Liga",
+    competition.season_id
   );
 
+  const approvedCount = games.filter((g) => g.result_status === "approved").length;
+
+  const maxW = { maxWidth: "1200px", margin: "0 auto", padding: "0 20px", width: "100%" };
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Resultados</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {gamesWithResultOrPending.length} jogo{gamesWithResultOrPending.length !== 1 ? "s" : ""} com resultado
+    <div>
+      <CourtBg>
+        <div style={{ ...maxW, padding: "40px 20px 36px" }}>
+          <p
+            style={{
+              fontFamily: "var(--font-ibm-mono, monospace)",
+              fontSize: "11px",
+              fontWeight: 500,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: "#F97316",
+              marginBottom: "8px",
+            }}
+          >
+            LIGA INATEL
+          </p>
+          <h1
+            style={{
+              fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))",
+              fontWeight: 800,
+              fontSize: "clamp(40px, 8vw, 72px)",
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+              color: "#F6F2EC",
+              lineHeight: 0.9,
+              margin: "0 0 12px",
+            }}
+          >
+            RESULTADOS
+          </h1>
+          <p
+            style={{
+              fontFamily: "var(--font-barlow, sans-serif)",
+              fontSize: "14px",
+              color: "#B9AFA4",
+            }}
+          >
+            {approvedCount} resultado{approvedCount !== 1 ? "s" : ""} aprovado{approvedCount !== 1 ? "s" : ""}
+            {" · "}mais recente primeiro
           </p>
         </div>
-        <Link
-          href="/liga-inatel/resultados/submeter"
-          className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors"
-        >
-          + Submeter resultado
-        </Link>
-      </div>
+      </CourtBg>
 
-      {gamesWithResultOrPending.length === 0 ? (
-        <div className="text-center py-12 space-y-3">
-          <p className="text-muted-foreground">Ainda não há resultados registados.</p>
-          <Link href="/liga-inatel/resultados/submeter" className="text-orange-500 text-sm hover:underline">
-            Foste a um jogo? Submete o resultado →
-          </Link>
-        </div>
-      ) : (
+      <div style={{ ...maxW, padding: "32px 20px 48px" }}>
         <GamesCalendarClient
           games={games}
-          ourTeamName={ourTeam}
           competitionSlug="liga-inatel"
           mode="results"
         />
-      )}
+      </div>
     </div>
   );
 }
