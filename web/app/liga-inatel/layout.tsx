@@ -27,7 +27,7 @@ export const metadata: Metadata = {
 export default function LigaInatelLayout({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className={`${bcHeavy.variable} ${ibmMono.variable}`}
+      className={`${bcHeavy.variable} ${ibmMono.variable} liga-inatel-root`}
       style={{
         minHeight: "100dvh",
         display: "flex",
@@ -115,31 +115,34 @@ export default function LigaInatelLayout({ children }: { children: React.ReactNo
           <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
             <Link
               href="/liga-inatel/resultados/submeter"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                padding: "8px 14px",
-                borderRadius: "4px",
-                background: "#F97316",
-                color: "#15110E",
-                textDecoration: "none",
-                fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))",
-                fontWeight: 800,
-                fontSize: "12px",
-                letterSpacing: "0.07em",
-                textTransform: "uppercase",
-                transition: "background .15s",
-                whiteSpace: "nowrap",
-              }}
-              onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "#FB8A3C")}
-              onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "#F97316")}
+              className="liga-cta-btn"
             >
               + Resultado
             </Link>
           </div>
         </div>
       </header>
+
+      <style>{`
+        .liga-cta-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 14px;
+          border-radius: 4px;
+          background: #F97316;
+          color: #15110E;
+          text-decoration: none;
+          font-family: var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif));
+          font-weight: 800;
+          font-size: 12px;
+          letter-spacing: 0.07em;
+          text-transform: uppercase;
+          transition: background .15s;
+          white-space: nowrap;
+        }
+        .liga-cta-btn:hover { background: #FB8A3C; }
+      `}</style>
 
       {/* Conteúdo */}
       <main style={{ flex: 1 }}>{children}</main>
