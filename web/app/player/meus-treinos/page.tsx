@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AutoAttendanceButton } from "@/components/trainings/auto-attendance-button";
 import { RsvpButtons } from "@/components/trainings/rsvp-buttons";
+import { TreinosPaginationWrapper } from "./TreinosPaginationWrapper";
 
 export const metadata = { title: "Os Meus Treinos" };
 
@@ -147,8 +148,10 @@ export default async function MeusTreinosPage() {
 
     const typeLabel = t.type ? (TYPE_LABELS[t.type] ?? t.type) : null;
     const typeColor = t.type ? (TYPE_COLORS[t.type] ?? TYPE_COLORS.geral) : TYPE_COLORS.geral;
+    const trainingYear = new Date(`${t.date}T12:00:00`).getFullYear();
     const dateStr = new Date(`${t.date}T12:00:00`).toLocaleDateString("pt-PT", {
       weekday: "long", day: "numeric", month: "long",
+      ...(trainingYear !== new Date().getFullYear() ? { year: "numeric" } : {}),
     });
 
     const myAttendance = attendanceByTraining.get(t.id);
@@ -213,14 +216,20 @@ export default async function MeusTreinosPage() {
                 {isPast && (
                   <Badge variant="secondary" className="text-[11px]">Terminado</Badge>
                 )}
-                {showAttendanceBadge && attendanceInfo && (
-                  <Badge variant="outline" className={`text-[11px] ${attendanceInfo.badge}`}>
-                    {myAttendance?.status === "present" && myAttendance.photo_url && (
-                      <CheckCircle2 className="h-3 w-3 mr-1 inline" />
-                    )}
-                    {myAttendance?.status === "absent" && <XCircle className="h-3 w-3 mr-1 inline" />}
-                    {attendanceInfo.label}
-                  </Badge>
+                {showAttendanceBadge && (
+                  attendanceInfo ? (
+                    <Badge variant="outline" className={`text-[11px] ${attendanceInfo.badge}`}>
+                      {myAttendance?.status === "present" && myAttendance.photo_url && (
+                        <CheckCircle2 className="h-3 w-3 mr-1 inline" />
+                      )}
+                      {myAttendance?.status === "absent" && <XCircle className="h-3 w-3 mr-1 inline" />}
+                      {attendanceInfo.label}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[11px] bg-gray-100 text-gray-500 border-gray-300 dark:bg-gray-800/40 dark:text-gray-400 dark:border-gray-700">
+                      Sem registo
+                    </Badge>
+                  )
                 )}
               </div>
             </div>
@@ -317,18 +326,18 @@ export default async function MeusTreinosPage() {
         {(upcoming ?? []).length === 0
           ? <p className="text-sm text-muted-foreground">Sem treinos agendados.</p>
           : (
-            <div className="space-y-3">
+            <TreinosPaginationWrapper initialCount={5} label="treinos">
               {(upcoming as TrainingRow[]).map((t) => <TrainingCard key={t.id} t={t} />)}
-            </div>
+            </TreinosPaginationWrapper>
           )}
       </div>
 
       {(past ?? []).length > 0 && (
         <div className="space-y-3">
           <h2 className="text-base font-semibold text-muted-foreground">Treinos Anteriores</h2>
-          <div className="space-y-3">
+          <TreinosPaginationWrapper initialCount={5} label="treinos anteriores">
             {(past as TrainingRow[]).map((t) => <TrainingCard key={t.id} t={t} isPast />)}
-          </div>
+          </TreinosPaginationWrapper>
         </div>
       )}
     </div>
