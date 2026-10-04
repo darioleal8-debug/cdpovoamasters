@@ -4,7 +4,7 @@ import { createClient as createSupabase } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { syncTeamChat, syncAnnouncementChat } from "@/lib/chat/team-sync";
 import { ensureStaffChat } from "@/lib/chat/staff-sync";
-import { syncGameEventChats, syncTrainingEventChats } from "@/lib/chat/event-thread-sync";
+import { syncGameEventChats, syncTrainingEventChats, ensurePlayerInTrainingThreads } from "@/lib/chat/event-thread-sync";
 import { canDirectMessage, canCreateGroup, type ChatRole, type ChatPostPolicy } from "@/lib/chat/permissions";
 
 export const runtime = "nodejs";
@@ -58,6 +58,7 @@ async function throttledSync(userId: string, isStaff: boolean, admin: ReturnType
       isStaff ? ensureStaffChat(admin) : Promise.resolve(),
       isStaff ? syncGameEventChats(admin) : Promise.resolve(),
       syncTrainingEventChats(admin), // cria fios de treino para todos os utilizadores
+      isStaff ? Promise.resolve() : ensurePlayerInTrainingThreads(admin, userId), // retro-add player to existing threads
     ]);
   } catch {
     // Sync não-fatal — o utilizador vê threads existentes mesmo que o sync falhe
