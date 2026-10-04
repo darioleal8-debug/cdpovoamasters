@@ -19,7 +19,9 @@ export default async function PlayerLayout({ children }: { children: React.React
 
   // Seccionista não é jogador — redirecionar para a área de jogos
   if (profile.role === "seccionista") redirect("/jogos");
-  if (!profile.active) redirect("/login");
+  // Conta inativa: signout antes de ir para /login para evitar loop
+  // (middleware veria sessão válida e redirigiria de volta para /player)
+  if (!profile.active) redirect("/api/auth/signout");
 
   const playerName = profile.name || user.email || "Jogador";
   const userRole   = profile.role as "admin" | "treinador" | "jogador";
