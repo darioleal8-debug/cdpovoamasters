@@ -78,8 +78,9 @@ export async function GET() {
 
   const isStaff = ["admin", "treinador"].includes(caller.role);
 
-  // Sync throttled — no máximo uma vez por 5 min por utilizador
-  await throttledSync(caller.id, isStaff, admin);
+  // Sync throttled — fire and forget para não bloquear a resposta.
+  // Threads novos criados pelo sync aparecem no próximo poll (60s) ou via realtime.
+  throttledSync(caller.id, isStaff, admin).catch(() => {});
 
   // IDs de chats em que o utilizador participa
   let chatIds: string[];
