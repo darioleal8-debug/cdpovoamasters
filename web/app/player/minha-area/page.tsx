@@ -7,6 +7,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { NextGameCard } from "@/components/games/next-game-card";
 import { StatsSection } from "@/components/player/stats-section";
+import { AvailabilityPrompt } from "@/components/player/availability-prompt";
+import { lisbonDateTime } from "@/lib/event-time";
+import type { AvailabilityRosterRow } from "@/types/availability";
 import Link from "next/link";
 
 export const metadata = { title: "Minha Área" };
@@ -20,7 +23,13 @@ type TrainingRow = {
   location:   string | null;
   type:       string | null;
   notes:      string | null;
+  rsvp_deadline_hours: number | null;
 };
+
+type TrainingRsvpProps = {
+  answer: "yes" | "no" | null;
+  roster: AvailabilityRosterRow[];
+} | null;
 
 type ComunicadoRow = {
   id:          string;
@@ -71,9 +80,12 @@ function initials(name: string): string {
 function NextTrainingCard({
   training,
   note,
+  rsvp,
 }: {
   training: TrainingRow | null;
   note:     string | null;
+  /** null = utilizador sem perfil de jogador → não mostra os botões */
+  rsvp:     TrainingRsvpProps;
 }) {
   const TRAINING_BG = "#3b5f92";
 
@@ -94,6 +106,10 @@ function NextTrainingCard({
   const label   = dateLabel(training.date);
   const isToday = label === "Hoje";
   const typeLabel = training.type ? (TYPE_LABELS[training.type] ?? training.type) : null;
+  const deadlineIso = new Date(
+    lisbonDateTime(training.date, training.start_time).getTime()
+    - (training.rsvp_deadline_hours ?? 0) * 3_600_000
+  ).toISOString();
 
   return (
     <div className="overflow-hidden rounded-xl border shadow-sm flex flex-col">
@@ -141,6 +157,19 @@ function NextTrainingCard({
         </div>
       </div>
 
+      {/* ── Disponibilidade do jogador ── */}
+      {rsvp && (
+        <div className="border-b bg-background px-5 py-4">
+          <AvailabilityPrompt
+            kind="training"
+            eventId={training.id}
+            deadlineIso={deadlineIso}
+            initialAnswer={rsvp.answer}
+            initialRoster={rsvp.roster}
+          />
+        </div>
+      )}
+
       {/* ── Zona branca — Foco do treino ── */}
       <div className="bg-background flex-1 px-5 py-4">
         <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
@@ -181,6 +210,8 @@ export default async function MinhaAreaPage() {
     .from("players")
     .select("id")
     .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   // ── Pagamentos em atraso ──────────────────────────────────
@@ -199,7 +230,7 @@ export default async function MinhaAreaPage() {
   const { data: nextTrainingRaw } = activeSeason?.id
     ? await supabase
         .from("trainings")
-        .select("id, date, start_time, location, type, notes")
+        .select("id, date, start_time, location, type, notes, rsvp_deadline_hours")
         .eq("season_id", activeSeason.id)
         .gte("date", today)
         .order("date", { ascending: true })
@@ -224,6 +255,27 @@ export default async function MinhaAreaPage() {
         .maybeSingle();
       trainingNote = (dbNote as { note_text: string } | null)?.note_text ?? null;
     }
+  }
+
+  // ── Confirmação de presença no próximo treino ─────────────
+  let trainingRsvp: TrainingRsvpProps = null;
+  if (nextTraining && linkedPlayer?.id) {
+    const [{ data: ownRsvp }, { data: rosterRows }] = await Promise.all([
+      supabase
+        .from("training_rsvps")
+        .select("status")
+        .eq("training_id", nextTraining.id)
+        .eq("player_id", linkedPlayer.id)
+        .maybeSingle(),
+      supabase.rpc("training_rsvp_roster", { p_training_id: nextTraining.id }),
+    ]);
+    trainingRsvp = {
+      answer:
+        ownRsvp?.status === "going" ? "yes"
+        : ownRsvp?.status === "not_going" ? "no"
+        : null,
+      roster: (rosterRows ?? []) as AvailabilityRosterRow[],
+    };
   }
 
   // ── Comunicados (chat de equipa, importante = true) ───────
@@ -323,8 +375,11 @@ export default async function MinhaAreaPage() {
 
       {/* ── Par de cartões: Próximo Jogo + Próximo Treino ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <NextGameCard highlightPlayerId={linkedPlayer?.id ?? null} />
-        <NextTrainingCard training={nextTraining} note={trainingNote} />
+        <NextGameCard
+          highlightPlayerId={linkedPlayer?.id ?? null}
+          availabilityPlayerId={linkedPlayer?.id ?? null}
+        />
+        <NextTrainingCard training={nextTraining} note={trainingNote} rsvp={trainingRsvp} />
       </div>
 
       {/* ── Linha 2: Estatísticas (2/3) + Comunicados (1/3) ── */}
