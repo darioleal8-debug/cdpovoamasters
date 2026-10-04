@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { NavLink } from "@/components/layout/nav-link";
 
 const PLAYER_NAV = [
-  { href: "/player",                 label: "Início",             icon: Home },
+  { href: "/player/minha-area",       label: "Início",             icon: Home },
   { href: "/player/plantel",         label: "Plantel",            icon: Users },
   { href: "/player/meu-perfil",      label: "O Meu Perfil",       icon: User },
   { href: "/player/meus-jogos",      label: "Os Meus Jogos",      icon: Calendar },

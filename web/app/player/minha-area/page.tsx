@@ -289,7 +289,7 @@ export default async function MinhaAreaPage() {
     { href: "/player/meus-jogos",      icon: Calendar,       label: "Os Meus Jogos",      desc: "Próximos jogos"     },
     { href: "/player/meus-treinos",    icon: Dumbbell,       label: "Os Meus Treinos",    desc: "Agenda de treinos"  },
     { href: "/player/meus-pagamentos", icon: CreditCard,     label: "Os Meus Pagamentos", desc: "Quotas"             },
-    { href: "/palmares",               icon: Trophy,         label: "Palmarés",            desc: "Historial"          },
+    { href: "/player/palmares",         icon: Trophy,         label: "Palmarés",            desc: "Historial"          },
   ] as const;
 
   return (
