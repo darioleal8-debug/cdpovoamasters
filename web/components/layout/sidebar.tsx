@@ -17,6 +17,7 @@ import {
   UserCog,
   FileUp,
   Landmark,
+  ActivitySquare,
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,10 @@ const managementItems = [
   { label: "Estatísticas",     href: "/estatisticas",  icon: BarChart3 },
   { label: "Histórico",        href: "/historico",     icon: History   },
   { label: "Palmarés",         href: "/palmares",      icon: Trophy    },
+];
+
+const adminOnlyItems = [
+  { label: "Utilização",       href: "/utilizacao",   icon: ActivitySquare },
 ];
 
 const playerAreaItems = [
@@ -78,6 +83,7 @@ export function Sidebar({ role, rolesExtra = [] }: { role?: UserRole; rolesExtra
   const isSeccionista    = role === "seccionista";
   const isManager        = rolesAll.includes("admin") || rolesAll.includes("treinador");
   const hasFinanceAccess = rolesAll.includes("admin") || rolesAll.includes("tesoureiro");
+  const isAdmin          = rolesAll.includes("admin");
 
   return (
     <aside
@@ -147,6 +153,17 @@ export function Sidebar({ role, rolesExtra = [] }: { role?: UserRole; rolesExtra
                 <SectionLabel>Financeiro</SectionLabel>
                 <div className="space-y-0.5">
                   <NavLink href="/financeiro" icon={Landmark} label="Gestão Financeira" />
+                </div>
+              </>
+            )}
+
+            {isAdmin && (
+              <>
+                <SectionLabel>Analytics</SectionLabel>
+                <div className="space-y-0.5">
+                  {adminOnlyItems.map((item) => (
+                    <NavLink key={item.href} {...item} />
+                  ))}
                 </div>
               </>
             )}
