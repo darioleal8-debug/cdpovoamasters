@@ -18,6 +18,7 @@ import {
   FileUp,
   Landmark,
   ActivitySquare,
+  Shield,
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,7 @@ const managementItems = [
   { label: "Estatísticas",     href: "/estatisticas",  icon: BarChart3 },
   { label: "Histórico",        href: "/historico",     icon: History   },
   { label: "Palmarés",         href: "/palmares",      icon: Trophy    },
+  { label: "Liga INATEL",      href: "/liga-inatel",   icon: Shield    },
 ];
 
 const adminOnlyItems = [
@@ -56,6 +58,7 @@ const seccionistaItems = [
   { label: "Jogos",        href: "/jogos",        icon: Calendar },
   { label: "Estatísticas", href: "/estatisticas", icon: BarChart3 },
   { label: "Palmarés",     href: "/palmares",     icon: Trophy    },
+  { label: "Liga INATEL",  href: "/liga-inatel",  icon: Shield    },
 ];
 
 const communicationItems = [

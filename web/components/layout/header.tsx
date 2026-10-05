@@ -49,6 +49,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/financeiro":      "Financeiro",
   "/configuracoes":   "Definições",
   "/utilizacao":      "Utilização",
+  "/liga-inatel":     "Liga INATEL",
 };
 
 function getTitle(pathname: string): string {

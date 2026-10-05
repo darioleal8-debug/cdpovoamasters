@@ -16,6 +16,7 @@ import {
   Settings,
   History,
   Landmark,
+  Shield,
 } from "lucide-react";
 import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
 import { useClubSettings } from "@/lib/club-context";
@@ -43,6 +44,7 @@ const SECONDARY: RailItem[] = [
   { label: "Stats",      href: "/estatisticas",  icon: BarChart3 },
   { label: "Histórico",  href: "/historico",     icon: History },
   { label: "Financeiro", href: "/financeiro",    icon: Landmark },
+  { label: "Liga",       href: "/liga-inatel",   icon: Shield },
   { label: "Definições", href: "/configuracoes", icon: Settings },
 ];
 

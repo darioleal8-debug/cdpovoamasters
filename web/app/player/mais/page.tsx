@@ -8,6 +8,7 @@ import {
   LogOut,
   Settings,
   User,
+  Shield,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "@/components/ui/toaster";
@@ -22,6 +23,7 @@ interface MenuItem {
 const ITEMS: MenuItem[] = [
   { label: "Os Meus Treinos",  href: "/player/meus-treinos",  icon: Dumbbell,   desc: "Presenças e sessões" },
   { label: "Pagamentos",       href: "/player/pagamentos",    icon: CreditCard,  desc: "Histórico de quotas" },
+  { label: "Liga INATEL",      href: "/liga-inatel",          icon: Shield,      desc: "Classificação e resultados" },
   { label: "O Meu Perfil",     href: "/player/conta",         icon: User,        desc: "Dados e foto de perfil" },
   { label: "Preferências",     href: "/player/preferencias",  icon: Settings,    desc: "Notificações e conta" },
 ];

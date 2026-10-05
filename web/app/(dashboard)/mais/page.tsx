@@ -12,6 +12,7 @@ import {
   Settings,
   Users,
   UserCog,
+  Shield,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "@/components/ui/toaster";
@@ -30,6 +31,7 @@ const ITEMS: MenuItem[] = [
   { label: "Estatísticas",     href: "/estatisticas",  icon: BarChart3,     desc: "Análise da época" },
   { label: "Histórico",        href: "/historico",     icon: History,       desc: "Épocas anteriores" },
   { label: "Financeiro",       href: "/financeiro",    icon: Landmark,      desc: "Caixa e entradas" },
+  { label: "Liga INATEL",      href: "/liga-inatel",   icon: Shield,        desc: "Classificação e resultados" },
   { label: "Gestão de Contas", href: "/gestao-contas", icon: UserCog,       desc: "Contas de utilizador" },
   { label: "Configurações",    href: "/configuracoes", icon: Settings,      desc: "Preferências do clube" },
 ];
