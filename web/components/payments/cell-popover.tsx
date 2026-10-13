@@ -96,14 +96,14 @@ export function CellPopover({ active, seasonId, onClose, onQuickSave, onOpenEdit
       {/* Header */}
       <div className="px-3 py-2.5 border-b flex items-center gap-2">
         <span
-          className="inline-flex h-5 items-center rounded-full px-2 text-[10px] font-bold"
+          className="inline-flex h-5 items-center rounded-full px-2 text-[11px] font-bold"
           style={{ background: colors.bg, color: colors.text }}
         >
           {CELL_STATUS_LABELS[status]}
         </span>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-semibold truncate">{player.name}</p>
-          <p className="text-[10px] text-muted-foreground">{monthLabel(cell.month, cell.year, true)}</p>
+          <p className="text-[11px] text-muted-foreground">{monthLabel(cell.month, cell.year, true)}</p>
         </div>
       </div>
 
@@ -122,7 +122,7 @@ export function CellPopover({ active, seasonId, onClose, onQuickSave, onOpenEdit
       )}
       {payment?.payment_date && (
         <div className="px-3 py-1.5 border-b">
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-[11px] text-muted-foreground">
             Pago em {new Date(payment.payment_date).toLocaleDateString("pt-PT")}
             {payment.method ? ` · ${payment.method}` : ""}
           </p>

@@ -63,11 +63,11 @@ export default async function MeusJogosPage() {
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-semibold truncate">{game.title}</p>
               {game.opponent && (
-                <Badge variant="outline" className="text-[10px]">
+                <Badge variant="outline" className="text-[11px]">
                   {game.title.includes("(Fora)") ? "@" : "vs"} {game.opponent}
                 </Badge>
               )}
-              {isPast && <Badge variant="secondary" className="text-[10px]">Terminado</Badge>}
+              {isPast && <Badge variant="secondary" className="text-[11px]">Terminado</Badge>}
             </div>
             <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
@@ -87,7 +87,7 @@ export default async function MeusJogosPage() {
                   </p>
                 : <div className="mt-1 flex flex-wrap gap-1.5">
                     {callups.map((c) => (
-                      <Badge key={c.id} variant="secondary" className="text-[10px]">
+                      <Badge key={c.id} variant="secondary" className="text-[11px]">
                         {c.number != null ? `#${c.number} ` : ""}{c.name}
                       </Badge>
                     ))}

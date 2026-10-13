@@ -44,7 +44,7 @@ export function DashboardShell({ userName, userEmail, userRole, userRolesExtra, 
          * Em mobile adicionamos padding-bottom igual à altura da barra inferior
          * para que o conteúdo não fique tapado.
          */}
-        <main className="flex-1 overflow-y-auto bg-background">
+        <main className="flex-1 overflow-y-auto overscroll-y-contain bg-background">
           {/*
            * Padding bottom: mobile → espaço para a bottom-nav + gap
            *                  tablet+ → padding normal (bottom-nav esconde em md:hidden)

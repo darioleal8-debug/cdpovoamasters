@@ -56,7 +56,7 @@ export default function SpectatorPage() {
     const rawStats = (statsRes.data ?? []) as (PlayerGameStatsWithUser & { player_id: string })[];
     const playerIds = [...new Set(rawStats.map((s) => s.player_id))];
     const { data: rosterRows } = playerIds.length > 0
-      ? await supabase.from("v_roster").select("player_id, name").in("player_id", playerIds)
+      ? await supabase.from("v_roster_public").select("player_id, name").in("player_id", playerIds)
       : { data: [] };
     const nameById = new Map((rosterRows ?? []).map((r) => [r.player_id as string, r.name as string]));
     setStats(rawStats.map((s) => ({ ...s, user: { id: s.player_id, name: nameById.get(s.player_id) ?? "?" } })) as PlayerRow[]);

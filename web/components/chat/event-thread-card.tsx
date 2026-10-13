@@ -81,7 +81,7 @@ export function EventThreadCard({ thread, active, onClick }: Props) {
       {/* Etiqueta de tipo + data */}
       <div className="flex items-center justify-between gap-2">
         <span
-          className="text-[10px] font-bold uppercase tracking-widest"
+          className="text-[11px] font-bold uppercase tracking-widest"
           style={{ color: active ? "var(--action, #F97316)" : "#A9B4C7" }}
         >
           {typeLabel} · {dateLabel}
@@ -89,7 +89,7 @@ export function EventThreadCard({ thread, active, onClick }: Props) {
         <div className="flex items-center gap-2 shrink-0">
           {!past && thread.days_until !== null && thread.days_until <= 7 && (
             <span
-              className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+              className="text-[11px] font-bold px-1.5 py-0.5 rounded-full"
               style={{ background: "rgba(245,158,11,.15)", color: "var(--highlight, #F59E0B)" }}
             >
               {thread.days_until === 0 ? "Hoje" : `${thread.days_until}d`}
@@ -97,7 +97,7 @@ export function EventThreadCard({ thread, active, onClick }: Props) {
           )}
           {thread.unread_count > 0 && (
             <span
-              className="h-5 min-w-5 flex items-center justify-center rounded-full text-[10px] font-bold px-1"
+              className="h-5 min-w-5 flex items-center justify-center rounded-full text-[11px] font-bold px-1"
               style={{ background: "var(--action, #F97316)", color: "#fff" }}
             >
               {thread.unread_count}
@@ -125,7 +125,7 @@ export function EventThreadCard({ thread, active, onClick }: Props) {
           <p className="text-[11px] truncate" style={{ color: "rgba(169,180,199,.7)" }}>
             {previewText(thread.last_message)}
           </p>
-          <span className="shrink-0 text-[10px]" style={{ color: "rgba(169,180,199,.5)" }}>
+          <span className="shrink-0 text-[11px]" style={{ color: "rgba(169,180,199,.5)" }}>
             {fmtPreviewTime(thread.last_message.created_at)}
           </span>
         </div>

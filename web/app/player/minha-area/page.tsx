@@ -104,7 +104,7 @@ function NextTrainingCard({
             Próximo Treino
           </span>
           <Badge
-            className="text-[10px] font-semibold"
+            className="text-[11px] font-semibold"
             style={{
               backgroundColor: isToday
                 ? "var(--club-secondary, #F28C28)"
@@ -143,7 +143,7 @@ function NextTrainingCard({
 
       {/* ── Zona branca — Foco do treino ── */}
       <div className="bg-background flex-1 px-5 py-4">
-        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
           Foco do treino
         </p>
         {note ? (
@@ -256,7 +256,7 @@ export default async function MinhaAreaPage() {
         ];
 
         const { data: senders } = senderIds.length > 0
-          ? await supabase.from("users").select("id, name, role").in("id", senderIds)
+          ? await supabase.from("user_display_names").select("id, name, role").in("id", senderIds)
           : { data: [] };
 
         const senderById = new Map(
@@ -356,7 +356,7 @@ export default async function MinhaAreaPage() {
                     <div className="flex items-start gap-2.5">
                       {/* Avatar */}
                       <div
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
                         style={{ backgroundColor: "var(--club-primary, #1d4079)" }}
                       >
                         {initials(c.sender_name)}
@@ -364,10 +364,10 @@ export default async function MinhaAreaPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
                           <p className="text-xs font-semibold truncate">{c.sender_name}</p>
-                          <p className="text-[10px] text-muted-foreground shrink-0">{relTime(c.created_at)}</p>
+                          <p className="text-[11px] text-muted-foreground shrink-0">{relTime(c.created_at)}</p>
                         </div>
                         {c.sender_role && (
-                          <p className="text-[10px] text-muted-foreground capitalize">{c.sender_role}</p>
+                          <p className="text-[11px] text-muted-foreground capitalize">{c.sender_role}</p>
                         )}
                         <p className="text-xs text-foreground/80 mt-1 line-clamp-2 leading-relaxed">
                           {c.content}
@@ -410,7 +410,7 @@ export default async function MinhaAreaPage() {
             </div>
             <div>
               <p className="text-sm font-semibold">{label}</p>
-              <p className="text-[10px] text-muted-foreground">{desc}</p>
+              <p className="text-[11px] text-muted-foreground">{desc}</p>
             </div>
           </Link>
         ))}

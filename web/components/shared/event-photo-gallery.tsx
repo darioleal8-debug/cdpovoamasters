@@ -360,11 +360,11 @@ export function EventPhotoGallery({ entityType, entityId, title }: Props) {
               {/* Hover overlay */}
               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-1.5">
                 {p.uploader_name && (
-                  <p className="text-white text-[10px] font-medium truncate leading-tight">
+                  <p className="text-white text-[11px] font-medium truncate leading-tight">
                     {p.uploader_name}
                   </p>
                 )}
-                <p className="text-white/70 text-[10px] truncate leading-tight">
+                <p className="text-white/70 text-[11px] truncate leading-tight">
                   {new Date(p.created_at).toLocaleDateString("pt-PT", { day: "2-digit", month: "2-digit" })}
                 </p>
               </div>

@@ -146,7 +146,7 @@ export function CreateTrainingModal({ open, onClose, seasonId, onSubmit }: Props
                   <p className="text-xs font-medium text-green-800 dark:text-green-200">
                     Localização capturada
                     {gps.location.accuracy <= 20 && (
-                      <span className="ml-1.5 text-[10px] font-normal opacity-80">
+                      <span className="ml-1.5 text-[11px] font-normal opacity-80">
                         (precisão: {Math.round(gps.location.accuracy)}m)
                       </span>
                     )}
