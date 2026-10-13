@@ -7,7 +7,8 @@
 --   gestão desportiva = admin, treinador, seccionista  → is_manager()
 --   quotas/finanças   = admin, tesoureiro               → is_finance()
 --   temporadas, definições do clube, kits, templates    → is_admin()
--- Todas exigem conta ativa (users.active) e consideram users.roles_extra.
+-- Todas (incluindo is_admin/is_staff/is_trainer_or_above, redefinidas aqui) exigem conta
+-- ativa (users.active) e consideram users.roles_extra.
 -- =====================================================================
 
 -- ── 1. Enum de faltas usado pelo ecrã live (STA-07) ───────────────────
@@ -38,6 +39,26 @@ CREATE OR REPLACE FUNCTION public.is_finance()
 RETURNS boolean
 LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
   SELECT public.has_active_role(ARRAY['admin','tesoureiro'])
+$$;
+
+-- As funções já existentes (usadas por dezenas de políticas) passam também a exigir conta ativa
+-- e a honrar roles_extra — mantendo os papéis de cada uma (revisão final, Importante 2).
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS boolean
+LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
+  SELECT public.has_active_role(ARRAY['admin'])
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_staff()
+RETURNS boolean
+LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
+  SELECT public.has_active_role(ARRAY['admin','seccionista'])
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_trainer_or_above()
+RETURNS boolean
+LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
+  SELECT public.has_active_role(ARRAY['admin','seccionista','treinador'])
 $$;
 
 REVOKE ALL ON FUNCTION public.has_active_role(text[]), public.is_manager(), public.is_finance() FROM PUBLIC, anon;
@@ -130,7 +151,8 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
 DECLARE v_uid uuid := (SELECT auth.uid());
 BEGIN
   IF v_uid IS NULL THEN RETURN NEW; END IF;
-  IF EXISTS (SELECT 1 FROM public.users WHERE id = v_uid AND role = 'admin') THEN RETURN NEW; END IF;
+  -- Só um admin ATIVO está isento (um admin desativado não se pode reativar a si próprio)
+  IF public.has_active_role(ARRAY['admin']) THEN RETURN NEW; END IF;
   IF NEW.role                 IS DISTINCT FROM OLD.role                 THEN RAISE EXCEPTION 'Sem permissão para alterar o campo role'; END IF;
   IF NEW.status               IS DISTINCT FROM OLD.status               THEN RAISE EXCEPTION 'Sem permissão para alterar o campo status'; END IF;
   IF NEW.active               IS DISTINCT FROM OLD.active               THEN RAISE EXCEPTION 'Sem permissão para alterar o campo active'; END IF;

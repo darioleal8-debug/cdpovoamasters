@@ -9,7 +9,7 @@ DECLARE n bigint; BEGIN EXECUTE sql; GET DIAGNOSTICS n = ROW_COUNT; RETURN n; EX
 GRANT EXECUTE ON FUNCTION public._run(text), public._count(text), public._affected(text) TO authenticated, anon;
 
 -- Fixtures
-INSERT INTO auth.users VALUES ('a0000000-0000-0000-0000-000000000001'),('a0000000-0000-0000-0000-000000000002'),
+INSERT INTO auth.users VALUES ('a0000000-0000-0000-0000-000000000008'),('a0000000-0000-0000-0000-000000000001'),('a0000000-0000-0000-0000-000000000002'),
  ('a0000000-0000-0000-0000-000000000003'),('a0000000-0000-0000-0000-000000000004'),('a0000000-0000-0000-0000-000000000005'),
  ('a0000000-0000-0000-0000-000000000006'),('a0000000-0000-0000-0000-000000000007');
 INSERT INTO public.users(id,email,role,active) VALUES
@@ -19,7 +19,8 @@ INSERT INTO public.users(id,email,role,active) VALUES
  ('a0000000-0000-0000-0000-000000000004','tesoureiro@x','tesoureiro',true),
  ('a0000000-0000-0000-0000-000000000005','j1@x','jogador',true),
  ('a0000000-0000-0000-0000-000000000006','j2@x','jogador',true),
- ('a0000000-0000-0000-0000-000000000007','treinador.inativo@x','treinador',false);
+ ('a0000000-0000-0000-0000-000000000007','treinador.inativo@x','treinador',false),
+ ('a0000000-0000-0000-0000-000000000008','admin.inativo@x','admin',false);
 INSERT INTO public.seasons(id,name) VALUES ('b0000000-0000-0000-0000-000000000001','2026/27');
 INSERT INTO public.players(id,season_id,user_id) VALUES
  ('c0000000-0000-0000-0000-000000000001','b0000000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-000000000005'),
@@ -59,6 +60,13 @@ RESET ROLE;
 -- ── Treinador desativado ────────────────────────────────────
 SET ROLE authenticated; SELECT set_config('request.jwt.claim.sub','a0000000-0000-0000-0000-000000000007',false);
 INSERT INTO public._results(test,ok,detail) SELECT 'SEC-14 treinador desativado não cria jogo', r LIKE 'erro%', r FROM (SELECT public._run($q$INSERT INTO public.events(season_id,title) VALUES ('b0000000-0000-0000-0000-000000000001','Jogo inativo')$q$) r) x;
+INSERT INTO public._results(test,ok,detail) SELECT 'Final-2 treinador desativado não cria treino (is_trainer_or_above)', r LIKE 'erro%', r FROM (SELECT public._run($q$INSERT INTO public.trainings(season_id) VALUES ('b0000000-0000-0000-0000-000000000001')$q$) r) x;
+RESET ROLE;
+
+-- ── Admin desativado ────────────────────────────────────────
+SET ROLE authenticated; SELECT set_config('request.jwt.claim.sub','a0000000-0000-0000-0000-000000000008',false);
+INSERT INTO public._results(test,ok,detail) SELECT 'Final-2 admin desativado não cria temporada (is_admin)', r LIKE 'erro%', r FROM (SELECT public._run($q$INSERT INTO public.seasons(name) VALUES ('inativo')$q$) r) x;
+INSERT INTO public._results(test,ok,detail) SELECT 'Final-2 admin desativado não se reativa (trigger)', r LIKE 'erro%', r FROM (SELECT public._run($q$UPDATE public.users SET active=true WHERE id='a0000000-0000-0000-0000-000000000008'$q$) r) x;
 RESET ROLE;
 
 -- ── Tesoureiro ──────────────────────────────────────────────

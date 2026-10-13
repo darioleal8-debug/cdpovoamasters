@@ -84,6 +84,7 @@ CREATE POLICY "p1_game_callups_write" ON public.game_callups FOR ALL TO authenti
 CREATE POLICY "p1_player_payments_staff" ON public.player_payments FOR ALL TO authenticated USING (is_staff()) WITH CHECK (is_staff());
 CREATE POLICY "p1_player_payments_own" ON public.player_payments FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM public.players p WHERE p.id = player_id AND p.user_id = (SELECT auth.uid())));
 CREATE POLICY "p1_trainings_select" ON public.trainings FOR SELECT TO authenticated USING ((SELECT auth.uid()) IS NOT NULL);
+CREATE POLICY "p1_trainings_write" ON public.trainings FOR ALL TO authenticated USING (is_trainer_or_above()) WITH CHECK (is_trainer_or_above());
 CREATE POLICY "p1_training_attendance_staff" ON public.training_attendance FOR ALL TO authenticated USING (is_trainer_or_above()) WITH CHECK (is_trainer_or_above());
 CREATE POLICY "p1_training_attendance_own_select" ON public.training_attendance FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM public.players p WHERE p.id = player_id AND p.user_id = (SELECT auth.uid())));
 CREATE POLICY "p1_training_attendance_own_insert" ON public.training_attendance FOR INSERT TO authenticated WITH CHECK (player_id IN (SELECT players.id FROM public.players WHERE players.user_id = auth.uid()));
