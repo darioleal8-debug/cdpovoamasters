@@ -107,16 +107,17 @@ export async function GET(req: NextRequest) {
 
   if (nextTraining) {
     const { data: attendance } = await supabase
-      .from("training_attendances")
-      .select("player_id, attended")
-      .eq("training_id", nextTraining.id);
+      .from("training_attendance")
+      .select("player_id, status")
+      .eq("training_id", nextTraining.id)
+      .in("status", ["present", "late"]);
 
-    type AttRow = { player_id: string; attended: boolean };
-    const rows = (attendance ?? []) as unknown as AttRow[];
-    attendedCount = rows.filter((r) => r.attended).length;
+    type AttRow = { player_id: string; status: string };
+    const rows = (attendance ?? []) as AttRow[];
+    attendedCount = rows.length;
 
     // Enriquecer com nome e foto via v_roster
-    const attendedIds = rows.filter((r) => r.attended).slice(0, 5).map((r) => r.player_id);
+    const attendedIds = rows.slice(0, 5).map((r) => r.player_id);
     if (attendedIds.length > 0) {
       const { data: attRoster } = await supabase
         .from("v_roster")
@@ -139,12 +140,15 @@ export async function GET(req: NextRequest) {
       .eq("season_id", sid)
       .gte("date", ago14).lt("date", today);
 
-    for (const t of (recentTrainings ?? []) as Array<{ id: string }>) {
-      const { count } = await supabase
-        .from("training_attendances")
-        .select("id", { count: "exact", head: true })
-        .eq("training_id", t.id);
-      if ((count ?? 0) === 0) missingAttCount++;
+    // Uma só query em vez de uma por treino (PERF-08)
+    const recentIds = ((recentTrainings ?? []) as Array<{ id: string }>).map((t) => t.id);
+    if (recentIds.length > 0) {
+      const { data: marked } = await supabase
+        .from("training_attendance")
+        .select("training_id")
+        .in("training_id", recentIds);
+      const withAttendance = new Set(((marked ?? []) as Array<{ training_id: string }>).map((r) => r.training_id));
+      missingAttCount = recentIds.filter((id) => !withAttendance.has(id)).length;
     }
   }
 
@@ -234,7 +238,7 @@ export async function GET(req: NextRequest) {
   } | null = null;
 
   const isPlayer = userProfile?.role === "jogador" ||
-    (Array.isArray(userProfile?.roles_extra) && userProfile?.roles_extra.includes("player"));
+    (Array.isArray(userProfile?.roles_extra) && userProfile?.roles_extra.includes("jogador"));
 
   if (isPlayer) {
     // Encontrar o player_id deste utilizador na temporada corrente
@@ -244,20 +248,20 @@ export async function GET(req: NextRequest) {
     if (playerRow) {
       const pid = playerRow.id;
       const [statsRes, attRes, payRes] = await Promise.all([
-        supabase.from("player_game_stats").select("points").eq("player_id", pid),
-        supabase.from("training_attendances").select("attended").eq("player_id", pid),
+        supabase.from("player_game_stats").select("pts").eq("player_id", pid),
+        supabase.from("training_attendance").select("status").eq("player_id", pid),
         supabase.from("player_payments").select("status").eq("player_id", pid).eq("season_id", sid),
       ]);
 
-      const stats = (statsRes.data ?? []) as Array<{ points: number }>;
-      const att   = (attRes.data  ?? []) as Array<{ attended: boolean }>;
+      const stats = (statsRes.data ?? []) as Array<{ pts: number }>;
+      const att   = (attRes.data  ?? []) as Array<{ status: string }>;
       const pays  = (payRes.data  ?? []) as Array<{ status: string }>;
 
       const gamesPlayed   = stats.length;
-      const totalPts      = stats.reduce((s, r) => s + (Number(r.points) || 0), 0);
+      const totalPts      = stats.reduce((s, r) => s + (Number(r.pts) || 0), 0);
       const avgPoints     = gamesPlayed > 0 ? Math.round((totalPts / gamesPlayed) * 10) / 10 : null;
       const attTotal      = att.length;
-      const attPct        = attTotal > 0 ? Math.round(att.filter((r) => r.attended).length / attTotal * 100) : null;
+      const attPct        = attTotal > 0 ? Math.round(att.filter((r) => r.status === "present" || r.status === "late").length / attTotal * 100) : null;
       const hasLate       = pays.some((p) => p.status === "late" || p.status === "partial");
       const allPaid       = pays.length > 0 && pays.every((p) => p.status === "paid" || p.status === "exempt");
 

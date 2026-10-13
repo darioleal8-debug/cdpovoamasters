@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { buildPlayerProfileUpdate } from "@/lib/profile/player-update";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
@@ -44,22 +45,19 @@ export async function GET() {
   // Buscar registo de jogador ligado (se existir)
   const { data: playerRows } = await admin
     .from("players")
-    .select("id, name, position, height, weight, age, photo_url, number, season_id")
+    .select("id, position, height, weight, age, photo_url, number, season_id") // sem players.name (041)
     .eq("user_id", authUser.id)
     .order("created_at", { ascending: false })
     .limit(1);
 
   const player = playerRows?.[0] ?? null;
 
-  return NextResponse.json({
-    user: profile ?? {
-      id:    authUser.id,
-      email: authUser.email,
-      name:  authUser.user_metadata?.name ?? authUser.email,
-      role:  "admin", // fallback para utilizadores sem registo (admin original)
-    },
-    player,
-  });
+  // Sem perfil em public.users já não é tratado como admin (DAT-04/SEC-23)
+  if (!profile) {
+    return NextResponse.json({ user: null, player: null, error: "Conta sem perfil no clube." }, { status: 403 });
+  }
+
+  return NextResponse.json({ user: profile, player });
 }
 
 // ─── PUT /api/auth/me ─── jogador edita o próprio perfil ─
@@ -87,18 +85,22 @@ export async function PUT(req: NextRequest) {
     if (error) return fail(`Erro ao atualizar perfil: ${error.message}`, 500);
   }
 
-  // Atualizar dados do jogador (se ligado)
-  const playerUpdates: Record<string, unknown> = {};
-  if (body.position !== undefined) playerUpdates.position = body.position || null;
-  if (body.height   !== undefined) playerUpdates.height   = Number(body.height) || null;
-  if (body.weight   !== undefined) playerUpdates.weight   = Number(body.weight) || null;
-  if (body.age      !== undefined) playerUpdates.age      = Number(body.age)    || null;
-
+  // Atualizar dados desportivos: só campos preenchidos e só no perfil da época ativa (DAT-02)
+  const playerUpdates = buildPlayerProfileUpdate(body);
   if (Object.keys(playerUpdates).length > 0) {
-    await admin
-      .from("players")
-      .update(playerUpdates)
-      .eq("user_id", authUser.id);
+    const { data: activeSeason } = await admin
+      .from("seasons").select("id").eq("status", "ativa").maybeSingle();
+    if (activeSeason) {
+      const { error: playerErr } = await admin
+        .from("players")
+        .update(playerUpdates)
+        .eq("user_id", authUser.id)
+        .eq("season_id", activeSeason.id);
+      if (playerErr) {
+        console.error("[api/auth/me] Erro ao atualizar perfil desportivo:", playerErr.message);
+        return NextResponse.json({ error: "Não foi possível guardar os dados desportivos." }, { status: 500 });
+      }
+    }
   }
 
   return NextResponse.json({ success: true });

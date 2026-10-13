@@ -112,7 +112,7 @@ export function useLiveGame(
     // Step 2: fetch players rows (name, jersey number, optional user_id)
     const { data: playersData } = await supabase
       .from("players")
-      .select("id, name, number, user_id")
+      .select("id, number, user_id") // players.name foi removida (041); o nome vem de users (STA-01)
       .in("id", playerIds)
       .order("number", { ascending: true });
 
@@ -153,7 +153,7 @@ export function useLiveGame(
         age: null,
         user: {
           id: uid,
-          name: userData?.name ?? (p.name as string),
+          name: userData?.name ?? "—",
           email: "",
           status: "ativo",
         },

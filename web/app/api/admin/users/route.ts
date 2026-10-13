@@ -232,36 +232,12 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (playerError) {
-      // 23505 = unique_violation em uq_player_name_season — já existe
-      // um jogador com este nome nesta temporada (ex: criado manualmente
-      // em /jogadores). Em vez de falhar, ligamos a esse registo.
-      if (playerError.code === "23505") {
-        const { data: linked, error: linkError } = await admin
-          .from("players")
-          .update({
-            user_id: newUserId,
-            ...(jersey_number ? { number: Number(jersey_number) } : {}),
-            ...(position      ? { position }                      : {}),
-          })
-          .eq("name", name)
-          .eq("season_id", season_id)
-          .is("user_id", null)
-          .select()
-          .single();
-
-        if (linkError || !linked) {
-          playerCreationError =
-            "Já existe um jogador com este nome nesta temporada, associado a outra conta. " +
-            "Liga manualmente em Gestão de Jogadores.";
-          console.error("[api/admin/users] Conflito ao ligar jogador:", linkError?.message ?? playerError.message);
-        } else {
-          playerRecord = linked;
-          console.log("[api/admin/users] Jogador existente ligado à nova conta:", linked.id);
-        }
-      } else {
-        playerCreationError = playerError.message;
-        console.error("[api/admin/users] Erro ao criar jogador:", playerError.message);
-      }
+      // players.name já não existe (041) e (user_id, season_id) é único: um conflito aqui
+      // significa que este utilizador já tem perfil nesta época — não há registo "por nome" a ligar.
+      playerCreationError = playerError.code === "23505"
+        ? "Este utilizador já tem perfil de jogador nesta temporada."
+        : playerError.message;
+      console.error("[api/admin/users] Erro ao criar jogador:", playerError.message);
     } else {
       playerRecord = newPlayer;
     }

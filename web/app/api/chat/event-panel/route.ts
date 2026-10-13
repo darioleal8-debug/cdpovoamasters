@@ -14,10 +14,16 @@ export async function GET(req: Request) {
 
   // ── Jogo ─────────────────────────────────────────────────────
   if (eventId) {
-    const { data: callups } = await supabase
-      .from("game_callups")
-      .select("status, player_id")
-      .eq("event_id", eventId);
+    // game_callups não tem status nem event_id (CONV-04); a resposta do atleta vive em game_availability
+    const [{ data: callups }, { data: availability }] = await Promise.all([
+      supabase.from("game_callups").select("player_id").eq("game_id", eventId),
+      supabase.from("game_availability").select("player_id, status").eq("game_id", eventId),
+    ]);
+    const availabilityByPlayer = new Map(
+      ((availability ?? []) as Array<{ player_id: string; status: string }>).map((a) => [a.player_id, a.status])
+    );
+    const toPanelStatus = (s: string | undefined) =>
+      s === "available" ? "confirmado" : s === "unavailable" ? "indisponivel" : "pendente";
 
     const playerIds = (callups ?? []).map((c) => c.player_id as string).filter(Boolean);
     const { data: roster } = playerIds.length > 0
@@ -32,7 +38,7 @@ export async function GET(req: Request) {
         name:      r?.name      ?? "—",
         position:  r?.position  ?? null,
         photo_url: r?.photo_url ?? null,
-        status:    (c.status as string) ?? "pendente",
+        status:    toPanelStatus(availabilityByPlayer.get(c.player_id as string)),
       };
     });
 
@@ -42,10 +48,10 @@ export async function GET(req: Request) {
   // ── Treino ────────────────────────────────────────────────────
   if (trainingId) {
     const { data: attendances } = await supabase
-      .from("training_attendances")
-      .select("attended, player_id")
+      .from("training_attendance")
+      .select("player_id, status")
       .eq("training_id", trainingId)
-      .eq("attended", true);
+      .in("status", ["present", "late"]);
 
     const playerIds = (attendances ?? []).map((a) => a.player_id as string).filter(Boolean);
     const { data: roster } = playerIds.length > 0

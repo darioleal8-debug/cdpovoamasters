@@ -1,32 +1,32 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
+import { authorize } from "@/lib/auth/guards";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  const auth = await authorize();
+  if (!auth.ok) return auth.response;
+  const supabase = auth.supabase;
 
-  // Find team chat(s)
-  const { data: teamChats } = await supabase
+  // Comunicados = canal 'announcement' (onde o admin publica). Lido com service role porque
+  // é para todos os membros ativos, participem ou não do canal (UX-12).
+  const admin = await createAdminClient();
+  const { data: announcement } = await admin
     .from("chats")
     .select("id")
-    .eq("type", "team")
-    .limit(5);
+    .eq("type", "announcement")
+    .maybeSingle();
 
-  if (!teamChats || teamChats.length === 0) {
+  if (!announcement?.id) {
     return NextResponse.json({ comunicados: [] });
   }
 
-  const teamChatIds = teamChats.map((c: { id: string }) => c.id);
-
-  // Fetch important messages
-  const { data: msgs } = await supabase
+  const { data: msgs } = await admin
     .from("chat_messages")
     .select("id, content, created_at, sender_id")
-    .in("chat_id", teamChatIds)
-    .eq("importante", true)
+    .eq("chat_id", announcement.id)
+    .eq("is_system", false)
     .is("hidden_at", null)
     .order("created_at", { ascending: false })
     .limit(3);

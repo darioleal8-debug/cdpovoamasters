@@ -88,8 +88,9 @@ export async function POST(
   if (!session) return fail("Sessão de jogo não encontrada", 404);
 
   // Load roster for this season
+  // players.name foi removida (041): nome via v_roster (id = players.id) (STA-01)
   const { data: players } = await db
-    .from("players")
+    .from("v_roster")
     .select("id, name, number")
     .eq("season_id", session.season_id);
 

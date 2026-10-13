@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import {
   AlertTriangle, Calendar, Clock, CreditCard,
@@ -226,22 +226,23 @@ export default async function MinhaAreaPage() {
     }
   }
 
-  // ── Comunicados (chat de equipa, importante = true) ───────
+  // ── Comunicados (canal 'announcement', onde o admin publica — UX-12) ───────
+  // Lido com service role: é para todos os membros ativos (o layout já garante sessão ativa).
   let comunicados: ComunicadoRow[] = [];
   try {
-    const { data: teamChat } = await supabase
+    const admin = await createAdminClient();
+    const { data: teamChat } = await admin
       .from("chats")
       .select("id")
-      .eq("type", "team")
-      .limit(1)
+      .eq("type", "announcement")
       .maybeSingle();
 
     if (teamChat?.id) {
-      const { data: msgs } = await supabase
+      const { data: msgs } = await admin
         .from("chat_messages")
         .select("id, content, created_at, sender_id")
         .eq("chat_id", teamChat.id)
-        .eq("importante", true)
+        .eq("is_system", false)
         .is("hidden_at", null)
         .order("created_at", { ascending: false })
         .limit(3);
