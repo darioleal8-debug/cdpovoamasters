@@ -1,4 +1,5 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { authorize } from "@/lib/auth/guards";
 import { redirect } from "next/navigation";
 import {
   AlertTriangle, Calendar, Clock, CreditCard,
@@ -159,6 +160,9 @@ function NextTrainingCard({
 // ── Página principal ──────────────────────────────────────────────────────────
 
 export default async function MinhaAreaPage() {
+  // Verificação própria: na navegação cliente o layout não volta a correr (revisão final, Importante 3)
+  const authz = await authorize();
+  if (!authz.ok) redirect(authz.response.status === 401 ? "/login" : "/login?reason=inactive");
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");

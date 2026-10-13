@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
+import { authorize } from "@/lib/auth/guards";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, User } from "lucide-react";
 import { POSITION_LABELS } from "@/lib/utils";
@@ -23,6 +24,9 @@ export default async function PlayerPublicProfilePage({
 }) {
   const { playerId } = await params;
   if (!playerId || playerId === "null") notFound();
+  // Verificação própria: na navegação cliente o layout não volta a correr (revisão final, Importante 3)
+  const authz = await authorize();
+  if (!authz.ok) redirect(authz.response.status === 401 ? "/login" : "/login?reason=inactive");
 
   const admin = await createAdminClient();
 
