@@ -1,3 +1,4 @@
+import { todayInClubTz } from "@/lib/time/club-time";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { authorize } from "@/lib/auth/guards";
 import { redirect } from "next/navigation";
@@ -40,7 +41,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 function dateLabel(dateStr: string): string {
-  const todayMs = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00").getTime();
+  const todayMs = new Date(todayInClubTz() + "T00:00:00").getTime();
   const tMs     = new Date(dateStr + "T00:00:00").getTime();
   const diff    = Math.round((tMs - todayMs) / 86_400_000);
   if (diff === 0) return "Hoje";
@@ -173,7 +174,7 @@ export default async function MinhaAreaPage() {
     .eq("id", user.id)
     .single();
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInClubTz();
 
   const { data: activeSeason } = await supabase
     .from("seasons")

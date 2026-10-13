@@ -1,3 +1,4 @@
+import { todayInClubTz } from "@/lib/time/club-time";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -5,7 +6,7 @@ export const runtime = "nodejs";
 
 // ── Helpers ─────────────────────────────────────────────────
 function daysUntil(dateStr: string): number {
-  const today = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00").getTime();
+  const today = new Date(todayInClubTz() + "T00:00:00").getTime();
   return Math.round((new Date(dateStr + "T00:00:00").getTime() - today) / 86_400_000);
 }
 
@@ -27,8 +28,8 @@ export async function GET(req: NextRequest) {
 
   const sp        = req.nextUrl.searchParams;
   const seasonId  = sp.get("season_id");
-  const today     = new Date().toISOString().slice(0, 10);
-  const ago14     = new Date(Date.now() - 14 * 86_400_000).toISOString().slice(0, 10);
+  const today     = todayInClubTz();
+  const ago14     = todayInClubTz(new Date(Date.now() - 14 * 86_400_000));
 
   // Temporada de contexto (ou activa)
   const seasonRes = seasonId

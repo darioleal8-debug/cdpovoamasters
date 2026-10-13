@@ -1,3 +1,4 @@
+import { todayInClubTz } from "@/lib/time/club-time";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Clock, Dumbbell, MapPin, BookOpen, Pin, CalendarDays, CheckCircle2, XCircle, MessageSquare } from "lucide-react";
@@ -65,7 +66,7 @@ export default async function MeusTreinosPage() {
   const { data: season } = await supabase
     .from("seasons").select("id").eq("status", "ativa").maybeSingle();
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInClubTz();
 
   const [{ data: upcoming }, { data: past }] = season
     ? await Promise.all([

@@ -1,3 +1,4 @@
+import { todayInClubTz } from "@/lib/time/club-time";
 import { createClient } from "@/lib/supabase/server";
 import { Calendar, Clock, MapPin, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +11,7 @@ const POSITION_LABELS: Record<string, string> = {
 };
 
 function dateLabel(dateStr: string): string {
-  const todayMs  = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00").getTime();
+  const todayMs  = new Date(todayInClubTz() + "T00:00:00").getTime();
   const gameMs   = new Date(dateStr + "T00:00:00").getTime();
   const diffDays = Math.round((gameMs - todayMs) / 86_400_000);
   if (diffDays === 0) return "Hoje";
@@ -36,7 +37,7 @@ export async function NextGameCard({
   showAdminLinks?: boolean;
 }) {
   const supabase = await createClient();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInClubTz();
 
   const { data: game } = await supabase
     .from("events")

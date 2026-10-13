@@ -1,3 +1,4 @@
+import { todayInClubTz } from "@/lib/time/club-time";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Calendar, Clock, MapPin, Users } from "lucide-react";
@@ -11,7 +12,7 @@ export default async function MeusJogosPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInClubTz();
 
   // Buscar todos os jogos: próximos (ASC) + passados (DESC), depois unir mantendo essa ordem
   const [{ data: upcoming }, { data: past }] = await Promise.all([

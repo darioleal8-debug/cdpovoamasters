@@ -15,18 +15,16 @@ const MONTH_NAMES_FULL = [
   "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro",
 ];
 
-export function getSeasonMonths(season: Season): SeasonMonth[] {
-  const start = new Date(season.start_date);
-  const end   = new Date(season.end_date);
+export function getSeasonMonths(season: Pick<Season, "start_date" | "end_date">): SeasonMonth[] {
+  // Parse manual de YYYY-MM-DD: new Date("YYYY-MM-DD") é meia-noite UTC e, a oeste de UTC,
+  // getMonth() devolvia o mês anterior (QUO-19)
+  const [sy, sm] = season.start_date.split("-").map(Number);
+  const [ey, em] = season.end_date.split("-").map(Number);
   const result: SeasonMonth[] = [];
-  const cur = new Date(start.getFullYear(), start.getMonth(), 1);
-  while (cur <= end) {
-    result.push({
-      month: cur.getMonth() + 1,
-      year:  cur.getFullYear(),
-      label: `${MONTH_NAMES_PT[cur.getMonth()]} ${cur.getFullYear()}`,
-    });
-    cur.setMonth(cur.getMonth() + 1);
+  for (let y = sy, m = sm; y < ey || (y === ey && m <= em); m++) {
+    if (m > 12) { m = 1; y++; if (y > ey) break; }
+    if (y === ey && m > em) break;
+    result.push({ month: m, year: y, label: `${MONTH_NAMES_PT[m - 1]} ${y}` });
   }
   return result;
 }

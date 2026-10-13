@@ -1,4 +1,5 @@
 ﻿"use client";
+import { todayInClubTz } from "@/lib/time/club-time";
 
 import { useState, useMemo } from "react";
 import { format, parseISO, startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
@@ -75,8 +76,8 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
         const d = parseISO(t.date);
         return isWithinInterval(d, { start: weekStart, end: weekEnd });
       }
-      if (filterPeriod === "future") return t.date >= now.toISOString().slice(0, 10);
-      if (filterPeriod === "past")   return t.date <  now.toISOString().slice(0, 10);
+      if (filterPeriod === "future") return t.date >= todayInClubTz(now);
+      if (filterPeriod === "past")   return t.date <  todayInClubTz(now);
       return true;
     });
   }, [trainings, filterType, filterMonth, filterPeriod]);
@@ -183,7 +184,7 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
                   </td>
                 </tr>
               : filtered.map((t) => {
-                  const isPast = t.date < new Date().toISOString().slice(0, 10);
+                  const isPast = t.date < todayInClubTz();
 
                   return (
                     <tr key={t.id} className={cn("hover:bg-muted/30 transition-colors", isPast && "opacity-70")}>

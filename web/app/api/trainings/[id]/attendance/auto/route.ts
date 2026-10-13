@@ -1,3 +1,4 @@
+import { todayInClubTz } from "@/lib/time/club-time";
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/auth/guards";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
@@ -49,7 +50,7 @@ export async function POST(
   }
 
   // Validar que o treino é HOJE
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInClubTz();
   if (training.date !== today) {
     return NextResponse.json(
       { error: "A auto-presença por fotografia só está disponível no dia do treino." },
