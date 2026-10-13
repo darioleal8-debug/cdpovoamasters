@@ -89,7 +89,7 @@ export default function PagamentosPage() {
     [payments, historyPlayer]
   );
   const historySummary = useMemo(
-    () => historyPlayer ? summary.find(s => s.player_id === historyPlayer.id) : undefined,
+    () => historyPlayer ? summary.find(s => s.player_id === historyPlayer.player_id) : undefined, // id = user_id (QUO-15)
     [summary, historyPlayer]
   );
 

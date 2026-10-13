@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { pickPaymentUpdate } from "@/lib/payments/update-fields";
 import { authorize } from "@/lib/auth/guards";
 import { FINANCE } from "@/lib/auth/roles";
 import { createClient } from "@/lib/supabase/server";
@@ -50,8 +51,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     .eq("id", id)
     .single();
 
-  // Não permitir alterar chaves únicas via PUT
-  const { season_id: _s, player_id: _p, created_by: _c, created_at: _ca, ...allowed } = body;
+  // Lista branca: só campos editáveis (antes passavam user_id, receipt_sent, month… → 500 / mass-assignment; QUO-01/06)
+  const allowed = pickPaymentUpdate(body);
 
   const { data, error } = await supabase
     .from("player_payments")

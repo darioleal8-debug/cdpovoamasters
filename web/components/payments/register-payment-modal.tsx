@@ -1,5 +1,6 @@
 "use client";
 
+import { parseAmountDue } from "@/lib/payments/update-fields";
 import { useState, useEffect } from "react";
 import { Loader2, Pencil, Plus, Trash2, AlertTriangle } from "lucide-react";
 import {
@@ -116,7 +117,7 @@ export function RegisterPaymentModal({ open, onClose, onSave, onDelete, players,
       month:          selMonth,
       reference_year: selYear,
       amount:         parseFloat(amount)    || 0,
-      amount_due:     parseFloat(amountDue) || 20,
+      amount_due:     parseAmountDue(amountDue), // 0 é válido (isenção) — QUO-07
       status,
       method:       method ? method as PlayerPaymentMethod : null,
       notes:        notes.trim() || null,
