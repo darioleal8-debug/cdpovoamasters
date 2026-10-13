@@ -302,7 +302,7 @@ function regexParseFromLiga(
   ourTeam: string
 ): AIParseResult {
   const ourPattern = new RegExp(
-    ourTeam.normalize("NFD").replace(/[̀-ͯ]/g, ""),
+    ourTeam.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
     "i"
   );
 
@@ -327,8 +327,10 @@ function regexParseFromLiga(
       continue;
     }
 
-    const isHome = ourPattern.test(homeTeam);
-    const isOurGame = isHome || ourPattern.test(awayTeam);
+    // Padrão construído sem acentos → comparar também sem acentos (CONV-10)
+    const noAccents = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const isHome = ourPattern.test(noAccents(homeTeam));
+    const isOurGame = isHome || ourPattern.test(noAccents(awayTeam));
 
     games.push({
       jornada:   r.jornada,

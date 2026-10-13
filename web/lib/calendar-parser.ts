@@ -128,14 +128,17 @@ export function slugTeamName(name: string): string {
     .trim();
 }
 
+const stripAccents = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
 // ─── Date / Time Parsing ──────────────────────────────────
 
 const DATE_RE = /(\d{1,2})[\/\-\.](\d{1,2}|\w{3})[\/\-\.](\d{4})/i;
 
 export function parseDate(raw: string): string | null {
   if (!raw) return null;
-  // Remove day-name prefix: "qui, " / "sex " / etc.
-  const s = raw.replace(/^\w+[,.]?\s*/, "").trim();
+  // Remove só um prefixo ALFABÉTICO de dia da semana ("qui, ", "Sáb. ") — \w também apanhava
+  // os dígitos do próprio dia (CONV-09)
+  const s = raw.replace(/^[A-Za-zÀ-ÿ]+[,.]?\s*/, "").trim();
 
   const m = s.match(DATE_RE);
   if (!m) return null;
@@ -156,6 +159,9 @@ export function parseDate(raw: string): string | null {
   if (month < 1 || month > 12) return null;
   if (day < 1 || day > 31) return null;
   if (year < 2020 || year > 2040) return null;
+  // Rejeitar datas impossíveis (31/02, 31/04…) — CONV-11
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  if (probe.getUTCMonth() !== month - 1 || probe.getUTCDate() !== day) return null;
 
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
@@ -212,8 +218,9 @@ export function parseGameLine(
   const afterNum = trimmed.slice(numMatch[0].length);
 
   // Find the date anchor
+  // Prefixo opcional só com nomes de dias PT — o antigo \w{2,4} comia o fim do nome do visitante (CONV-11)
   const dateMatch = afterNum.match(
-    /(\w{2,4}[,.]?\s*)?\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4}/
+    /(?:\b(?:seg|ter|qua|qui|sex|s[áa]b|dom)[a-zçá-]*[,.]?\s*)?\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4}/i
   );
   if (!dateMatch) return null;
 
@@ -259,8 +266,9 @@ export function parseGameLine(
   const pavilion = normalizeTeamName(venueParts[0] ?? "");
   const locality = venueParts.slice(1).join(", ") || "";
 
-  const isHome = ourTeamPattern.test(homeTeam);
-  const isAway = ourTeamPattern.test(awayTeam);
+  // O padrão do clube é construído sem acentos; comparar também sem acentos (CONV-10)
+  const isHome = ourTeamPattern.test(stripAccents(homeTeam));
+  const isAway = ourTeamPattern.test(stripAccents(awayTeam));
   const isOurGame = isHome || isAway;
 
   return {
@@ -286,7 +294,7 @@ export function parsePDFText(
   ourTeam: string = "Póvoa"
 ): ParseResult {
   const ourTeamPattern = new RegExp(
-    ourTeam.normalize("NFD").replace(/[̀-ͯ]/g, ""),
+    ourTeam.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
     "i"
   );
 
@@ -304,16 +312,12 @@ export function parsePDFText(
     const line = rawLine.trim();
     if (!line) continue;
 
-    // Detect volta header (before jornada — "2ª VOLTA" may appear alone)
+    // Cabeçalhos de volta e/ou jornada — podem vir na mesma linha ("JORNADA 3 - 2ª VOLTA") (CONV-11)
     const v = detectVolta(line);
-    if (v !== null) { currentVolta = v; continue; }
-
-    // Detect jornada header
     const j = detectJornada(line);
-    if (j !== null) {
-      currentJornada = j;
-      continue;
-    }
+    if (v !== null) currentVolta = v;
+    if (j !== null) currentJornada = j;
+    if (v !== null || j !== null) continue;
 
     // Skip obvious non-game lines
     if (
@@ -375,7 +379,7 @@ export function parseExcelRows(
   ourTeam: string = "Póvoa"
 ): ParseResult {
   const ourTeamPattern = new RegExp(
-    ourTeam.normalize("NFD").replace(/[̀-ͯ]/g, ""),
+    ourTeam.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
     "i"
   );
 
