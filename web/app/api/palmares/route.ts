@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 
 function fail(msg: string, status = 400) {
@@ -18,6 +19,9 @@ async function requireAdmin() {
 }
 
 export async function GET() {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   // Usa admin client para contornar RLS — palmares é informação pública do clube
   const admin = await createAdminClient();
   const { data, error } = await admin
@@ -30,6 +34,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   const { supabase, user, isAdmin } = await requireAdmin();
   if (!user)    return fail("Não autenticado", 401);
   if (!isAdmin) return fail("Sem permissão", 403);

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { banDurationFor } from "@/lib/auth/session-revocation";
+import { authorize } from "@/lib/auth/guards";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
@@ -58,6 +60,9 @@ function validateBirthDate(dateStr: string): string | null {
 
 // ─── GET /api/admin/users ─────────────────────────────────
 export async function GET() {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   const authUser = await getAuthUser();
   if (!authUser) return fail("Não autenticado", 401);
 
@@ -105,6 +110,9 @@ export async function GET() {
 
 // ─── POST /api/admin/users ────────────────────────────────
 export async function POST(req: NextRequest) {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   const authUser = await getAuthUser();
   if (!authUser) return fail("Não autenticado", 401);
 
@@ -291,6 +299,9 @@ export async function POST(req: NextRequest) {
 
 // ─── PATCH /api/admin/users ───────────────────────────────
 export async function PATCH(req: NextRequest) {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   const authUser = await getAuthUser();
   if (!authUser) return fail("Não autenticado", 401);
 
@@ -323,11 +334,28 @@ export async function PATCH(req: NextRequest) {
   const { error } = await admin.from("users").update(updates).eq("id", user_id);
   if (error) return fail(error.message, 500);
 
+  // Desativar também corta a sessão no Auth (senão o refresh do token mantinha o acesso)
+  if (active !== undefined) {
+    const { error: banError } = await admin.auth.admin.updateUserById(user_id, {
+      ban_duration: banDurationFor(Boolean(active)),
+    });
+    if (banError) {
+      console.error("[api/admin/users] Falha ao (des)banir no Auth:", banError.message);
+      return NextResponse.json(
+        { success: true, warning: "Conta atualizada, mas não foi possível terminar/repor a sessão no Auth." },
+        { status: 200 }
+      );
+    }
+  }
+
   return NextResponse.json({ success: true });
 }
 
 // ─── DELETE /api/admin/users ──────────────────────────────
 export async function DELETE(req: NextRequest) {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   const authUser = await getAuthUser();
   if (!authUser) return fail("Não autenticado", 401);
 

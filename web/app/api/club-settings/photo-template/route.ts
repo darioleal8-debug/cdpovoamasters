@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import type { PhotoTemplateConfig } from "@/lib/photo-composite";
 
@@ -10,6 +11,9 @@ function fail(msg: string, status = 400) {
 
 // GET /api/club-settings/photo-template
 export async function GET() {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return fail("Não autenticado", 401);
@@ -28,6 +32,9 @@ export async function GET() {
 
 // PUT /api/club-settings/photo-template
 export async function PUT(req: NextRequest) {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return fail("Não autenticado", 401);

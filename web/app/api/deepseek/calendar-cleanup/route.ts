@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -205,6 +206,9 @@ function mergeActions(
 // ─── POST /api/deepseek/calendar-cleanup ─────────────────────────
 
 export async function POST(req: NextRequest) {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   // Auth
   const authClient = await createClient();
   const { data: { user } } = await authClient.auth.getUser();
