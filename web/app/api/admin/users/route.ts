@@ -4,7 +4,7 @@ import { authorize } from "@/lib/auth/guards";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import { createActivationToken, activationLink as buildLink } from "@/lib/activation-token";
+import { createActivationToken, activationLink as buildLink, isActivationConfigured } from "@/lib/activation-token";
 import { sendActivationEmail } from "@/lib/email";
 
 export const runtime = "nodejs";
@@ -180,6 +180,11 @@ export async function POST(req: NextRequest) {
   }
   if (caller.role === "treinador" && role !== "jogador") {
     return fail("Treinadores só podem criar contas de jogador", 403);
+  }
+
+  // Validar a configuração ANTES de criar seja o que for (revisão final, Importante 6)
+  if (role === "jogador" && !isActivationConfigured()) {
+    return fail("Configuração em falta no servidor: ACTIVATION_SECRET. Não é possível emitir links de ativação.", 500);
   }
 
   // ── Criar utilizador Auth ────────────────────────────────

@@ -3,7 +3,7 @@ import { authorize } from "@/lib/auth/guards";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import { createActivationToken, activationLink as buildLink, TOKEN_TTL_MS } from "@/lib/activation-token";
+import { createActivationToken, activationLink as buildLink, TOKEN_TTL_MS, isActivationConfigured } from "@/lib/activation-token";
 import { sendActivationEmail } from "@/lib/email";
 
 export const runtime = "nodejs";
@@ -75,6 +75,8 @@ export async function POST(req: NextRequest) {
   if (!target) return fail("Utilizador não encontrado", 404);
   if (target.role !== "jogador") return fail("Apenas jogadores precisam de link de ativação", 400);
   if (target.active) return fail("A conta já está ativa. Não é necessário um link de ativação.", 400);
+
+  if (!isActivationConfigured()) return fail("Configuração em falta no servidor: ACTIVATION_SECRET. Não é possível emitir links de ativação.", 500);
 
   // Gerar novo token HMAC
   const token = createActivationToken(userId);

@@ -18,6 +18,11 @@ function secret(): string {
   return DEV_ONLY_SECRET;
 }
 
+/** Verdadeiro se é possível emitir tokens. Chamar ANTES de criar contas (evita contas meio criadas). */
+export function isActivationConfigured(): boolean {
+  return !!process.env.ACTIVATION_SECRET?.trim() || process.env.NODE_ENV !== "production";
+}
+
 // Formato: base64url( userId : expiresAt : hmac(userId:expiresAt) )
 export function createActivationToken(userId: string): string {
   const expiresAt = Date.now() + TOKEN_TTL_MS;

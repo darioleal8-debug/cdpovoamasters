@@ -27,3 +27,24 @@ describe("segredo dos tokens de ativação", () => {
     expect(() => createActivationToken("user-1")).toThrow(/ACTIVATION_SECRET/);
   });
 });
+
+import { isActivationConfigured } from "./activation-token";
+
+describe("isActivationConfigured (revisão final, Importante 6)", () => {
+  afterEach(() => vi.unstubAllEnvs());
+  it("falso em produção sem ACTIVATION_SECRET — validar antes de criar a conta", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ACTIVATION_SECRET", "");
+    expect(isActivationConfigured()).toBe(false);
+  });
+  it("verdadeiro com ACTIVATION_SECRET definido", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ACTIVATION_SECRET", "segredo");
+    expect(isActivationConfigured()).toBe(true);
+  });
+  it("verdadeiro em desenvolvimento (segredo de dev)", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("ACTIVATION_SECRET", "");
+    expect(isActivationConfigured()).toBe(true);
+  });
+});
