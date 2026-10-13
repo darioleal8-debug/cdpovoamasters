@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CheckCircle2, XCircle, MapPin, Camera, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAttendance } from "@/hooks/use-trainings";
+import { eligibleRoster, buildAttendanceRecords, hasUnsavedChanges } from "@/lib/trainings/attendance-form";
 import type { Training, RosterEntry, AttendanceStatus, TrainingAttendance } from "@/types/database";
 
 const STATUS_CONFIG: Record<AttendanceStatus, { label: string; color: string }> = {
@@ -34,11 +35,25 @@ export function AttendanceModal({ training, players, open, onClose }: Props) {
   const [validating, setValidating] = useState<string | null>(null);
   const [autoExpanded, setAutoExpanded] = useState(true);
 
-  useEffect(() => {
+  // Só atletas com perfil nesta época e conta ativa (PRES-04, PRES-17); chave única = player_id
+  const roster = useMemo(() => eligibleRoster(players), [players]);
+  const excludedCount = players.length - roster.length;
+
+  const initial = useMemo(() => {
     const map: Record<string, AttendanceStatus> = {};
     for (const a of attendance) map[a.player_id] = a.status;
-    setLocal(map);
+    return map;
   }, [attendance]);
+
+  useEffect(() => { setLocal(initial); }, [initial]);
+
+  const dirty = hasUnsavedChanges(initial, local);
+
+  function requestClose() {
+    if (saving) return;
+    if (dirty && !window.confirm("Tens alterações por guardar. Sair sem guardar?")) return;
+    onClose();
+  }
 
   // Mapa player_id → registo completo (para auto-presença)
   const attendanceRecordMap = useMemo(() => {
@@ -49,8 +64,8 @@ export function AttendanceModal({ training, players, open, onClose }: Props) {
 
   // Jogadores com auto-presença pendente de validação
   const autoPendingPlayers = useMemo(
-    () => players.filter((p) => local[p.player_id ?? ""] === "auto_present"),
-    [players, local]
+    () => roster.filter((p) => local[p.player_id] === "auto_present"),
+    [roster, local]
   );
 
   function setStatus(playerId: string, status: AttendanceStatus) {
@@ -65,27 +80,25 @@ export function AttendanceModal({ training, players, open, onClose }: Props) {
 
   async function handleSave() {
     setSaving(true);
-    const records = players
-      .filter((p) => p.player_id && local[p.player_id])
-      .map((p) => ({ player_id: p.player_id!, status: local[p.player_id!] }));
-    await saveAttendance(records);
+    const ok = await saveAttendance(buildAttendanceRecords(roster, local));
     setSaving(false);
-    onClose();
+    // Em caso de erro o modal fica aberto com as marcações (PRES-19); o hook já mostra o toast
+    if (ok) onClose();
   }
 
   const stats = {
-    present:      players.filter((p) => local[p.player_id ?? ""] === "present").length,
-    late:         players.filter((p) => local[p.player_id ?? ""] === "late").length,
-    justified:    players.filter((p) => local[p.player_id ?? ""] === "justified").length,
-    absent:       players.filter((p) => local[p.player_id ?? ""] === "absent").length,
-    auto_present: players.filter((p) => local[p.player_id ?? ""] === "auto_present").length,
-    total:        players.length,
+    present:      roster.filter((p) => local[p.player_id] === "present").length,
+    late:         roster.filter((p) => local[p.player_id] === "late").length,
+    justified:    roster.filter((p) => local[p.player_id] === "justified").length,
+    absent:       roster.filter((p) => local[p.player_id] === "absent").length,
+    auto_present: roster.filter((p) => local[p.player_id] === "auto_present").length,
+    total:        roster.length,
   };
 
   if (!training) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) requestClose(); }}>
       <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>
@@ -108,9 +121,15 @@ export function AttendanceModal({ training, players, open, onClose }: Props) {
             </Badge>
           )}
           <Badge variant="outline" className="ml-auto">
-            Marcados: {Object.keys(local).filter((id) => local[id]).length} / {stats.total}
+            Marcados: {roster.filter((p) => local[p.player_id]).length} / {stats.total}
           </Badge>
         </div>
+
+        {excludedCount > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {excludedCount === 1 ? "1 atleta não aparece" : `${excludedCount} atletas não aparecem`} por não ter perfil nesta temporada ou ter a conta desativada.
+          </p>
+        )}
 
         <div className="overflow-y-auto flex-1 space-y-3 pr-1">
           {/* Secção Auto-Presenças */}
@@ -131,7 +150,7 @@ export function AttendanceModal({ training, players, open, onClose }: Props) {
               {autoExpanded && (
                 <div className="border-t border-violet-200 dark:border-violet-800 divide-y divide-violet-100 dark:divide-violet-900">
                   {autoPendingPlayers.map((player) => {
-                    const record = attendanceRecordMap.get(player.player_id ?? "");
+                    const record = attendanceRecordMap.get(player.player_id);
                     if (!record) return null;
                     const isValidating = validating === record.id;
                     return (
@@ -206,12 +225,12 @@ export function AttendanceModal({ training, players, open, onClose }: Props) {
               ? Array.from({ length: 5 }).map((_, i) => (
                   <Skeleton key={i} className="h-12 w-full rounded-lg" />
                 ))
-              : players.length === 0
+              : roster.length === 0
               ? <p className="py-8 text-center text-muted-foreground text-sm">
                   Nenhum jogador no plantel desta temporada.
                 </p>
-              : players.map((player) => {
-                  const status = local[player.player_id ?? ""] as AttendanceStatus | undefined;
+              : roster.map((player) => {
+                  const status = local[player.player_id] as AttendanceStatus | undefined;
                   const isAuto = status === "auto_present";
                   return (
                     <div
@@ -239,7 +258,7 @@ export function AttendanceModal({ training, players, open, onClose }: Props) {
                         {STATUS_ORDER.map((s) => (
                           <button
                             key={s}
-                            onClick={() => setStatus(player.player_id ?? player.user_id, s)}
+                            onClick={() => setStatus(player.player_id, s)}
                             className={cn(
                               "rounded px-2 py-0.5 text-[11px] font-medium border transition-all",
                               status === s
@@ -258,8 +277,8 @@ export function AttendanceModal({ training, players, open, onClose }: Props) {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={saving || players.length === 0}>
+          <Button variant="outline" onClick={requestClose} disabled={saving}>Cancelar</Button>
+          <Button onClick={handleSave} disabled={saving || roster.length === 0}>
             {saving ? "A guardar..." : "Guardar Presenças"}
           </Button>
         </DialogFooter>

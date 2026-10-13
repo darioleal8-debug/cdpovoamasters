@@ -184,12 +184,6 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
                 </tr>
               : filtered.map((t) => {
                   const isPast = t.date < new Date().toISOString().slice(0, 10);
-                  // Contar presenças a partir das estatísticas por jogador
-                  const presentCount = players.filter((p) => {
-                    // Aproximação via attendanceStats: não é por treino, mas é útil para mostrar algo
-                    // Para o detalhe real, usa o AttendanceModal
-                    return attendanceStats[p.player_id ?? ""];
-                  }).length;
 
                   return (
                     <tr key={t.id} className={cn("hover:bg-muted/30 transition-colors", isPast && "opacity-70")}>
@@ -237,7 +231,7 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
                           title="Ver/editar presenças"
                         >
                           <Users className="h-3.5 w-3.5" />
-                          <span>{presentCount > 0 ? `${presentCount} marcados` : "Marcar"}</span>
+                          <span>Presenças</span>
                         </button>
                       </td>
                       {/* Ações */}
