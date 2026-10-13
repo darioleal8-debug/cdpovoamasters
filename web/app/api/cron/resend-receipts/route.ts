@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAuthorizedCron } from "@/lib/cron-auth";
 import { createAdminClient } from "@/lib/supabase/server";
 import { sendPaymentReceiptEmail } from "@/lib/email";
 
@@ -9,10 +10,8 @@ export const maxDuration = 60;
 // Reenvia recibos que falharam há mais de 10 minutos.
 // Invocar via Vercel Cron Jobs (vercel.json → crons) ou manualmente.
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAuthorizedCron(req)) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
   const admin = await createAdminClient();

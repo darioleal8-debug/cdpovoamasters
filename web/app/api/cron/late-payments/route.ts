@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAuthorizedCron } from "@/lib/cron-auth";
 import { createClient } from "@supabase/supabase-js";
 import { sendLatePaymentEmail } from "@/lib/email";
 
@@ -13,12 +14,10 @@ function adminClient() {
 }
 
 export async function POST(req: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = req.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  // Fail-closed (QUO-04). Nota: só POST de propósito — o Vercel Cron chama GET e ativá-lo
+  // sem idempotência enviaria avisos diários a todos (Fase B).
+  if (!isAuthorizedCron(req)) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
   const db = adminClient();
