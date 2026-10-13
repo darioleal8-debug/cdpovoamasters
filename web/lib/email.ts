@@ -1,4 +1,5 @@
 // Serviço de envio de email com suporte a múltiplos provedores.
+import { noEmailServiceResult } from "./email-fallback";
 // Prioridade: Resend → Gmail SMTP → SMTP personalizado → console (dev)
 //
 // Variáveis de ambiente necessárias (adicionar ao .env.local):
@@ -178,9 +179,9 @@ export async function sendActivationEmail(opts: {
   console.log("[EMAIL DEV] Nenhum serviço de email configurado");
   console.log(`  Para:    ${opts.to}`);
   console.log(`  Assunto: ${subject}`);
-  console.log(`  Link:    ${activationLink}`);
+  console.log("  Link:    [omitido dos logs]");
   console.log("=".repeat(60) + "\n");
-  return { success: true, devFallback: true };
+  return noEmailServiceResult();
 }
 
 export async function sendPasswordResetEmail(opts: {
@@ -238,7 +239,7 @@ export async function sendPasswordResetEmail(opts: {
   console.log(`  Assunto: ${subject}`);
   console.log(`  [password omitida dos logs]`);
   console.log("=".repeat(60) + "\n");
-  return { success: true, devFallback: true };
+  return noEmailServiceResult();
 }
 
 export async function sendLatePaymentEmail(opts: {
@@ -296,7 +297,7 @@ export async function sendLatePaymentEmail(opts: {
   console.log(`  Para:    ${opts.to}`);
   console.log(`  Assunto: ${subject}`);
   console.log("=".repeat(60) + "\n");
-  return { success: true, devFallback: true };
+  return noEmailServiceResult();
 }
 
 export async function sendPaymentReceiptEmail(opts: {
@@ -373,5 +374,5 @@ export async function sendPaymentReceiptEmail(opts: {
   console.log(`  Assunto: ${subject}`);
   console.log(`  Mês:     ${MONTHS[(opts.month - 1) % 12]} ${opts.year} — ${opts.amount}€`);
   console.log("=".repeat(60) + "\n");
-  return { success: true, devFallback: true };
+  return noEmailServiceResult();
 }

@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
     emailError       = result.error ?? null;
   }
 
-  console.log(`[activation-link] Novo link para ${target.email}: ${link}`);
+  console.log("[activation-link] Novo link de ativação gerado");
 
   return NextResponse.json({
     activationLink:  link,

@@ -220,7 +220,7 @@ export async function sendAndLogPaymentReceipt(opts: {
     sendResult = { success: false, error: msg };
   }
 
-  const emailOk = sendResult.success || !!sendResult.devFallback;
+  const emailOk = sendResult.success; // em produção, sem serviço de email, success=false (QUO-11)
 
   if (emailOk) {
     console.log(tag, `✓ Email enviado para ${email}${sendResult.devFallback ? " (dev-fallback, não enviado realmente)" : ""}`);
@@ -261,7 +261,7 @@ export async function sendAndLogPaymentReceipt(opts: {
   }
 
   // ── 11. Resultado ────────────────────────────────────────────
-  if (sendResult.devFallback) return { sent: true,  note: "dev" };
+  if (sendResult.devFallback && sendResult.success) return { sent: true, note: "dev" };
   if (sendResult.success)     return { sent: true,  note: "ok" };
   return { sent: false, note: "resend_error", error: sendResult.error };
 }

@@ -298,8 +298,8 @@ export async function POST(req: NextRequest) {
     emailSent        = emailResult.success && !emailDevFallback;
     emailError       = emailResult.error ?? null;
 
-    console.log(`[api/admin/users] Link de ativação para ${email}:`);
-    console.log(`  ${link}`);
+    // O link (com token) nunca vai para os logs — é devolvido apenas ao admin na resposta (QUAL-11)
+    console.log(`[api/admin/users] Link de ativação gerado (email enviado: ${emailSent})`);
   }
 
   return NextResponse.json({
