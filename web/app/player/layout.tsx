@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PlayerShell } from "@/components/player/player-shell";
+import { canReturnToDashboard } from "@/lib/auth/view-as";
 
 export default async function PlayerLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -22,10 +23,9 @@ export default async function PlayerLayout({ children }: { children: React.React
   if (!profile.active) redirect("/login?reason=inactive");
 
   const playerName = profile.name || user.email || "Jogador";
-  const userRole   = profile.role as "admin" | "treinador" | "jogador";
 
   return (
-    <PlayerShell playerName={playerName} userRole={userRole}>
+    <PlayerShell playerName={playerName} canReturnToDashboard={canReturnToDashboard(profile.role)}>
       {children}
     </PlayerShell>
   );

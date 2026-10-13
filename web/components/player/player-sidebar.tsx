@@ -25,16 +25,15 @@ const PLAYER_NAV = [
 
 export function PlayerSidebar({
   playerName,
-  userRole,
+  canReturnToDashboard = false,
 }: {
   playerName?: string;
-  userRole?: "admin" | "treinador" | "jogador";
+  canReturnToDashboard?: boolean;
 }) {
   const { settings } = useClubSettings();
   const router  = useRouter();
   const supabase = createClient();
   const unreadChatCount = useUnreadChatCount();
-  const isManager = userRole === "admin" || userRole === "treinador";
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -75,7 +74,7 @@ export function PlayerSidebar({
 
       {/* Navegação */}
       <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-4">
-        {isManager && (
+        {canReturnToDashboard && (
           <div className="mb-3">
             <Link
               href="/dashboard"

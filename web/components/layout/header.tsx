@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, Moon, Sun, User } from "lucide-react";
+import { LogOut, Moon, Repeat, Sun, User } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ interface HeaderProps {
   userName:  string;
   userEmail: string;
   userRole:  string;
+  canViewAsPlayer?: boolean;
 }
 
 function getInitials(name: string): string {
@@ -57,7 +58,7 @@ function getTitle(pathname: string): string {
   return "HoopHub";
 }
 
-export function Header({ userName, userEmail, userRole }: HeaderProps) {
+export function Header({ userName, userEmail, userRole, canViewAsPlayer = false }: HeaderProps) {
   const router   = useRouter();
   const pathname = usePathname();
   const supabase = createClient();
@@ -165,6 +166,16 @@ export function Header({ userName, userEmail, userRole }: HeaderProps) {
               <User className="mr-2 h-4 w-4 text-gray-500" />
               Perfil
             </DropdownMenuItem>
+            {canViewAsPlayer && (
+              <DropdownMenuItem
+                onClick={() => router.push("/player")}
+                className="cursor-pointer rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                style={{ minHeight: 44 }}
+              >
+                <Repeat className="mr-2 h-4 w-4 text-gray-500" />
+                Ver como jogador
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator className="bg-gray-100 my-1" />
             <DropdownMenuItem
               onClick={handleLogout}

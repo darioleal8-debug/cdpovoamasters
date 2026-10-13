@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import type { UserRole } from "@/types/database";
+import { canViewAsPlayer } from "@/lib/auth/view-as";
 
 export default async function DashboardLayout({
   children,
@@ -47,12 +48,21 @@ export default async function DashboardLayout({
     redirect("/player");
   }
 
+  // Ficha de jogador ligada a esta conta → pode alternar para a área do jogador
+  const { data: linkedPlayers } = await supabase
+    .from("players")
+    .select("id")
+    .eq("user_id", user.id)
+    .limit(1);
+  const viewAsPlayer = canViewAsPlayer(userRole, (linkedPlayers?.length ?? 0) > 0);
+
   return (
     <DashboardShell
       userName={userName}
       userEmail={userEmail}
       userRole={userRole}
       userRolesExtra={userRolesExtra}
+      canViewAsPlayer={viewAsPlayer}
     >
       {children}
     </DashboardShell>

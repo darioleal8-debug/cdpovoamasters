@@ -1,15 +1,17 @@
 "use client";
 
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { PlayerSidebar } from "./player-sidebar";
 import { PlayerBottomNav } from "./player-bottom-nav";
 
 interface Props {
   playerName: string;
-  userRole:   "admin" | "treinador" | "jogador";
+  canReturnToDashboard: boolean;
   children:   React.ReactNode;
 }
 
-export function PlayerShell({ playerName, userRole, children }: Props) {
+export function PlayerShell({ playerName, canReturnToDashboard, children }: Props) {
   return (
     <div
       className="flex overflow-hidden"
@@ -17,7 +19,7 @@ export function PlayerShell({ playerName, userRole, children }: Props) {
     >
       {/* Sidebar — tablet+ only (hidden on mobile, shown md+) */}
       <div className="hidden md:flex w-64 flex-none">
-        <PlayerSidebar playerName={playerName} userRole={userRole} />
+        <PlayerSidebar playerName={playerName} canReturnToDashboard={canReturnToDashboard} />
       </div>
 
       {/* Main content */}
@@ -38,6 +40,16 @@ export function PlayerShell({ playerName, userRole, children }: Props) {
           >
             Área do Jogador
           </span>
+          {canReturnToDashboard && (
+            <Link
+              href="/dashboard"
+              className="ml-auto flex items-center gap-1.5 rounded-md px-2 text-xs font-medium text-white/70 hover:text-white"
+              style={{ minHeight: 44 }}
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Gestão
+            </Link>
+          )}
         </header>
 
         <main
