@@ -38,6 +38,8 @@ export function deriveStats(plays: PlayByPlay[], currentPeriod: number): DeriveR
   let awayPts = 0;
 
   for (const play of plays) {
+    // Jogadas anuladas (soft-delete) não contam (STA-16)
+    if ((play as { deleted_at?: string | null }).deleted_at) continue;
     const pid = play.player_id as string | null;
 
     if (play.is_home_team) {
@@ -62,6 +64,12 @@ export function deriveStats(plays: PlayByPlay[], currentPeriod: number): DeriveR
           case "foul_tec":      s.fouls_tec++; s.fouls_total++; break;
           case "foul_anti":     s.fouls_anti++; s.fouls_total++; break;
           case "foul_committed":s.fouls_total++; break; // legacy event type
+        }
+        // Assistência registada no próprio cesto (secondary_player_id), tal como recordPlay grava (STA-16)
+        const assistId = (play as { secondary_player_id?: string | null }).secondary_player_id;
+        if (assistId && play.event_type.endsWith("_made")) {
+          if (!playerMap.has(assistId)) playerMap.set(assistId, empty());
+          playerMap.get(assistId)!.ast++;
         }
       }
       // Home team fouls for current period (tec does NOT count for team fouls)
