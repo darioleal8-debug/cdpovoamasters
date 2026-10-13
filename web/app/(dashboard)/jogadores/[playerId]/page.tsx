@@ -1,5 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { authorize } from "@/lib/auth/guards";
+import { MANAGERS } from "@/lib/auth/roles";
 import { PlayerProfileClient } from "./player-profile-client";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +13,11 @@ export default async function PlayerProfilePage({
 }) {
   const { playerId } = await params;
   if (!playerId || playerId === "null") notFound();
+
+  // Página com contactos, data de nascimento e quotas: só gestão (SEC-12).
+  // O layout (dashboard) mostra children sem sessão (landing), por isso a verificação tem de estar aqui.
+  const auth = await authorize(MANAGERS);
+  if (!auth.ok) redirect(auth.response.status === 401 ? "/login" : "/dashboard");
 
   const admin = await createAdminClient();
 

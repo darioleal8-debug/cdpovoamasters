@@ -23,12 +23,17 @@ export default async function DashboardLayout({
   const { data: profile } = await supabase
     .from("users")
     .select("name, role, active, roles_extra")
-    .eq("email", user.email!)
-    .single();
+    .eq("id", user.id)
+    .maybeSingle();
 
   // Sem perfil → auth existe mas public.users não tem este utilizador
   if (!profile) {
     redirect("/login");
+  }
+
+  // Conta desativada: o /login termina a sessão (evita ciclo /player ⇄ /login ⇄ /dashboard)
+  if (!profile.active) {
+    redirect("/login?reason=inactive");
   }
 
   const userName      = profile.name       ?? user.email ?? "Utilizador";
