@@ -15,7 +15,7 @@ const NAV_ITEMS = [
   { label: "Início",  href: "/player/minha-area", icon: LayoutDashboard, exact: true  },
   { label: "Plantel", href: "/player/plantel",    icon: Users,           exact: false },
   { label: "Chat",    href: "/player/chat",        icon: MessageSquare,   exact: false },
-  { label: "Conta",   href: "/player/conta",       icon: User,            exact: false },
+  { label: "Conta",   href: "/player/meu-perfil",  icon: User,            exact: false },
   { label: "Mais",    href: "/player/mais",        icon: MoreHorizontal,  exact: false },
 ] as const;
 

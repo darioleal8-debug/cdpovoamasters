@@ -6,7 +6,6 @@ import {
   Dumbbell,
   CreditCard,
   LogOut,
-  Settings,
   User,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -21,9 +20,8 @@ interface MenuItem {
 
 const ITEMS: MenuItem[] = [
   { label: "Os Meus Treinos",  href: "/player/meus-treinos",  icon: Dumbbell,   desc: "Presenças e sessões" },
-  { label: "Pagamentos",       href: "/player/pagamentos",    icon: CreditCard,  desc: "Histórico de quotas" },
-  { label: "O Meu Perfil",     href: "/player/conta",         icon: User,        desc: "Dados e foto de perfil" },
-  { label: "Preferências",     href: "/player/preferencias",  icon: Settings,    desc: "Notificações e conta" },
+  { label: "Pagamentos",       href: "/player/meus-pagamentos", icon: CreditCard,  desc: "Histórico de quotas" },
+  { label: "O Meu Perfil",     href: "/player/meu-perfil",    icon: User,        desc: "Dados e foto de perfil" },
 ];
 
 export default function PlayerMaisPage() {

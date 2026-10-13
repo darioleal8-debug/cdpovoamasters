@@ -177,11 +177,15 @@ export default async function MinhaAreaPage() {
     .eq("status", "ativa")
     .maybeSingle();
 
-  const { data: linkedPlayer } = await supabase
-    .from("players")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  // Um perfil por época: sem filtrar pela época ativa, maybeSingle() falha a partir da 2.ª época (UX-19)
+  const { data: linkedPlayer } = activeSeason
+    ? await supabase
+        .from("players")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("season_id", activeSeason.id)
+        .maybeSingle()
+    : { data: null };
 
   // ── Pagamentos em atraso ──────────────────────────────────
   let isPaymentLate = false;
@@ -290,7 +294,7 @@ export default async function MinhaAreaPage() {
     { href: "/player/meus-jogos",      icon: Calendar,       label: "Os Meus Jogos",      desc: "Próximos jogos"     },
     { href: "/player/meus-treinos",    icon: Dumbbell,       label: "Os Meus Treinos",    desc: "Agenda de treinos"  },
     { href: "/player/meus-pagamentos", icon: CreditCard,     label: "Os Meus Pagamentos", desc: "Quotas"             },
-    { href: "/palmares",               icon: Trophy,         label: "Palmarés",            desc: "Historial"          },
+    { href: "/player/palmares",        icon: Trophy,         label: "Palmarés",            desc: "Historial"          },
   ] as const;
 
   return (
