@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { paymentChanged } from "@/lib/payments/history-diff";
 import { pickPaymentUpdate } from "@/lib/payments/update-fields";
 import { authorize } from "@/lib/auth/guards";
 import { FINANCE } from "@/lib/auth/roles";
@@ -67,13 +68,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   // Registar histórico se houve alteração real
   if (before) {
-    const changed =
-      before.amount       !== (allowed.amount       ?? before.amount)       ||
-      before.amount_due   !== (allowed.amount_due   ?? before.amount_due)   ||
-      before.status       !== (allowed.status       ?? before.status)       ||
-      before.method       !== (allowed.method       ?? before.method)       ||
-      before.notes        !== (allowed.notes        ?? before.notes)        ||
-      before.payment_date !== (allowed.payment_date ?? before.payment_date);
+    const changed = paymentChanged(before as Record<string, unknown>, allowed as Record<string, unknown>);
 
     if (changed) {
       await supabase.from("player_payments_history").insert({
