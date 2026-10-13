@@ -44,8 +44,7 @@ export async function DELETE(
   const { chatId, messageId } = await params;
   const admin = adminClient();
 
-  const { data: caller } = await admin
-    .from("users").select("id, role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
   if (!caller) return fail("Perfil não encontrado", 404);
 
   const { data: message } = await admin

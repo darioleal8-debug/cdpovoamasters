@@ -156,11 +156,7 @@ export async function DELETE(
     .single();
   if (!photo) return fail("Foto não encontrada", 404);
 
-  const { data: caller } = await db
-    .from("users")
-    .select("role")
-    .eq("id", authUser.id)
-    .single();
+  const caller = authz.profile; // papel ativo (authorize)
 
   if (photo.user_id !== authUser.id && caller?.role !== "admin") {
     return fail("Sem permissão para apagar esta foto", 403);

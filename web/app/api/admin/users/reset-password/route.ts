@@ -63,13 +63,8 @@ export async function POST(req: NextRequest) {
 
   const admin = adminClient();
 
-  // Verificar que o caller é admin (usando service role para contornar RLS)
-  const { data: caller, error: callerError } = await admin
-    .from("users").select("role, email").eq("id", authUser.id).single();
-
-  if (callerError) {
-    console.error(`[reset-password] Erro ao verificar role do caller (id=${authUser.id}):`, callerError.message);
-  }
+  // Verificar que o caller é admin
+  const caller = authz.profile; // papel ativo (authorize)
 
   if (caller?.role !== "admin") {
     console.warn(`[reset-password] Acesso negado — caller id=${authUser.id} email=${authUser.email} role=${caller?.role ?? "null"}`);

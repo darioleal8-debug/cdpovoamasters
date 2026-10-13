@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   if (!authUser) return fail("Não autenticado", 401);
 
   const db = adminClient();
-  const { data: profile } = await db.from("users").select("role").eq("id", authUser.id).single();
+  const profile = authz.profile; // papel ativo (authorize)
   if (!profile || !["admin", "treinador"].includes(profile.role)) return fail("Sem permissão", 403);
 
   let body: HistConfirmPayload;

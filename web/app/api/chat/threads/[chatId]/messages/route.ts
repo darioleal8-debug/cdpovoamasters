@@ -61,8 +61,7 @@ export async function GET(
   const { chatId } = await params;
   const admin = adminClient();
 
-  const { data: caller } = await admin
-    .from("users").select("id, role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
   if (!caller) return fail("Perfil não encontrado", 404);
 
   const chat = await canSeeChat(admin, chatId, caller.id, caller.role);
@@ -174,8 +173,7 @@ export async function POST(
   if (!content) return fail("Mensagem vazia");
 
   const admin = adminClient();
-  const { data: caller } = await admin
-    .from("users").select("id, role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
   if (!caller) return fail("Perfil não encontrado", 404);
 
   const chat = await canSeeChat(admin, chatId, caller.id, caller.role);
@@ -235,8 +233,7 @@ export async function DELETE(
   const { chatId } = await params;
   const admin = adminClient();
 
-  const { data: caller } = await admin
-    .from("users").select("id, role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
   if (!caller || caller.role !== "admin") return fail("Sem permissão", 403);
 
   const { error } = await admin.from("chat_messages").delete().eq("chat_id", chatId);

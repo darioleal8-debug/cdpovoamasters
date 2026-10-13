@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
-import { canManageContent } from "@/lib/permissions";
+import { authorize } from "@/lib/auth/guards";
+import { MANAGERS } from "@/lib/auth/roles";
 
 export const runtime = "nodejs";
 
@@ -12,22 +11,6 @@ function fail(msg: string, status = 400) {
   return NextResponse.json({ success: false, error: msg }, { status });
 }
 
-async function getSupabase() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
-  );
-  const { data: { user } } = await supabase.auth.getUser();
-  return { supabase, user };
-}
-
-async function isManager(supabase: Awaited<ReturnType<typeof getSupabase>>["supabase"], userId: string) {
-  const { data: caller } = await supabase.from("users").select("role").eq("id", userId).single();
-  return !!caller && canManageContent(caller.role);
-}
-
 // ─── PUT /api/trainings/[id]/notes/[noteId] ──────────────
 // Apenas admin/treinador podem editar notas (qualquer nota, não só as próprias).
 export async function PUT(
@@ -35,11 +18,10 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; noteId: string }> }
 ) {
   const { id: training_id, noteId } = await params;
-  const { supabase, user } = await getSupabase();
-  if (!user) return fail("Não autenticado", 401);
-  if (!(await isManager(supabase, user.id))) {
-    return fail("Apenas administradores e treinadores podem editar notas", 403);
-  }
+  // Sessão + conta ativa + gestão desportiva (papel ativo)
+  const auth = await authorize(MANAGERS);
+  if (!auth.ok) return auth.response;
+  const { supabase } = auth;
 
   let body: { note_text: string };
   try { body = await req.json(); } catch { return fail("JSON inválido"); }
@@ -65,11 +47,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; noteId: string }> }
 ) {
   const { id: training_id, noteId } = await params;
-  const { supabase, user } = await getSupabase();
-  if (!user) return fail("Não autenticado", 401);
-  if (!(await isManager(supabase, user.id))) {
-    return fail("Apenas administradores e treinadores podem apagar notas", 403);
-  }
+  // Sessão + conta ativa + gestão desportiva (papel ativo)
+  const auth = await authorize(MANAGERS);
+  if (!auth.ok) return auth.response;
+  const { supabase } = auth;
 
   const { error } = await supabase
     .from("training_notes")

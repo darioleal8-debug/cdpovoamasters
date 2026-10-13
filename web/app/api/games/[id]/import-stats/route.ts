@@ -46,11 +46,7 @@ export async function POST(
 
   const db = adminClient();
 
-  const { data: profile } = await db
-    .from("users")
-    .select("role")
-    .eq("id", authUser.id)
-    .single();
+  const profile = authz.profile; // papel ativo (authorize)
 
   if (!profile || !["admin", "treinador"].includes(profile.role)) {
     return fail("Sem permissão", 403);

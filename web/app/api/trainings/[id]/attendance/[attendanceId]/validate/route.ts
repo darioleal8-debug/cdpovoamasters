@@ -19,11 +19,7 @@ export async function POST(
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   // Verificar role
-  const { data: userData } = await supabase
-    .from("users")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+  const userData = authz.profile; // papel ativo (authorize)
 
   if (!userData || !["admin", "treinador"].includes(userData.role)) {
     return NextResponse.json({ error: "Sem permissão. Apenas treinadores e administradores podem validar presenças." }, { status: 403 });

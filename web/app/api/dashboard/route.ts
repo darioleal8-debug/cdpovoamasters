@@ -1,6 +1,6 @@
 import { todayInClubTz } from "@/lib/time/club-time";
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { authorize } from "@/lib/auth/guards";
 
 export const runtime = "nodejs";
 
@@ -22,9 +22,10 @@ function truncateNames(names: string[], total: number): string {
 
 // ── GET /api/dashboard?season_id=… ──────────────────────────
 export async function GET(req: NextRequest) {
-  const supabase   = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Sessão + conta ativa; o perfil já traz o papel ativo
+  const auth = await authorize();
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   const sp        = req.nextUrl.searchParams;
   const seasonId  = sp.get("season_id");
@@ -228,8 +229,7 @@ export async function GET(req: NextRequest) {
   tasks.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity] || b.count - a.count);
 
   // Dados do jogador (para utilizadores com roles_extra: ["player"])
-  const { data: userProfile } = await supabase
-    .from("users").select("role, roles_extra").eq("id", user.id).single();
+  const userProfile = auth.profile; // papel ativo (authorize)
 
   let playerData: {
     games_played: number;

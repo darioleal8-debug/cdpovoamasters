@@ -40,8 +40,7 @@ export async function GET() {
   if (!authUser) return fail("Não autenticado", 401);
 
   const admin = adminClient();
-  const { data: caller } = await admin
-    .from("users").select("id, role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
   if (!caller) return fail("Perfil não encontrado", 404);
 
   let query = admin

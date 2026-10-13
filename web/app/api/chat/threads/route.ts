@@ -76,8 +76,7 @@ export async function GET() {
 
   const admin = adminClient();
 
-  const { data: caller } = await admin
-    .from("users").select("id, role, name").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
   if (!caller) return fail("Perfil não encontrado", 404);
 
   const isStaff = ["admin", "treinador"].includes(caller.role);
@@ -395,8 +394,7 @@ export async function POST(req: NextRequest) {
   if (type !== "direct" && type !== "group") return fail("Tipo de chat inválido");
 
   const admin = adminClient();
-  const { data: caller } = await admin
-    .from("users").select("id, role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
   if (!caller) return fail("Perfil não encontrado", 404);
   const callerRole = caller.role as ChatRole;
 

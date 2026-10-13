@@ -68,8 +68,7 @@ export async function GET() {
 
   const admin = adminClient();
 
-  const { data: caller } = await admin
-    .from("users").select("role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
 
   if (!caller || !["admin", "treinador"].includes(caller.role)) {
     return fail("Sem permissão", 403);
@@ -172,8 +171,7 @@ export async function POST(req: NextRequest) {
 
   const admin = adminClient();
 
-  const { data: caller } = await admin
-    .from("users").select("role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
 
   if (!caller || !["admin", "treinador"].includes(caller.role)) {
     return fail("Sem permissão — apenas admin ou treinador podem criar contas", 403);
@@ -320,8 +318,7 @@ export async function PATCH(req: NextRequest) {
   if (!user_id) return fail("user_id é obrigatório");
 
   const admin = adminClient();
-  const { data: caller } = await admin
-    .from("users").select("role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
 
   if (caller?.role !== "admin") {
     return fail("Apenas o administrador pode alterar contas", 403);
@@ -370,8 +367,7 @@ export async function DELETE(req: NextRequest) {
   if (userId === authUser.id) return fail("Não podes eliminar a tua própria conta", 400);
 
   const admin = adminClient();
-  const { data: caller } = await admin
-    .from("users").select("role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
 
   if (caller?.role !== "admin") return fail("Apenas o administrador pode eliminar contas", 403);
 

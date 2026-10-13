@@ -3,7 +3,7 @@ import { authorize } from "@/lib/auth/guards";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import { canManageChatPermissions } from "@/lib/chat/permissions";
+import { canManageChatPermissions, type ChatRole } from "@/lib/chat/permissions";
 
 export const runtime = "nodejs";
 
@@ -45,8 +45,7 @@ export async function DELETE(
   const { chatId } = await params;
   const admin = adminClient();
 
-  const { data: caller } = await admin
-    .from("users").select("id, role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
   if (!caller) return fail("Perfil não encontrado", 404);
   if (caller.role !== "admin") return fail("Sem permissão para eliminar conversa", 403);
 
@@ -89,10 +88,9 @@ export async function PATCH(
   }
 
   const admin = adminClient();
-  const { data: caller } = await admin
-    .from("users").select("id, role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
   if (!caller) return fail("Perfil não encontrado", 404);
-  if (!canManageChatPermissions(caller.role)) return fail("Sem permissão para gerir esta conversa", 403);
+  if (!canManageChatPermissions(caller.role as ChatRole)) return fail("Sem permissão para gerir esta conversa", 403);
 
   const { data: chat } = await admin.from("chats").select("id, type").eq("id", chatId).single();
   if (!chat) return fail("Conversa não encontrada", 404);

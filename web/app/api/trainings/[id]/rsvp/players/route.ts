@@ -1,27 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { authorize } from "@/lib/auth/guards";
+import { hasAnyRole, MANAGERS } from "@/lib/auth/roles";
 
 export const runtime = "nodejs";
 
 function fail(msg: string, status = 400) {
   return NextResponse.json({ error: msg }, { status });
-}
-
-async function getSupabase() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
-  );
-  const { data: { user } } = await supabase.auth.getUser();
-  return { supabase, user };
-}
-
-async function requireTrainer(supabase: ReturnType<typeof createServerClient>) {
-  const { data: ok } = await supabase.rpc("is_trainer_or_above");
-  return !!ok;
 }
 
 // ─── GET /api/trainings/[id]/rsvp/players ────────────────────────────────────
@@ -31,9 +15,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: trainingId } = await params;
-  const { supabase, user } = await getSupabase();
-  if (!user) return fail("Não autenticado", 401);
-  if (!(await requireTrainer(supabase))) return fail("Permissão negada", 403);
+  // Sessão + conta ativa; auth.profile traz o papel ativo
+  const auth = await authorize();
+  if (!auth.ok) return auth.response;
+  const { supabase } = auth;
+  if (!hasAnyRole(auth.profile, MANAGERS)) return fail("Permissão negada", 403);
 
   // Buscar treino para obter season_id
   const { data: training } = await supabase
@@ -98,9 +84,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: trainingId } = await params;
-  const { supabase, user } = await getSupabase();
-  if (!user) return fail("Não autenticado", 401);
-  if (!(await requireTrainer(supabase))) return fail("Permissão negada", 403);
+  // Sessão + conta ativa; auth.profile traz o papel ativo
+  const auth = await authorize();
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
+  if (!hasAnyRole(auth.profile, MANAGERS)) return fail("Permissão negada", 403);
 
   let body: {
     player_id?: string;

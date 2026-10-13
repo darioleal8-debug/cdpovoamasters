@@ -58,8 +58,7 @@ export async function POST(req: NextRequest) {
   const admin = adminClient();
 
   // Verificar permissão
-  const { data: caller } = await admin
-    .from("users").select("role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
 
   if (!caller || !["admin", "treinador"].includes(caller.role)) {
     return fail("Sem permissão", 403);

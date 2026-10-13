@@ -42,11 +42,7 @@ export async function PUT(req: NextRequest) {
   const admin = await createAdminClient();
 
   // Verificar permissão de admin
-  const { data: profile } = await admin
-    .from("users")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+  const profile = authz.profile; // papel ativo (authorize)
   if (profile?.role !== "admin") return fail("Sem permissão", 403);
 
   const body = await req.json() as PhotoTemplateConfig;

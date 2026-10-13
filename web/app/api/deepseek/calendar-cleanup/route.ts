@@ -220,11 +220,7 @@ export async function POST(req: NextRequest) {
   const admin = await createAdminClient();
 
   // Admin only
-  const { data: userRow } = await admin
-    .from("users")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+  const userRow = authz.profile; // papel ativo (authorize)
   if (userRow?.role !== "admin") return fail("Acesso negado — apenas admins", 403);
 
   const body = await req.json().catch(() => ({})) as { season_id?: string };

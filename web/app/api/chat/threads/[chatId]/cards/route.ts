@@ -55,8 +55,7 @@ export async function POST(
   if (!card_data) return fail("card_data obrigatório");
 
   const admin = adminClient();
-  const { data: caller } = await admin
-    .from("users").select("id, role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
   if (!caller) return fail("Perfil não encontrado", 404);
 
   const { data: chat } = await admin

@@ -1,22 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { authorize } from "@/lib/auth/guards";
+import { hasAnyRole, MANAGERS } from "@/lib/auth/roles";
 
 export const runtime = "nodejs";
 
 function fail(msg: string, status = 400) {
   return NextResponse.json({ error: msg }, { status });
-}
-
-async function getSupabase() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
-  );
-  const { data: { user } } = await supabase.auth.getUser();
-  return { supabase, user };
 }
 
 // ─── GET /api/trainings/[id]/rsvp ────────────────────────────────────────────
@@ -26,8 +15,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: trainingId } = await params;
-  const { supabase, user } = await getSupabase();
-  if (!user) return fail("Não autenticado", 401);
+  // Sessão + conta ativa; auth.profile traz o papel ativo
+  const auth = await authorize();
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   // Sumário via view
   const { data: summary, error: sumErr } = await supabase
@@ -71,8 +62,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: trainingId } = await params;
-  const { supabase, user } = await getSupabase();
-  if (!user) return fail("Não autenticado", 401);
+  // Sessão + conta ativa; auth.profile traz o papel ativo
+  const auth = await authorize();
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   let body: { status?: string; reason_code?: string | null; reason_text?: string | null };
   try { body = await req.json(); }
@@ -98,7 +91,7 @@ export async function POST(
   if (tErr || !training) return fail("Treino não encontrado", 404);
 
   // Validação de prazo (servidor) — treinadores+: sem prazo
-  const { data: isTrainer } = await supabase.rpc("is_trainer_or_above");
+  const isTrainer = hasAnyRole(auth.profile, MANAGERS);
   if (!isTrainer) {
     const trainingStart = new Date(`${training.date}T${training.start_time}`);
     const deadline = new Date(trainingStart.getTime() - training.rsvp_deadline_hours * 60 * 60 * 1000);
