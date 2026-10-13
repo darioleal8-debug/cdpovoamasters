@@ -1,6 +1,7 @@
 ﻿"use client";
+import { toPeriodPartials } from "@/lib/live/period-scores";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useLiveGame } from "@/hooks/use-live-game";
 import { createClient } from "@/lib/supabase/client";
@@ -56,6 +57,8 @@ export default function GameStatsPage() {
 
   const { session, plays, playerStats, periodScores, roster, loading } =
     useLiveGame(params.eventId);
+  // game_period_scores guarda acumulados; a tabela mostra parciais (STA-08)
+  const periodPartials = useMemo(() => toPeriodPartials(periodScores), [periodScores]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -91,7 +94,12 @@ export default function GameStatsPage() {
   // Filter out ghost rows — stats with player_id that no longer maps to any player
   // (can happen when old user-id-based rows coexist with the new player-id-based rows)
   const validStats = playerStats.filter(
-    (p) => roster.some((r) => r.user_id === p.player_id) || !!(p as any).user?.name
+    (p) => {
+      if (roster.some((r) => r.user_id === p.player_id)) return true;
+      // "?" é o nome por omissão de linhas sem jogador conhecido (legado user_id) — não contam (STA-11)
+      const name = (p as unknown as { user?: { name?: string } }).user?.name;
+      return !!name && name !== "?";
+    }
   );
   const sortedStats = [...validStats].sort((a, b) => b.pts - a.pts);
 
@@ -196,25 +204,25 @@ export default function GameStatsPage() {
           </div>
 
           {/* Period scores */}
-          {periodScores.length > 0 && (
+          {periodPartials.length > 0 && (
             <div className="mt-3 border-t border-white/10 pt-3">
               <div className="flex text-xs text-white/50 mb-1">
                 <span className="w-24" />
-                {periodScores.map((p) => (
+                {periodPartials.map((p) => (
                   <span key={p.period} className="flex-1 text-center">P{p.period}</span>
                 ))}
                 <span className="flex-1 text-center font-bold text-white">Tot</span>
               </div>
               <div className="flex text-xs">
                 <span className="w-24 text-white/60">CD Póvoa</span>
-                {periodScores.map((p) => (
+                {periodPartials.map((p) => (
                   <span key={p.period} className="flex-1 text-center text-white tabular-nums">{p.home_score}</span>
                 ))}
                 <span className="flex-1 text-center font-bold text-white tabular-nums">{session.home_score}</span>
               </div>
               <div className="flex text-xs mt-0.5">
                 <span className="w-24 text-white/60 truncate">{session.opponent_name}</span>
-                {periodScores.map((p) => (
+                {periodPartials.map((p) => (
                   <span key={p.period} className="flex-1 text-center text-white/70 tabular-nums">{p.away_score}</span>
                 ))}
                 <span className="flex-1 text-center font-bold text-white/70 tabular-nums">{session.away_score}</span>

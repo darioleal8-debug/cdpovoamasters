@@ -952,6 +952,12 @@ export function useLiveGame(
 
     if (session.clock_running) await stopClock();
 
+    // Gravar o acumulado do último período (antes só o nextPeriod gravava — faltava o P4) (STA-08)
+    await supabase.from("game_period_scores").upsert(
+      { game_session_id: session.id, period: session.current_period, home_score: session.home_score, away_score: session.away_score },
+      { onConflict: "game_session_id,period" }
+    );
+
     await supabase.from("player_court_stints")
       .update({ exit_clock_secs: 0, exit_home_score: session.home_score, exit_away_score: session.away_score })
       .eq("game_session_id", session.id)

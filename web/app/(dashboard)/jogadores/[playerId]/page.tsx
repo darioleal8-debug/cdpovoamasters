@@ -90,7 +90,7 @@ export default async function PlayerProfilePage({
   // ── 6. Estatísticas de jogo ─────────────────────────────────
   const { data: gameStatsRaw } = await admin
     .from("player_game_stats")
-    .select("id, game_session_id, pts, reb_off, reb_def, ast, stl, blk, tov, fg2_made, fg2_att, fg3_made, fg3_att, ft_made, ft_att, minutes_played, efficiency")
+    .select("id, game_session_id, pts, reb_off, reb_def, ast, stl, blk, tov, fg2_made, fg2_att, fg3_made, fg3_att, ft_made, ft_att, seconds_played, efficiency") // minutes_played nunca é escrito (STA-10)
     .eq("player_id", playerId)
     .eq("season_id", player.season_id);
 
@@ -143,7 +143,7 @@ export default async function PlayerProfilePage({
       fg3_att:        Number(s.fg3_att ?? 0),
       ft_made:        Number(s.ft_made ?? 0),
       ft_att:         Number(s.ft_att ?? 0),
-      minutes_played: Number(s.minutes_played ?? 0),
+      minutes_played: Number(s.seconds_played ?? 0) / 60,
       efficiency:     Number(s.efficiency ?? 0),
       session:        sessionMap.get(s.game_session_id as string) ?? null,
     })).sort((a, b) => (b.session?.event_date ?? "").localeCompare(a.session?.event_date ?? ""));
