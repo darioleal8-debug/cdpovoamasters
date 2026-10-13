@@ -3,7 +3,7 @@ import { authorize } from "@/lib/auth/guards";
 import { MANAGERS } from "@/lib/auth/roles";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { addDays, addWeeks, addMonths, parseISO, format, getDay, setDate } from "date-fns";
+import { generateTrainingDates } from "@/lib/trainings/recurrence";
 
 export const runtime = "nodejs";
 
@@ -68,8 +68,18 @@ export async function POST(req: NextRequest) {
     .eq("id", season_id)
     .single();
 
-  const seasonEnd = season?.end_date ? parseISO(season.end_date) : null;
-  const recurrenceEnd = end_date ? parseISO(end_date) : seasonEnd;
+  // Validar e gerar as datas ANTES de gravar a regra (DAT-09: NaN causava ciclo infinito
+  // e a regra ficava órfã; PRES-10: mensal 29–31 saltava meses)
+  const recurrenceEnd = end_date || season?.end_date || null;
+  const generated = generateTrainingDates({
+    start: date,
+    type: recurrence_type as "unique" | "weekly" | "monthly",
+    dayOfWeek: day_of_week !== undefined && day_of_week !== null && String(day_of_week) !== "" ? Number(day_of_week) : undefined,
+    dayOfMonth: day_of_month !== undefined && day_of_month !== null && String(day_of_month) !== "" ? Number(day_of_month) : undefined,
+    end: recurrenceEnd,
+  });
+  if (!generated.ok) return fail(generated.error);
+  const dates = generated.dates;
 
   let recurrenceId: string | null = null;
 
@@ -81,7 +91,7 @@ export async function POST(req: NextRequest) {
         day_of_week: recurrence_type === "weekly"  ? Number(day_of_week) : null,
         day_of_month: recurrence_type === "monthly" ? Number(day_of_month) : null,
         start_date: date,
-        end_date: recurrenceEnd ? format(recurrenceEnd, "yyyy-MM-dd") : null,
+        end_date: recurrenceEnd,
         start_time, end_time: end_time || null,
         location: location || "", type, notes: notes || null,
         created_by: user.id,
@@ -92,35 +102,6 @@ export async function POST(req: NextRequest) {
     if (ruleErr) return fail(ruleErr.message, 500);
     recurrenceId = rule.id;
   }
-
-  // Gerar datas
-  const dates: string[] = [];
-  const startDate = parseISO(date);
-  const maxDate   = recurrenceEnd ?? (seasonEnd ?? addMonths(startDate, 12));
-
-  if (recurrence_type === "unique") {
-    dates.push(format(startDate, "yyyy-MM-dd"));
-  } else if (recurrence_type === "weekly") {
-    const targetDow = Number(day_of_week ?? getDay(startDate));
-    let current = startDate;
-    // avançar até ao primeiro dia correto
-    while (getDay(current) !== targetDow) current = addDays(current, 1);
-    while (current <= maxDate) {
-      dates.push(format(current, "yyyy-MM-dd"));
-      current = addWeeks(current, 1);
-    }
-  } else if (recurrence_type === "monthly") {
-    const targetDom = Number(day_of_month ?? startDate.getDate());
-    let current = setDate(startDate, targetDom);
-    if (current < startDate) current = addMonths(current, 1);
-    while (current <= maxDate) {
-      dates.push(format(current, "yyyy-MM-dd"));
-      current = addMonths(current, 1);
-      current = setDate(current, targetDom);
-    }
-  }
-
-  if (dates.length === 0) return fail("Nenhuma data gerada com os parâmetros fornecidos");
 
   const gpsLat = location_lat ? parseFloat(String(location_lat)) : null;
   const gpsLng = location_lng ? parseFloat(String(location_lng)) : null;
