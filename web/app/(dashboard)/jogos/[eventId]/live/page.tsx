@@ -364,7 +364,13 @@ export default function LiveGamePage() {
       )}
 
       {/* ── DIALOG: Iniciar Jogo ─────────────────────────── */}
-      <Dialog open={startDialog} onOpenChange={(v) => { if (session) setStartDialog(v); }}>
+      <Dialog
+        open={startDialog}
+        onOpenChange={(v) => {
+          if (session) setStartDialog(v);
+          else if (!v) router.push("/jogos"); // sem jogo iniciado, fechar = voltar aos jogos (UX-09)
+        }}
+      >
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>🏀 Iniciar Jogo</DialogTitle></DialogHeader>
           <div className="space-y-4">
@@ -395,6 +401,9 @@ export default function LiveGamePage() {
             </div>
           </div>
           <DialogFooter>
+            <Button variant="outline" disabled={recording} onClick={() => router.push("/jogos")}>
+              Cancelar
+            </Button>
             <Button disabled={recording}
               onClick={async () => {
                 const ok = await startGame(opponentName || "Adversário", startingFive);
