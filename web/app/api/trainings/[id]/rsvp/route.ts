@@ -38,14 +38,17 @@ export async function GET(
 
   if (sumErr) return fail(sumErr.message, 500);
 
-  // RSVP próprio (jogador atual)
-  const { data: playerRecord } = await supabase
-    .from("players")
-    .select("id")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // RSVP próprio: perfil da época do treino (não o mais recente)
+  const { data: trainingRow } = await supabase
+    .from("trainings").select("season_id").eq("id", trainingId).maybeSingle();
+  const { data: playerRecord } = trainingRow
+    ? await supabase
+        .from("players")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("season_id", trainingRow.season_id)
+        .maybeSingle()
+    : { data: null };
 
   let own = null;
   if (playerRecord) {

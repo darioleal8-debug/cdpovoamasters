@@ -28,7 +28,7 @@ export default async function DashboardLayout({
 
   // Sem perfil → auth existe mas public.users não tem este utilizador
   if (!profile) {
-    redirect("/login");
+    redirect("/login?reason=noprofile");
   }
 
   // Conta desativada: o /login termina a sessão (evita ciclo /player ⇄ /login ⇄ /dashboard)

@@ -243,7 +243,9 @@ export default async function MinhaAreaPage() {
       .from("chats")
       .select("id")
       .eq("type", "announcement")
-      .maybeSingle();
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle(); // tolera mais de um canal announcement
 
     if (teamChat?.id) {
       const { data: msgs } = await admin

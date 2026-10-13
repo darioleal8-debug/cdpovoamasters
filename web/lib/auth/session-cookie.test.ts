@@ -23,6 +23,9 @@ describe("shouldRedirectFromLogin", () => {
   it("não redireciona quando a conta foi desativada (quebra o ciclo de redireções)", () => {
     expect(shouldRedirectFromLogin(true, new URLSearchParams("reason=inactive"))).toBe(false);
   });
+  it("não redireciona contas Auth sem perfil no clube (quebra o ciclo; minor da revisão)", () => {
+    expect(shouldRedirectFromLogin(true, new URLSearchParams("reason=noprofile"))).toBe(false);
+  });
   it("não redireciona sem sessão", () => {
     expect(shouldRedirectFromLogin(false, new URLSearchParams(""))).toBe(false);
   });

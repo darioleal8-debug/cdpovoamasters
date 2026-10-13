@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
+import { ADMIN } from "@/lib/auth/roles";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET() {
@@ -16,9 +18,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await authorize(ADMIN);
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   const body = await req.json();
   const { team_name, jersey_home_color, shorts_home_color, jersey_away_color, shorts_away_color, notes } = body;

@@ -16,7 +16,9 @@ export async function GET() {
     .from("chats")
     .select("id")
     .eq("type", "announcement")
-    .maybeSingle();
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle(); // tolera mais de um canal announcement
 
   if (!announcement?.id) {
     return NextResponse.json({ comunicados: [] });

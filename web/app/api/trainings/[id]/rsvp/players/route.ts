@@ -45,13 +45,20 @@ export async function GET(
   if (!training) return fail("Treino não encontrado", 404);
 
   // Lista de jogadores activos desta temporada
+  // players não tem jersey_number (é number) nem FK para user_display_names: nomes à parte
   const { data: players, error: pErr } = await supabase
     .from("players")
-    .select("id, jersey_number, user_display_names(name)")
+    .select("id, number, user_id")
     .eq("season_id", training.season_id)
-    .order("jersey_number", { ascending: true, nullsFirst: false });
+    .order("number", { ascending: true, nullsFirst: false });
 
   if (pErr) return fail(pErr.message, 500);
+
+  const userIds = (players ?? []).map((p) => p.user_id as string).filter(Boolean);
+  const { data: names } = userIds.length > 0
+    ? await supabase.from("user_display_names").select("id, name").in("id", userIds)
+    : { data: [] as { id: string; name: string }[] };
+  const nameByUser = new Map((names ?? []).map((n) => [n.id as string, n.name as string]));
 
   // RSVPs para este treino
   const { data: rsvps } = await supabase
@@ -65,13 +72,10 @@ export async function GET(
 
   const rows = (players ?? []).map((p) => {
     const r = rsvpMap.get(p.id);
-    const udn = Array.isArray(p.user_display_names)
-      ? p.user_display_names[0]
-      : p.user_display_names;
     return {
       player_id:    p.id,
-      name:         (udn as { name: string } | null)?.name ?? "—",
-      jersey_number: p.jersey_number,
+      name:         nameByUser.get(p.user_id as string) ?? "—",
+      jersey_number: p.number,
       status:       r?.status ?? null,
       reason_code:  r?.reason_code ?? null,
       reason_text:  r?.reason_text ?? null,

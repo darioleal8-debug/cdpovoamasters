@@ -14,8 +14,8 @@ export default async function PlayerLayout({ children }: { children: React.React
     .eq("id", user.id)
     .single();
 
-  // Sem perfil (admin original sem registo) → dashboard
-  if (!profile) redirect("/dashboard");
+  // Sem perfil no clube → /login termina a sessão (evita ciclo /player ⇄ /dashboard)
+  if (!profile) redirect("/login?reason=noprofile");
 
   // Seccionista não é jogador — redirecionar para a área de jogos
   if (profile.role === "seccionista") redirect("/jogos");

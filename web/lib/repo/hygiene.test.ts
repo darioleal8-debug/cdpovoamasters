@@ -14,6 +14,7 @@ describe("higiene do repositório (QUAL-08/10/13, STA-18, UI-05)", () => {
     "components/payments/player-payments-table.tsx",
     "components/players/players-table.tsx",
     "trace.txt",
+    "app/api/players/[playerId]/stats", // sem consumidores; procurava por user_id (STA-03)
   ];
   for (const f of dead) {
     it(`código morto removido: web/${f}`, () => expect(existsSync(path.join(WEB, f))).toBe(false));

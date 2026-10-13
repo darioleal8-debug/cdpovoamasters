@@ -46,3 +46,20 @@ describe("referências a schema inexistente em produção", () => {
     expect(read("app/player/minha-area/page.tsx")).not.toContain('"importante"');
   });
 });
+
+describe("RSVP de treinos (minor da revisão + bug novo)", () => {
+  it("lista de RSVP não pede players.jersey_number nem embute user_display_names a partir de players", () => {
+    const src = read("app/api/trainings/[id]/rsvp/players/route.ts");
+    expect(src).not.toMatch(/from\("players"\)[\s\S]{0,40}select\("[^"]*jersey_number/);
+    expect(src).not.toMatch(/from\("players"\)[\s\S]{0,40}select\("[^"]*user_display_names\(/);
+  });
+  it("o RSVP próprio usa o perfil da época do treino, não o mais recente", () => {
+    const src = read("app/api/trainings/[id]/rsvp/route.ts");
+    const get = src.slice(src.indexOf("export async function GET"), src.indexOf("export async function", src.indexOf("export async function GET") + 10));
+    expect(get).toMatch(/\.eq\("season_id"/);
+  });
+  it("comunicados não usam maybeSingle() no canal announcement", () => {
+    const src = read("app/api/player/comunicados/route.ts");
+    expect(src).not.toMatch(/"announcement"\)\s*\.maybeSingle\(\)/);
+  });
+});

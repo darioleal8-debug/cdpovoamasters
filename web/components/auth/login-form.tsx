@@ -27,9 +27,14 @@ export function LoginForm() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("activated") === "1") setJustActivated(true);
     // Conta desativada com sessão ainda válida: terminar a sessão aqui (os layouts server não podem apagar cookies)
-    if (params.get("reason") === "inactive") {
+    const reason = params.get("reason");
+    if (reason === "inactive" || reason === "noprofile") {
       supabase.auth.signOut().finally(() =>
-        setError("A tua conta está desativada. Fala com o administrador do clube.")
+        setError(
+          reason === "inactive"
+            ? "A tua conta está desativada. Fala com o administrador do clube."
+            : "A tua conta não está associada a nenhum clube. Fala com o administrador."
+        )
       );
     }
   }, [supabase]);

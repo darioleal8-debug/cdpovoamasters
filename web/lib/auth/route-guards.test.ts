@@ -5,7 +5,6 @@ import path from "node:path";
 // Cada rota abaixo tem de chamar authorize() com o grupo indicado (auditoria: DAT-01, SEC-03/13/15/16/17/26, CONV-07, DAT-20).
 const EXPECTED: Record<string, string> = {
   "app/api/players/route.ts": "authorize(MANAGERS)",
-  "app/api/players/[playerId]/stats/route.ts": "authorize()",
   "app/api/hist/players/route.ts": "authorize()",
   "app/api/hist/games/route.ts": "authorize()",
   "app/api/deepseek/evaluation/route.ts": "authorize(MANAGERS)",
@@ -19,6 +18,9 @@ const EXPECTED: Record<string, string> = {
   "app/api/games/[id]/callups/[callupId]/route.ts": "authorize(MANAGERS)",
   "app/api/player-payments/route.ts": "authorize(FINANCE)",
   "app/api/player-payments/[id]/route.ts": "authorize(FINANCE)",
+  "app/api/club-settings/route.ts": "authorize(ADMIN)",
+  "app/api/team-kits/route.ts": "authorize(ADMIN)",
+  "app/api/team-kits/[id]/route.ts": "authorize(ADMIN)",
 };
 
 describe("rotas protegidas por papel", () => {
