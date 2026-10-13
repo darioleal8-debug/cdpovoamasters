@@ -80,7 +80,7 @@ export default function AlterarPasswordPage() {
             Alterar Password
           </h1>
           <p className="text-center text-sm" style={{ color: "#5A6478" }}>
-            A tua password temporária expirou. Define uma nova password para continuar.
+            Define uma nova palavra-passe para continuar.
           </p>
         </div>
 

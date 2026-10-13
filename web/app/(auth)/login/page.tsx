@@ -4,7 +4,7 @@ import { LoginPanelLeft } from "@/components/auth/login-panel-left";
 import { LoginForm }      from "@/components/auth/login-form";
 
 export const metadata: Metadata = {
-  title: "Entrar — hoophub",
+  title: "Entrar",
   description: "Acede ao hoophub com o teu email e palavra-passe.",
   robots: { index: false, follow: false },
 };

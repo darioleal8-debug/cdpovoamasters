@@ -28,6 +28,7 @@ export function LoginForm() {
     if (params.get("activated") === "1") setJustActivated(true);
     // Conta desativada com sessão ainda válida: terminar a sessão aqui (os layouts server não podem apagar cookies)
     const reason = params.get("reason");
+    if (reason === "link_invalido") setError("O link expirou ou já foi usado. Pede um novo em \"Esqueci-me\".");
     if (reason === "inactive" || reason === "noprofile") {
       supabase.auth.signOut().finally(() =>
         setError(

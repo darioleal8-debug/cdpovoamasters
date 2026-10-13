@@ -4,7 +4,7 @@ import { LandingClient } from "./landing-client";
 import type { Metadata }  from "next";
 
 export const metadata: Metadata = {
-  title: "hoophub — Gestão de clubes de basquetebol de veteranos",
+  title: { absolute: "hoophub — Gestão de clubes de basquetebol de veteranos" },
   description:
     "Plantel, convocatórias, quotas e estatística de jogo num só sítio. Feito para clubes de basquetebol de veteranos que se gerem a si próprios.",
   robots: { index: true, follow: true },
