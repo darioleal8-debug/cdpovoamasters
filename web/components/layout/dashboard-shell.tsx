@@ -11,11 +11,11 @@ interface Props {
   userEmail:      string;
   userRole:       UserRole;
   userRolesExtra: UserRole[];
-  canViewAsPlayer: boolean;
+  availableRoles: UserRole[];
   children:       React.ReactNode;
 }
 
-export function DashboardShell({ userName, userEmail, userRole, userRolesExtra, canViewAsPlayer, children }: Props) {
+export function DashboardShell({ userName, userEmail, userRole, userRolesExtra, availableRoles, children }: Props) {
   return (
     /*
      * Shell de 100dvh — evita o bug do vh em iOS com barra do Safari.
@@ -38,7 +38,7 @@ export function DashboardShell({ userName, userEmail, userRole, userRolesExtra, 
 
       {/* ── Coluna principal ─────────────────────────────────────── */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <Header userName={userName} userEmail={userEmail} userRole={userRole} canViewAsPlayer={canViewAsPlayer} />
+        <Header userName={userName} userEmail={userEmail} userRole={userRole} availableRoles={availableRoles} />
 
         {/*
          * Área de scroll do conteúdo.

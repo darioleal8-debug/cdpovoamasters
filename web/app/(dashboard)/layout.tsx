@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import type { UserRole } from "@/types/database";
-import { canViewAsPlayer } from "@/lib/auth/view-as";
+import { readActiveRoleCookie } from "@/lib/auth/guards";
+import { applyActiveRole, availableRoles } from "@/lib/auth/active-role";
 
 export default async function DashboardLayout({
   children,
@@ -38,8 +39,11 @@ export default async function DashboardLayout({
   }
 
   const userName      = profile.name       ?? user.email ?? "Utilizador";
-  const userRole      = profile.role       as UserRole;
-  const userRolesExtra = (profile.roles_extra ?? []) as UserRole[];
+  // Papel ativo escolhido no seletor (só restringe aos papéis que a conta tem)
+  const effective      = applyActiveRole({ role: profile.role as UserRole, roles_extra: profile.roles_extra }, await readActiveRoleCookie());
+  const userRole       = effective.role;
+  const userRolesExtra = (effective.roles_extra ?? []) as UserRole[];
+  const roles          = availableRoles({ role: profile.role as UserRole, roles_extra: profile.roles_extra });
   const userEmail     = user.email         ?? "";
 
   // Jogadores (role primário) pertencem à área do jogador.
@@ -48,21 +52,13 @@ export default async function DashboardLayout({
     redirect("/player");
   }
 
-  // Ficha de jogador ligada a esta conta → pode alternar para a área do jogador
-  const { data: linkedPlayers } = await supabase
-    .from("players")
-    .select("id")
-    .eq("user_id", user.id)
-    .limit(1);
-  const viewAsPlayer = canViewAsPlayer(userRole, (linkedPlayers?.length ?? 0) > 0);
-
   return (
     <DashboardShell
       userName={userName}
       userEmail={userEmail}
       userRole={userRole}
       userRolesExtra={userRolesExtra}
-      canViewAsPlayer={viewAsPlayer}
+      availableRoles={roles}
     >
       {children}
     </DashboardShell>

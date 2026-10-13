@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authorize } from "@/lib/auth/guards";
+import { authorize, readActiveRoleCookie } from "@/lib/auth/guards";
+import { applyActiveRole, availableRoles } from "@/lib/auth/active-role";
 import { buildPlayerProfileUpdate } from "@/lib/profile/player-update";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
@@ -42,7 +43,7 @@ export async function GET() {
 
   const { data: profile } = await admin
     .from("users")
-    .select("id, email, name, role, phone, birth_date, photo_url, active")
+    .select("id, email, name, role, roles_extra, phone, birth_date, photo_url, active")
     .eq("id", authUser.id)
     .single();
 
@@ -61,7 +62,9 @@ export async function GET() {
     return NextResponse.json({ user: null, player: null, error: "Conta sem perfil no clube." }, { status: 403 });
   }
 
-  return NextResponse.json({ user: profile, player });
+  // Papel ativo: a UI comporta-se como o papel escolhido; available_roles alimenta o seletor
+  const { roles_extra: _extra, ...effective } = applyActiveRole(profile, await readActiveRoleCookie());
+  return NextResponse.json({ user: { ...effective, available_roles: availableRoles(profile) }, player });
 }
 
 // ─── PUT /api/auth/me ─── jogador edita o próprio perfil ─

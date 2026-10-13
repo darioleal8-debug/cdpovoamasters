@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
 interface Entry {
@@ -314,12 +313,11 @@ export function PalmaresView({ allowAdmin = true }: { allowAdmin?: boolean }) {
 
   useEffect(() => {
     if (!allowAdmin) return;
-    const sb = createClient();
-    sb.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) return;
-      const { data: profile } = await sb.from("users").select("role").eq("id", user.id).single();
-      setIsAdmin(profile?.role === "admin");
-    });
+    // /api/auth/me já devolve o papel ativo (seletor de papel)
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setIsAdmin(d?.user?.role === "admin"))
+      .catch(() => setIsAdmin(false));
   }, [allowAdmin]);
 
   const loadPalmares = useCallback(() => {

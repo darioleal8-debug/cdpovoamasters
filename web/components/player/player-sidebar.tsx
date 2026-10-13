@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { RoleSwitcherChip } from "@/components/auth/role-switcher";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowLeft, Calendar, CreditCard, Dumbbell, Home, LogOut, MessageSquare, Trophy, User, Users } from "lucide-react";
+import { Calendar, CreditCard, Dumbbell, Home, LogOut, MessageSquare, Trophy, User, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useClubSettings } from "@/lib/club-context";
 import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
@@ -25,10 +26,12 @@ const PLAYER_NAV = [
 
 export function PlayerSidebar({
   playerName,
-  canReturnToDashboard = false,
+  availableRoles = [],
+  activeRole = "jogador",
 }: {
   playerName?: string;
-  canReturnToDashboard?: boolean;
+  availableRoles?: string[];
+  activeRole?: string;
 }) {
   const { settings } = useClubSettings();
   const router  = useRouter();
@@ -74,15 +77,9 @@ export function PlayerSidebar({
 
       {/* Navegação */}
       <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-4">
-        {canReturnToDashboard && (
-          <div className="mb-3">
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-3 rounded-md px-3 py-2 text-xs font-medium text-white/40 hover:text-white/75 transition-colors"
-            >
-              <ArrowLeft className="h-3.5 w-3.5 shrink-0" />
-              <span>Voltar ao Dashboard</span>
-            </Link>
+        {availableRoles.length > 1 && (
+          <div className="mb-3 px-3">
+            <RoleSwitcherChip roles={availableRoles} activeRole={activeRole} />
           </div>
         )}
 
