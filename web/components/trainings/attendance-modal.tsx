@@ -35,7 +35,7 @@ export function AttendanceModal({ training, players, open, onClose }: Props) {
   const [validating, setValidating] = useState<string | null>(null);
   const [autoExpanded, setAutoExpanded] = useState(true);
 
-  // Só atletas com perfil nesta época e conta ativa (PRES-04, PRES-17); chave única = player_id
+  // Só atletas com perfil nesta época (PRES-04); chave única = player_id
   const roster = useMemo(() => eligibleRoster(players), [players]);
   const excludedCount = players.length - roster.length;
 
@@ -127,7 +127,7 @@ export function AttendanceModal({ training, players, open, onClose }: Props) {
 
         {excludedCount > 0 && (
           <p className="text-xs text-muted-foreground">
-            {excludedCount === 1 ? "1 atleta não aparece" : `${excludedCount} atletas não aparecem`} por não ter perfil nesta temporada ou ter a conta desativada.
+            {excludedCount === 1 ? "1 atleta não aparece" : `${excludedCount} atletas não aparecem`} por não ter perfil nesta temporada.
           </p>
         )}
 
@@ -243,7 +243,12 @@ export function AttendanceModal({ training, players, open, onClose }: Props) {
                       <span className="w-7 shrink-0 text-center text-xs font-mono text-muted-foreground">
                         {player.number ?? "—"}
                       </span>
-                      <span className="flex-1 text-sm font-medium truncate">{player.name}</span>
+                      <span className="flex-1 text-sm font-medium truncate">
+                        {player.name}
+                        {player.active === false && (
+                          <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">(conta inativa)</span>
+                        )}
+                      </span>
 
                       {/* Badge auto-presença */}
                       {isAuto && (

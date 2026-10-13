@@ -4,12 +4,15 @@ import { eligibleRoster, buildAttendanceRecords, hasUnsavedChanges } from "./att
 const roster = [
   { user_id: "u-ana", player_id: "p-ana", active: true },
   { user_id: "u-novo", player_id: null, active: true },      // sem perfil nesta época
-  { user_id: "u-saiu", player_id: "p-saiu", active: false }, // conta desativada
+  { user_id: "u-pend", player_id: "p-pend", active: false }, // perfil na época, conta ainda por ativar
 ];
 
-describe("eligibleRoster (PRES-04, PRES-17)", () => {
-  it("só atletas com perfil na época e conta ativa", () => {
-    expect(eligibleRoster(roster).map((p) => p.player_id)).toEqual(["p-ana"]);
+describe("eligibleRoster (PRES-04; revisão final, Importante 4)", () => {
+  it("todos os atletas com perfil na época, incluindo contas por ativar", () => {
+    expect(eligibleRoster(roster).map((p) => p.player_id)).toEqual(["p-ana", "p-pend"]);
+  });
+  it("exclui quem não tem perfil nesta época", () => {
+    expect(eligibleRoster(roster).some((p) => p.player_id === null)).toBe(false);
   });
 });
 

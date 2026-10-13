@@ -7,9 +7,13 @@ export interface RosterLike {
 
 export type EligiblePlayer<T extends RosterLike> = T & { player_id: string };
 
-/** Atletas que podem ter presença registada: perfil nesta época e conta ativa. */
+/**
+ * Atletas que podem ter presença registada: perfil nesta época. Contas com active=false continuam
+ * elegíveis — `active` mistura "ainda por ativar" com "desativado" e um atleta que nunca abriu a app
+ * também treina (revisão final, Importante 4). O modal mostra uma etiqueta nesses casos.
+ */
 export function eligibleRoster<T extends RosterLike>(players: T[]): EligiblePlayer<T>[] {
-  return players.filter((p): p is EligiblePlayer<T> => !!p.player_id && p.active !== false);
+  return players.filter((p): p is EligiblePlayer<T> => !!p.player_id);
 }
 
 export function buildAttendanceRecords(
