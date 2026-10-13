@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { canManageContent } from "@/lib/permissions";
+import { authorize } from "@/lib/auth/guards";
+import { MANAGERS } from "@/lib/auth/roles";
 
 export const runtime = "nodejs";
 
@@ -30,13 +31,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; callupId: string }> }
 ) {
   const { id: game_id, callupId } = await params;
-  const { supabase, user } = await getSupabase();
-  if (!user) return fail("Não autenticado", 401);
-
-  const { data: caller } = await supabase.from("users").select("role").eq("id", user.id).single();
-  if (!caller || !canManageContent(caller.role)) {
-    return fail("Apenas administradores e treinadores podem remover convocados", 403);
-  }
+  const auth = await authorize(MANAGERS);
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   const { error } = await supabase
     .from("game_callups")

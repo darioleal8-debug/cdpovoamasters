@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
 import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
@@ -61,22 +62,27 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ playerId: string }> }
 ) {
+  const auth = await authorize();
+  if (!auth.ok) return auth.response;
+
   const { playerId } = await params;
   const db = adminClient();
 
   // 1. Player + season
   const { data: player, error: pErr } = await db
     .from("players")
-    .select("*, seasons(id, name, status, year)")
+    .select("id, user_id, season_id, number, position, photo_url, seasons(id, name, status, year)")
     .eq("id", playerId)
     .single();
 
   if (pErr || !player) return fail("Jogador não encontrado", 404);
 
   const userId = player.user_id as string | null;
+  // Só campos públicos do perfil desportivo (SEC-03): nada de contactos, datas de nascimento ou user_id.
+  const publicPlayer = { id: player.id, season_id: player.season_id, number: player.number, position: player.position, photo_url: player.photo_url, seasons: player.seasons };
 
   if (!userId) {
-    return NextResponse.json({ player, hasStats: false, currentSeason: null, history: [] });
+    return NextResponse.json({ player: publicPlayer, hasStats: false, currentSeason: null, history: [] });
   }
 
   // 2. All stats for this user (all seasons, all games)
@@ -140,7 +146,7 @@ export async function GET(
     .sort((a, b) => String(b.season.year ?? "").localeCompare(String(a.season.year ?? "")));
 
   return NextResponse.json({
-    player,
+    player: publicPlayer,
     hasStats: true,
     currentSeason: {
       season: seasonMap[currentSeasonId] ?? (player.seasons as object),

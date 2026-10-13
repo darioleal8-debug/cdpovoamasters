@@ -1,21 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import { authorize } from "@/lib/auth/guards";
+import { MANAGERS } from "@/lib/auth/roles";
 import { createClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
 
 export const runtime = "nodejs";
-
-// ─── Auth: obtém utilizador autenticado ──────────────────
-async function getAuthUser() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
-  );
-  const { data: { user } } = await supabase.auth.getUser();
-  return user;
-}
 
 // ─── Admin client (para Storage — bypassa RLS) ───────────
 function adminClient() {
@@ -77,8 +65,8 @@ async function uploadPhoto(
 
 // ─── POST /api/players ─── Criar jogador ─────────────────
 export async function POST(req: NextRequest) {
-  const authUser = await getAuthUser();
-  if (!authUser) return fail("Não autenticado — faz login antes de continuar", 401);
+  const auth = await authorize(MANAGERS);
+  if (!auth.ok) return auth.response;
 
   let fd: FormData;
   try {
@@ -171,8 +159,8 @@ export async function POST(req: NextRequest) {
 //   focal_y          (float 0-1, default 0.3)
 //   template_version (int)
 export async function PATCH(req: NextRequest) {
-  const authUser = await getAuthUser();
-  if (!authUser) return fail("Não autenticado", 401);
+  const auth = await authorize(MANAGERS);
+  if (!auth.ok) return auth.response;
 
   let fd: FormData;
   try {
@@ -257,8 +245,8 @@ export async function PATCH(req: NextRequest) {
 
 // ─── DELETE /api/players ─── Remover jogador ─────────────
 export async function DELETE(req: NextRequest) {
-  const authUser = await getAuthUser();
-  if (!authUser) return fail("Não autenticado", 401);
+  const auth = await authorize(MANAGERS);
+  if (!auth.ok) return auth.response;
 
   const { searchParams } = new URL(req.url);
   const playerId = searchParams.get("id")?.trim() ?? "";

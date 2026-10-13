@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
+import { MANAGERS } from "@/lib/auth/roles";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { addDays, addWeeks, addMonths, parseISO, format, getDay, setDate } from "date-fns";
@@ -44,8 +46,9 @@ export async function GET(req: NextRequest) {
 
 // ─── POST /api/trainings — criar treino (com recorrência) ──
 export async function POST(req: NextRequest) {
-  const { supabase, user } = await getSupabase();
-  if (!user) return fail("Não autenticado", 401);
+  const auth = await authorize(MANAGERS);
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return fail("JSON inválido"); }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
@@ -12,6 +13,8 @@ function adminClient() {
 }
 
 export async function GET(req: NextRequest) {
+  const auth = await authorize();
+  if (!auth.ok) return auth.response;
   const seasonId = req.nextUrl.searchParams.get("season_id");
   const db = adminClient();
 

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
+import { FINANCE } from "@/lib/auth/roles";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { sendAndLogPaymentReceipt } from "@/lib/payment-receipt";
 
@@ -21,9 +23,9 @@ async function enrichPayments(
 }
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await authorize();
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   const sp = req.nextUrl.searchParams;
   const season_id = sp.get("season_id");
@@ -51,9 +53,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await authorize(FINANCE);
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   const body = await req.json();
   const { season_id, player_id: bodyPlayerId, user_id, month, reference_year, amount, amount_due, status, method, notes, payment_date } = body;
