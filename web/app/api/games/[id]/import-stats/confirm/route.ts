@@ -44,7 +44,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  await params; // eslint-disable-line @typescript-eslint/no-unused-expressions
+  await params;
 
   const authUser = await getAuthUser();
   if (!authUser) return fail("Não autenticado", 401);

@@ -135,12 +135,12 @@ const DATE_RE = /(\d{1,2})[\/\-\.](\d{1,2}|\w{3})[\/\-\.](\d{4})/i;
 export function parseDate(raw: string): string | null {
   if (!raw) return null;
   // Remove day-name prefix: "qui, " / "sex " / etc.
-  let s = raw.replace(/^\w+[,.]?\s*/, "").trim();
+  const s = raw.replace(/^\w+[,.]?\s*/, "").trim();
 
   const m = s.match(DATE_RE);
   if (!m) return null;
 
-  let [, d, mid, y] = m;
+  const [, d, mid, y] = m;
   let month: number;
 
   if (/^\d+$/.test(mid)) {

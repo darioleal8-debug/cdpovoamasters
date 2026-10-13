@@ -94,7 +94,7 @@ export async function GET(
 
   // Leituras por mensagem (para "lido por N")
   const msgIds = page.map((m: { id: string }) => m.id);
-  let readsByMsg = new Map<string, number>();
+  const readsByMsg = new Map<string, number>();
   if (msgIds.length > 0) {
     const { data: reads } = await admin
       .from("chat_message_reads")

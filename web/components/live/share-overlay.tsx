@@ -57,7 +57,7 @@ export function ShareOverlay({
       }
     };
     run();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Download JPG ──────────────────────────────────────────────────────────
   const handleJpg = useCallback(() => {

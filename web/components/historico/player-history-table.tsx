@@ -50,7 +50,8 @@ export function PlayerHistoryTable() {
   function toggle(playerId: string) {
     setExpanded((prev) => {
       const next = new Set(prev);
-      next.has(playerId) ? next.delete(playerId) : next.add(playerId);
+      if (next.has(playerId)) next.delete(playerId);
+      else next.add(playerId);
       return next;
     });
   }

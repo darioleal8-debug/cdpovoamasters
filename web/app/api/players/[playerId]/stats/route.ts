@@ -114,7 +114,7 @@ export async function GET(
   const currentRows = bySeason.get(currentSeasonId) ?? [];
   const sessionIds = currentRows.map((r) => r.game_session_id).filter(Boolean);
 
-  let ctxMap: Record<string, { opponent_name: string; event_date: string | null; home_score: number; away_score: number }> = {};
+  const ctxMap: Record<string, { opponent_name: string; event_date: string | null; home_score: number; away_score: number }> = {};
   if (sessionIds.length > 0) {
     const { data: sessions } = await db
       .from("game_sessions")
