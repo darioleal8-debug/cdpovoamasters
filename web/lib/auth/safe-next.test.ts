@@ -30,3 +30,16 @@ describe("página de recuperação (UX-02)", () => {
     expect(existsSync(path.join(__dirname, "..", "..", "app/auth/callback/route.ts"))).toBe(true);
   });
 });
+
+describe("safeNextPath com caracteres de controlo (revisão A.2, Imp. 1)", () => {
+  it("rejeita tab/newline que o URL parser remove (\"/\\t/evil.com\" → https://evil.com)", () => {
+    expect(safeNextPath("/\t/evil.com")).toBe("/");
+    expect(safeNextPath("/\n/evil.com")).toBe("/");
+    expect(safeNextPath("/\r//evil.com")).toBe("/");
+  });
+  it("o resultado resolve sempre para a própria origem", () => {
+    for (const n of ["/alterar-password", "/\t/evil.com", "/%2F%2Fevil.com", "/a/../../b"]) {
+      expect(new URL(safeNextPath(n), "https://app.test").origin).toBe("https://app.test");
+    }
+  });
+});

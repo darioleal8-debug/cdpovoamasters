@@ -1,4 +1,5 @@
 "use client";
+import { todayInClubTz } from "@/lib/time/club-time";
 
 import { parseAmountDue } from "@/lib/payments/update-fields";
 import { useState, useEffect } from "react";
@@ -78,7 +79,7 @@ export function RegisterPaymentModal({ open, onClose, onSave, onDelete, players,
   const [status,      setStatus]      = useState<PlayerPaymentStatus>(existing?.status ?? "paid");
   const [method,      setMethod]      = useState<PlayerPaymentMethod | "">(existing?.method ?? "");
   const [notes,       setNotes]       = useState(existing?.notes ?? "");
-  const [paymentDate, setPaymentDate] = useState(existing?.payment_date ?? today.toISOString().slice(0, 10));
+  const [paymentDate, setPaymentDate] = useState(existing?.payment_date ?? todayInClubTz(today));
   const [saving,      setSaving]      = useState(false);
   const [deleting,    setDeleting]    = useState(false);
   const [confirmDel,  setConfirmDel]  = useState(false);
@@ -94,7 +95,7 @@ export function RegisterPaymentModal({ open, onClose, onSave, onDelete, players,
     setStatus(ex?.status ?? "paid");
     setMethod(ex?.method ?? "");
     setNotes(ex?.notes   ?? "");
-    setPaymentDate(ex?.payment_date ?? today.toISOString().slice(0, 10));
+    setPaymentDate(ex?.payment_date ?? todayInClubTz(today));
     setConfirmDel(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);

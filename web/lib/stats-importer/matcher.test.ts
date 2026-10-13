@@ -33,3 +33,20 @@ describe("matchPlayers (STA-13)", () => {
     expect(row).toMatchObject({ player_id: "a", status: "ok" });
   });
 });
+
+describe("matchPlayers — revisão A.2", () => {
+  it("'Ana' não é associada automaticamente a 'Joana Silva' (inclusão por palavra, Imp. 2)", () => {
+    const [row] = matchPlayers([ext("Ana")], [{ id: "j", name: "Joana Silva", number: 3 }]);
+    expect(row.player_id === "j" && row.status === "ok").toBe(false);
+  });
+  it("controlo: 'Rui Costa' contido em 'Rui Costa Santos' continua ok", () => {
+    const [row] = matchPlayers([ext("Rui Costa")], [{ id: "a", name: "Rui Costa Santos", number: 4 }, { id: "b", name: "Ana Lopes", number: 8 }]);
+    expect(row).toMatchObject({ player_id: "a", status: "ok" });
+  });
+  it("match por número tem prioridade sobre um match por nome anterior (Imp. 3)", () => {
+    const roster = [{ id: "a", name: "Rui Costa", number: 4 }, { id: "b", name: "Ana Lopes", number: 8 }];
+    const rows = matchPlayers([ext("R. Costa", 11), ext("Rui Costa", 4)], roster);
+    expect(rows[1]).toMatchObject({ player_id: "a", status: "ok" });
+    expect(rows[0].player_id === "a" && rows[0].status === "ok").toBe(false);
+  });
+});

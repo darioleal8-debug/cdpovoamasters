@@ -40,15 +40,34 @@ export function matchHistPlayers(
       };
     }
 
+    // Ambígua: o wizard trata hist_player_id=null como "criar jogador novo" — por isso nunca
+    // deixar null + include por omissão (revisão A.2). Um único candidato livre vem pré-selecionado
+    // (como antes); sem escolha segura, a linha fica excluída até o utilizador decidir.
+    const free = good.filter((g) => !assigned.has(g.id));
+    const candidates = good.slice(0, 5).map(({ score: _, ...g }) => g);
+    // Só pré-seleciona se o melhor candidato estiver livre (senão escolheria um candidato fraco)
+    if (free.length === 1 && free[0].id === best.id) {
+      assigned.add(free[0].id);
+      return {
+        extracted:        e,
+        hist_player_id:   free[0].id,
+        hist_player_name: free[0].name,
+        match_type:       "name" as const,
+        status:           "ambiguous" as HistMatchStatus,
+        candidates,
+        new_player_name:  e.pdf_name,
+        include:          true,
+      };
+    }
     return {
       extracted:        e,
       hist_player_id:   null,
       hist_player_name: null,
       match_type:       "none" as const,
       status:           "ambiguous" as HistMatchStatus,
-      candidates:       good.slice(0, 5).map(({ score: _, ...g }) => g),
+      candidates,
       new_player_name:  e.pdf_name,
-      include:          true,
+      include:          false,
     };
   });
 }

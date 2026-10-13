@@ -10,6 +10,10 @@ const FILES = [
   "app/player/meus-jogos/page.tsx",
   "app/player/minha-area/page.tsx",
   "components/trainings/trainings-list.tsx",
+  // revisão A.2, Imp. 6: próximo treino e datas de pagamento por omissão
+  "components/dashboard/next-training-card.tsx",
+  "components/payments/cell-popover.tsx",
+  "components/payments/register-payment-modal.tsx",
 ];
 
 describe("'hoje' calculado no fuso do clube (PRES-14, CONV-13)", () => {

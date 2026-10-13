@@ -42,3 +42,18 @@ describe("parsePDFText (CONV-11)", () => {
     expect(r.games[0].jornada).toBe(3);
   });
 });
+
+describe("prefixo de dia da semana não come nomes de equipas (revisão A.2, Imp. 5)", () => {
+  it("'SC Quarteira' não é tratado como 'qua'", () => {
+    const g = parseGameLine("7   SC Braga   SC Quarteira   16/10/2026   21:30   Pav. X   Braga", 2, /Povoa/i);
+    expect(g?.away_team).toBe("SC Quarteira");
+  });
+  it("'Terceira' não faz desaparecer o jogo", () => {
+    const g = parseGameLine("7   CD Póvoa   Terceira   16/10/2026   21:30   Pav. X   Póvoa", 2, /Povoa/i);
+    expect(g?.away_team).toBe("Terceira");
+  });
+  it("controlo: 'Sexta-feira 16/10/2026' e 'qui, 16/10/2026' continuam a ser prefixos", () => {
+    expect(parseGameLine("7   SC Braga   CD Povoa   Sexta-feira 16/10/2026   21:30   Pav. X   Braga", 2, /Povoa/i)?.away_team).toBe("CD Povoa");
+    expect(parseGameLine("7   SC Braga   CD Povoa   qui, 16/10/2026   21:30   Pav. X   Braga", 2, /Povoa/i)?.away_team).toBe("CD Povoa");
+  });
+});

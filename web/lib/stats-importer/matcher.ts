@@ -42,8 +42,10 @@ export function nameSimilarity(pdfName: string, rosterName: string): number {
     return rTok[0]?.startsWith(initial) ? 0.9 : 0.5;
   }
 
-  // Inclusão (ex.: "rui costa" ⊂ "rui costa santos") — exige ≥ 3 caracteres
-  if (pn.length >= 3 && (rn.includes(pn) || pn.includes(rn))) return 0.92;
+  // Inclusão por PALAVRAS inteiras (ex.: "rui costa" ⊂ "rui costa santos"); a substring
+  // simples fazia "ana" ⊂ "joana silva" (revisão A.2)
+  const within = (a: string[], b: string[]) => a.every((t) => b.includes(t));
+  if (pn.length >= 3 && (within(pTok, rTok) || within(rTok, pTok))) return 0.92;
 
   // Apelido igual (mín. 3 caracteres para evitar falsos positivos)
   if (pLast.length >= 3 && pLast === rLast) return 0.88;
@@ -60,29 +62,33 @@ export function matchPlayers(
   extracted: ExtractedPlayerStats[],
   roster: RosterCandidate[]
 ): MatchedRow[] {
-  // Um jogador do plantel só pode ser associado automaticamente a UMA linha do PDF (STA-13)
+  // Um jogador do plantel só pode ser associado automaticamente a UMA linha do PDF (STA-13).
+  // Duas passagens: primeiro os números de camisola únicos, depois os nomes contra os jogadores
+  // ainda livres — a ordem das linhas deixa de decidir quem fica com o jogador (revisão A.2).
   const assigned = new Set<string>();
   const strip = ({ score: _, ...g }: RosterCandidate & { score: number }) => g;
+  const result: (MatchedRow | null)[] = extracted.map(() => null);
 
-  return extracted.map((e) => {
-    // 1. Número da camisola
-    if (e.pdf_number !== null) {
-      const byNum = roster.filter((r) => r.number === e.pdf_number);
-      if (byNum.length === 1 && !assigned.has(byNum[0].id)) {
-        assigned.add(byNum[0].id);
-        return row(e, byNum[0], "number", "ok", []);
-      }
-      if (byNum.length > 1) {
-        return unresolved(e, "number", "ambiguous", byNum);
-      }
+  extracted.forEach((e, i) => {
+    if (e.pdf_number === null) return;
+    const byNum = roster.filter((r) => r.number === e.pdf_number);
+    if (byNum.length === 1 && !assigned.has(byNum[0].id)) {
+      assigned.add(byNum[0].id);
+      result[i] = row(e, byNum[0], "number", "ok", []);
+    } else if (byNum.length > 1) {
+      result[i] = unresolved(e, "number", "ambiguous", byNum);
     }
+  });
+
+  extracted.forEach((e, i) => {
+    if (result[i]) return;
 
     // Sem nome utilizável → não associar (includes("") era sempre verdadeiro)
     if (!normalize(e.pdf_name ?? "")) {
-      return unresolved(e, "none", "unmatched", []);
+      result[i] = unresolved(e, "none", "unmatched", []);
+      return;
     }
 
-    // 2. Semelhança de nome
     const scored = roster
       .map((r) => ({ ...r, score: nameSimilarity(e.pdf_name, r.name) }))
       .sort((a, b) => b.score - a.score);
@@ -90,7 +96,8 @@ export function matchPlayers(
     const THRESHOLD = 0.65;
     const good = scored.filter((s) => s.score >= THRESHOLD);
     if (good.length === 0) {
-      return unresolved(e, "none", "unmatched", []);
+      result[i] = unresolved(e, "none", "unmatched", []);
+      return;
     }
 
     const [best, second] = good;
@@ -98,11 +105,13 @@ export function matchPlayers(
     const clearWinner = best.score >= 0.88 && (!second || second.score < best.score - 0.05);
     if (clearWinner && !assigned.has(best.id)) {
       assigned.add(best.id);
-      return row(e, best, "name", "ok", []);
+      result[i] = row(e, best, "name", "ok", []);
+      return;
     }
-
-    return unresolved(e, "name", "ambiguous", good.slice(0, 5).map(strip));
+    result[i] = unresolved(e, "name", "ambiguous", good.slice(0, 5).map(strip));
   });
+
+  return result as MatchedRow[];
 }
 
 function row(

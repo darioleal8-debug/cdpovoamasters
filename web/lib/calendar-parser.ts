@@ -218,9 +218,10 @@ export function parseGameLine(
   const afterNum = trimmed.slice(numMatch[0].length);
 
   // Find the date anchor
-  // Prefixo opcional só com nomes de dias PT — o antigo \w{2,4} comia o fim do nome do visitante (CONV-11)
+  // Prefixo opcional só com formas FECHADAS de dias PT ("qui", "quinta", "quinta-feira") — o antigo
+  // \w{2,4} e um prefixo aberto comiam nomes como "Quarteira"/"Terceira" (CONV-11)
   const dateMatch = afterNum.match(
-    /(?:\b(?:seg|ter|qua|qui|sex|s[áa]b|dom)[a-zçá-]*[,.]?\s*)?\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4}/i
+    /(?:(?<![A-Za-zÀ-ÿ])(?:seg(?:unda)?|ter(?:ça|ca)?|qua(?:rta)?|qui(?:nta)?|sex(?:ta)?|s[áa]b(?:ado)?|dom(?:ingo)?)(?:-feira)?\.?,?\s*)?\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4}/i
   );
   if (!dateMatch) return null;
 

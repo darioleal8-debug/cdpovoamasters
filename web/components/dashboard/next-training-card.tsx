@@ -1,4 +1,5 @@
 "use client";
+import { todayInClubTz } from "@/lib/time/club-time";
 
 import { useEffect, useState } from "react";
 import { Check, X, HelpCircle } from "lucide-react";
@@ -35,7 +36,7 @@ function fmtDate(d: string, t?: string | null): string {
 }
 
 function daysUntil(dateStr: string): number {
-  const today = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00").getTime();
+  const today = new Date(todayInClubTz() + "T00:00:00").getTime();
   return Math.round((new Date(dateStr + "T00:00:00").getTime() - today) / 86_400_000);
 }
 

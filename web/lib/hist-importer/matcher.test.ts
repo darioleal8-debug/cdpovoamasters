@@ -26,3 +26,20 @@ describe("matchHistPlayers (STA-13, histórico)", () => {
     expect(row).toMatchObject({ hist_player_id: "b", status: "ok" });
   });
 });
+
+describe("matchHistPlayers — revisão A.2 (Imp. 4: ambíguas não criam jogador por omissão)", () => {
+  it("um único candidato abaixo do limiar vem pré-selecionado", () => {
+    const [row] = matchHistPlayers([ext("Rui Csota")], [{ id: "a", name: "Rui Costa" }] as never);
+    expect(row).toMatchObject({ hist_player_id: "a", status: "ambiguous", include: true });
+  });
+  it("ambígua sem escolha possível fica excluída (não cria duplicado)", () => {
+    const rows = matchHistPlayers([ext("Rui Costa"), ext("Rui Costa")], [{ id: "a", name: "Rui Costa" }, { id: "b", name: "Rui Pinto" }] as never);
+    expect(rows[1].status).toBe("ambiguous");
+    expect(rows[1].hist_player_id === null && rows[1].include === true).toBe(false);
+    expect(rows[1].hist_player_id).not.toBe("b"); // não pré-seleciona o "Rui Pinto" (candidato fraco)
+  });
+  it("controlo: jogador realmente novo continua 'new'", () => {
+    const [row] = matchHistPlayers([ext("Zé Manel")], [{ id: "a", name: "Rui Costa" }] as never);
+    expect(row.status).toBe("new");
+  });
+});
