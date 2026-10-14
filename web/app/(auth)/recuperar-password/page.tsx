@@ -1,73 +1,126 @@
 "use client";
 
 import { useState } from "react";
+import { ArrowLeft, CheckCircle2, Loader2, Mail } from "lucide-react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 
-// Recuperação de palavra-passe (UX-02). A resposta é sempre a mesma, exista ou não a conta
-// (não revela que emails estão registados).
-const SENT_MESSAGE =
-  "Se existir uma conta com este email, vais receber um link para definires uma nova palavra-passe. Verifica também o spam.";
+const FOCUS_RING =
+  "focus:outline-none focus:ring-4 focus:ring-[rgba(249,115,22,.16)] focus:border-[#F97316]";
 
 export default function RecuperarPasswordPage() {
-  const [email, setEmail] = useState("");
-  const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [email,   setEmail]   = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sent,    setSent]    = useState(false);
+
+  const supabase = createClient();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email.trim()) return;
-    setSending(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/auth/callback?next=/alterar-password`,
-    });
-    if (error) console.warn("[recuperar-password]", error.message); // mesma resposta ao utilizador
-    setSending(false);
-    setSent(true);
+    setLoading(true);
+    try {
+      // redirectTo must be in Supabase project's allowed Redirect URLs list
+      await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+        redirectTo: `${window.location.origin}/redefinir-password`,
+      });
+      // Always show success — never reveal whether email exists
+      setSent(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
-    <main className="flex min-h-[100dvh] items-center justify-center bg-white px-6 py-12">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="space-y-1.5">
-          <h1 className="text-3xl font-bold tracking-tight">Recuperar palavra-passe</h1>
-          <p className="text-sm text-muted-foreground">
-            Indica o email da tua conta e enviamos-te um link para definires uma nova palavra-passe.
+    <div className="flex min-h-dvh flex-col items-center justify-center px-4">
+      <div
+        className="w-full max-w-sm rounded-2xl p-8 shadow-2xl"
+        style={{ background: "#fff" }}
+      >
+        {/* Back link */}
+        <Link
+          href="/login"
+          className="mb-6 inline-flex items-center gap-1.5 text-sm transition-opacity hover:opacity-70"
+          style={{ color: "#5A6478" }}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Voltar ao login
+        </Link>
+
+        {/* Icon + title */}
+        <div className="mb-6 flex flex-col items-center gap-2">
+          <div
+            className="flex h-12 w-12 items-center justify-center rounded-full"
+            style={{ background: "rgba(249,115,22,.10)" }}
+          >
+            <Mail className="h-5 w-5" style={{ color: "#F97316" }} />
+          </div>
+          <h1 className="text-xl font-bold" style={{ color: "#0F1729" }}>
+            Recuperar password
+          </h1>
+          <p className="text-center text-[13px]" style={{ color: "#5A6478" }}>
+            Introduz o teu email e receberás um link para definires uma nova password.
           </p>
         </div>
 
+        {/* Success state */}
         {sent ? (
-          <p role="status" className="rounded-lg border bg-muted/40 p-4 text-sm">{SENT_MESSAGE}</p>
+          <div className="flex flex-col items-center gap-3 py-4 text-center">
+            <CheckCircle2 className="h-10 w-10 text-green-500" />
+            <p className="font-semibold" style={{ color: "#0F1729" }}>
+              Email enviado!
+            </p>
+            <p className="text-[13px]" style={{ color: "#5A6478" }}>
+              Se esse endereço tiver uma conta no hoophub, receberás o link de
+              recuperação em breve. Verifica também a pasta de spam.
+            </p>
+            <Link
+              href="/login"
+              className="mt-2 text-[13px] font-semibold transition-opacity hover:opacity-70"
+              style={{ color: "#B26016" }}
+            >
+              Voltar ao login
+            </Link>
+          </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="email">Email</Label>
+          /* Form */
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+            <div className="flex flex-col gap-1.5">
+              <Label
+                htmlFor="email"
+                className="text-sm font-semibold"
+                style={{ color: "#0F1729" }}
+              >
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
+                placeholder="o.teu@email.com"
                 autoComplete="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="o.teu@email.com"
+                disabled={loading}
+                className={`h-[52px] text-sm rounded-xl border px-4 ${FOCUS_RING}`}
+                style={{ borderColor: "#E4E7EE" }}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={sending}>
-              {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Enviar link
-            </Button>
+
+            <button
+              type="submit"
+              disabled={!email.trim() || loading}
+              aria-busy={loading}
+              className="h-[54px] w-full rounded-xl text-[15px] font-semibold text-white transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+              style={{ background: "#F97316" }}
+            >
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              {loading ? "A enviar…" : "Enviar link de recuperação"}
+            </button>
           </form>
         )}
-
-        <p className="text-center text-sm">
-          <Link href="/login" className="font-medium underline-offset-4 hover:underline">Voltar ao login</Link>
-        </p>
       </div>
-    </main>
+    </div>
   );
 }

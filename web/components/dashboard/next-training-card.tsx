@@ -3,6 +3,7 @@ import { todayInClubTz } from "@/lib/time/club-time";
 
 import { useEffect, useState } from "react";
 import { Check, X, HelpCircle } from "lucide-react";
+import Link from "next/link";
 import type { TrainingRsvpSummary } from "@/types/database";
 
 interface Avatar {
@@ -164,6 +165,15 @@ export function NextTrainingCard({ training, loading }: Props) {
           </span>
         </div>
       )}
+
+      {/* Ver respostas */}
+      <Link
+        href={`/player/meus-treinos/${training.id}`}
+        className="text-[12px] font-medium hover:underline"
+        style={{ color: "var(--action, #F97316)" }}
+      >
+        Ver quem vai →
+      </Link>
     </div>
   );
 }

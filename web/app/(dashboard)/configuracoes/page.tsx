@@ -18,6 +18,7 @@ import { checkPwnedPassword, PWNED_ERROR_MESSAGE } from "@/lib/pwned-password";
 import { LogoUpload }           from "@/components/settings/logo-upload";
 import { TeamKitsSettings }     from "@/components/settings/team-kits-settings";
 import { PhotoTemplateEditor }  from "@/components/admin/photo-template-editor";
+import { PublicPageSettings }   from "@/components/settings/public-page-settings";
 
 const EMPTY_SEASON: SeasonFormData = { name: "", year: "", start_date: "", end_date: "" };
 
@@ -118,6 +119,21 @@ export default function ConfiguracoesPage() {
         <h1 className="text-2xl font-bold tracking-tight">Configurações</h1>
         <p className="text-muted-foreground">Gerir perfil, conta e temporadas</p>
       </div>
+
+      {/* ── Página Pública ─────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Página Pública da Equipa</CardTitle>
+          <CardDescription>
+            Partilha o plantel, calendário e resultados com adeptos e familiares. Não requer login.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PublicPageSettings />
+        </CardContent>
+      </Card>
+
+      <Separator />
 
       {/* ── Logotipo do Clube ──────────────────────────────── */}
       <Card>

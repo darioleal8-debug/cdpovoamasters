@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Calendar, Clock, MapPin, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { AvailabilityPrompt } from "@/components/player/availability-prompt";
+import { lisbonDateTime } from "@/lib/event-time";
 
 const POSITION_LABELS: Record<string, string> = {
   base: "Base",
@@ -32,9 +34,12 @@ function initials(name: string) {
 export async function NextGameCard({
   highlightPlayerId,
   showAdminLinks = false,
+  availabilityPlayerId = null,
 }: {
   highlightPlayerId?: string | null;
   showAdminLinks?: boolean;
+  /** Quando definido, mostra ao jogador os botões de disponibilidade para o jogo. */
+  availabilityPlayerId?: string | null;
 }) {
   const supabase = await createClient();
   const today = todayInClubTz();
@@ -71,6 +76,19 @@ export async function NextGameCard({
     })
     .filter((c): c is CallupRow & { player: PlayerRow } => c !== null);
 
+  // Disponibilidade do próprio jogador para este jogo
+  let myAvailability: "yes" | "no" | null = null;
+  if (availabilityPlayerId) {
+    const { data: availabilityRow } = await supabase
+      .from("game_availability")
+      .select("status")
+      .eq("game_id", game.id)
+      .eq("player_id", availabilityPlayerId)
+      .maybeSingle();
+    if (availabilityRow?.status === "available")   myAvailability = "yes";
+    if (availabilityRow?.status === "unavailable") myAvailability = "no";
+  }
+
   const label   = dateLabel(game.event_date);
   const isToday = label === "Hoje";
 
@@ -86,7 +104,7 @@ export async function NextGameCard({
             Próximo Jogo
           </span>
           <Badge
-            className="text-[10px] font-semibold"
+            className="text-[11px] font-semibold"
             style={{
               backgroundColor: isToday ? "var(--club-secondary, #F28C28)" : "rgba(255,255,255,0.15)",
               color: "#fff",
@@ -137,6 +155,18 @@ export async function NextGameCard({
         )}
       </div>
 
+      {/* ── Disponibilidade do jogador ── */}
+      {availabilityPlayerId && (
+        <div className="border-b bg-background px-5 py-4">
+          <AvailabilityPrompt
+            kind="game"
+            eventId={game.id}
+            deadlineIso={lisbonDateTime(game.event_date, game.event_time).toISOString()}
+            initialAnswer={myAvailability}
+          />
+        </div>
+      )}
+
       {/* ── Convocados ── */}
       <div className="bg-background px-5 py-4">
         <div className="mb-3 flex items-center gap-2">
@@ -164,7 +194,7 @@ export async function NextGameCard({
                 >
                   {/* Avatar */}
                   <div
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
                     style={{ backgroundColor: isHighlighted ? "var(--club-secondary, #F28C28)" : "var(--club-primary, #111111)" }}
                   >
                     {p.photo_url ? (
@@ -179,7 +209,7 @@ export async function NextGameCard({
                       {p.number ? `#${p.number} ` : ""}{p.name.split(" ")[0]}
                     </p>
                     {p.position && (
-                      <p className="text-[10px] text-muted-foreground leading-tight">
+                      <p className="text-[11px] text-muted-foreground leading-tight">
                         {POSITION_LABELS[p.position] ?? p.position}
                       </p>
                     )}
@@ -189,6 +219,17 @@ export async function NextGameCard({
             })}
           </div>
         )}
+      </div>
+
+      {/* ── Rodapé — ver disponibilidades ── */}
+      <div className="border-t bg-background px-5 py-3">
+        <Link
+          href={`/player/meus-jogos/${game.id}`}
+          className="text-xs font-medium hover:underline"
+          style={{ color: "var(--club-primary, #1d4079)" }}
+        >
+          Ver disponibilidades →
+        </Link>
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { RoleSwitcherChip } from "@/components/auth/role-switcher";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { Calendar, CreditCard, Dumbbell, Home, LogOut, MessageSquare, Trophy, User, Users } from "lucide-react";
+import { BarChart2, Calendar, CreditCard, Dumbbell, Home, LogOut, MessageSquare, Trophy, User, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useClubSettings } from "@/lib/club-context";
 import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
@@ -13,11 +13,12 @@ import { cn } from "@/lib/utils";
 import { NavLink } from "@/components/layout/nav-link";
 
 const PLAYER_NAV = [
-  { href: "/player",                 label: "Início",             icon: Home },
+  { href: "/player/minha-area",       label: "Início",             icon: Home },
   { href: "/player/plantel",         label: "Plantel",            icon: Users },
   { href: "/player/meu-perfil",      label: "O Meu Perfil",       icon: User },
   { href: "/player/meus-jogos",      label: "Os Meus Jogos",      icon: Calendar },
   { href: "/player/meus-treinos",    label: "Os Meus Treinos",    icon: Dumbbell },
+  { href: "/player/assiduidade",    label: "A Minha Assiduidade", icon: BarChart2 },
   { href: "/player/meus-pagamentos", label: "Os Meus Pagamentos", icon: CreditCard },
   { href: "/player/palmares",        label: "Palmarés",           icon: Trophy },
   { href: "/player/chat",            label: "Chat",               icon: MessageSquare },

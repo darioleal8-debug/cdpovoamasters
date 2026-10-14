@@ -80,6 +80,34 @@ export interface Payment {
   updated_at: string;
 }
 
+export type DocumentCategory =
+  | "regulamentos"
+  | "calendario"
+  | "financeiro"
+  | "seguros_saude"
+  | "clube"
+  | "formularios";
+
+export interface ClubDocument {
+  id:           string;
+  season:       string;
+  title:        string;
+  summary:      string | null;
+  category:     DocumentCategory;
+  file_url:     string;
+  storage_key:  string;
+  file_size:    number;
+  page_count:   number | null;
+  version:      number;
+  admin_note:   string | null;
+  required:     boolean;
+  created_by:   string | null;
+  creator:      { name: string } | null;
+  created_at:   string;
+  updated_at:   string;
+  archived_at:  string | null;
+}
+
 export type ChatType = "direct" | "group" | "team" | "staff" | "announcement" | "event";
 export type ChatPostPolicy = "all" | "admin_only";
 export type CardType = "callup_response" | "poll" | "transport" | "attendance" | "quota_reminder";
@@ -574,12 +602,12 @@ export interface TrainingAttendance {
   status: AttendanceStatus;
   updated_at: string;
   updated_by: string | null;
-  method: "manual" | "photo" | "gps";
+  method: "manual" | "photo" | "gps" | "gps_checkin" | "no_gps" | null;
   // Auto-Presença
   photo_url: string | null;
   gps_lat: number | null;
   gps_lng: number | null;
-  gps_validated: boolean;
+  gps_validated: boolean | null;
   gps_distance_m: number | null;
   auto_timestamp: string | null;
   validated_by: string | null;

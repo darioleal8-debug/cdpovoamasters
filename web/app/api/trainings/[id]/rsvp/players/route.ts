@@ -30,51 +30,20 @@ export async function GET(
 
   if (!training) return fail("Treino não encontrado", 404);
 
-  // Lista de jogadores activos desta temporada
-  // players não tem jersey_number (é number) nem FK para user_display_names: nomes à parte
-  const { data: players, error: pErr } = await supabase
-    .from("players")
-    .select("id, number, user_id")
-    .eq("season_id", training.season_id)
-    .order("number", { ascending: true, nullsFirst: false });
+  // Plantel activo desta temporada + RSVP de cada jogador.
+  // (players.jersey_number não existe — o número vive em players.number e o nome
+  //  em users.name; a RPC training_rsvp_roster faz o JOIN correcto.)
+  const { data: rows, error: rErr } = await supabase
+    .rpc("training_rsvp_roster", { p_training_id: trainingId });
 
-  if (pErr) return fail(pErr.message, 500);
-
-  const userIds = (players ?? []).map((p) => p.user_id as string).filter(Boolean);
-  const { data: names } = userIds.length > 0
-    ? await supabase.from("user_display_names").select("id, name").in("id", userIds)
-    : { data: [] as { id: string; name: string }[] };
-  const nameByUser = new Map((names ?? []).map((n) => [n.id as string, n.name as string]));
-
-  // RSVPs para este treino
-  const { data: rsvps } = await supabase
-    .from("training_rsvps")
-    .select("player_id, status, reason_code, reason_text, responded_at")
-    .eq("training_id", trainingId);
-
-  const rsvpMap = new Map(
-    (rsvps ?? []).map((r) => [r.player_id, r])
-  );
-
-  const rows = (players ?? []).map((p) => {
-    const r = rsvpMap.get(p.id);
-    return {
-      player_id:    p.id,
-      name:         nameByUser.get(p.user_id as string) ?? "—",
-      jersey_number: p.number,
-      status:       r?.status ?? null,
-      reason_code:  r?.reason_code ?? null,
-      reason_text:  r?.reason_text ?? null,
-      responded_at: r?.responded_at ?? null,
-    };
-  });
+  if (rErr) return fail(rErr.message, 500);
 
   const deadline = new Date(
     new Date(`${training.date}T${training.start_time}`).getTime()
     - training.rsvp_deadline_hours * 3_600_000
   ).toISOString();
 
-  return NextResponse.json({ players: rows, deadline });
+  return NextResponse.json({ players: rows ?? [], deadline });
 }
 
 // ─── POST /api/trainings/[id]/rsvp/players ───────────────────────────────────

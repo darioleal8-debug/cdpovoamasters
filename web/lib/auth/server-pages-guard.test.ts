@@ -13,10 +13,17 @@ function pages(dir: string): string[] {
   });
 }
 
+// Páginas públicas por design (sem sessão): só mostram dados publicáveis.
+const PUBLIC_BY_DESIGN = new Set([
+  "equipa/[slug]/page.tsx",            // página pública da equipa (só com club_settings.is_public)
+  "liga-inatel/page.tsx",              // classificação pública da liga
+  "liga-inatel/jogo/[eventId]/page.tsx", // ficha pública de jogo da liga
+]);
+
 describe("páginas server com service role chamam authorize()", () => {
   for (const file of pages(APP)) {
     const src = readFileSync(file, "utf8");
-    if (!/createAdminClient|SERVICE_ROLE/.test(src)) continue;
+    if (!/createAdminClient|SERVICE_ROLE/.test(src) || PUBLIC_BY_DESIGN.has(path.relative(APP, file))) continue;
     it(path.relative(APP, file), () => expect(src).toMatch(/authorize\(/));
   }
 });

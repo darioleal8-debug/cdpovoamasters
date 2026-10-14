@@ -96,7 +96,7 @@ export function RsvpButtons({ trainingId, deadlineIso, initialStatus = null }: P
         <Button
           size="sm"
           variant={currentStatus === "going" ? "default" : "outline"}
-          disabled={saving || currentStatus === "going"}
+          disabled={saving}
           onClick={handleGoing}
           className="min-h-[44px] px-3 gap-1.5 text-xs"
         >

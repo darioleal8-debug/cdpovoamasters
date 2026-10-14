@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSeasons } from "@/hooks/use-seasons";
 import { useGames } from "@/hooks/use-games";
 import { useLeagueCalendar } from "@/hooks/use-league-calendar";
 import { useTeamKits } from "@/hooks/use-team-kits";
 import { GamesTable } from "@/components/games/games-table";
+import type { GameSessionSummary } from "@/components/games/games-table";
 import { CallupsModal } from "@/components/games/callups-modal";
 import { LeagueCalendar } from "@/components/games/league-calendar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -15,6 +16,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/toaster";
+import { createClient } from "@/lib/supabase/client";
 import { Trophy, CalendarDays } from "lucide-react";
 import type { Event } from "@/types/database";
 
@@ -35,6 +38,71 @@ export default function JogosPage() {
 
   const [callupsGame, setCallupsGame] = useState<Event | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Event | null>(null);
+
+  // Game sessions for past games (to show scores + gate "Resultado" button)
+  const [gameSessions, setGameSessions] = useState<Record<string, GameSessionSummary>>({});
+
+  // Result modal
+  const [resultGame,   setResultGame]   = useState<Event | null>(null);
+  const [resultHome,   setResultHome]   = useState(0);
+  const [resultAway,   setResultAway]   = useState(0);
+  const [resultSaving, setResultSaving] = useState(false);
+
+  // Fetch game sessions whenever events change
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const pastGameIds = events
+      .filter((e) => e.type === "jogo" && e.event_date < today)
+      .map((e) => e.id);
+    if (!pastGameIds.length) { setGameSessions({}); return; }
+
+    const supabase = createClient();
+    supabase
+      .from("game_sessions")
+      .select("event_id, home_score, away_score, status")
+      .in("event_id", pastGameIds)
+      .then(({ data }) => {
+        if (!data) return;
+        const map: Record<string, GameSessionSummary> = {};
+        for (const s of data) map[s.event_id as string] = {
+          home_score: s.home_score as number,
+          away_score: s.away_score as number,
+          status:     s.status as string,
+        };
+        setGameSessions(map);
+      });
+  }, [events]);
+
+  function openResult(event: Event) {
+    const existing = gameSessions[event.id];
+    setResultHome(existing?.home_score ?? 0);
+    setResultAway(existing?.away_score ?? 0);
+    setResultGame(event);
+  }
+
+  async function submitResult() {
+    if (!resultGame) return;
+    setResultSaving(true);
+    try {
+      const res = await fetch(`/api/games/${resultGame.id}/result`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ home_score: resultHome, away_score: resultAway }),
+      });
+      const json = await res.json() as { error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Erro desconhecido");
+      setGameSessions((prev) => ({
+        ...prev,
+        [resultGame.id]: { home_score: resultHome, away_score: resultAway, status: "finished" },
+      }));
+      toast({ title: "Resultado registado com sucesso" });
+      setResultGame(null);
+    } catch (e) {
+      toast({ title: "Erro ao guardar resultado", description: e instanceof Error ? e.message : "Erro", variant: "destructive" });
+    } finally {
+      setResultSaving(false);
+    }
+  }
 
   const [dialogOpen, setDialogOpen]       = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -166,6 +234,8 @@ export default function JogosPage() {
             onEdit={openEdit}
             onDelete={handleDelete}
             onCallups={setCallupsGame}
+            gameSessions={gameSessions}
+            onResult={openResult}
           />
 
           <CallupsModal
@@ -265,6 +335,67 @@ export default function JogosPage() {
           </Dialog>
         </TabsContent>
       </Tabs>
+
+      {/* ── Resultado Final Modal ── */}
+      <Dialog open={!!resultGame} onOpenChange={(o) => { if (!o) setResultGame(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Resultado Final</DialogTitle>
+          </DialogHeader>
+          {resultGame && (
+            <div className="space-y-4 py-2">
+              <p className="text-sm text-muted-foreground">
+                {resultGame.title}{resultGame.opponent ? ` vs. ${resultGame.opponent}` : ""}
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="res-home" className="text-xs font-semibold uppercase tracking-wide">
+                    CD Póvoa Masters
+                  </Label>
+                  <Input
+                    id="res-home"
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={resultHome}
+                    onChange={(e) => setResultHome(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                    className="text-2xl font-bold text-center h-14 tabular-nums"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="res-away" className="text-xs font-semibold uppercase tracking-wide">
+                    {resultGame.opponent ?? "Adversário"}
+                  </Label>
+                  <Input
+                    id="res-away"
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={resultAway}
+                    onChange={(e) => setResultAway(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                    className="text-2xl font-bold text-center h-14 tabular-nums"
+                  />
+                </div>
+              </div>
+              {resultHome !== resultAway && (
+                <p className="text-sm text-center font-semibold" style={{
+                  color: resultHome > resultAway ? "#16a34a" : "#dc2626",
+                }}>
+                  {resultHome > resultAway ? "Vitória" : "Derrota"} — {Math.abs(resultHome - resultAway)} pontos de diferença
+                </p>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setResultGame(null)} disabled={resultSaving}>
+              Cancelar
+            </Button>
+            <Button onClick={submitResult} disabled={resultSaving}>
+              {resultSaving ? "A guardar…" : "Guardar Resultado"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirmação de remoção de evento */}
       <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>

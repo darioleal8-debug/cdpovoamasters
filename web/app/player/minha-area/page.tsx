@@ -3,12 +3,16 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { authorize } from "@/lib/auth/guards";
 import { redirect } from "next/navigation";
 import {
-  AlertTriangle, Calendar, Clock, CreditCard,
+  AlertTriangle, BarChart2, Calendar, Clock, CreditCard,
   Dumbbell, MapPin, MessageSquare, Trophy, User,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { NextGameCard } from "@/components/games/next-game-card";
 import { StatsSection } from "@/components/player/stats-section";
+import { AvailabilityPrompt } from "@/components/player/availability-prompt";
+import { GpsCheckinButton } from "@/components/trainings/gps-checkin-button";
+import { lisbonDateTime } from "@/lib/event-time";
+import type { AvailabilityRosterRow } from "@/types/availability";
 import Link from "next/link";
 
 export const metadata = { title: "Minha Área" };
@@ -22,7 +26,13 @@ type TrainingRow = {
   location:   string | null;
   type:       string | null;
   notes:      string | null;
+  rsvp_deadline_hours: number | null;
 };
+
+type TrainingRsvpProps = {
+  answer: "yes" | "no" | null;
+  roster: AvailabilityRosterRow[];
+} | null;
 
 type ComunicadoRow = {
   id:          string;
@@ -73,9 +83,15 @@ function initials(name: string): string {
 function NextTrainingCard({
   training,
   note,
+  rsvp,
+  hasAttendance = false,
 }: {
-  training: TrainingRow | null;
-  note:     string | null;
+  training:      TrainingRow | null;
+  note:          string | null;
+  /** null = utilizador sem perfil de jogador → não mostra os botões */
+  rsvp:          TrainingRsvpProps;
+  /** true se a presença GPS/manual já foi registada hoje */
+  hasAttendance?: boolean;
 }) {
   const TRAINING_BG = "#3b5f92";
 
@@ -96,6 +112,7 @@ function NextTrainingCard({
   const label   = dateLabel(training.date);
   const isToday = label === "Hoje";
   const typeLabel = training.type ? (TYPE_LABELS[training.type] ?? training.type) : null;
+  const deadlineIso = lisbonDateTime(training.date, training.start_time).toISOString();
 
   return (
     <div className="overflow-hidden rounded-xl border shadow-sm flex flex-col">
@@ -143,6 +160,29 @@ function NextTrainingCard({
         </div>
       </div>
 
+      {/* ── Disponibilidade do jogador ── */}
+      {rsvp && (
+        <div className="border-b bg-background px-5 py-4">
+          <AvailabilityPrompt
+            kind="training"
+            eventId={training.id}
+            deadlineIso={deadlineIso}
+            initialAnswer={rsvp.answer}
+            initialRoster={rsvp.roster}
+          />
+        </div>
+      )}
+
+      {/* ── Marcar Presença GPS — só no dia do treino ── */}
+      {isToday && rsvp !== null && !hasAttendance && (
+        <div className="border-b bg-background px-5 py-4">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Presença
+          </p>
+          <GpsCheckinButton trainingId={training.id} />
+        </div>
+      )}
+
       {/* ── Zona branca — Foco do treino ── */}
       <div className="bg-background flex-1 px-5 py-4">
         <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
@@ -153,6 +193,17 @@ function NextTrainingCard({
         ) : (
           <p className="text-sm text-muted-foreground">Sem notas para este treino.</p>
         )}
+      </div>
+
+      {/* ── Rodapé — ver respostas ── */}
+      <div className="border-t bg-background px-5 py-3">
+        <Link
+          href={`/player/meus-treinos/${training.id}`}
+          className="text-xs font-medium hover:underline"
+          style={{ color: "var(--club-primary, #1d4079)" }}
+        >
+          Ver quem vai →
+        </Link>
       </div>
     </div>
   );
@@ -165,8 +216,7 @@ export default async function MinhaAreaPage() {
   const authz = await authorize();
   if (!authz.ok) redirect(authz.response.status === 401 ? "/login" : "/login?reason=inactive");
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const user = authz.user;
 
   const { data: profile } = await supabase
     .from("users")
@@ -182,15 +232,24 @@ export default async function MinhaAreaPage() {
     .eq("status", "ativa")
     .maybeSingle();
 
-  // Um perfil por época: sem filtrar pela época ativa, maybeSingle() falha a partir da 2.ª época (UX-19)
-  const { data: linkedPlayer } = activeSeason
-    ? await supabase
-        .from("players")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("season_id", activeSeason.id)
-        .maybeSingle()
-    : { data: null };
+  // Um perfil por época: primeiro o da época ativa (UX-19); senão o mais recente
+  let linkedPlayer: { id: string } | null = null;
+  if (activeSeason) {
+    const { data } = await supabase
+      .from("players").select("id")
+      .eq("user_id", user.id).eq("season_id", activeSeason.id)
+      .maybeSingle();
+    linkedPlayer = data;
+  }
+  if (!linkedPlayer) {
+    const { data } = await supabase
+      .from("players").select("id")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    linkedPlayer = data;
+  }
 
   // ── Pagamentos em atraso ──────────────────────────────────
   let isPaymentLate = false;
@@ -208,7 +267,7 @@ export default async function MinhaAreaPage() {
   const { data: nextTrainingRaw } = activeSeason?.id
     ? await supabase
         .from("trainings")
-        .select("id, date, start_time, location, type, notes")
+        .select("id, date, start_time, location, type, notes, rsvp_deadline_hours")
         .eq("season_id", activeSeason.id)
         .gte("date", today)
         .order("date", { ascending: true })
@@ -235,8 +294,42 @@ export default async function MinhaAreaPage() {
     }
   }
 
+  // ── Confirmação de presença no próximo treino ─────────────
+  let trainingRsvp: TrainingRsvpProps = null;
+  if (nextTraining && linkedPlayer?.id) {
+    const [{ data: ownRsvp }, { data: rosterRows }] = await Promise.all([
+      supabase
+        .from("training_rsvps")
+        .select("status")
+        .eq("training_id", nextTraining.id)
+        .eq("player_id", linkedPlayer.id)
+        .maybeSingle(),
+      supabase.rpc("training_rsvp_roster", { p_training_id: nextTraining.id }),
+    ]);
+    trainingRsvp = {
+      answer:
+        ownRsvp?.status === "going" ? "yes"
+        : ownRsvp?.status === "not_going" ? "no"
+        : null,
+      roster: (rosterRows ?? []) as AvailabilityRosterRow[],
+    };
+  }
+
+  // ── Presença no treino de hoje ───────────────────────────
+  let hasTrainingAttendance = false;
+  if (nextTraining && linkedPlayer?.id && nextTraining.date === today) {
+    const { data: att } = await supabase
+      .from("training_attendance")
+      .select("id")
+      .eq("training_id", nextTraining.id)
+      .eq("player_id", linkedPlayer.id)
+      .in("status", ["present", "late", "auto_present"])
+      .maybeSingle();
+    hasTrainingAttendance = att !== null;
+  }
+
   // ── Comunicados (canal 'announcement', onde o admin publica — UX-12) ───────
-  // Lido com service role: é para todos os membros ativos (o layout já garante sessão ativa).
+  // Lido com service role: é para todos os membros ativos (authorize() acima garante sessão ativa).
   let comunicados: ComunicadoRow[] = [];
   try {
     const admin = await createAdminClient();
@@ -246,7 +339,7 @@ export default async function MinhaAreaPage() {
       .eq("type", "announcement")
       .order("created_at", { ascending: true })
       .limit(1)
-      .maybeSingle(); // tolera mais de um canal announcement
+      .maybeSingle();
 
     if (teamChat?.id) {
       const { data: msgs } = await admin
@@ -299,9 +392,10 @@ export default async function MinhaAreaPage() {
   const shortcuts = [
     { href: "/player/meu-perfil",      icon: User,           label: "O Meu Perfil",       desc: "Ver e editar"       },
     { href: "/player/meus-jogos",      icon: Calendar,       label: "Os Meus Jogos",      desc: "Próximos jogos"     },
-    { href: "/player/meus-treinos",    icon: Dumbbell,       label: "Os Meus Treinos",    desc: "Agenda de treinos"  },
-    { href: "/player/meus-pagamentos", icon: CreditCard,     label: "Os Meus Pagamentos", desc: "Quotas"             },
-    { href: "/player/palmares",        icon: Trophy,         label: "Palmarés",            desc: "Historial"          },
+    { href: "/player/meus-treinos",    icon: Dumbbell,   label: "Os Meus Treinos",       desc: "Agenda de treinos"  },
+    { href: "/player/assiduidade",    icon: BarChart2,  label: "A Minha Assiduidade",   desc: "Treinos e jogos"    },
+    { href: "/player/meus-pagamentos", icon: CreditCard, label: "Os Meus Pagamentos",    desc: "Quotas"             },
+    { href: "/player/palmares",        icon: Trophy,     label: "Palmarés",              desc: "Historial"          },
   ] as const;
 
   return (
@@ -335,8 +429,11 @@ export default async function MinhaAreaPage() {
 
       {/* ── Par de cartões: Próximo Jogo + Próximo Treino ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <NextGameCard highlightPlayerId={linkedPlayer?.id ?? null} />
-        <NextTrainingCard training={nextTraining} note={trainingNote} />
+        <NextGameCard
+          highlightPlayerId={linkedPlayer?.id ?? null}
+          availabilityPlayerId={linkedPlayer?.id ?? null}
+        />
+        <NextTrainingCard training={nextTraining} note={trainingNote} rsvp={trainingRsvp} hasAttendance={hasTrainingAttendance} />
       </div>
 
       {/* ── Linha 2: Estatísticas (2/3) + Comunicados (1/3) ── */}

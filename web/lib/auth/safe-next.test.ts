@@ -26,7 +26,7 @@ describe("página de recuperação (UX-02)", () => {
     expect(existsSync(f)).toBe(true);
     const src = readFileSync(f, "utf8");
     expect(src).toContain("resetPasswordForEmail");
-    expect(src).toContain("Se existir uma conta com este email");
+    expect(src).toContain("Se esse endereço tiver uma conta");
     expect(existsSync(path.join(__dirname, "..", "..", "app/auth/callback/route.ts"))).toBe(true);
   });
 });

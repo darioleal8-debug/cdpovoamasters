@@ -10,7 +10,8 @@ import {
   type ColumnDef,
   type SortingState,
 } from "@tanstack/react-table";
-import { ArrowUpDown, CalendarX, Plus, Search, Trash2, Pencil, Radio, BarChart2, Map, Users, Trophy, Swords, Dumbbell } from "lucide-react";
+import { ArrowUpDown, CalendarX, Plus, Search, Trash2, Pencil, Radio, BarChart2, Map, Users, Trophy, Swords, Dumbbell, Flag } from "lucide-react";
+import { ShareButton } from "@/components/ui/share-button";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { Event, EventType } from "@/types/database";
 import { EVENT_TYPE_LABELS, formatDateShort, buildMapsUrl } from "@/lib/utils";
 
+export interface GameSessionSummary {
+  home_score: number;
+  away_score: number;
+  status: string;
+}
+
 interface GamesTableProps {
   events: Event[];
   loading?: boolean;
@@ -28,6 +35,8 @@ interface GamesTableProps {
   onEdit?: (event: Event) => void;
   onDelete?: (event: Event) => void;
   onCallups?: (event: Event) => void;
+  gameSessions?: Record<string, GameSessionSummary>;
+  onResult?: (event: Event) => void;
 }
 
 const TYPE_BADGE: Record<EventType, "default" | "secondary" | "outline"> = {
@@ -36,7 +45,8 @@ const TYPE_BADGE: Record<EventType, "default" | "secondary" | "outline"> = {
   outro:  "outline",
 };
 
-export function GamesTable({ events, loading, onAdd, onEdit, onDelete, onCallups }: GamesTableProps) {
+export function GamesTable({ events, loading, onAdd, onEdit, onDelete, onCallups, gameSessions = {}, onResult }: GamesTableProps) {
+  const today = new Date().toISOString().slice(0, 10);
   const [sorting, setSorting] = useState<SortingState>([{ id: "event_date", desc: false }]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("todos");
@@ -116,6 +126,26 @@ export function GamesTable({ events, loading, onAdd, onEdit, onDelete, onCallups
                   {row.original.title.includes("(Fora)") ? "@" : "vs."} {row.original.opponent}
                 </p>
               )}
+              {/* Score badge for past finished games */}
+              {(() => {
+                if (row.original.type !== "jogo") return null;
+                const isPast = row.original.event_date < today;
+                const session = gameSessions[row.original.id];
+                if (!isPast || !session || session.status !== "finished") return null;
+                const won = session.home_score > session.away_score;
+                const lost = session.home_score < session.away_score;
+                return (
+                  <span
+                    className="inline-flex items-center gap-1 text-[11px] font-bold font-mono px-1.5 py-0.5 rounded mt-0.5"
+                    style={{
+                      background: won ? "#dcfce7" : lost ? "#fee2e2" : "#f3f4f6",
+                      color:      won ? "#15803d" : lost ? "#dc2626" : "#6b7280",
+                    }}
+                  >
+                    {won ? "V" : lost ? "D" : "E"} {session.home_score}–{session.away_score}
+                  </span>
+                );
+              })()}
             </div>
           );
         },
@@ -130,7 +160,12 @@ export function GamesTable({ events, loading, onAdd, onEdit, onDelete, onCallups
       {
         id: "actions",
         header: "",
-        cell: ({ row }) => (
+        cell: ({ row }) => {
+          const isPast = row.original.type === "jogo" && row.original.event_date < today;
+          const session = gameSessions[row.original.id];
+          const hasFinishedSession = session?.status === "finished";
+          const showResultBtn = isPast;
+          return (
           <TooltipProvider delayDuration={400}>
             <div className="flex items-center justify-end gap-1">
               {row.original.type === "jogo" && (
@@ -146,17 +181,35 @@ export function GamesTable({ events, loading, onAdd, onEdit, onDelete, onCallups
                     </TooltipTrigger>
                     <TooltipContent>Convocados</TooltipContent>
                   </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Link href={`/jogos/${row.original.id}/live`}>
-                        <Button variant="ghost" size="sm" className="h-8 gap-1 text-green-700 hover:text-green-800 hover:bg-green-50 px-2">
-                          <Radio className="h-3.5 w-3.5" />
-                          <span className="hidden sm:inline text-xs">Live</span>
+                  {!isPast && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Link href={`/jogos/${row.original.id}/live`}>
+                          <Button variant="ghost" size="sm" className="h-8 gap-1 text-green-700 hover:text-green-800 hover:bg-green-50 px-2">
+                            <Radio className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline text-xs">Live</span>
+                          </Button>
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent>Iniciar jogo ao vivo</TooltipContent>
+                    </Tooltip>
+                  )}
+                  {showResultBtn && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 gap-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50 px-2"
+                          onClick={() => onResult?.(row.original)}
+                        >
+                          <Flag className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline text-xs">{hasFinishedSession ? "Editar" : "Resultado"}</span>
                         </Button>
-                      </Link>
-                    </TooltipTrigger>
-                    <TooltipContent>Iniciar jogo ao vivo</TooltipContent>
-                  </Tooltip>
+                      </TooltipTrigger>
+                      <TooltipContent>{hasFinishedSession ? "Editar resultado" : "Registar resultado final"}</TooltipContent>
+                    </Tooltip>
+                  )}
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Link href={`/jogos/${row.original.id}/stats`}>
@@ -185,6 +238,15 @@ export function GamesTable({ events, loading, onAdd, onEdit, onDelete, onCallups
               )}
               <Tooltip>
                 <TooltipTrigger asChild>
+                  <ShareButton
+                    eventId={row.original.id}
+                    title={row.original.title ?? undefined}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>Copiar link de disponibilidade</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit?.(row.original)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
@@ -201,11 +263,12 @@ export function GamesTable({ events, loading, onAdd, onEdit, onDelete, onCallups
               </Tooltip>
             </div>
           </TooltipProvider>
-        ),
+          );
+        },
         size: 140,
       },
     ],
-    [onEdit, onDelete, onCallups]
+    [onEdit, onDelete, onCallups, gameSessions, onResult, today]
   );
 
   const table = useReactTable({

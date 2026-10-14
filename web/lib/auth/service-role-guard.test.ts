@@ -9,6 +9,10 @@ const SERVICE_ROLE = /SERVICE_ROLE|createAdminClient|adminClient\(|makeAdminClie
 const PUBLIC_BY_DESIGN = new Set([
   "activate/route.ts",               // ativação por token (sem sessão)
   "public/request-access/route.ts",  // formulário público com rate-limit
+  "public/equipa/[slug]/route.ts",   // página pública da equipa (só com club_settings.is_public)
+  "public/news/route.ts",            // notícias publicadas
+  "public/news/[slug]/route.ts",     // notícia publicada
+  "public/result-submissions/route.ts", // submissão pública de resultados (rate-limit por IP, aprovação do admin)
 ]);
 
 function routes(dir: string): string[] {

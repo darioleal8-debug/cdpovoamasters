@@ -16,8 +16,9 @@ export function LoginForm() {
   const [rememberMe,   setRememberMe]   = useState(false);
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState("");
-  const [justActivated,setJustActivated]= useState(false);
-  const [attempts,     setAttempts]     = useState(0);
+  const [justActivated, setJustActivated] = useState(false);
+  const [passwordReset, setPasswordReset] = useState(false);
+  const [attempts,      setAttempts]      = useState(0);
   const errorRef = useRef<HTMLDivElement>(null);
 
   const router   = useRouter();
@@ -26,6 +27,7 @@ export function LoginForm() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("activated") === "1") setJustActivated(true);
+    if (params.get("password-reset") === "1") setPasswordReset(true);
     // Conta desativada com sessão ainda válida: terminar a sessão aqui (os layouts server não podem apagar cookies)
     const reason = params.get("reason");
     if (reason === "link_invalido") setError("O link expirou ou já foi usado. Pede um novo em \"Esqueci-me\".");
@@ -93,7 +95,12 @@ export function LoginForm() {
         return;
       }
 
-      router.push("/dashboard");
+      const redirectTo = new URLSearchParams(window.location.search).get("redirectTo");
+      const dest =
+        redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//")
+          ? redirectTo
+          : "/dashboard";
+      router.push(dest);
       router.refresh();
     } catch (err) {
       setError(`Erro inesperado. Tenta novamente. (${err instanceof Error ? err.message : "desconhecido"})`);
@@ -112,6 +119,15 @@ export function LoginForm() {
           style={{ background: "rgba(18,133,91,.08)", color: "var(--ok, #12855B)", border: "1px solid rgba(18,133,91,.2)" }}>
           <CheckCircle2 className="h-4 w-4 shrink-0" />
           Conta ativada! Podes entrar.
+        </div>
+      )}
+
+      {/* Sucesso de recuperação de password */}
+      {passwordReset && !error && (
+        <div className="flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm font-medium"
+          style={{ background: "rgba(18,133,91,.08)", color: "var(--ok, #12855B)", border: "1px solid rgba(18,133,91,.2)" }}>
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          Password redefinida! Podes entrar com a nova password.
         </div>
       )}
 

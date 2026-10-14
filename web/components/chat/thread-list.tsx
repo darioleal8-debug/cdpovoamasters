@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { MessageCircle, Search, Users } from "lucide-react";
 import { EventThreadCard } from "./event-thread-card";
 import { NewChatDialog } from "./new-chat-dialog";
@@ -293,15 +294,29 @@ export function ThreadList({ currentUser, activeChatId, onSelect, threads, loadi
             {!query && thisWeek.length === 0 && upcoming.length === 0 && permanent.length === 0 && directs.length === 0 && !loading && (
               <div className="flex flex-col items-center gap-3 py-12 px-4 text-center">
                 <p className="font-condensed font-bold text-lg uppercase" style={{ color: "rgba(169,180,199,.4)" }}>
-                  Sem jogos ou treinos agendados
+                  Sem eventos agendados
                 </p>
-                <p className="text-[12px]" style={{ color: "rgba(169,180,199,.35)" }}>
-                  Agenda um evento para criar o fio automaticamente.
-                </p>
-                <a href="/jogos" className="text-[12px] font-semibold px-3 py-1.5 rounded-xl"
-                  style={{ background: "rgba(249,115,22,.1)", color: "var(--action,#F97316)" }}>
-                  Ir para Jogos
-                </a>
+                {currentUser?.role === "jogador" ? (
+                  <>
+                    <p className="text-[12px]" style={{ color: "rgba(169,180,199,.35)" }}>
+                      Os fios de treino e jogo aparecem aqui automaticamente.
+                    </p>
+                    <Link href="/player/meus-jogos" className="text-[12px] font-semibold px-3 py-1.5 rounded-xl"
+                      style={{ background: "rgba(249,115,22,.1)", color: "var(--action,#F97316)" }}>
+                      Ver os meus jogos
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[12px]" style={{ color: "rgba(169,180,199,.35)" }}>
+                      Agenda um evento para criar o fio automaticamente.
+                    </p>
+                    <a href="/jogos" className="text-[12px] font-semibold px-3 py-1.5 rounded-xl"
+                      style={{ background: "rgba(249,115,22,.1)", color: "var(--action,#F97316)" }}>
+                      Ir para Jogos
+                    </a>
+                  </>
+                )}
               </div>
             )}
 

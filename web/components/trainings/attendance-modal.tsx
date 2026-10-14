@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle2, XCircle, MapPin, Camera, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckCircle2, XCircle, MapPin, Camera, ChevronDown, ChevronUp, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAttendance } from "@/hooks/use-trainings";
 import { eligibleRoster, buildAttendanceRecords, hasUnsavedChanges } from "@/lib/trainings/attendance-form";
@@ -232,6 +232,9 @@ export function AttendanceModal({ training, players, open, onClose }: Props) {
               : roster.map((player) => {
                   const status = local[player.player_id] as AttendanceStatus | undefined;
                   const isAuto = status === "auto_present";
+                  const rec    = attendanceRecordMap.get(player.player_id);
+                  const hasGpsCheckin = rec?.method === "gps_checkin" || rec?.method === "no_gps";
+
                   return (
                     <div
                       key={player.user_id}
@@ -243,14 +246,42 @@ export function AttendanceModal({ training, players, open, onClose }: Props) {
                       <span className="w-7 shrink-0 text-center text-xs font-mono text-muted-foreground">
                         {player.number ?? "—"}
                       </span>
-                      <span className="flex-1 text-sm font-medium truncate">
-                        {player.name}
-                        {player.active === false && (
-                          <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">(conta inativa)</span>
+                      {/* Nome + indicador GPS inline */}
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium truncate">
+                          {player.name}
+                          {player.active === false && (
+                            <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">(conta inativa)</span>
+                          )}
+                        </span>
+                        {hasGpsCheckin && (
+                          <div className="mt-0.5">
+                            {rec?.method === "no_gps" ? (
+                              <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <WifiOff className="h-2.5 w-2.5" />
+                                Sem GPS
+                              </span>
+                            ) : rec?.gps_validated === true ? (
+                              <span className="flex items-center gap-1 text-[10px] text-green-600 dark:text-green-400">
+                                <MapPin className="h-2.5 w-2.5" />
+                                GPS ✓ {rec.gps_distance_m !== null ? `${rec.gps_distance_m}m` : ""}
+                              </span>
+                            ) : rec?.gps_validated === false ? (
+                              <span className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400">
+                                <MapPin className="h-2.5 w-2.5" />
+                                Fora do raio {rec.gps_distance_m !== null ? `(${rec.gps_distance_m}m)` : ""}
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <MapPin className="h-2.5 w-2.5" />
+                                GPS (sem recinto)
+                              </span>
+                            )}
+                          </div>
                         )}
-                      </span>
+                      </div>
 
-                      {/* Badge auto-presença */}
+                      {/* Badge auto-presença pendente */}
                       {isAuto && (
                         <Badge variant="outline" className={cn("text-[11px] shrink-0", STATUS_CONFIG.auto_present.color)}>
                           <Camera className="h-2.5 w-2.5 mr-1" />

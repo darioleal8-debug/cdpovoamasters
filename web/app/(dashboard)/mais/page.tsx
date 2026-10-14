@@ -9,9 +9,12 @@ import {
   History,
   Landmark,
   LogOut,
+  Newspaper,
   Settings,
   Users,
   UserCog,
+  Shield,
+  FolderOpen,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "@/components/ui/toaster";
@@ -28,9 +31,12 @@ const ITEMS: MenuItem[] = [
   { label: "Temporadas",       href: "/temporadas",    icon: CalendarRange, desc: "Gerir épocas desportivas" },
   { label: "Treinos",          href: "/treinos",       icon: Dumbbell,      desc: "Sessões e presenças" },
   { label: "Estatísticas",     href: "/estatisticas",  icon: BarChart3,     desc: "Análise da época" },
+  { label: "Documentos",       href: "/documentos",    icon: FolderOpen,    desc: "Regulamentos e documentos oficiais" },
   { label: "Histórico",        href: "/historico",     icon: History,       desc: "Épocas anteriores" },
   { label: "Financeiro",       href: "/financeiro",    icon: Landmark,      desc: "Caixa e entradas" },
-  { label: "Gestão de Contas", href: "/gestao-contas", icon: UserCog,       desc: "Contas de utilizador" },
+  { label: "Liga INATEL",      href: "/liga-inatel",    icon: Shield,        desc: "Classificação e resultados" },
+  { label: "Notícias",         href: "/noticias-admin", icon: Newspaper,    desc: "Gerir artigos e publicações" },
+  { label: "Gestão de Contas", href: "/gestao-contas",  icon: UserCog,      desc: "Contas de utilizador" },
   { label: "Configurações",    href: "/configuracoes", icon: Settings,      desc: "Preferências do clube" },
 ];
 

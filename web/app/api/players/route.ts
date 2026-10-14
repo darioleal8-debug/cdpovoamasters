@@ -60,7 +60,7 @@ async function uploadPhoto(
     .from("player-photos")
     .getPublicUrl(path);
 
-  return publicUrl;
+  return `${publicUrl}?t=${Date.now()}`;
 }
 
 // ─── POST /api/players ─── Criar jogador ─────────────────
