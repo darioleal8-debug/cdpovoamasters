@@ -146,7 +146,7 @@ export async function ensureTrainingThread(
 
   // Participantes: staff + jogadores com presenças registadas
   const { data: attendance } = await admin
-    .from("training_attendances")
+    .from("training_attendance")
     .select("player:players(user_id)")
     .eq("training_id", trainingId);
 
@@ -257,6 +257,49 @@ export async function syncTrainingEventChats(admin: SupabaseClient): Promise<voi
   for (const trainingId of missing) {
     await ensureTrainingThread(admin, trainingId).catch(() => {/* ignora erros individuais */});
   }
+}
+
+// ── Garantir que um jogador está em todos os threads de treino ─
+//
+// Corre em GET /api/chat/threads para utilizadores não-staff. Resolve o caso
+// em que o thread foi criado antes do player.user_id ser ligado ao registo
+// de jogador — esses jogadores nunca foram adicionados como participantes.
+export async function ensurePlayerInTrainingThreads(
+  admin: SupabaseClient,
+  userId: string
+): Promise<void> {
+  const { data: season } = await admin
+    .from("seasons").select("id").eq("status", "ativa").single();
+  if (!season) return;
+
+  // Todos os threads de treino da temporada activa
+  const { data: trainingChats } = await admin
+    .from("chats")
+    .select("id")
+    .eq("season_id", season.id)
+    .eq("type", "event")
+    .eq("status", "active")
+    .not("training_id", "is", null);
+
+  if (!trainingChats || trainingChats.length === 0) return;
+
+  const chatIds = trainingChats.map((c: { id: string }) => c.id);
+
+  // Quais destes já têm o player como participante
+  const { data: existing } = await admin
+    .from("chat_participants")
+    .select("chat_id")
+    .eq("user_id", userId)
+    .in("chat_id", chatIds);
+
+  const alreadyIn = new Set((existing ?? []).map((p: { chat_id: string }) => p.chat_id));
+  const missing = chatIds.filter((id) => !alreadyIn.has(id));
+
+  if (missing.length === 0) return;
+
+  await admin.from("chat_participants").insert(
+    missing.map((chat_id) => ({ chat_id, user_id: userId, role_in_chat: "member" }))
+  );
 }
 
 // ── Arquivar fios com +3 dias após o evento ──────────────────

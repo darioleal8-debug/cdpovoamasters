@@ -183,7 +183,7 @@ export function LogoUpload() {
             ) : (
               <div className="flex flex-col items-center gap-1 text-muted-foreground">
                 <ImageIcon className="h-8 w-8 opacity-40" />
-                <span className="text-[10px]">Sem logotipo</span>
+                <span className="text-[11px]">Sem logotipo</span>
               </div>
             )}
             {preview && (

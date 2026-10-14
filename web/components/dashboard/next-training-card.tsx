@@ -1,5 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { Check, X, HelpCircle } from "lucide-react";
+import Link from "next/link";
+import type { TrainingRsvpSummary } from "@/types/database";
 
 interface Avatar {
   id:        string;
@@ -46,6 +50,16 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 export function NextTrainingCard({ training, loading }: Props) {
+  const [rsvp, setRsvp] = useState<TrainingRsvpSummary | null>(null);
+
+  useEffect(() => {
+    if (!training?.id) return;
+    fetch(`/api/trainings/${training.id}/rsvp`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((json) => { if (json?.summary) setRsvp(json.summary); })
+      .catch(() => {});
+  }, [training?.id]);
+
   if (loading) {
     return (
       <div className="rounded-2xl p-5 flex flex-col gap-4 animate-pulse"
@@ -101,6 +115,21 @@ export function NextTrainingCard({ training, loading }: Props) {
         </p>
       </div>
 
+      {/* RSVPs */}
+      {rsvp && (
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="flex items-center gap-1 text-[11px] font-semibold text-green-700">
+            <Check className="h-3 w-3" /> {rsvp.going_count} vão
+          </span>
+          <span className="flex items-center gap-1 text-[11px] text-red-500">
+            <X className="h-3 w-3" /> {rsvp.not_going_count} não vão
+          </span>
+          <span className="flex items-center gap-1 text-[11px]" style={{ color: "var(--muted-text,#5A6478)" }}>
+            <HelpCircle className="h-3 w-3" /> {rsvp.no_response_count} sem resposta
+          </span>
+        </div>
+      )}
+
       {/* Avatares e presença */}
       {training.roster_size > 0 && (
         <div className="flex items-center gap-3">
@@ -135,6 +164,15 @@ export function NextTrainingCard({ training, loading }: Props) {
           </span>
         </div>
       )}
+
+      {/* Ver respostas */}
+      <Link
+        href={`/player/meus-treinos/${training.id}`}
+        className="text-[12px] font-medium hover:underline"
+        style={{ color: "var(--action, #F97316)" }}
+      >
+        Ver quem vai →
+      </Link>
     </div>
   );
 }

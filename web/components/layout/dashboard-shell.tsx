@@ -4,6 +4,7 @@ import { Sidebar }   from "./sidebar";
 import { TabRail }   from "./tab-rail";
 import { BottomNav } from "./bottom-nav";
 import { Header }    from "./header";
+import { useActivityTracker } from "@/hooks/use-activity-tracker";
 import type { UserRole } from "@/types/database";
 
 interface Props {
@@ -15,6 +16,8 @@ interface Props {
 }
 
 export function DashboardShell({ userName, userEmail, userRole, userRolesExtra, children }: Props) {
+  useActivityTracker();
+
   return (
     /*
      * Shell de 100dvh — evita o bug do vh em iOS com barra do Safari.
@@ -44,7 +47,7 @@ export function DashboardShell({ userName, userEmail, userRole, userRolesExtra, 
          * Em mobile adicionamos padding-bottom igual à altura da barra inferior
          * para que o conteúdo não fique tapado.
          */}
-        <main className="flex-1 overflow-y-auto bg-background">
+        <main className="flex-1 overflow-y-auto overscroll-y-contain bg-background">
           {/*
            * Padding bottom: mobile → espaço para a bottom-nav + gap
            *                  tablet+ → padding normal (bottom-nav esconde em md:hidden)

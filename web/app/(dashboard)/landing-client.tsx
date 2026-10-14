@@ -4,12 +4,23 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Calendar, CreditCard, BarChart3, Menu, X, ChevronRight } from "lucide-react";
 
+interface NewsArticle {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string;
+  category: string;
+  published_at: string;
+  is_featured: boolean;
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface PublicClub {
   id: string;
   name: string;
   logo_url: string | null;
+  slug: string | null;
   league: string | null;
   position: number | null;
   wins: number;
@@ -62,6 +73,7 @@ function NavBar() {
           { label: "Como funciona", href: "#como-funciona" },
           { label: "Clubes e ligas", href: "#clubes" },
           { label: "Funcionalidades", href: "#funcionalidades" },
+          { label: "Notícias", href: "/noticias" },
         ].map(({ label, href }) => (
           <a
             key={href}
@@ -123,6 +135,7 @@ function NavBar() {
             { label: "Como funciona", href: "#como-funciona" },
             { label: "Clubes e ligas",  href: "#clubes" },
             { label: "Funcionalidades", href: "#funcionalidades" },
+            { label: "Notícias", href: "/noticias" },
           ].map(({ label, href }) => (
             <a
               key={href}
@@ -279,7 +292,7 @@ function ScreenConvocatoria() {
           <div key={n} className="flex items-center justify-between py-1">
             <span className="text-[12px]" style={{ color: i < 3 ? BLACK : GRAY }}>{n}</span>
             <span
-              className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+              className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
               style={{
                 background: i < 3 ? "#DCFCE7" : "#F3F4F6",
                 color: i < 3 ? "#15803D" : GRAY,
@@ -305,7 +318,7 @@ function ScreenLive() {
       {/* Score bar */}
       <div className="px-4 py-3 flex items-center justify-between">
         <div className="text-center">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">Póvoa</p>
+          <p className="text-[11px] font-bold uppercase tracking-widest text-white/50">Póvoa</p>
           <p className="text-[36px] font-black tabular-nums leading-none text-white">34</p>
         </div>
         <div className="flex flex-col items-center gap-1">
@@ -320,7 +333,7 @@ function ScreenLive() {
           </span>
         </div>
         <div className="text-center">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">Rival</p>
+          <p className="text-[11px] font-bold uppercase tracking-widest text-white/50">Rival</p>
           <p className="text-[36px] font-black tabular-nums leading-none text-white">29</p>
         </div>
       </div>
@@ -371,7 +384,7 @@ function ScreenQuotas() {
             { label: "Em falta", value: "€ 360",   color: "#D92D20" },
           ].map(({ label, value, color }) => (
             <div key={label} className="rounded-xl p-3" style={{ background: LIGHT }}>
-              <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: GRAY }}>{label}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: GRAY }}>{label}</p>
               <p className="text-[18px] font-black mt-0.5" style={{ color }}>{value}</p>
             </div>
           ))}
@@ -385,7 +398,7 @@ function ScreenQuotas() {
           <div key={name} className="flex items-center justify-between py-1 border-b last:border-0" style={{ borderColor: BORDER }}>
             <span className="text-[12px]" style={{ color: BLACK }}>{name}</span>
             <span
-              className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+              className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
               style={{
                 background: ok ? "#DCFCE7" : "#FEE2E2",
                 color: ok ? "#15803D" : "#B91C1C",
@@ -528,7 +541,7 @@ function ClubsSection({ data }: { data: HomeData | null }) {
 }
 
 function ClubCard({ club }: { club: PublicClub }) {
-  return (
+  const inner = (
     <div
       className="rounded-2xl overflow-hidden"
       style={{ background: "#fff", border: `1px solid ${BORDER}` }}
@@ -574,6 +587,112 @@ function ClubCard({ club }: { club: PublicClub }) {
         {club.lastActivityLabel}
       </div>
     </div>
+  );
+  if (club.slug) {
+    return (
+      <Link href={`/equipa/${club.slug}`} className="block hover:opacity-90 transition-opacity">
+        {inner}
+      </Link>
+    );
+  }
+  return inner;
+}
+
+// ─── News section ─────────────────────────────────────────────────────────────
+
+function NewsSection() {
+  const [articles, setArticles] = useState<NewsArticle[]>([]);
+
+  useEffect(() => {
+    fetch("/api/public/news?limit=3")
+      .then((r) => r.json())
+      .then(({ articles: data }: { articles: NewsArticle[] }) => setArticles(data ?? []))
+      .catch(() => {});
+  }, []);
+
+  if (articles.length === 0) return null;
+
+  return (
+    <section
+      className="px-6 py-16 md:py-20"
+      style={{ background: "#F7F8FA" }}
+      aria-labelledby="news-title"
+    >
+      <div className="max-w-5xl mx-auto">
+        <div className="flex items-end justify-between mb-8">
+          <div>
+            <p
+              className="text-[13px] font-bold uppercase tracking-widest mb-2"
+              style={{ color: DARK_ORANGE }}
+            >
+              Notícias
+            </p>
+            <h2
+              id="news-title"
+              className="text-[26px] font-black leading-tight"
+              style={{ color: BLACK }}
+            >
+              Novidades do basquetebol
+            </h2>
+          </div>
+          <Link
+            href="/noticias"
+            className="flex items-center gap-1 text-[14px] font-semibold transition-colors hover:opacity-70"
+            style={{ color: DARK_ORANGE }}
+          >
+            Ver todas <ChevronRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {articles.map((a) => (
+            <Link
+              key={a.id}
+              href={`/noticias/${a.slug}`}
+              className="block"
+              style={{ textDecoration: "none" }}
+            >
+              <article
+                className="rounded-2xl p-6 flex flex-col gap-3 h-full transition-shadow hover:shadow-md"
+                style={{ background: "#fff", border: `1px solid ${BORDER}` }}
+              >
+                <span
+                  className="text-[11px] font-bold uppercase tracking-wider self-start"
+                  style={{ color: DARK_ORANGE }}
+                >
+                  {a.category}
+                </span>
+                <h3
+                  className="text-[16px] font-bold leading-snug flex-1"
+                  style={{ color: BLACK }}
+                >
+                  {a.title}
+                </h3>
+                <p
+                  className="text-[13px] leading-relaxed"
+                  style={{
+                    color: GRAY,
+                    display: "-webkit-box",
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                  }}
+                >
+                  {a.excerpt}
+                </p>
+                <p className="text-[12px]" style={{ color: "#9CA3AF" }}>
+                  {new Date(a.published_at).toLocaleDateString("pt-PT", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </p>
+              </article>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -632,6 +751,7 @@ function Footer() {
       links: [
         { label: "Funcionalidades", href: "#funcionalidades" },
         { label: "Como funciona",   href: "#como-funciona"   },
+        { label: "Notícias",        href: "/noticias"        },
       ],
     },
     {
@@ -731,6 +851,7 @@ export function LandingClient({ initialData }: { initialData: HomeData | null })
         <Hero data={data} />
         <Features />
         <ClubsSection data={data} />
+        <NewsSection />
         <CtaSection />
       </main>
       <Footer />

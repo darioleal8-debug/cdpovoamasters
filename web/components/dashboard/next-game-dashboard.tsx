@@ -184,11 +184,11 @@ export function NextGameDashboard({ game, loading }: Props) {
           Fechar convocatória
         </Link>
         <Link
-          href={`/jogos/${game.id}/stats`}
+          href={`/player/meus-jogos/${game.id}`}
           className="flex items-center justify-center h-11 md:h-10 rounded-xl border px-5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
           style={{ borderColor: "rgba(255,255,255,.2)", touchAction: "manipulation" }}
         >
-          Ver jogo
+          Ver disponibilidades
         </Link>
       </div>
     </section>

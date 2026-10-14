@@ -4,7 +4,7 @@ import { createClient as createSupabase } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { syncTeamChat, syncAnnouncementChat } from "@/lib/chat/team-sync";
 import { ensureStaffChat } from "@/lib/chat/staff-sync";
-import { syncGameEventChats, syncTrainingEventChats } from "@/lib/chat/event-thread-sync";
+import { syncGameEventChats, syncTrainingEventChats, ensurePlayerInTrainingThreads } from "@/lib/chat/event-thread-sync";
 import { canDirectMessage, canCreateGroup, type ChatRole, type ChatPostPolicy } from "@/lib/chat/permissions";
 
 export const runtime = "nodejs";
@@ -58,6 +58,7 @@ async function throttledSync(userId: string, isStaff: boolean, admin: ReturnType
       isStaff ? ensureStaffChat(admin) : Promise.resolve(),
       isStaff ? syncGameEventChats(admin) : Promise.resolve(),
       syncTrainingEventChats(admin), // cria fios de treino para todos os utilizadores
+      isStaff ? Promise.resolve() : ensurePlayerInTrainingThreads(admin, userId), // retro-add player to existing threads
     ]);
   } catch {
     // Sync não-fatal — o utilizador vê threads existentes mesmo que o sync falhe
@@ -78,8 +79,9 @@ export async function GET() {
 
   const isStaff = ["admin", "treinador"].includes(caller.role);
 
-  // Sync throttled — no máximo uma vez por 5 min por utilizador
-  await throttledSync(caller.id, isStaff, admin);
+  // Sync throttled — fire and forget para não bloquear a resposta.
+  // Threads novos criados pelo sync aparecem no próximo poll (60s) ou via realtime.
+  throttledSync(caller.id, isStaff, admin).catch(() => {});
 
   // IDs de chats em que o utilizador participa
   let chatIds: string[];

@@ -115,7 +115,7 @@ function GameRow({ game, expanded, kitsByTeam }: { game: LeagueGame; expanded: b
           <Badge
             variant="outline"
             className={cn(
-              "gap-1 text-[10px] font-semibold uppercase tracking-wide",
+              "gap-1 text-[11px] font-semibold uppercase tracking-wide",
               game.competition === "Taça"
                 ? "border-purple-400/60 bg-purple-50 text-purple-700 dark:bg-purple-950/20 dark:text-purple-400"
                 : "border-cdpovoa-primary/30 bg-cdpovoa-primary/5 text-cdpovoa-primary/80"
@@ -135,7 +135,7 @@ function GameRow({ game, expanded, kitsByTeam }: { game: LeagueGame; expanded: b
           <Badge
             variant={isHome ? "default" : "outline"}
             className={cn(
-              "gap-1 text-[10px] font-semibold uppercase tracking-wide",
+              "gap-1 text-[11px] font-semibold uppercase tracking-wide",
               isHome
                 ? "bg-cdpovoa-primary hover:bg-cdpovoa-primary/90"
                 : "border-cdpovoa-primary/50 text-cdpovoa-primary"
@@ -221,7 +221,7 @@ function JornadaSection({
           {hasOurGame && (
             <Badge
               variant="outline"
-              className="w-fit gap-1 border-cdpovoa-primary/40 bg-cdpovoa-primary/5 text-cdpovoa-primary text-[10px]"
+              className="w-fit gap-1 border-cdpovoa-primary/40 bg-cdpovoa-primary/5 text-cdpovoa-primary text-[11px]"
             >
               <Trophy className="h-2.5 w-2.5" />
               O nosso jogo
@@ -293,7 +293,7 @@ function NextGameBanner({ game }: { game: LeagueGame }) {
       <div className="flex items-center gap-2 shrink-0">
         <Trophy className="h-5 w-5 text-cdpovoa-primary" />
         <span className="text-sm font-semibold text-cdpovoa-primary">Próximo jogo</span>
-        <Badge className="bg-cdpovoa-primary text-white text-[10px]">J{game.jornada}</Badge>
+        <Badge className="bg-cdpovoa-primary text-white text-[11px]">J{game.jornada}</Badge>
       </div>
       <div className="flex flex-1 flex-wrap items-center gap-2 text-sm">
         <span className={cn("font-bold", game.is_home && "text-cdpovoa-primary")}>{game.home_team}</span>

@@ -2,14 +2,17 @@
 
 import { useState, useMemo, useRef } from "react";
 import { useSeasons } from "@/hooks/use-seasons";
-import { usePlayers } from "@/hooks/use-players";
+import { useRosterPlayers } from "@/hooks/use-players";
 import { useGames } from "@/hooks/use-games";
 import { usePayments } from "@/hooks/use-payments";
 import { useSeasonStats, type StatsFilter, DEFAULT_STATS_FILTER } from "@/hooks/use-season-stats";
+import { useTrainings } from "@/hooks/use-trainings";
 import { AttendanceChart } from "@/components/dashboard/attendance-chart";
 import { PaymentsChart } from "@/components/dashboard/payments-chart";
 import { PositionsChart } from "@/components/dashboard/positions-chart";
 import { MetricCard } from "@/components/dashboard/metric-card";
+import { AttendanceTab } from "@/components/stats/attendance-tab";
+import { TrainingStatsTab } from "@/components/stats/training-stats-tab";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,8 +31,9 @@ export default function EstatisticasPage() {
   const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(null);
   const seasonId = selectedSeasonId ?? activeSeason?.id ?? null;
 
-  const { players, loading: playersLoading }                             = usePlayers(seasonId);
+  const { players, loading: playersLoading }                             = useRosterPlayers(seasonId);
   const { events,  loading: eventsLoading }                              = useGames(seasonId);
+  const { trainings, loading: trainingsLoading }                         = useTrainings(seasonId);
   const { payments, totalPago, totalPendente, loading: paymentsLoading } = usePayments(seasonId);
 
   // ── Filtro de estatísticas desportivas ──────────────────────────────────────
@@ -38,21 +42,30 @@ export default function EstatisticasPage() {
   const { stats: gameStats, loading: statsLoading } = useSeasonStats(seasonId, statsFilter);
 
   // Each section has its own loading flag — statsLoading must NOT block the basic metrics
-  const basicLoading    = eventsLoading;
+  const basicLoading    = eventsLoading || trainingsLoading;
   const playersLoading_ = statsLoading;   // player count comes from players table via useSeasonStats
-  const posLoading      = playersLoading; // position distribution still comes from player_profiles
+  const posLoading      = playersLoading; // position distribution comes from players table
 
   /* ── Calendário por mês ──────────────────────────────── */
   const attendanceData = useMemo<AttendanceDataPoint[]>(() => {
     const map = new Map<string, { jogos: number; treinos: number }>();
+    // Trainings from public.trainings (the authoritative table)
+    for (const t of trainings) {
+      const m = MONTH_ABBR[new Date(t.date + "T00:00:00").getMonth()];
+      const e = map.get(m) ?? { jogos: 0, treinos: 0 };
+      e.treinos++;
+      map.set(m, e);
+    }
+    // Games from events table
     for (const ev of events) {
+      if (ev.type !== "jogo") continue;
       const m = MONTH_ABBR[new Date(ev.event_date).getMonth()];
       const e = map.get(m) ?? { jogos: 0, treinos: 0 };
-      if (ev.type === "jogo") e.jogos++; else if (ev.type === "treino") e.treinos++;
+      e.jogos++;
       map.set(m, e);
     }
     return Array.from(map.entries()).map(([month, v]) => ({ month, ...v }));
-  }, [events]);
+  }, [events, trainings]);
 
   /* ── Pagamentos por mês (últimos 8) ──────────────────── */
   const paymentsChartData = useMemo<PaymentDataPoint[]>(() => {
@@ -109,15 +122,19 @@ export default function EstatisticasPage() {
   }, [players]);
 
   const totalGames     = events.filter(e => e.type === "jogo").length;
-  const totalTrainings = events.filter(e => e.type === "treino").length;
+  const totalTrainings = trainings.length;
+  const today          = new Date().toISOString().slice(0, 10);
+  const trainingsCompleted = trainings.filter((t) => t.date < today).length;
 
   // Tabs de secção (mobile)
-  type Tab = "equipa" | "desportivo" | "financeiro";
+  type Tab = "equipa" | "desportivo" | "financeiro" | "assiduidade" | "treinos";
   const [activeTab, setActiveTab] = useState<Tab>("equipa");
   const TABS: Array<{ id: Tab; label: string }> = [
-    { id: "equipa",      label: "Equipa" },
-    { id: "desportivo",  label: "Desportivo" },
-    { id: "financeiro",  label: "Financeiro" },
+    { id: "equipa",       label: "Equipa" },
+    { id: "desportivo",   label: "Desportivo" },
+    { id: "financeiro",   label: "Financeiro" },
+    { id: "assiduidade",  label: "Assiduidade" },
+    { id: "treinos",      label: "Treinos" },
   ];
 
   return (
@@ -181,7 +198,8 @@ export default function EstatisticasPage() {
           <MetricCard title="Jogos" value={totalGames}
             description="Total na temporada" icon={Calendar} accent="blue" loading={basicLoading} />
           <MetricCard title="Treinos" value={totalTrainings}
-            description="Sessões marcadas" icon={BarChart3} accent="amber" loading={basicLoading} />
+            description={trainingsCompleted > 0 ? `${trainingsCompleted} realizado(s)` : "Sessões marcadas"}
+            icon={BarChart3} accent="amber" loading={basicLoading} />
           <MetricCard title="c/ Stats" value={gameStats?.games_finished ?? 0}
             description="Jogos com estatísticas" icon={Trophy} accent="blue" loading={statsLoading} />
         </div>
@@ -302,6 +320,32 @@ export default function EstatisticasPage() {
             loading={paymentsLoading} />
         </div>
         <PaymentsChart data={paymentsChartData} loading={paymentsLoading} />
+      </section>
+
+      {/* ── Bloco 4: Assiduidade ───────────────────────────────── */}
+      <section
+        className={[
+          "space-y-4",
+          activeTab !== "assiduidade" ? "hidden md:block" : "",
+        ].join(" ")}
+      >
+        <p className="hidden md:block text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Assiduidade
+        </p>
+        <AttendanceTab seasonId={seasonId} />
+      </section>
+
+      {/* ── Bloco 5: Treinos ──────────────────────────────────── */}
+      <section
+        className={[
+          "space-y-4",
+          activeTab !== "treinos" ? "hidden md:block" : "",
+        ].join(" ")}
+      >
+        <p className="hidden md:block text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Estatísticas de Treinos
+        </p>
+        <TrainingStatsTab seasonId={seasonId} />
       </section>
 
     </div>

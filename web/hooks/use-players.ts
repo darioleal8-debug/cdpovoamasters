@@ -5,6 +5,51 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "@/components/ui/toaster";
 import type { PlayerWithUser, PlayerFormData } from "@/types/database";
 
+// Reads from the players table (not player_profiles).
+// Used wherever position/name/number from the authoritative players table is needed.
+export function useRosterPlayers(seasonId: string | null) {
+  const [players, setPlayers] = useState<Array<{
+    id: string; name: string; number: number | null; position: string | null;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
+
+  const load = useCallback(async () => {
+    if (!seasonId) { setPlayers([]); setLoading(false); return; }
+    setLoading(true);
+    // players.name removed in migration 041 — name lives in users.name
+    const { data: rows, error } = await supabase
+      .from("players")
+      .select("id, number, position, user_id")
+      .eq("season_id", seasonId)
+      .order("number", { ascending: true, nullsFirst: false });
+
+    if (error || !rows?.length) {
+      setPlayers([]);
+      setLoading(false);
+      return;
+    }
+
+    const userIds = rows.map(r => r.user_id as string).filter(Boolean);
+    const { data: usersData } = await supabase
+      .from("users").select("id, name").in("id", userIds);
+    const nameMap = Object.fromEntries(
+      (usersData ?? []).map(u => [(u as { id: string; name: string }).id, (u as { id: string; name: string }).name])
+    );
+
+    setPlayers(rows.map(r => ({
+      id:       r.id as string,
+      name:     nameMap[r.user_id as string] ?? "",
+      number:   r.number as number | null,
+      position: r.position as string | null,
+    })));
+    setLoading(false);
+  }, [seasonId, supabase]);
+
+  useEffect(() => { load(); }, [load]);
+  return { players, loading };
+}
+
 export function usePlayers(seasonId: string | null) {
   const [players, setPlayers] = useState<PlayerWithUser[]>([]);
   const [loading, setLoading] = useState(true);

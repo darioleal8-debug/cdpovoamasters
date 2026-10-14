@@ -341,7 +341,7 @@ export function PalmaresView({ allowAdmin = true }: { allowAdmin?: boolean }) {
   const roomIdx   = Math.min(activeRoom, Math.max(rooms.length - 1, 0));
   const current   = rooms[roomIdx] ?? { label: "", items: [] };
   const titulos   = entries.filter(e => e.colocacao === 1).length;
-  const podios    = entries.length;
+  const podios    = entries.filter(e => e.colocacao <= 3).length;
   const lastTitle = entries.find(e => e.colocacao === 1);
   const closeModal = useCallback(() => setSelected(null), []);
 
@@ -367,7 +367,7 @@ export function PalmaresView({ allowAdmin = true }: { allowAdmin?: boolean }) {
         .palmares-door.active { border-color: #c9a24b; background: rgba(201,162,75,0.09); color: #c9a24b; }
       `}</style>
 
-      <div className="palmares-root -mx-4 md:-mx-6 -mt-6 px-4 md:px-6 pb-20 pt-10 min-h-screen">
+      <div className="palmares-root -mx-4 md:-mx-6 -mt-6 px-4 md:px-6 pb-20 pt-10 min-h-full">
 
         {/* Header */}
         <div className="text-center mb-10">

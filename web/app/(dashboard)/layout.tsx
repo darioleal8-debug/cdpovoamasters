@@ -26,9 +26,11 @@ export default async function DashboardLayout({
     .eq("email", user.email!)
     .single();
 
-  // Sem perfil → auth existe mas public.users não tem este utilizador
+  // Sem perfil → auth existe mas public.users não tem este utilizador.
+  // Redireciona para signout (não /login directamente) para quebrar o loop
+  // middleware ↔ dashboard que acontece quando a sessão é válida mas o perfil não existe.
   if (!profile) {
-    redirect("/login");
+    redirect("/api/auth/signout");
   }
 
   const userName      = profile.name       ?? user.email ?? "Utilizador";

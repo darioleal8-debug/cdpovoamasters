@@ -24,8 +24,8 @@ export async function POST(req: NextRequest) {
   try { body = await req.json(); }
   catch { return fail("JSON inválido"); }
 
-  if (!body.new_password || body.new_password.length < 8) {
-    return fail("A nova password deve ter pelo menos 8 caracteres");
+  if (!body.new_password || body.new_password.length < 10) {
+    return fail("A nova password deve ter pelo menos 10 caracteres");
   }
 
   const cookieStore = await cookies();

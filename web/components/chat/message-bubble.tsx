@@ -111,7 +111,7 @@ function OtherBubble({ msg, showSender }: { msg: Msg; showSender: boolean }) {
             </span>
             {roleLabel && (
               <span
-                className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full"
+                className="text-[11px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full"
                 style={{ background: "rgba(169,180,199,.1)", color: "#A9B4C7" }}
               >
                 {roleLabel}
