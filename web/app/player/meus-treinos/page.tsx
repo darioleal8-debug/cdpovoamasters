@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { Clock, Dumbbell, MapPin, BookOpen, Pin, CalendarDays, CheckCircle2, XCircle, MessageSquare } from "lucide-react";
+import { Clock, Dumbbell, MapPin, BookOpen, Pin, CalendarDays, CheckCircle2, XCircle, MessageSquare, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AutoAttendanceButton } from "@/components/trainings/auto-attendance-button";
+import { GpsCheckinButton } from "@/components/trainings/gps-checkin-button";
 import { RsvpButtons } from "@/components/trainings/rsvp-buttons";
 import { TreinosPaginationWrapper } from "./TreinosPaginationWrapper";
 
@@ -33,6 +33,8 @@ type RsvpRow = {
   reason_code: string | null;
   reason_text: string | null;
 };
+type TeamRsvpEntry = { player_id: string; name: string | null; number: number | null };
+type TeamRsvpSummary = { going: TeamRsvpEntry[]; not_going: TeamRsvpEntry[] };
 
 const TYPE_LABELS: Record<string, string> = {
   tecnico: "Técnico", fisico: "Físico", tatico: "Tático",
@@ -66,7 +68,16 @@ export default async function MeusTreinosPage() {
   const { data: season } = await supabase
     .from("seasons").select("id").eq("status", "ativa").maybeSingle();
 
-  const today = new Date().toISOString().slice(0, 10);
+  // Hora actual em Lisboa (Portugal usa Europe/Lisbon — UTC+1 no verão, UTC+0 no inverno)
+  const lisbonNowStr = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Lisbon" });
+  const today    = lisbonNowStr.slice(0, 10);  // "2026-10-12"
+  const nowHHMM  = lisbonNowStr.slice(11, 16); // "21:35"
+
+  function addMinutes(hhmm: string, minutes: number): string {
+    const [h, m] = hhmm.split(":").map(Number);
+    const total = h * 60 + m + minutes;
+    return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+  }
 
   const [{ data: upcoming }, { data: past }] = season
     ? await Promise.all([
@@ -134,9 +145,58 @@ export default async function MeusTreinosPage() {
     notesByTraining.set(n.training_id, list);
   }
 
+  // RSVPs de TODA a equipa (para mostrar quem vai / não vai)
+  // players.name removido na migration 041 — nome via users.name
+  type TeamRsvpRaw = {
+    training_id: string; player_id: string; status: string;
+    players: { user_id: string | null; number: number | null } | null;
+  };
+  const { data: teamRsvpRaw } = trainingIds.length
+    ? await supabase
+        .from("training_rsvps")
+        .select("training_id, player_id, status, players(user_id, number)")
+        .in("training_id", trainingIds)
+    : { data: [] as TeamRsvpRaw[] };
+
+  const teamRows = (teamRsvpRaw ?? []) as TeamRsvpRaw[];
+  const teamUserIds = [
+    ...new Set(teamRows.map(r => (r.players as { user_id?: string | null } | null)?.user_id).filter((id): id is string => !!id)),
+  ];
+  const { data: teamUsersData } = teamUserIds.length
+    ? await supabase.from("users").select("id, name").in("id", teamUserIds)
+    : { data: [] as { id: string; name: string }[] };
+  const teamNameMap = Object.fromEntries(
+    (teamUsersData ?? []).map(u => [(u as { id: string; name: string }).id, (u as { id: string; name: string }).name])
+  );
+
+  const teamRsvpsByTraining = new Map<string, TeamRsvpSummary>();
+  for (const r of teamRows) {
+    const p = r.players as { user_id?: string | null; number?: number | null } | null;
+    const uid = p?.user_id ?? null;
+    const entry: TeamRsvpEntry = {
+      player_id: r.player_id,
+      name:   uid ? (teamNameMap[uid] ?? null) : null,
+      number: typeof p?.number === "number" ? p.number : null,
+    };
+    const cur = teamRsvpsByTraining.get(r.training_id) ?? { going: [], not_going: [] };
+    if (r.status === "going")     cur.going.push(entry);
+    else if (r.status === "not_going") cur.not_going.push(entry);
+    teamRsvpsByTraining.set(r.training_id, cur);
+  }
+  // Sort each list by number asc (nulls last), then name
+  for (const s of teamRsvpsByTraining.values()) {
+    const cmp = (a: TeamRsvpEntry, b: TeamRsvpEntry) => {
+      if (a.number == null && b.number != null) return 1;
+      if (a.number != null && b.number == null) return -1;
+      if (a.number !== b.number) return (a.number ?? 0) - (b.number ?? 0);
+      return (a.name ?? "").localeCompare(b.name ?? "", "pt");
+    };
+    s.going.sort(cmp);
+    s.not_going.sort(cmp);
+  }
+
   function computeDeadline(t: TrainingRow): string {
-    const startMs = new Date(`${t.date}T${t.start_time ?? "00:00"}`).getTime();
-    return new Date(startMs - (t.rsvp_deadline_hours ?? 3) * 3_600_000).toISOString();
+    return new Date(`${t.date}T${t.start_time ?? "00:00"}`).toISOString();
   }
 
   function TrainingCard({ t, isPast = false }: { t: TrainingRow; isPast?: boolean }) {
@@ -158,14 +218,26 @@ export default async function MeusTreinosPage() {
     const attendanceInfo = myAttendance ? ATTENDANCE_STATUS[myAttendance.status] : null;
     const isToday = t.date === today;
 
-    const showAutoButton = isToday && playerRecord !== null && !myAttendance;
-    const showFutureNotice = !isPast && !isToday && playerRecord !== null && !myAttendance;
+    // Janela de check-in GPS: start_time → end_time + 30 min
+    const startHHMM = t.start_time?.slice(0, 5) ?? null;
+    const endHHMM   = t.end_time?.slice(0, 5)   ?? null;
+    const closeHHMM = endHHMM
+      ? addMinutes(endHHMM, 30)
+      : startHHMM ? addMinutes(startHHMM, 120) : null;
+
+    const checkinOpen   = isToday && !!startHHMM && nowHHMM >= startHHMM && (!closeHHMM || nowHHMM <= closeHHMM);
+    const checkinBefore = isToday && !!startHHMM && nowHHMM < startHHMM;
+    const checkinClosed = isToday && !!closeHHMM && nowHHMM > closeHHMM;
+
+    const showCheckinButton = checkinOpen  && playerRecord !== null && !myAttendance;
+    const showFutureNotice  = !isPast && !isToday && playerRecord !== null && !myAttendance;
     const showAttendanceBadge = isPast || (myAttendance && myAttendance.status !== null);
 
     const deadlineIso = computeDeadline(t);
     const deadlinePast = new Date() > new Date(deadlineIso);
     const myRsvp = rsvpByTraining.get(t.id);
     const showRsvp = playerRecord !== null && !isPast && (!deadlinePast || myRsvp);
+    const teamSummary = teamRsvpsByTraining.get(t.id);
 
     return (
       <Card className={`overflow-hidden transition-opacity ${isPast ? "opacity-60" : ""}`}>
@@ -256,20 +328,82 @@ export default async function MeusTreinosPage() {
               </div>
             )}
 
-            {/* Auto-Presença */}
+            {/* Confirmações da equipa */}
+            {teamSummary && (teamSummary.going.length > 0 || teamSummary.not_going.length > 0) && (
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Confirmações
+                  </span>
+                  {teamSummary.going.length > 0 && (
+                    <span className="text-[11px] font-bold rounded-full bg-green-100 text-green-700 border border-green-300 px-1.5 py-0.5 leading-none dark:bg-green-900/30 dark:text-green-400 dark:border-green-700">
+                      {teamSummary.going.length} {teamSummary.going.length === 1 ? "vai" : "vão"}
+                    </span>
+                  )}
+                  {teamSummary.not_going.length > 0 && (
+                    <span className="text-[11px] font-bold rounded-full bg-red-100 text-red-700 border border-red-300 px-1.5 py-0.5 leading-none dark:bg-red-900/30 dark:text-red-400 dark:border-red-700">
+                      {teamSummary.not_going.length} não {teamSummary.not_going.length === 1 ? "vai" : "vão"}
+                    </span>
+                  )}
+                </div>
+
+                {teamSummary.going.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {teamSummary.going.map((p) => (
+                      <span
+                        key={p.player_id}
+                        className="inline-flex items-center gap-1 text-[11px] rounded-full bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 dark:bg-green-950/20 dark:text-green-400 dark:border-green-800"
+                      >
+                        {p.number != null && <span className="opacity-50 text-[10px]">#{p.number}</span>}
+                        {p.name ? p.name.split(" ")[0] : "—"}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {teamSummary.not_going.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {teamSummary.not_going.map((p) => (
+                      <span
+                        key={p.player_id}
+                        className="inline-flex items-center gap-1 text-[11px] rounded-full bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 dark:bg-red-950/20 dark:text-red-400 dark:border-red-800"
+                      >
+                        {p.number != null && <span className="opacity-50 text-[10px]">#{p.number}</span>}
+                        {p.name ? p.name.split(" ")[0] : "—"}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Marcação de presença por GPS */}
             {!playerRecord && !isPast && (
               <p className="text-xs text-muted-foreground/70 italic">
                 Sem perfil de jogador associado — contacta o teu treinador.
               </p>
             )}
 
-            {showAutoButton && (
-              <AutoAttendanceButton trainingId={t.id} currentStatus={null} />
+            {showCheckinButton && (
+              <GpsCheckinButton trainingId={t.id} />
+            )}
+
+            {checkinBefore && playerRecord && !myAttendance && (
+              <p className="text-xs text-muted-foreground/60 italic">
+                A marcação de presença abre às {startHHMM}h.
+              </p>
+            )}
+
+            {checkinClosed && playerRecord && !myAttendance && (
+              <p className="text-xs text-muted-foreground/60 italic">
+                O registo de presença fechou às {closeHHMM}h.
+              </p>
             )}
 
             {showFutureNotice && (
               <p className="text-xs text-muted-foreground/60 italic">
-                A auto-presença por fotografia só está disponível no dia do treino.
+                A marcação de presença está disponível no dia do treino a partir das {startHHMM ?? "hora de início"}h.
               </p>
             )}
 

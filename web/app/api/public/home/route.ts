@@ -27,7 +27,7 @@ export async function GET() {
     // A tabela club_settings tem uma linha por clube.
     const { data: publicClubs } = await supabase
       .from("club_settings")
-      .select("id, club_name, logo_url, is_public")
+      .select("id, club_name, logo_url, is_public, slug")
       .eq("is_public", true)
       .limit(10);
 
@@ -101,6 +101,7 @@ export async function GET() {
         id:                 club.id,
         name:               club.club_name ?? "Clube",
         logo_url:           club.logo_url ?? null,
+        slug:               (club as { slug?: string | null }).slug ?? null,
         league,
         position:           null,   // não há dados de classificação na BD ainda
         wins,

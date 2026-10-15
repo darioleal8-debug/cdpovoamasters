@@ -1,13 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import {
-  AlertTriangle, Calendar, Clock, CreditCard,
+  AlertTriangle, BarChart2, Calendar, Clock, CreditCard,
   Dumbbell, MapPin, MessageSquare, Trophy, User,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { NextGameCard } from "@/components/games/next-game-card";
 import { StatsSection } from "@/components/player/stats-section";
 import { AvailabilityPrompt } from "@/components/player/availability-prompt";
+import { GpsCheckinButton } from "@/components/trainings/gps-checkin-button";
+import { BirthdayBanner } from "@/components/birthday/birthday-banner";
 import { lisbonDateTime } from "@/lib/event-time";
 import type { AvailabilityRosterRow } from "@/types/availability";
 import Link from "next/link";
@@ -81,11 +83,14 @@ function NextTrainingCard({
   training,
   note,
   rsvp,
+  hasAttendance = false,
 }: {
-  training: TrainingRow | null;
-  note:     string | null;
+  training:      TrainingRow | null;
+  note:          string | null;
   /** null = utilizador sem perfil de jogador → não mostra os botões */
-  rsvp:     TrainingRsvpProps;
+  rsvp:          TrainingRsvpProps;
+  /** true se a presença GPS/manual já foi registada hoje */
+  hasAttendance?: boolean;
 }) {
   const TRAINING_BG = "#3b5f92";
 
@@ -106,10 +111,7 @@ function NextTrainingCard({
   const label   = dateLabel(training.date);
   const isToday = label === "Hoje";
   const typeLabel = training.type ? (TYPE_LABELS[training.type] ?? training.type) : null;
-  const deadlineIso = new Date(
-    lisbonDateTime(training.date, training.start_time).getTime()
-    - (training.rsvp_deadline_hours ?? 0) * 3_600_000
-  ).toISOString();
+  const deadlineIso = lisbonDateTime(training.date, training.start_time).toISOString();
 
   return (
     <div className="overflow-hidden rounded-xl border shadow-sm flex flex-col">
@@ -170,6 +172,16 @@ function NextTrainingCard({
         </div>
       )}
 
+      {/* ── Marcar Presença GPS — só no dia do treino ── */}
+      {isToday && rsvp !== null && !hasAttendance && (
+        <div className="border-b bg-background px-5 py-4">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Presença
+          </p>
+          <GpsCheckinButton trainingId={training.id} />
+        </div>
+      )}
+
       {/* ── Zona branca — Foco do treino ── */}
       <div className="bg-background flex-1 px-5 py-4">
         <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
@@ -180,6 +192,17 @@ function NextTrainingCard({
         ) : (
           <p className="text-sm text-muted-foreground">Sem notas para este treino.</p>
         )}
+      </div>
+
+      {/* ── Rodapé — ver respostas ── */}
+      <div className="border-t bg-background px-5 py-3">
+        <Link
+          href={`/player/meus-treinos/${training.id}`}
+          className="text-xs font-medium hover:underline"
+          style={{ color: "var(--club-primary, #1d4079)" }}
+        >
+          Ver quem vai →
+        </Link>
       </div>
     </div>
   );
@@ -278,6 +301,19 @@ export default async function MinhaAreaPage() {
     };
   }
 
+  // ── Presença no treino de hoje ───────────────────────────
+  let hasTrainingAttendance = false;
+  if (nextTraining && linkedPlayer?.id && nextTraining.date === today) {
+    const { data: att } = await supabase
+      .from("training_attendance")
+      .select("id")
+      .eq("training_id", nextTraining.id)
+      .eq("player_id", linkedPlayer.id)
+      .in("status", ["present", "late", "auto_present"])
+      .maybeSingle();
+    hasTrainingAttendance = att !== null;
+  }
+
   // ── Comunicados (chat de equipa, importante = true) ───────
   let comunicados: ComunicadoRow[] = [];
   try {
@@ -339,9 +375,10 @@ export default async function MinhaAreaPage() {
   const shortcuts = [
     { href: "/player/meu-perfil",      icon: User,           label: "O Meu Perfil",       desc: "Ver e editar"       },
     { href: "/player/meus-jogos",      icon: Calendar,       label: "Os Meus Jogos",      desc: "Próximos jogos"     },
-    { href: "/player/meus-treinos",    icon: Dumbbell,       label: "Os Meus Treinos",    desc: "Agenda de treinos"  },
-    { href: "/player/meus-pagamentos", icon: CreditCard,     label: "Os Meus Pagamentos", desc: "Quotas"             },
-    { href: "/player/palmares",         icon: Trophy,         label: "Palmarés",            desc: "Historial"          },
+    { href: "/player/meus-treinos",    icon: Dumbbell,   label: "Os Meus Treinos",       desc: "Agenda de treinos"  },
+    { href: "/player/assiduidade",    icon: BarChart2,  label: "A Minha Assiduidade",   desc: "Treinos e jogos"    },
+    { href: "/player/meus-pagamentos", icon: CreditCard, label: "Os Meus Pagamentos",    desc: "Quotas"             },
+    { href: "/player/palmares",        icon: Trophy,     label: "Palmarés",              desc: "Historial"          },
   ] as const;
 
   return (
@@ -373,13 +410,16 @@ export default async function MinhaAreaPage() {
         </div>
       )}
 
+      {/* ── Aniversários de hoje ── */}
+      <BirthdayBanner isAdmin={false} />
+
       {/* ── Par de cartões: Próximo Jogo + Próximo Treino ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <NextGameCard
           highlightPlayerId={linkedPlayer?.id ?? null}
           availabilityPlayerId={linkedPlayer?.id ?? null}
         />
-        <NextTrainingCard training={nextTraining} note={trainingNote} rsvp={trainingRsvp} />
+        <NextTrainingCard training={nextTraining} note={trainingNote} rsvp={trainingRsvp} hasAttendance={hasTrainingAttendance} />
       </div>
 
       {/* ── Linha 2: Estatísticas (2/3) + Comunicados (1/3) ── */}

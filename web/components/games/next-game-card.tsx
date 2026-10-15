@@ -219,6 +219,17 @@ export async function NextGameCard({
           </div>
         )}
       </div>
+
+      {/* ── Rodapé — ver disponibilidades ── */}
+      <div className="border-t bg-background px-5 py-3">
+        <Link
+          href={`/player/meus-jogos/${game.id}`}
+          className="text-xs font-medium hover:underline"
+          style={{ color: "var(--club-primary, #1d4079)" }}
+        >
+          Ver disponibilidades →
+        </Link>
+      </div>
     </div>
   );
 }

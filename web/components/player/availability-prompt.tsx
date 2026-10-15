@@ -34,7 +34,7 @@ const COPY = {
     yes: "Vou", no: "Não vou",
     doneYes: "Vais ao treino", doneNo: "Não vais ao treino",
     confirmNo: "Confirmar falta",
-    closed: "Prazo de confirmação encerrado.",
+    closed: "O treino já começou.",
   },
 } as const;
 
@@ -137,20 +137,20 @@ export function AvailabilityPrompt({
       {/* ── Botões ── */}
       {closed ? (
         <p className="text-xs italic text-muted-foreground">
-          {answer ? "Já não é possível alterar." : copy.closed}
+          {copy.closed}
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-2">
           <Button
             type="button"
             variant="outline"
-            disabled={saving !== null || answer === "yes"}
+            disabled={saving !== null}
             aria-pressed={answer === "yes"}
             onClick={() => submit("yes")}
             className={cn(
               "min-h-[44px] gap-1.5",
               answer === "yes" &&
-                "border-green-600 bg-green-600 text-white disabled:opacity-100 hover:bg-green-600 hover:text-white"
+                "border-green-600 bg-green-600 text-white hover:bg-green-700 hover:text-white"
             )}
           >
             {saving === "yes"

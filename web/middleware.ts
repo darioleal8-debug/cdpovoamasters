@@ -89,10 +89,15 @@ export async function middleware(request: NextRequest) {
     return buildRedirect(new URL("/login", request.url));
   }
 
-  // /login com sessão válida confirmada → dashboard
+  // /login com sessão válida confirmada → dashboard (ou redirectTo se seguro)
   // Só redireciona se getUser() confirmar utilizador real; nunca por simples presença de cookie
   if (path.startsWith("/login") && user) {
-    return buildRedirect(new URL("/dashboard", request.url));
+    const redirectTo = request.nextUrl.searchParams.get("redirectTo");
+    const dest =
+      redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//")
+        ? redirectTo
+        : "/dashboard";
+    return buildRedirect(new URL(dest, request.url));
   }
 
   // Passagem normal — devolve supabaseResponse para propagar tokens renovados

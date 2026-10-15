@@ -94,25 +94,36 @@ export async function POST(
 
   if (tErr || !training) return fail("Treino não encontrado", 404);
 
-  // Validação de prazo (servidor) — treinadores+: sem prazo
+  // Bloquear alterações apenas depois de o treino ter começado
   const { data: isTrainer } = await supabase.rpc("is_trainer_or_above");
   if (!isTrainer) {
     const trainingStart = new Date(`${training.date}T${training.start_time}`);
-    const deadline = new Date(trainingStart.getTime() - training.rsvp_deadline_hours * 60 * 60 * 1000);
-    if (new Date() > deadline) {
-      return fail("O prazo de confirmação já passou", 422);
+    if (new Date() > trainingStart) {
+      return fail("O treino já começou", 422);
     }
   }
 
-  // Buscar player_id na temporada do treino
-  const { data: playerRecord, error: pErr } = await supabase
-    .from("players")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("season_id", training.season_id)
-    .maybeSingle();
-
-  if (pErr || !playerRecord) return fail("Não tens perfil de jogador nesta temporada", 403);
+  // Season-specific lookup first; fallback to most recent player record (same
+  // pattern as minha-area / assiduidade — handles user_id not yet linked to the
+  // current season's player row).
+  let playerRecord: { id: string } | null = null;
+  {
+    const { data: p1 } = await supabase
+      .from("players").select("id")
+      .eq("user_id", user.id).eq("season_id", training.season_id)
+      .maybeSingle();
+    if (p1) {
+      playerRecord = p1;
+    } else {
+      const { data: p2 } = await supabase
+        .from("players").select("id")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }).limit(1)
+        .maybeSingle();
+      playerRecord = p2;
+    }
+  }
+  if (!playerRecord) return fail("Não tens perfil de jogador nesta temporada", 403);
 
   // Upsert
   const { error: upsertErr } = await supabase

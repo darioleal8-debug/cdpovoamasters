@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { format, parseISO, startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
 import { pt } from "date-fns/locale";
 import { Plus, Users, FileText, Pencil, Trash2, Clock, MapPin, BarChart, Camera, MessageSquare } from "lucide-react";
+import { ShareButton } from "@/components/ui/share-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -263,6 +264,7 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
                             <Camera className="h-3.5 w-3.5" />
                             <span className="hidden sm:inline text-xs">Fotos</span>
                           </Button>
+                          <ShareButton eventId={t.id} title={`Treino — ${t.date}`} />
                           <Button variant="ghost" size="icon" className="h-7 w-7"
                             onClick={() => setEdit(t)}>
                             <Pencil className="h-3.5 w-3.5" />

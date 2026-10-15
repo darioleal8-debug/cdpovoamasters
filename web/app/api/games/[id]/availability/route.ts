@@ -93,12 +93,26 @@ export async function POST(
     return fail("O jogo já começou — já não é possível alterar a disponibilidade", 422);
   }
 
-  const { data: playerRecord } = await supabase
-    .from("players")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("season_id", game.season_id)
-    .maybeSingle();
+  // Season-specific lookup first; fallback to most recent player record (same
+  // pattern as minha-area / assiduidade — handles user_id not yet linked to the
+  // current season's player row).
+  let playerRecord: { id: string } | null = null;
+  {
+    const { data: p1 } = await supabase
+      .from("players").select("id")
+      .eq("user_id", user.id).eq("season_id", game.season_id)
+      .maybeSingle();
+    if (p1) {
+      playerRecord = p1;
+    } else {
+      const { data: p2 } = await supabase
+        .from("players").select("id")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }).limit(1)
+        .maybeSingle();
+      playerRecord = p2;
+    }
+  }
   if (!playerRecord) return fail("Não tens perfil de jogador nesta temporada", 403);
 
   const unavailable = body.status === "unavailable";

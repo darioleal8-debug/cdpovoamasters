@@ -166,7 +166,15 @@ export default function ConvocatoriaPage() {
   // ── Derived data ─────────────────────────────────────────
   // game_callups.player_id === players.id === RosterEntry.player_id
   const calledUpIds = new Set(callups.map((c) => c.player_id));
-  const slots = Array.from({ length: 12 }, (_, i) => callups[i] ?? null);
+
+  // Liga INATEL → strict 12-player limit; all other game types → no limit.
+  const isLigaInatel = !!event?.competition?.toLowerCase().includes("inatel");
+  const maxCallups: number | null = isLigaInatel ? 12 : null;
+
+  // Rail slots: 12 fixed slots for INATEL; all filled + 1 empty "add" slot otherwise.
+  const slots: (typeof callups[0] | null)[] = maxCallups !== null
+    ? Array.from({ length: maxCallups }, (_, i) => callups[i] ?? null)
+    : [...callups, null];
 
   // Only players with a profile this season and a jersey number
   const eligible = players.filter((p) => p.player_id !== null && p.number !== null);
@@ -201,8 +209,8 @@ export default function ConvocatoriaPage() {
       return;
     }
     if (calledUpIds.has(pid)) return;
-    if (callups.length >= 12) {
-      toast({ title: "Máximo de 12 convocados atingido", variant: "destructive" });
+    if (maxCallups !== null && callups.length >= maxCallups) {
+      toast({ title: `Máximo de ${maxCallups} convocados atingido`, variant: "destructive" });
       return;
     }
     if (!skipAvailCheck && byPlayerId.get(pid)?.status === "unavailable") {
@@ -251,10 +259,11 @@ export default function ConvocatoriaPage() {
       if (!att?.length) { toast({ title: "Nenhuma presença no último treino", variant: "destructive" }); return; }
 
       const presentSet = new Set((att as { player_id: string }[]).map((a) => a.player_id));
-      const toAdd = sorted
-        .filter((p) => presentSet.has(p.player_id!) && !calledUpIds.has(p.player_id!) && !latePlayerIds.has(p.player_id!))
-        .slice(0, 12 - callups.length)
-        .map((p) => p.player_id!);
+      const eligible30 = sorted
+        .filter((p) => presentSet.has(p.player_id!) && !calledUpIds.has(p.player_id!) && !latePlayerIds.has(p.player_id!));
+      const toAdd = maxCallups !== null
+        ? eligible30.slice(0, maxCallups - callups.length).map((p) => p.player_id!)
+        : eligible30.map((p) => p.player_id!);
 
       if (!toAdd.length) { toast({ title: "Nenhum disponível para convocar" }); return; }
       let added = 0;
@@ -287,11 +296,11 @@ export default function ConvocatoriaPage() {
       for (const a of att as { player_id: string }[])
         counts[a.player_id] = (counts[a.player_id] ?? 0) + 1;
 
-      const toAdd = Object.entries(counts)
+      const sorted30 = Object.entries(counts)
         .sort((a, b) => b[1] - a[1])
         .map(([pid]) => pid)
-        .filter((pid) => !calledUpIds.has(pid) && !latePlayerIds.has(pid))
-        .slice(0, 12 - callups.length);
+        .filter((pid) => !calledUpIds.has(pid) && !latePlayerIds.has(pid));
+      const toAdd = maxCallups !== null ? sorted30.slice(0, maxCallups - callups.length) : sorted30;
 
       if (!toAdd.length) { toast({ title: "Nenhum disponível para convocar" }); return; }
       let added = 0;
@@ -329,10 +338,10 @@ export default function ConvocatoriaPage() {
 
   async function applyDsRecommendation() {
     if (!dsResult) return;
-    const toAdd = dsResult.evaluation.recommended_players
+    const dsFiltered = dsResult.evaluation.recommended_players
       .map((p) => p.player_id)
-      .filter((pid) => !calledUpIds.has(pid) && !latePlayerIds.has(pid))
-      .slice(0, 12 - callups.length);
+      .filter((pid) => !calledUpIds.has(pid) && !latePlayerIds.has(pid));
+    const toAdd = maxCallups !== null ? dsFiltered.slice(0, maxCallups - callups.length) : dsFiltered;
     let added = 0;
     for (const pid of toAdd) { if (await addCallup(pid)) added++; }
     if (added > 0) setOrigin("avaliacao-ia");
@@ -389,7 +398,7 @@ export default function ConvocatoriaPage() {
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={autoLastTraining}
-            disabled={autoLoading || isLoading || callups.length >= 12}
+            disabled={autoLoading || isLoading || (maxCallups !== null && callups.length >= maxCallups)}
             className="text-xs font-semibold rounded-lg px-3 py-1.5 transition-all active:scale-95 disabled:opacity-40 whitespace-nowrap"
             style={{ background: "#15803d", color: "#fff" }}
           >
@@ -397,7 +406,7 @@ export default function ConvocatoriaPage() {
           </button>
           <button
             onClick={auto30Days}
-            disabled={autoLoading || isLoading || callups.length >= 12}
+            disabled={autoLoading || isLoading || (maxCallups !== null && callups.length >= maxCallups)}
             className="text-xs font-semibold rounded-lg px-3 py-1.5 transition-all active:scale-95 disabled:opacity-40 whitespace-nowrap"
             style={{ background: "#7c3aed", color: "#fff" }}
           >
@@ -414,16 +423,16 @@ export default function ConvocatoriaPage() {
           </button>
         </div>
 
-        {/* N/12 pill */}
+        {/* N/max pill */}
         <div
           className="shrink-0 flex items-center gap-1 text-sm font-bold px-3 py-1 rounded-full"
           style={{
-            background: callups.length >= 12 ? "rgba(74,222,128,0.12)" : "#182238",
-            color:      callups.length >= 12 ? "#4ade80" : "#eef3fb",
+            background: (maxCallups !== null && callups.length >= maxCallups) ? "rgba(74,222,128,0.12)" : "#182238",
+            color:      (maxCallups !== null && callups.length >= maxCallups) ? "#4ade80" : "#eef3fb",
           }}
         >
-          {callups.length}/12
-          {callups.length >= 12 && <CheckCircle2 className="h-3.5 w-3.5" />}
+          {callups.length}{maxCallups !== null ? `/${maxCallups}` : " conv."}
+          {maxCallups !== null && callups.length >= maxCallups && <CheckCircle2 className="h-3.5 w-3.5" />}
         </div>
       </header>
 
@@ -456,12 +465,18 @@ export default function ConvocatoriaPage() {
           )}
         </div>
 
-        {/* 12 slots — REGRA 1: horizontal grid, repeat(12,1fr), gap 8px, 58px height */}
+        {/* Slots rail — 12-column grid for Liga INATEL; scrollable flex row otherwise */}
         <div
-          style={{
+          style={maxCallups !== null ? {
             display: "grid",
             gridTemplateColumns: "repeat(12, 1fr)",
             gap: 8,
+          } : {
+            display: "flex",
+            flexWrap: "nowrap",
+            gap: 8,
+            overflowX: "auto",
+            paddingBottom: 4,
           }}
         >
           {slots.map((callup, i) => {
@@ -480,6 +495,9 @@ export default function ConvocatoriaPage() {
                 onClick={() => callup && removeCallup(callup.id)}
                 style={{
                   height: 58,
+                  width: maxCallups === null ? 58 : undefined,
+                  minWidth: maxCallups === null ? 58 : undefined,
+                  flexShrink: maxCallups === null ? 0 : undefined,
                   borderRadius: 9,
                   border: callup ? "1.5px solid #2f4670" : "1.5px dashed #26314a",
                   background: callup ? "#1b2b46" : "#141c2e",
@@ -531,7 +549,9 @@ export default function ConvocatoriaPage() {
                     )}
                   </>
                 ) : (
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#33405e" }}>{i + 1}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#33405e" }}>
+                    {maxCallups !== null ? i + 1 : "+"}
+                  </span>
                 )}
               </div>
             );

@@ -6,6 +6,7 @@ import { TasksCard }          from "@/components/dashboard/tasks-card";
 import { NextTrainingCard }   from "@/components/dashboard/next-training-card";
 import { ClubNoticesCard }    from "@/components/dashboard/club-notices-card";
 import { PlayerSeasonCard }   from "@/components/dashboard/player-season-card";
+import { BirthdayBanner }     from "@/components/birthday/birthday-banner";
 
 // ── Types ─────────────────────────────────────────────────────
 interface DashboardData {
@@ -321,6 +322,7 @@ export function OverviewClient({ seasonId }: { seasonId: string | null }) {
   return (
     <div className="space-y-6">
       <DashboardHeader {...headerProps} />
+      <BirthdayBanner isAdmin={!data.isPlayer} />
       {view === "jogador" && data.isPlayer ? <PlayerView data={data} /> : <TrainerView data={data} />}
     </div>
   );

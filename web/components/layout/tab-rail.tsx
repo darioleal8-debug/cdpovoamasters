@@ -17,6 +17,7 @@ import {
   History,
   Landmark,
   Shield,
+  FolderOpen,
 } from "lucide-react";
 import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
 import { useClubSettings } from "@/lib/club-context";
@@ -42,6 +43,7 @@ const SECONDARY: RailItem[] = [
   { label: "Temporadas", href: "/temporadas",    icon: CalendarRange },
   { label: "Contas",     href: "/gestao-contas", icon: UserCog },
   { label: "Stats",      href: "/estatisticas",  icon: BarChart3 },
+  { label: "Docs",       href: "/documentos",    icon: FolderOpen },
   { label: "Histórico",  href: "/historico",     icon: History },
   { label: "Financeiro", href: "/financeiro",    icon: Landmark },
   { label: "Liga",       href: "/liga-inatel",   icon: Shield },

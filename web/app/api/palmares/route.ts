@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   const { epoca, competicao, colocacao } = body;
   if (!epoca || !competicao || !colocacao) return fail("Campos obrigatórios: epoca, competicao, colocacao");
-  if (!["Liga", "Taça"].includes(competicao)) return fail("competicao deve ser Liga ou Taça");
+  if (!["Liga", "Taça", "Supertaça"].includes(competicao)) return fail("competicao deve ser Liga, Taça ou Supertaça");
   if (![1, 2, 3].includes(colocacao))         return fail("colocacao deve ser 1, 2 ou 3");
 
   const { data, error } = await supabase

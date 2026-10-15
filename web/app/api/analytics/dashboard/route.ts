@@ -66,14 +66,21 @@ export async function GET(req: NextRequest) {
       .gte("created_at", new Date(Date.now() - 365 * 86_400_000).toISOString()),
   ]);
 
-  // ── 2. Últimos logins via Auth Admin API ──────────────────────
+  // ── 2. Últimos logins via Auth Admin API (com paginação) ──────
   let authUsers: Array<{ id: string; last_sign_in_at: string | null }> = [];
   try {
-    const { data } = await admin.auth.admin.listUsers({ perPage: 500 });
-    authUsers = (data?.users ?? []).map((u) => ({
-      id: u.id,
-      last_sign_in_at: u.last_sign_in_at ?? null,
-    }));
+    let page = 1;
+    while (true) {
+      const { data } = await admin.auth.admin.listUsers({ perPage: 200, page });
+      const batch = data?.users ?? [];
+      authUsers.push(...batch.map((u) => ({
+        id: u.id,
+        last_sign_in_at: u.last_sign_in_at ?? null,
+      })));
+      if (batch.length < 200) break;
+      page++;
+      if (page > 25) break; // safety cap
+    }
   } catch {
     // non-critical
   }
@@ -146,16 +153,23 @@ export async function GET(req: NextRequest) {
     if (!cur || l.created_at > cur) userLastSeen.set(l.user_id, l.created_at);
   }
 
-  const usersList = (users ?? []).map((u) => ({
-    id:             u.id as string,
-    name:           u.name as string,
-    email:          u.email as string,
-    role:           u.role as string,
-    active:         u.active as boolean,
-    events_period:  userEventMap.get(u.id as string) ?? 0,
-    last_seen:      userLastSeen.get(u.id as string) ?? null,
-    last_login:     lastLoginMap.get(u.id as string) ?? null,
-  })).sort((a, b) => b.events_period - a.events_period);
+  const usersList = (users ?? []).map((u) => {
+    const uid        = u.id as string;
+    const lastSeen   = userLastSeen.get(uid) ?? null;
+    const lastLogin  = lastLoginMap.get(uid) ?? null;
+    // Se não há actividade tracked mas há login recente, usa o login como "último acesso"
+    const lastSeenFallback = lastSeen ?? lastLogin;
+    return {
+      id:            uid,
+      name:          u.name as string,
+      email:         u.email as string,
+      role:          u.role as string,
+      active:        u.active as boolean,
+      events_period: userEventMap.get(uid) ?? 0,
+      last_seen:     lastSeenFallback,
+      last_login:    lastLogin,
+    };
+  }).sort((a, b) => b.events_period - a.events_period);
 
   return NextResponse.json({
     period_days: days,

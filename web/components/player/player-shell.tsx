@@ -2,6 +2,7 @@
 
 import { PlayerSidebar } from "./player-sidebar";
 import { PlayerBottomNav } from "./player-bottom-nav";
+import { useActivityTracker } from "@/hooks/use-activity-tracker";
 
 interface Props {
   playerName: string;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function PlayerShell({ playerName, userRole, children }: Props) {
+  useActivityTracker();
   return (
     <div
       className="flex overflow-hidden"

@@ -19,6 +19,8 @@ import {
   Landmark,
   ActivitySquare,
   Shield,
+  Newspaper,
+  FolderOpen,
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -40,13 +42,15 @@ const managementItems = [
   { label: "Treinos",          href: "/treinos",       icon: Dumbbell },
   { label: "Pagamentos",       href: "/pagamentos",    icon: CreditCard },
   { label: "Estatísticas",     href: "/estatisticas",  icon: BarChart3 },
+  { label: "Documentos",       href: "/documentos",    icon: FolderOpen },
   { label: "Histórico",        href: "/historico",     icon: History   },
   { label: "Palmarés",         href: "/palmares",      icon: Trophy    },
   { label: "Liga INATEL",      href: "/liga-inatel",   icon: Shield    },
 ];
 
 const adminOnlyItems = [
-  { label: "Utilização",       href: "/utilizacao",   icon: ActivitySquare },
+  { label: "Utilização",       href: "/utilizacao",    icon: ActivitySquare },
+  { label: "Notícias",         href: "/noticias-admin", icon: Newspaper },
 ];
 
 const playerAreaItems = [
@@ -57,6 +61,7 @@ const playerAreaItems = [
 const seccionistaItems = [
   { label: "Jogos",        href: "/jogos",        icon: Calendar },
   { label: "Estatísticas", href: "/estatisticas", icon: BarChart3 },
+  { label: "Documentos",   href: "/documentos",   icon: FolderOpen },
   { label: "Palmarés",     href: "/palmares",     icon: Trophy    },
   { label: "Liga INATEL",  href: "/liga-inatel",  icon: Shield    },
 ];
