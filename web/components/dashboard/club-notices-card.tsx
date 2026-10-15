@@ -45,7 +45,7 @@ export function ClubNoticesCard({ notices, loading }: Props) {
               border: `1px solid ${n.pinned ? "rgba(249,115,22,.18)" : "var(--line,#E4E7EE)"}` }}>
             <div className="flex items-start justify-between gap-2">
               <p className="text-[13px] font-semibold leading-snug" style={{ color: "var(--text,#0F1729)" }}>
-                {n.pinned && <span className="mr-1.5 text-[10px] uppercase tracking-label font-bold" style={{ color: "var(--action,#F97316)" }}>Fixado ·</span>}
+                {n.pinned && <span className="mr-1.5 text-[11px] uppercase tracking-label font-bold" style={{ color: "var(--action,#F97316)" }}>Fixado ·</span>}
                 {n.title}
               </p>
               <span className="shrink-0 text-[11px] whitespace-nowrap" style={{ color: "var(--muted-text,#5A6478)" }}>

@@ -29,7 +29,7 @@ function initials(name: string): string {
 // ── Section label ─────────────────────────────────────────────
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="px-4 pt-5 pb-2 text-[10px] font-bold uppercase tracking-widest" style={{ color: "rgba(169,180,199,.45)" }}>
+    <p className="px-4 pt-5 pb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: "rgba(169,180,199,.45)" }}>
       {children}
     </p>
   );
@@ -60,7 +60,7 @@ function ChannelRow({ thread, active, onClick }: { thread: ChannelThread; active
             {thread.name}
           </p>
           {thread.last_message && (
-            <span className="shrink-0 text-[10px]" style={{ color: "rgba(169,180,199,.5)" }}>
+            <span className="shrink-0 text-[11px]" style={{ color: "rgba(169,180,199,.5)" }}>
               {fmtRelTime(thread.last_message.created_at)}
             </span>
           )}
@@ -68,7 +68,7 @@ function ChannelRow({ thread, active, onClick }: { thread: ChannelThread; active
         <p className="text-[11px] truncate" style={{ color: "rgba(169,180,199,.6)" }}>{preview || "Sem mensagens"}</p>
       </div>
       {thread.unread_count > 0 && (
-        <span className="h-5 min-w-5 flex items-center justify-center rounded-full text-[10px] font-bold px-1 shrink-0"
+        <span className="h-5 min-w-5 flex items-center justify-center rounded-full text-[11px] font-bold px-1 shrink-0"
           style={{ background: "var(--action,#F97316)", color: "#fff" }}>
           {thread.unread_count}
         </span>
@@ -97,7 +97,7 @@ function DirectRow({ thread, active, onClick }: { thread: DirectThread; active: 
         <div className="flex items-center justify-between gap-1">
           <p className="text-[13px] font-semibold truncate" style={{ color: "#E6EBF3" }}>{thread.name}</p>
           {thread.last_message && (
-            <span className="shrink-0 text-[10px]" style={{ color: "rgba(169,180,199,.5)" }}>
+            <span className="shrink-0 text-[11px]" style={{ color: "rgba(169,180,199,.5)" }}>
               {fmtRelTime(thread.last_message.created_at)}
             </span>
           )}
@@ -107,7 +107,7 @@ function DirectRow({ thread, active, onClick }: { thread: DirectThread; active: 
         </p>
       </div>
       {thread.unread_count > 0 && (
-        <span className="h-5 min-w-5 flex items-center justify-center rounded-full text-[10px] font-bold px-1 shrink-0"
+        <span className="h-5 min-w-5 flex items-center justify-center rounded-full text-[11px] font-bold px-1 shrink-0"
           style={{ background: "var(--action,#F97316)", color: "#fff" }}>
           {thread.unread_count}
         </span>
@@ -293,15 +293,29 @@ export function ThreadList({ currentUser, activeChatId, onSelect, threads, loadi
             {!query && thisWeek.length === 0 && upcoming.length === 0 && permanent.length === 0 && directs.length === 0 && !loading && (
               <div className="flex flex-col items-center gap-3 py-12 px-4 text-center">
                 <p className="font-condensed font-bold text-lg uppercase" style={{ color: "rgba(169,180,199,.4)" }}>
-                  Sem jogos ou treinos agendados
+                  Sem eventos agendados
                 </p>
-                <p className="text-[12px]" style={{ color: "rgba(169,180,199,.35)" }}>
-                  Agenda um evento para criar o fio automaticamente.
-                </p>
-                <a href="/jogos" className="text-[12px] font-semibold px-3 py-1.5 rounded-xl"
-                  style={{ background: "rgba(249,115,22,.1)", color: "var(--action,#F97316)" }}>
-                  Ir para Jogos
-                </a>
+                {currentUser?.role === "jogador" ? (
+                  <>
+                    <p className="text-[12px]" style={{ color: "rgba(169,180,199,.35)" }}>
+                      Os fios de treino e jogo aparecem aqui automaticamente.
+                    </p>
+                    <a href="/player/meus-jogos" className="text-[12px] font-semibold px-3 py-1.5 rounded-xl"
+                      style={{ background: "rgba(249,115,22,.1)", color: "var(--action,#F97316)" }}>
+                      Ver os meus jogos
+                    </a>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[12px]" style={{ color: "rgba(169,180,199,.35)" }}>
+                      Agenda um evento para criar o fio automaticamente.
+                    </p>
+                    <a href="/jogos" className="text-[12px] font-semibold px-3 py-1.5 rounded-xl"
+                      style={{ background: "rgba(249,115,22,.1)", color: "var(--action,#F97316)" }}>
+                      Ir para Jogos
+                    </a>
+                  </>
+                )}
               </div>
             )}
 

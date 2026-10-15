@@ -5,15 +5,17 @@ import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useGameCallups } from "@/hooks/use-game-callups";
 import { useRoster } from "@/hooks/use-roster";
+import { useGameAvailability } from "@/hooks/use-game-availability";
 import { toast } from "@/components/ui/toaster";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, CheckCircle2, Brain, X } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Brain, X, Check, HelpCircle } from "lucide-react";
 import { formatDateShort } from "@/lib/utils";
+import { RSVP_REASON_LABELS } from "@/types/database";
 import type { Event } from "@/types/database";
 
 // ─── Types ────────────────────────────────────────────────
 
-type Filter = "todos" | "treinaram" | "topaia" | "fora";
+type Filter = "todos" | "treinaram" | "topaia" | "fora" | "disponiveis" | "indisponiveis" | "sem-resposta";
 type Origin = "vazio" | "manual" | "ultimo-treino" | "ultimos-30" | "avaliacao-ia";
 
 interface DSPlayer { player_id: string; name: string; score?: number; reason: string; }
@@ -40,11 +42,21 @@ const ORIGIN_TEXT: Record<Origin, string> = {
 };
 
 const FILTER_LABELS: Record<Filter, string> = {
-  todos:    "Todos",
-  treinaram: "Treinaram",
-  topaia:   "Top 8 IA",
-  fora:     "Fora",
+  todos:          "Todos",
+  treinaram:      "Treinaram",
+  topaia:         "Top 8 IA",
+  fora:           "Fora",
+  disponiveis:    "Disponíveis",
+  indisponiveis:  "Indisponíveis",
+  "sem-resposta": "Sem resposta",
 };
+
+// 0 = disponível → topo; 1 = sem resposta; 2 = indisponível → fundo
+function availOrder(status: string | null | undefined): number {
+  if (status === "available")   return 0;
+  if (status === "unavailable") return 2;
+  return 1;
+}
 
 // ─── Page ─────────────────────────────────────────────────
 
@@ -66,6 +78,7 @@ export default function ConvocatoriaPage() {
   const [origin,       setOrigin]      = useState<Origin>("vazio");
   const [selectedPid,  setSelectedPid] = useState<string | null>(null);
   const [draggingPid,  setDraggingPid] = useState<string | null>(null);
+  const [confirmUnavailablePid, setConfirmUnavailablePid] = useState<string | null>(null);
 
   const [autoLoading,      setAutoLoading]      = useState(false);
   const [deepseekLoading,  setDeepseekLoading]  = useState(false);
@@ -76,6 +89,10 @@ export default function ConvocatoriaPage() {
     useGameCallups(params.eventId);
   const { players, loading: rosterLoading } =
     useRoster(event?.season_id ?? null);
+  const {
+    byPlayerId, loading: availLoading,
+    availableCount, unavailableCount, pendingCount,
+  } = useGameAvailability(params.eventId);
 
   // ── Fetch event ──────────────────────────────────────────
   useEffect(() => {
@@ -149,34 +166,55 @@ export default function ConvocatoriaPage() {
   // ── Derived data ─────────────────────────────────────────
   // game_callups.player_id === players.id === RosterEntry.player_id
   const calledUpIds = new Set(callups.map((c) => c.player_id));
-  const slots = Array.from({ length: 12 }, (_, i) => callups[i] ?? null);
+
+  // Liga INATEL → strict 12-player limit; all other game types → no limit.
+  const isLigaInatel = !!event?.competition?.toLowerCase().includes("inatel");
+  const maxCallups: number | null = isLigaInatel ? 12 : null;
+
+  // Rail slots: 12 fixed slots for INATEL; all filled + 1 empty "add" slot otherwise.
+  const slots: (typeof callups[0] | null)[] = maxCallups !== null
+    ? Array.from({ length: maxCallups }, (_, i) => callups[i] ?? null)
+    : [...callups, null];
 
   // Only players with a profile this season and a jersey number
   const eligible = players.filter((p) => p.player_id !== null && p.number !== null);
 
-  // Sorted by AI score descending
-  const sorted = [...eligible].sort(
-    (a, b) => (aiScores.get(b.player_id!) ?? 0) - (aiScores.get(a.player_id!) ?? 0)
-  );
+  // Ordenação: disponíveis → sem resposta → indisponíveis; dentro de cada grupo por IA
+  const sorted = [...eligible].sort((a, b) => {
+    const oa = availOrder(byPlayerId.get(a.player_id!)?.status);
+    const ob = availOrder(byPlayerId.get(b.player_id!)?.status);
+    if (oa !== ob) return oa - ob;
+    return (aiScores.get(b.player_id!) ?? 0) - (aiScores.get(a.player_id!) ?? 0);
+  });
 
   function visiblePlayers() {
     switch (filter) {
-      case "treinaram": return sorted.filter((p) => lastTrainingIds.has(p.player_id!));
-      case "topaia":    return sorted.filter((p) => aiScores.has(p.player_id!)).slice(0, 8);
-      case "fora":      return sorted.filter((p) => !calledUpIds.has(p.player_id!));
-      default:          return sorted;
+      case "treinaram":     return sorted.filter((p) => lastTrainingIds.has(p.player_id!));
+      case "topaia":        return sorted.filter((p) => aiScores.has(p.player_id!)).slice(0, 8);
+      case "fora":          return sorted.filter((p) => !calledUpIds.has(p.player_id!));
+      case "disponiveis":   return sorted.filter((p) => byPlayerId.get(p.player_id!)?.status === "available");
+      case "indisponiveis": return sorted.filter((p) => byPlayerId.get(p.player_id!)?.status === "unavailable");
+      case "sem-resposta":  return sorted.filter((p) => {
+        const row = byPlayerId.get(p.player_id!);
+        return !row || !row.status;
+      });
+      default:              return sorted;
     }
   }
 
   // ── Assign (add to callup) ────────────────────────────────
-  async function assign(pid: string) {
+  async function assign(pid: string, skipAvailCheck = false) {
     if (latePlayerIds.has(pid)) {
       toast({ title: "Quotas em atraso", description: "Regulariza as quotas para convocar este jogador.", variant: "destructive" });
       return;
     }
     if (calledUpIds.has(pid)) return;
-    if (callups.length >= 12) {
-      toast({ title: "Máximo de 12 convocados atingido", variant: "destructive" });
+    if (maxCallups !== null && callups.length >= maxCallups) {
+      toast({ title: `Máximo de ${maxCallups} convocados atingido`, variant: "destructive" });
+      return;
+    }
+    if (!skipAvailCheck && byPlayerId.get(pid)?.status === "unavailable") {
+      setConfirmUnavailablePid(pid);
       return;
     }
     if (await addCallup(pid)) {
@@ -221,10 +259,11 @@ export default function ConvocatoriaPage() {
       if (!att?.length) { toast({ title: "Nenhuma presença no último treino", variant: "destructive" }); return; }
 
       const presentSet = new Set((att as { player_id: string }[]).map((a) => a.player_id));
-      const toAdd = sorted
-        .filter((p) => presentSet.has(p.player_id!) && !calledUpIds.has(p.player_id!) && !latePlayerIds.has(p.player_id!))
-        .slice(0, 12 - callups.length)
-        .map((p) => p.player_id!);
+      const eligible30 = sorted
+        .filter((p) => presentSet.has(p.player_id!) && !calledUpIds.has(p.player_id!) && !latePlayerIds.has(p.player_id!));
+      const toAdd = maxCallups !== null
+        ? eligible30.slice(0, maxCallups - callups.length).map((p) => p.player_id!)
+        : eligible30.map((p) => p.player_id!);
 
       if (!toAdd.length) { toast({ title: "Nenhum disponível para convocar" }); return; }
       let added = 0;
@@ -257,11 +296,11 @@ export default function ConvocatoriaPage() {
       for (const a of att as { player_id: string }[])
         counts[a.player_id] = (counts[a.player_id] ?? 0) + 1;
 
-      const toAdd = Object.entries(counts)
+      const sorted30 = Object.entries(counts)
         .sort((a, b) => b[1] - a[1])
         .map(([pid]) => pid)
-        .filter((pid) => !calledUpIds.has(pid) && !latePlayerIds.has(pid))
-        .slice(0, 12 - callups.length);
+        .filter((pid) => !calledUpIds.has(pid) && !latePlayerIds.has(pid));
+      const toAdd = maxCallups !== null ? sorted30.slice(0, maxCallups - callups.length) : sorted30;
 
       if (!toAdd.length) { toast({ title: "Nenhum disponível para convocar" }); return; }
       let added = 0;
@@ -299,10 +338,10 @@ export default function ConvocatoriaPage() {
 
   async function applyDsRecommendation() {
     if (!dsResult) return;
-    const toAdd = dsResult.evaluation.recommended_players
+    const dsFiltered = dsResult.evaluation.recommended_players
       .map((p) => p.player_id)
-      .filter((pid) => !calledUpIds.has(pid) && !latePlayerIds.has(pid))
-      .slice(0, 12 - callups.length);
+      .filter((pid) => !calledUpIds.has(pid) && !latePlayerIds.has(pid));
+    const toAdd = maxCallups !== null ? dsFiltered.slice(0, maxCallups - callups.length) : dsFiltered;
     let added = 0;
     for (const pid of toAdd) { if (await addCallup(pid)) added++; }
     if (added > 0) setOrigin("avaliacao-ia");
@@ -359,7 +398,7 @@ export default function ConvocatoriaPage() {
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={autoLastTraining}
-            disabled={autoLoading || isLoading || callups.length >= 12}
+            disabled={autoLoading || isLoading || (maxCallups !== null && callups.length >= maxCallups)}
             className="text-xs font-semibold rounded-lg px-3 py-1.5 transition-all active:scale-95 disabled:opacity-40 whitespace-nowrap"
             style={{ background: "#15803d", color: "#fff" }}
           >
@@ -367,7 +406,7 @@ export default function ConvocatoriaPage() {
           </button>
           <button
             onClick={auto30Days}
-            disabled={autoLoading || isLoading || callups.length >= 12}
+            disabled={autoLoading || isLoading || (maxCallups !== null && callups.length >= maxCallups)}
             className="text-xs font-semibold rounded-lg px-3 py-1.5 transition-all active:scale-95 disabled:opacity-40 whitespace-nowrap"
             style={{ background: "#7c3aed", color: "#fff" }}
           >
@@ -384,16 +423,16 @@ export default function ConvocatoriaPage() {
           </button>
         </div>
 
-        {/* N/12 pill */}
+        {/* N/max pill */}
         <div
           className="shrink-0 flex items-center gap-1 text-sm font-bold px-3 py-1 rounded-full"
           style={{
-            background: callups.length >= 12 ? "rgba(74,222,128,0.12)" : "#182238",
-            color:      callups.length >= 12 ? "#4ade80" : "#eef3fb",
+            background: (maxCallups !== null && callups.length >= maxCallups) ? "rgba(74,222,128,0.12)" : "#182238",
+            color:      (maxCallups !== null && callups.length >= maxCallups) ? "#4ade80" : "#eef3fb",
           }}
         >
-          {callups.length}/12
-          {callups.length >= 12 && <CheckCircle2 className="h-3.5 w-3.5" />}
+          {callups.length}{maxCallups !== null ? `/${maxCallups}` : " conv."}
+          {maxCallups !== null && callups.length >= maxCallups && <CheckCircle2 className="h-3.5 w-3.5" />}
         </div>
       </header>
 
@@ -404,7 +443,7 @@ export default function ConvocatoriaPage() {
         onDragOver={onRailDragOver}
         onDrop={onRailDrop}
       >
-        {/* CONVOCADOS label + origin */}
+        {/* CONVOCADOS label + origin + resumo disponibilidade */}
         <div className="flex items-baseline gap-2 mb-2">
           <span
             className="text-[0.6rem] font-semibold uppercase tracking-widest"
@@ -415,71 +454,117 @@ export default function ConvocatoriaPage() {
           <span className="text-[0.58rem]" style={{ color: "#33405e" }}>
             {ORIGIN_TEXT[origin]}
           </span>
+          {!availLoading && (availableCount + unavailableCount + pendingCount) > 0 && (
+            <span className="ml-auto text-[0.58rem] font-medium tabular-nums" style={{ color: "#4f617a" }}>
+              <span style={{ color: "#4ade80" }}>{availableCount} disp.</span>
+              {" · "}
+              <span style={{ color: "#f87171" }}>{unavailableCount} indisp.</span>
+              {" · "}
+              <span>{pendingCount} s/resp.</span>
+            </span>
+          )}
         </div>
 
-        {/* 12 slots — REGRA 1: horizontal grid, repeat(12,1fr), gap 8px, 58px height */}
+        {/* Slots rail — 12-column grid for Liga INATEL; scrollable flex row otherwise */}
         <div
-          style={{
+          style={maxCallups !== null ? {
             display: "grid",
             gridTemplateColumns: "repeat(12, 1fr)",
             gap: 8,
+          } : {
+            display: "flex",
+            flexWrap: "nowrap",
+            gap: 8,
+            overflowX: "auto",
+            paddingBottom: 4,
           }}
         >
-          {slots.map((callup, i) => (
-            <div
-              key={i}
-              onClick={() => callup && removeCallup(callup.id)}
-              style={{
-                height: 58,
-                borderRadius: 9,
-                border: callup ? "1.5px solid #2f4670" : "1.5px dashed #26314a",
-                background: callup ? "#1b2b46" : "#141c2e",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: callup ? "pointer" : "default",
-                overflow: "hidden",
-                padding: "3px 4px",
-                gap: 2,
-                transition: "border-color 0.15s",
-              }}
-            >
-              {callup ? (
-                <>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", lineHeight: 1 }}>
-                    {callup.player.number ?? "?"}
+          {slots.map((callup, i) => {
+            const slotAvail = callup ? byPlayerId.get(callup.player_id) : undefined;
+            const dotColor =
+              slotAvail?.status === "available"   ? "#4ade80" :
+              slotAvail?.status === "unavailable" ? "#f87171" :
+              callup && !availLoading             ? "#33405e" : undefined;
+            const dotTitle =
+              slotAvail?.status === "available"   ? "Disponível" :
+              slotAvail?.status === "unavailable" ? "Indisponível" :
+              callup                              ? "Sem resposta" : undefined;
+            return (
+              <div
+                key={i}
+                onClick={() => callup && removeCallup(callup.id)}
+                style={{
+                  height: 58,
+                  width: maxCallups === null ? 58 : undefined,
+                  minWidth: maxCallups === null ? 58 : undefined,
+                  flexShrink: maxCallups === null ? 0 : undefined,
+                  borderRadius: 9,
+                  border: callup ? "1.5px solid #2f4670" : "1.5px dashed #26314a",
+                  background: callup ? "#1b2b46" : "#141c2e",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: callup ? "pointer" : "default",
+                  overflow: "hidden",
+                  padding: "3px 4px",
+                  gap: 2,
+                  transition: "border-color 0.15s",
+                  position: "relative",
+                }}
+              >
+                {callup ? (
+                  <>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", lineHeight: 1 }}>
+                      {callup.player.number ?? "?"}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        color: "#a8b6d1",
+                        lineHeight: 1,
+                        maxWidth: "100%",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        textAlign: "center",
+                      }}
+                    >
+                      {callup.player.name.split(" ")[0]}
+                    </span>
+                    {dotColor && (
+                      <div
+                        title={dotTitle}
+                        style={{
+                          position: "absolute",
+                          bottom: 5,
+                          right: 5,
+                          width: 6,
+                          height: 6,
+                          borderRadius: "50%",
+                          background: dotColor,
+                          flexShrink: 0,
+                        }}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#33405e" }}>
+                    {maxCallups !== null ? i + 1 : "+"}
                   </span>
-                  <span
-                    style={{
-                      fontSize: 10,
-                      color: "#a8b6d1",
-                      lineHeight: 1,
-                      maxWidth: "100%",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      textAlign: "center",
-                    }}
-                  >
-                    {callup.player.name.split(" ")[0]}
-                  </span>
-                </>
-              ) : (
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#33405e" }}>{i + 1}</span>
-              )}
-            </div>
-          ))}
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
       {/* ════ FILTER CHIPS ══════════════════════════════════ */}
-      {/* REGRA 4: Todos/Treinaram/Top 8 IA/Fora; active=#f97316 text=#0a1020 */}
       <div
-        className="shrink-0 flex items-center gap-2 px-5 py-2"
-        style={{ borderBottom: "1px solid #1a2540" }}
+        className="shrink-0 flex items-center gap-2 px-5 py-2 overflow-x-auto"
+        style={{ borderBottom: "1px solid #1a2540", scrollbarWidth: "none" }}
       >
-        {(["todos", "treinaram", "topaia", "fora"] as Filter[]).map((f) => {
+        {(["todos", "treinaram", "topaia", "fora", "disponiveis", "indisponiveis", "sem-resposta"] as Filter[]).map((f) => {
           const active = filter === f;
           return (
             <button
@@ -625,7 +710,6 @@ export default function ConvocatoriaPage() {
                   </div>
 
                   {/* ── ELEMENT 4: tags flex-wrap ── */}
-                  {/* REGRA 2: último treino condicional; N presenças sempre */}
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                     {inLastTraining && (
                       <span
@@ -673,6 +757,91 @@ export default function ConvocatoriaPage() {
                         BLOQ.
                       </span>
                     )}
+
+                    {/* ── Badge de disponibilidade ── */}
+                    {availLoading ? (
+                      <span
+                        className="animate-pulse"
+                        style={{
+                          display: "inline-block",
+                          width: 52,
+                          height: 14,
+                          background: "#232e49",
+                          borderRadius: 4,
+                        }}
+                      />
+                    ) : (() => {
+                      const avail = byPlayerId.get(pid);
+                      if (!avail || !avail.status) {
+                        return (
+                          <span
+                            style={{
+                              fontSize: "0.58rem", fontWeight: 600,
+                              color: "#4f617a",
+                              background: "#0e1626",
+                              border: "1px solid #1e2e45",
+                              borderRadius: 4,
+                              padding: "1px 6px",
+                              lineHeight: 1.6,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 3,
+                            }}
+                          >
+                            <HelpCircle style={{ width: 8, height: 8, flexShrink: 0 }} />
+                            Sem resposta
+                          </span>
+                        );
+                      }
+                      if (avail.status === "available") {
+                        return (
+                          <span
+                            style={{
+                              fontSize: "0.58rem", fontWeight: 700,
+                              color: "#4ade80",
+                              background: "#0d2918",
+                              border: "1px solid #1d5732",
+                              borderRadius: 4,
+                              padding: "1px 6px",
+                              lineHeight: 1.6,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 3,
+                            }}
+                          >
+                            <Check style={{ width: 8, height: 8, flexShrink: 0 }} />
+                            Disponível
+                          </span>
+                        );
+                      }
+                      // unavailable
+                      const reasonLabel = avail.reason_code === "outro" && avail.reason_text
+                        ? avail.reason_text.slice(0, 20)
+                        : avail.reason_code
+                        ? RSVP_REASON_LABELS[avail.reason_code as keyof typeof RSVP_REASON_LABELS]
+                        : null;
+                      return (
+                        <span
+                          title={avail.reason_text ?? undefined}
+                          style={{
+                            fontSize: "0.58rem", fontWeight: 700,
+                            color: "#f87171",
+                            background: "#2a0b0b",
+                            border: "1px solid #7f1d1d",
+                            borderRadius: 4,
+                            padding: "1px 6px",
+                            lineHeight: 1.6,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 3,
+                            maxWidth: "100%",
+                          }}
+                        >
+                          <X style={{ width: 8, height: 8, flexShrink: 0 }} />
+                          Indisp.{reasonLabel ? ` · ${reasonLabel}` : ""}
+                        </span>
+                      );
+                    })()}
                   </div>
 
                   {/* ── ELEMENT 5: barra 4px no fundo — REGRA 2 ── */}
@@ -701,6 +870,57 @@ export default function ConvocatoriaPage() {
           </div>
         )}
       </div>
+
+      {/* ════ CONFIRMAÇÃO: JOGADOR INDISPONÍVEL ═════════════ */}
+      {confirmUnavailablePid && (() => {
+        const avail = byPlayerId.get(confirmUnavailablePid);
+        const reasonLabel = avail?.reason_code === "outro" && avail.reason_text
+          ? avail.reason_text
+          : avail?.reason_code
+          ? RSVP_REASON_LABELS[avail.reason_code as keyof typeof RSVP_REASON_LABELS]
+          : null;
+        const playerName = sorted.find((p) => p.player_id === confirmUnavailablePid)?.name ?? "";
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+            style={{ backgroundColor: "rgba(0,0,0,0.8)" }}
+            onClick={(e) => { if (e.target === e.currentTarget) setConfirmUnavailablePid(null); }}
+          >
+            <div
+              className="w-full max-w-sm rounded-2xl p-5 space-y-3"
+              style={{ background: "#0f1929", border: "1px solid #3a1a1a" }}
+            >
+              <div className="flex items-center gap-2">
+                <X className="h-4 w-4 shrink-0" style={{ color: "#f87171" }} />
+                <h3 className="text-sm font-bold" style={{ color: "#f87171" }}>
+                  Jogador indisponível
+                </h3>
+              </div>
+              <p className="text-xs leading-relaxed" style={{ color: "#9fadc7" }}>
+                <strong style={{ color: "#eef3fb" }}>{playerName}</strong> indicou que não está disponível
+                {reasonLabel ? <> — <em>{reasonLabel}</em></> : ""}.
+                Queres convocar mesmo assim?
+              </p>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => { assign(confirmUnavailablePid, true); setConfirmUnavailablePid(null); }}
+                  className="flex-1 text-xs font-semibold rounded-xl py-2.5 transition-all active:scale-95"
+                  style={{ background: "#c2410c", color: "#fff" }}
+                >
+                  Convocar mesmo assim
+                </button>
+                <button
+                  onClick={() => setConfirmUnavailablePid(null)}
+                  className="flex-1 text-xs font-semibold rounded-xl py-2.5 transition-all"
+                  style={{ border: "1px solid #28344f", color: "#6f7d99" }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ════ DEEPSEEK MODAL ════════════════════════════════ */}
       {showDsModal && dsResult && (

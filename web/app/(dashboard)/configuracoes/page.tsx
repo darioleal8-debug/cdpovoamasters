@@ -14,9 +14,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toaster";
 import type { Season, SeasonFormData } from "@/types/database";
+import { checkPwnedPassword, PWNED_ERROR_MESSAGE } from "@/lib/pwned-password";
 import { LogoUpload }           from "@/components/settings/logo-upload";
 import { TeamKitsSettings }     from "@/components/settings/team-kits-settings";
 import { PhotoTemplateEditor }  from "@/components/admin/photo-template-editor";
+import { PublicPageSettings }   from "@/components/settings/public-page-settings";
 
 const EMPTY_SEASON: SeasonFormData = { name: "", year: "", start_date: "", end_date: "" };
 
@@ -57,6 +59,14 @@ export default function ConfiguracoesPage() {
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
     setSavingPassword(true);
+
+    const pwnedResult = await checkPwnedPassword(newPassword);
+    if (pwnedResult.pwned) {
+      toast({ title: "Password comprometida", description: PWNED_ERROR_MESSAGE, variant: "destructive" });
+      setSavingPassword(false);
+      return;
+    }
+
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     setSavingPassword(false);
     if (error) {
@@ -109,6 +119,21 @@ export default function ConfiguracoesPage() {
         <h1 className="text-2xl font-bold tracking-tight">Configurações</h1>
         <p className="text-muted-foreground">Gerir perfil, conta e temporadas</p>
       </div>
+
+      {/* ── Página Pública ─────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Página Pública da Equipa</CardTitle>
+          <CardDescription>
+            Partilha o plantel, calendário e resultados com adeptos e familiares. Não requer login.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PublicPageSettings />
+        </CardContent>
+      </Card>
+
+      <Separator />
 
       {/* ── Logotipo do Clube ──────────────────────────────── */}
       <Card>
@@ -281,7 +306,7 @@ export default function ConfiguracoesPage() {
       <Card>
         <CardHeader>
           <CardTitle>Alterar Password</CardTitle>
-          <CardDescription>Escolhe uma password forte com pelo menos 8 caracteres.</CardDescription>
+          <CardDescription>Escolhe uma password forte com pelo menos 10 caracteres.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
@@ -290,14 +315,14 @@ export default function ConfiguracoesPage() {
               <Input
                 id="new-password"
                 type="password"
-                minLength={8}
+                minLength={10}
                 required
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="Mínimo 10 caracteres"
               />
             </div>
-            <Button type="submit" disabled={savingPassword || newPassword.length < 8}>
+            <Button type="submit" disabled={savingPassword || newPassword.length < 10}>
               {savingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Alterar Password
             </Button>

@@ -55,7 +55,7 @@ function PlayerRow({ player }: { player: CallupPlayer }) {
         />
       ) : (
         <div
-          className="h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+          className="h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
           style={{ background: "rgba(169,180,199,.12)", color: "#E6EBF3" }}
         >
           {initials(player.name)}
@@ -64,7 +64,7 @@ function PlayerRow({ player }: { player: CallupPlayer }) {
       <div className="min-w-0 flex-1">
         <p className="text-[13px] font-medium truncate" style={{ color: "#E6EBF3" }}>{player.name}</p>
         {player.position && (
-          <p className="text-[10px] truncate" style={{ color: "rgba(169,180,199,.5)" }}>{player.position}</p>
+          <p className="text-[11px] truncate" style={{ color: "rgba(169,180,199,.5)" }}>{player.position}</p>
         )}
       </div>
       <StatusIcon status={player.status} />
@@ -87,7 +87,7 @@ function CallupMetrics({ confirmed, doubt, unavailable, pending }: { confirmed: 
       ].map(({ label, count, color, bg }) => (
         <div key={label} className="rounded-xl p-2.5 text-center" style={{ background: bg }}>
           <p className="text-[22px] font-bold font-condensed" style={{ color }}>{count}</p>
-          <p className="text-[10px] font-medium" style={{ color: "rgba(169,180,199,.7)" }}>{label}</p>
+          <p className="text-[11px] font-medium" style={{ color: "rgba(169,180,199,.7)" }}>{label}</p>
         </div>
       ))}
     </div>
@@ -211,7 +211,7 @@ export function EventPanel({ thread, onClose }: Props) {
                   if (group.length === 0) return null;
                   return (
                     <div key={status} className="mb-3">
-                      <p className="text-[10px] font-bold uppercase tracking-widest mb-1"
+                      <p className="text-[11px] font-bold uppercase tracking-widest mb-1"
                         style={{ color: "rgba(169,180,199,.4)" }}>
                         {STATUS_LABEL[status]} ({group.length})
                       </p>
@@ -225,7 +225,7 @@ export function EventPanel({ thread, onClose }: Props) {
             {/* Treino: lista de presentes */}
             {!isGame && players.length > 0 && (
               <div className="mb-3">
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-1"
+                <p className="text-[11px] font-bold uppercase tracking-widest mb-1"
                   style={{ color: "rgba(169,180,199,.4)" }}>
                   Jogadores ({players.length})
                 </p>

@@ -5,6 +5,7 @@ import { useRouter }  from "next/navigation";
 import { Eye, EyeOff, KeyRound, Loader2, CheckCircle2 } from "lucide-react";
 import { Input }  from "@/components/ui/input";
 import { Label }  from "@/components/ui/label";
+import { checkPwnedPassword, PWNED_ERROR_MESSAGE } from "@/lib/pwned-password";
 
 const FOCUS_RING = "focus:outline-none focus:ring-4 focus:ring-[rgba(249,115,22,.16)] focus:border-[#F97316]";
 
@@ -23,8 +24,8 @@ export default function AlterarPasswordPage() {
     e.preventDefault();
     setError("");
 
-    if (newPassword.length < 8) {
-      setError("A nova password deve ter pelo menos 8 caracteres.");
+    if (newPassword.length < 10) {
+      setError("A nova password deve ter pelo menos 10 caracteres.");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -33,6 +34,14 @@ export default function AlterarPasswordPage() {
     }
 
     setLoading(true);
+
+    const pwnedResult = await checkPwnedPassword(newPassword);
+    if (pwnedResult.pwned) {
+      setError(PWNED_ERROR_MESSAGE);
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch("/api/auth/change-password", {
         method:  "POST",
@@ -53,7 +62,7 @@ export default function AlterarPasswordPage() {
     }
   }
 
-  const canSubmit = newPassword.length >= 8 && confirmPassword.length >= 8 && !loading;
+  const canSubmit = newPassword.length >= 10 && confirmPassword.length >= 10 && !loading;
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center px-4"
@@ -84,7 +93,8 @@ export default function AlterarPasswordPage() {
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             {error && (
-              <div className="rounded-xl px-4 py-3 text-sm font-medium"
+              <div role="alert" aria-live="polite"
+                className="rounded-xl px-4 py-3 text-sm font-medium"
                 style={{ background: "rgba(217,45,32,.08)", color: "#D92D20", border: "1px solid rgba(217,45,32,.2)" }}>
                 {error}
               </div>
@@ -99,7 +109,7 @@ export default function AlterarPasswordPage() {
                 <Input
                   id="new-password"
                   type={showNew ? "text" : "password"}
-                  placeholder="Mínimo 8 caracteres"
+                  placeholder="Mínimo 10 caracteres"
                   autoComplete="new-password"
                   required
                   value={newPassword}

@@ -322,8 +322,10 @@ export async function PATCH(req: NextRequest) {
   try { body = await req.json(); }
   catch { return fail("JSON inválido"); }
 
-  const { user_id, role, active, name } = body as {
+  const { user_id, role, active, name, roles_extra, season_id, jersey_number, position } = body as {
     user_id?: string; role?: string; active?: boolean; name?: string;
+    roles_extra?: string[]; season_id?: string; jersey_number?: number | null;
+    position?: string | null;
   };
   if (!user_id) return fail("user_id é obrigatório");
 
@@ -342,10 +344,47 @@ export async function PATCH(req: NextRequest) {
     updates.role = role;
   }
   if (active !== undefined) updates.active = Boolean(active);
+  if (roles_extra !== undefined) {
+    if (!Array.isArray(roles_extra)) return fail("roles_extra deve ser um array");
+    const VALID_EXTRAS = ["jogador", "treinador"];
+    if (roles_extra.some((r) => !VALID_EXTRAS.includes(r))) return fail("Papel extra inválido");
+    updates.roles_extra = roles_extra;
+  }
   if (Object.keys(updates).length === 0) return fail("Nenhum campo para actualizar");
 
   const { error } = await admin.from("users").update(updates).eq("id", user_id);
   if (error) return fail(error.message, 500);
+
+  // Se "jogador" foi adicionado como papel extra e foi fornecida uma temporada,
+  // criar/actualizar o registo de jogador para esta época
+  if (
+    roles_extra !== undefined &&
+    roles_extra.includes("jogador") &&
+    season_id
+  ) {
+    const { data: existing } = await admin
+      .from("players")
+      .select("id")
+      .eq("user_id", user_id)
+      .eq("season_id", season_id)
+      .maybeSingle();
+
+    if (existing) {
+      // Actualizar número e posição se fornecidos
+      const playerUpdates: Record<string, unknown> = {};
+      if (jersey_number !== undefined) playerUpdates.number   = jersey_number;
+      if (position      !== undefined) playerUpdates.position = position;
+      if (Object.keys(playerUpdates).length > 0) {
+        await admin.from("players").update(playerUpdates).eq("id", existing.id);
+      }
+    } else {
+      // Criar registo de jogador para esta época
+      const playerPayload: Record<string, unknown> = { user_id, season_id };
+      if (jersey_number != null) playerPayload.number   = jersey_number;
+      if (position)              playerPayload.position = position;
+      await admin.from("players").insert(playerPayload);
+    }
+  }
 
   return NextResponse.json({ success: true });
 }

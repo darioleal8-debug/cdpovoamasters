@@ -11,6 +11,15 @@ interface PositionsChartProps {
   loading?: boolean;
 }
 
+function getPositionColor(name: string, primary: string): string {
+  switch (name) {
+    case "Base":        return "#FACC15";
+    case "Extremo":     return "#F97316";
+    case "Poste":       return primary;
+    default:            return "#94a3b8";
+  }
+}
+
 export function PositionsChart({ data, loading }: PositionsChartProps) {
   const [chartColors, setChartColors] = useState(["#111111", "#F28C28", "#555555", "#94a3b8"]);
   const total = data.reduce((s, d) => s + d.value, 0);
@@ -63,8 +72,8 @@ export function PositionsChart({ data, loading }: PositionsChartProps) {
                   paddingAngle={3}
                   dataKey="value"
                 >
-                  {data.map((_, index) => (
-                    <Cell key={index} fill={chartColors[index % chartColors.length]} />
+                  {data.map((entry) => (
+                    <Cell key={entry.name} fill={getPositionColor(entry.name, chartColors[0])} />
                   ))}
                 </Pie>
                 <Tooltip
@@ -88,7 +97,7 @@ export function PositionsChart({ data, loading }: PositionsChartProps) {
                   <div className="flex items-center gap-2">
                     <span
                       className="h-3 w-3 shrink-0 rounded-full"
-                      style={{ backgroundColor: chartColors[i % chartColors.length] }}
+                      style={{ backgroundColor: getPositionColor(item.name, chartColors[0]) }}
                     />
                     <span>{item.name}</span>
                   </div>

@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 interface Entry {
   id: string;
   epoca: string;
-  competicao: "Liga" | "Taça";
+  competicao: "Liga" | "Taça" | "Supertaça";
   colocacao: 1 | 2 | 3;
   created_at: string;
 }
@@ -71,12 +71,37 @@ function TrophyTaca({ sz, col, uid }: { sz: number; col: 1|2|3; uid: string }) {
   );
 }
 
+function TrophySupertaca({ sz, col, uid }: { sz: number; col: 1|2|3; uid: string }) {
+  const t  = TIER[col];
+  const id = `gs-${uid}`;
+  return (
+    <svg viewBox="0 0 120 150" width={sz} height={Math.round(sz * 1.25)} aria-hidden>
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor={t.gradTop} />
+          <stop offset="100%" stopColor={t.gradBot} />
+        </linearGradient>
+      </defs>
+      {/* Estrela de 5 pontas centralizada */}
+      <polygon
+        points="60,12 70,40 100,40 77,57 86,86 60,69 34,86 43,57 20,40 50,40"
+        fill={`url(#${id})`} stroke={t.solid} strokeWidth="1.4" strokeLinejoin="round"
+      />
+      {/* Haste */}
+      <rect x="55" y="86" width="10" height="20" fill={`url(#${id})`}/>
+      {/* Base */}
+      <path d="M38 108 H82 L87 118 H33 Z" fill={`url(#${id})`} stroke={t.solid} strokeWidth="1.1"/>
+      <rect x="29" y="118" width="62" height="8" rx="2" fill={t.solid} opacity="0.9"/>
+    </svg>
+  );
+}
+
 function Cup({ competicao, col, sz, uid }: {
-  competicao: "Liga"|"Taça"; col: 1|2|3; sz: number; uid: string;
+  competicao: "Liga"|"Taça"|"Supertaça"; col: 1|2|3; sz: number; uid: string;
 }) {
-  return competicao === "Liga"
-    ? <TrophyLiga sz={sz} col={col} uid={uid} />
-    : <TrophyTaca sz={sz} col={col} uid={uid} />;
+  if (competicao === "Liga")      return <TrophyLiga      sz={sz} col={col} uid={uid} />;
+  if (competicao === "Supertaça") return <TrophySupertaca sz={sz} col={col} uid={uid} />;
+  return                                 <TrophyTaca      sz={sz} col={col} uid={uid} />;
 }
 
 /* ─── Grouping ──────────────────────────────────────────────────────────── */
@@ -192,7 +217,7 @@ function TrophyModal({ piece, onClose }: { piece: Piece; onClose: () => void }) 
 /* ─── Add modal ─────────────────────────────────────────────────────────── */
 function AddModal({ onClose, onSaved }: { onClose: () => void; onSaved: (e: Entry) => void }) {
   const [epoca,      setEpoca]      = useState("");
-  const [competicao, setCompeticao] = useState<"Liga"|"Taça">("Liga");
+  const [competicao, setCompeticao] = useState<"Liga"|"Taça"|"Supertaça">("Liga");
   const [colocacao,  setColocacao]  = useState<1|2|3>(1);
   const [saving,     setSaving]     = useState(false);
   const [err,        setErr]        = useState("");
@@ -233,9 +258,10 @@ function AddModal({ onClose, onSaved }: { onClose: () => void; onSaved: (e: Entr
         </div>
         <div style={{ marginBottom: 16 }}>
           <label style={lS}>Competição</label>
-          <select style={iS} value={competicao} onChange={e => setCompeticao(e.target.value as "Liga"|"Taça")}>
+          <select style={iS} value={competicao} onChange={e => setCompeticao(e.target.value as "Liga"|"Taça"|"Supertaça")}>
             <option value="Liga">Liga</option>
             <option value="Taça">Taça</option>
+            <option value="Supertaça">Supertaça</option>
           </select>
         </div>
         <div style={{ marginBottom: 24 }}>
@@ -341,7 +367,7 @@ export function PalmaresView({ allowAdmin = true }: { allowAdmin?: boolean }) {
   const roomIdx   = Math.min(activeRoom, Math.max(rooms.length - 1, 0));
   const current   = rooms[roomIdx] ?? { label: "", items: [] };
   const titulos   = entries.filter(e => e.colocacao === 1).length;
-  const podios    = entries.length;
+  const podios    = entries.filter(e => e.colocacao <= 3).length;
   const lastTitle = entries.find(e => e.colocacao === 1);
   const closeModal = useCallback(() => setSelected(null), []);
 
@@ -367,7 +393,7 @@ export function PalmaresView({ allowAdmin = true }: { allowAdmin?: boolean }) {
         .palmares-door.active { border-color: #c9a24b; background: rgba(201,162,75,0.09); color: #c9a24b; }
       `}</style>
 
-      <div className="palmares-root -mx-4 md:-mx-6 -mt-6 px-4 md:px-6 pb-20 pt-10 min-h-screen">
+      <div className="palmares-root -mx-4 md:-mx-6 -mt-6 px-4 md:px-6 pb-20 pt-10 min-h-full">
 
         {/* Header */}
         <div className="text-center mb-10">

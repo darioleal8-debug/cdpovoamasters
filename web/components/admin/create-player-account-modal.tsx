@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/toaster";
 import { useSeasons } from "@/hooks/use-seasons";
+import { checkPwnedPassword, PWNED_ERROR_MESSAGE } from "@/lib/pwned-password";
 
 interface Props {
   open:    boolean;
@@ -214,6 +215,12 @@ export function CreatePlayerAccountModal({ open, onClose }: Props) {
 
     setSubmitting(true);
     try {
+      const pwnedResult = await checkPwnedPassword(password.trim());
+      if (pwnedResult.pwned) {
+        toast({ title: "Password comprometida", description: PWNED_ERROR_MESSAGE, variant: "destructive" });
+        return;
+      }
+
       const res = await fetch("/api/admin/users", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
@@ -324,8 +331,8 @@ export function CreatePlayerAccountModal({ open, onClose }: Props) {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="acc-pass">Password *</Label>
-            <Input id="acc-pass" type="password" required minLength={6} value={password}
-              onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
+            <Input id="acc-pass" type="password" required minLength={10} value={password}
+              onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 10 caracteres" />
           </div>
 
           <Separator />

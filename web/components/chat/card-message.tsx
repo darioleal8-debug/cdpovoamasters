@@ -31,7 +31,7 @@ function CallupResponseCard({ data }: { data: Record<string, unknown> }) {
       {note && (
         <p className="mt-1 text-[12px] pl-4" style={{ color: "#A9B4C7" }}>"{note}"</p>
       )}
-      <p className="mt-1 text-[10px] font-bold uppercase tracking-widest pl-4" style={{ color: conf.color }}>
+      <p className="mt-1 text-[11px] font-bold uppercase tracking-widest pl-4" style={{ color: conf.color }}>
         Resposta à convocatória · atualizado no painel
       </p>
     </div>
@@ -93,7 +93,7 @@ function QuotaReminderCard({ data }: { data: Record<string, unknown> }) {
             {lateCount} {lateCount === 1 ? "jogador" : "jogadores"} em atraso ·{" "}
             {new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(totalOwed)} por cobrar
           </p>
-          <p className="text-[10px] mt-1.5 font-semibold uppercase tracking-widest" style={{ color: "rgba(217,45,32,.7)" }}>
+          <p className="text-[11px] mt-1.5 font-semibold uppercase tracking-widest" style={{ color: "rgba(217,45,32,.7)" }}>
             Só visível para a equipa técnica
           </p>
         </div>

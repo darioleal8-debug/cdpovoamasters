@@ -15,7 +15,7 @@ const NAV_ITEMS = [
   { label: "Início",  href: "/player/minha-area", icon: LayoutDashboard, exact: true  },
   { label: "Plantel", href: "/player/plantel",    icon: Users,           exact: false },
   { label: "Chat",    href: "/player/chat",        icon: MessageSquare,   exact: false },
-  { label: "Conta",   href: "/player/conta",       icon: User,            exact: false },
+  { label: "Conta",   href: "/player/meu-perfil",  icon: User,            exact: false },
   { label: "Mais",    href: "/player/mais",        icon: MoreHorizontal,  exact: false },
 ] as const;
 
@@ -58,7 +58,7 @@ export function PlayerBottomNav() {
               />
               {badge > 0 && (
                 <span
-                  className="absolute -top-1 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[10px] font-bold"
+                  className="absolute -top-1 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[11px] font-bold"
                   style={{ background: "#F97316", color: "#fff" }}
                 >
                   {badge > 99 ? "99+" : badge}

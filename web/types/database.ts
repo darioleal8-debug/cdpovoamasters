@@ -80,6 +80,34 @@ export interface Payment {
   updated_at: string;
 }
 
+export type DocumentCategory =
+  | "regulamentos"
+  | "calendario"
+  | "financeiro"
+  | "seguros_saude"
+  | "clube"
+  | "formularios";
+
+export interface ClubDocument {
+  id:           string;
+  season:       string;
+  title:        string;
+  summary:      string | null;
+  category:     DocumentCategory;
+  file_url:     string;
+  storage_key:  string;
+  file_size:    number;
+  page_count:   number | null;
+  version:      number;
+  admin_note:   string | null;
+  required:     boolean;
+  created_by:   string | null;
+  creator:      { name: string } | null;
+  created_at:   string;
+  updated_at:   string;
+  archived_at:  string | null;
+}
+
 export type ChatType = "direct" | "group" | "team" | "staff" | "announcement" | "event";
 export type ChatPostPolicy = "all" | "admin_only";
 export type CardType = "callup_response" | "poll" | "transport" | "attendance" | "quota_reminder";
@@ -563,6 +591,8 @@ export interface Training {
   created_at: string;
   location_lat: number | null;
   location_lng: number | null;
+  rsvp_deadline_hours: number;
+  min_players: number;
 }
 
 export interface TrainingAttendance {
@@ -572,12 +602,12 @@ export interface TrainingAttendance {
   status: AttendanceStatus;
   updated_at: string;
   updated_by: string | null;
-  method: "manual" | "photo" | "gps";
+  method: "manual" | "photo" | "gps" | "gps_checkin" | "no_gps" | null;
   // Auto-Presença
   photo_url: string | null;
   gps_lat: number | null;
   gps_lng: number | null;
-  gps_validated: boolean;
+  gps_validated: boolean | null;
   gps_distance_m: number | null;
   auto_timestamp: string | null;
   validated_by: string | null;
@@ -626,6 +656,50 @@ export interface PlayerAttendanceStat {
   late: number;
   attendance_pct: number;
 }
+
+// ── RSVP ─────────────────────────────────────────────────────────────────────
+
+export type RsvpStatus = "going" | "not_going";
+export type RsvpReasonCode = "lesao" | "trabalho" | "viagem" | "outro";
+
+export interface TrainingRsvp {
+  id: string;
+  training_id: string;
+  player_id: string;
+  status: RsvpStatus;
+  reason_code: RsvpReasonCode | null;
+  reason_text: string | null;
+  responded_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export interface TrainingRsvpSummary {
+  training_id: string;
+  going_count: number;
+  not_going_count: number;
+  no_response_count: number;
+  total_players: number;
+  rsvp_deadline_hours: number;
+  min_players: number;
+}
+
+export interface TrainingRsvpPlayerRow {
+  player_id: string;
+  name: string;
+  jersey_number: number | null;
+  status: RsvpStatus | null;
+  reason_code: RsvpReasonCode | null;
+  reason_text: string | null;
+  responded_at: string | null;
+}
+
+export const RSVP_REASON_LABELS: Record<RsvpReasonCode, string> = {
+  lesao:     "Lesão",
+  trabalho:  "Trabalho",
+  viagem:    "Viagem",
+  outro:     "Outro motivo",
+};
 
 export const TRAINING_TYPE_LABELS: Record<TrainingType, string> = {
   tecnico:     "Técnico",

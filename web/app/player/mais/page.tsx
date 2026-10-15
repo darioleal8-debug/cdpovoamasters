@@ -3,10 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Dumbbell,
+  BarChart2,
+  BarChart3,
   CreditCard,
+  Dumbbell,
   LogOut,
+  Newspaper,
   Settings,
+  Shield,
   User,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -20,8 +24,12 @@ interface MenuItem {
 }
 
 const ITEMS: MenuItem[] = [
-  { label: "Os Meus Treinos",  href: "/player/meus-treinos",  icon: Dumbbell,   desc: "Presenças e sessões" },
+  { label: "Os Meus Treinos",    href: "/player/meus-treinos",   icon: Dumbbell,   desc: "Presenças e sessões" },
+  { label: "A Minha Assiduidade", href: "/player/assiduidade", icon: BarChart2,  desc: "Treinos e jogos" },
+  { label: "Estatísticas",       href: "/player/estatisticas", icon: BarChart3,  desc: "Equipa e calendário" },
   { label: "Pagamentos",       href: "/player/pagamentos",    icon: CreditCard,  desc: "Histórico de quotas" },
+  { label: "Liga INATEL",      href: "/liga-inatel",          icon: Shield,      desc: "Classificação e resultados" },
+  { label: "Notícias",         href: "/noticias",             icon: Newspaper,   desc: "Novidades e regulamentos" },
   { label: "O Meu Perfil",     href: "/player/conta",         icon: User,        desc: "Dados e foto de perfil" },
   { label: "Preferências",     href: "/player/preferencias",  icon: Settings,    desc: "Notificações e conta" },
 ];

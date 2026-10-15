@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Calendar, Clock, MapPin, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { AvailabilityPrompt } from "@/components/player/availability-prompt";
+import { lisbonDateTime } from "@/lib/event-time";
 
 const POSITION_LABELS: Record<string, string> = {
   base: "Base",
@@ -31,9 +33,12 @@ function initials(name: string) {
 export async function NextGameCard({
   highlightPlayerId,
   showAdminLinks = false,
+  availabilityPlayerId = null,
 }: {
   highlightPlayerId?: string | null;
   showAdminLinks?: boolean;
+  /** Quando definido, mostra ao jogador os botões de disponibilidade para o jogo. */
+  availabilityPlayerId?: string | null;
 }) {
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
@@ -69,6 +74,19 @@ export async function NextGameCard({
       return r ? { id: c.id as string, player: { id: r.player_id as string, name: r.name as string, number: r.number as number | null, position: r.position as string | null, photo_url: r.photo_url as string | null } } : null;
     })
     .filter((c): c is CallupRow & { player: PlayerRow } => c !== null);
+
+  // Disponibilidade do próprio jogador para este jogo
+  let myAvailability: "yes" | "no" | null = null;
+  if (availabilityPlayerId) {
+    const { data: availabilityRow } = await supabase
+      .from("game_availability")
+      .select("status")
+      .eq("game_id", game.id)
+      .eq("player_id", availabilityPlayerId)
+      .maybeSingle();
+    if (availabilityRow?.status === "available")   myAvailability = "yes";
+    if (availabilityRow?.status === "unavailable") myAvailability = "no";
+  }
 
   const label   = dateLabel(game.event_date);
   const isToday = label === "Hoje";
@@ -136,6 +154,18 @@ export async function NextGameCard({
         )}
       </div>
 
+      {/* ── Disponibilidade do jogador ── */}
+      {availabilityPlayerId && (
+        <div className="border-b bg-background px-5 py-4">
+          <AvailabilityPrompt
+            kind="game"
+            eventId={game.id}
+            deadlineIso={lisbonDateTime(game.event_date, game.event_time).toISOString()}
+            initialAnswer={myAvailability}
+          />
+        </div>
+      )}
+
       {/* ── Convocados ── */}
       <div className="bg-background px-5 py-4">
         <div className="mb-3 flex items-center gap-2">
@@ -188,6 +218,17 @@ export async function NextGameCard({
             })}
           </div>
         )}
+      </div>
+
+      {/* ── Rodapé — ver disponibilidades ── */}
+      <div className="border-t bg-background px-5 py-3">
+        <Link
+          href={`/player/meus-jogos/${game.id}`}
+          className="text-xs font-medium hover:underline"
+          style={{ color: "var(--club-primary, #1d4079)" }}
+        >
+          Ver disponibilidades →
+        </Link>
       </div>
     </div>
   );

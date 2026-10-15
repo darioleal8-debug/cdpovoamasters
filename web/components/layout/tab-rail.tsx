@@ -16,6 +16,8 @@ import {
   Settings,
   History,
   Landmark,
+  Shield,
+  FolderOpen,
 } from "lucide-react";
 import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
 import { useClubSettings } from "@/lib/club-context";
@@ -41,8 +43,10 @@ const SECONDARY: RailItem[] = [
   { label: "Temporadas", href: "/temporadas",    icon: CalendarRange },
   { label: "Contas",     href: "/gestao-contas", icon: UserCog },
   { label: "Stats",      href: "/estatisticas",  icon: BarChart3 },
+  { label: "Docs",       href: "/documentos",    icon: FolderOpen },
   { label: "Histórico",  href: "/historico",     icon: History },
   { label: "Financeiro", href: "/financeiro",    icon: Landmark },
+  { label: "Liga",       href: "/liga-inatel",   icon: Shield },
   { label: "Definições", href: "/configuracoes", icon: Settings },
 ];
 
@@ -71,7 +75,7 @@ function RailLink({ item, badge }: { item: RailItem; badge?: number }) {
         />
         {!!badge && badge > 0 && (
           <span
-            className="absolute -top-1 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[10px] font-bold"
+            className="absolute -top-1 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[11px] font-bold"
             style={{ background: "#F97316", color: "#fff" }}
           >
             {badge > 99 ? "99+" : badge}
@@ -79,7 +83,7 @@ function RailLink({ item, badge }: { item: RailItem; badge?: number }) {
         )}
       </div>
       <span
-        className="text-[10px] font-semibold text-center leading-tight"
+        className="text-[11px] font-semibold text-center leading-tight"
         style={{ color: active ? "#F97316" : "rgba(255,255,255,.4)" }}
       >
         {label}

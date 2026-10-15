@@ -1,12 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import {
-  AlertTriangle, Calendar, Clock, CreditCard,
+  AlertTriangle, BarChart2, Calendar, Clock, CreditCard,
   Dumbbell, MapPin, MessageSquare, Trophy, User,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { NextGameCard } from "@/components/games/next-game-card";
 import { StatsSection } from "@/components/player/stats-section";
+import { AvailabilityPrompt } from "@/components/player/availability-prompt";
+import { GpsCheckinButton } from "@/components/trainings/gps-checkin-button";
+import { BirthdayBanner } from "@/components/birthday/birthday-banner";
+import { lisbonDateTime } from "@/lib/event-time";
+import type { AvailabilityRosterRow } from "@/types/availability";
 import Link from "next/link";
 
 export const metadata = { title: "Minha Área" };
@@ -20,7 +25,13 @@ type TrainingRow = {
   location:   string | null;
   type:       string | null;
   notes:      string | null;
+  rsvp_deadline_hours: number | null;
 };
+
+type TrainingRsvpProps = {
+  answer: "yes" | "no" | null;
+  roster: AvailabilityRosterRow[];
+} | null;
 
 type ComunicadoRow = {
   id:          string;
@@ -71,9 +82,15 @@ function initials(name: string): string {
 function NextTrainingCard({
   training,
   note,
+  rsvp,
+  hasAttendance = false,
 }: {
-  training: TrainingRow | null;
-  note:     string | null;
+  training:      TrainingRow | null;
+  note:          string | null;
+  /** null = utilizador sem perfil de jogador → não mostra os botões */
+  rsvp:          TrainingRsvpProps;
+  /** true se a presença GPS/manual já foi registada hoje */
+  hasAttendance?: boolean;
 }) {
   const TRAINING_BG = "#3b5f92";
 
@@ -94,6 +111,7 @@ function NextTrainingCard({
   const label   = dateLabel(training.date);
   const isToday = label === "Hoje";
   const typeLabel = training.type ? (TYPE_LABELS[training.type] ?? training.type) : null;
+  const deadlineIso = lisbonDateTime(training.date, training.start_time).toISOString();
 
   return (
     <div className="overflow-hidden rounded-xl border shadow-sm flex flex-col">
@@ -104,7 +122,7 @@ function NextTrainingCard({
             Próximo Treino
           </span>
           <Badge
-            className="text-[10px] font-semibold"
+            className="text-[11px] font-semibold"
             style={{
               backgroundColor: isToday
                 ? "var(--club-secondary, #F28C28)"
@@ -141,9 +159,32 @@ function NextTrainingCard({
         </div>
       </div>
 
+      {/* ── Disponibilidade do jogador ── */}
+      {rsvp && (
+        <div className="border-b bg-background px-5 py-4">
+          <AvailabilityPrompt
+            kind="training"
+            eventId={training.id}
+            deadlineIso={deadlineIso}
+            initialAnswer={rsvp.answer}
+            initialRoster={rsvp.roster}
+          />
+        </div>
+      )}
+
+      {/* ── Marcar Presença GPS — só no dia do treino ── */}
+      {isToday && rsvp !== null && !hasAttendance && (
+        <div className="border-b bg-background px-5 py-4">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Presença
+          </p>
+          <GpsCheckinButton trainingId={training.id} />
+        </div>
+      )}
+
       {/* ── Zona branca — Foco do treino ── */}
       <div className="bg-background flex-1 px-5 py-4">
-        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
           Foco do treino
         </p>
         {note ? (
@@ -151,6 +192,17 @@ function NextTrainingCard({
         ) : (
           <p className="text-sm text-muted-foreground">Sem notas para este treino.</p>
         )}
+      </div>
+
+      {/* ── Rodapé — ver respostas ── */}
+      <div className="border-t bg-background px-5 py-3">
+        <Link
+          href={`/player/meus-treinos/${training.id}`}
+          className="text-xs font-medium hover:underline"
+          style={{ color: "var(--club-primary, #1d4079)" }}
+        >
+          Ver quem vai →
+        </Link>
       </div>
     </div>
   );
@@ -181,6 +233,8 @@ export default async function MinhaAreaPage() {
     .from("players")
     .select("id")
     .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   // ── Pagamentos em atraso ──────────────────────────────────
@@ -199,7 +253,7 @@ export default async function MinhaAreaPage() {
   const { data: nextTrainingRaw } = activeSeason?.id
     ? await supabase
         .from("trainings")
-        .select("id, date, start_time, location, type, notes")
+        .select("id, date, start_time, location, type, notes, rsvp_deadline_hours")
         .eq("season_id", activeSeason.id)
         .gte("date", today)
         .order("date", { ascending: true })
@@ -224,6 +278,40 @@ export default async function MinhaAreaPage() {
         .maybeSingle();
       trainingNote = (dbNote as { note_text: string } | null)?.note_text ?? null;
     }
+  }
+
+  // ── Confirmação de presença no próximo treino ─────────────
+  let trainingRsvp: TrainingRsvpProps = null;
+  if (nextTraining && linkedPlayer?.id) {
+    const [{ data: ownRsvp }, { data: rosterRows }] = await Promise.all([
+      supabase
+        .from("training_rsvps")
+        .select("status")
+        .eq("training_id", nextTraining.id)
+        .eq("player_id", linkedPlayer.id)
+        .maybeSingle(),
+      supabase.rpc("training_rsvp_roster", { p_training_id: nextTraining.id }),
+    ]);
+    trainingRsvp = {
+      answer:
+        ownRsvp?.status === "going" ? "yes"
+        : ownRsvp?.status === "not_going" ? "no"
+        : null,
+      roster: (rosterRows ?? []) as AvailabilityRosterRow[],
+    };
+  }
+
+  // ── Presença no treino de hoje ───────────────────────────
+  let hasTrainingAttendance = false;
+  if (nextTraining && linkedPlayer?.id && nextTraining.date === today) {
+    const { data: att } = await supabase
+      .from("training_attendance")
+      .select("id")
+      .eq("training_id", nextTraining.id)
+      .eq("player_id", linkedPlayer.id)
+      .in("status", ["present", "late", "auto_present"])
+      .maybeSingle();
+    hasTrainingAttendance = att !== null;
   }
 
   // ── Comunicados (chat de equipa, importante = true) ───────
@@ -256,7 +344,7 @@ export default async function MinhaAreaPage() {
         ];
 
         const { data: senders } = senderIds.length > 0
-          ? await supabase.from("users").select("id, name, role").in("id", senderIds)
+          ? await supabase.from("user_display_names").select("id, name, role").in("id", senderIds)
           : { data: [] };
 
         const senderById = new Map(
@@ -287,9 +375,10 @@ export default async function MinhaAreaPage() {
   const shortcuts = [
     { href: "/player/meu-perfil",      icon: User,           label: "O Meu Perfil",       desc: "Ver e editar"       },
     { href: "/player/meus-jogos",      icon: Calendar,       label: "Os Meus Jogos",      desc: "Próximos jogos"     },
-    { href: "/player/meus-treinos",    icon: Dumbbell,       label: "Os Meus Treinos",    desc: "Agenda de treinos"  },
-    { href: "/player/meus-pagamentos", icon: CreditCard,     label: "Os Meus Pagamentos", desc: "Quotas"             },
-    { href: "/palmares",               icon: Trophy,         label: "Palmarés",            desc: "Historial"          },
+    { href: "/player/meus-treinos",    icon: Dumbbell,   label: "Os Meus Treinos",       desc: "Agenda de treinos"  },
+    { href: "/player/assiduidade",    icon: BarChart2,  label: "A Minha Assiduidade",   desc: "Treinos e jogos"    },
+    { href: "/player/meus-pagamentos", icon: CreditCard, label: "Os Meus Pagamentos",    desc: "Quotas"             },
+    { href: "/player/palmares",        icon: Trophy,     label: "Palmarés",              desc: "Historial"          },
   ] as const;
 
   return (
@@ -321,10 +410,16 @@ export default async function MinhaAreaPage() {
         </div>
       )}
 
+      {/* ── Aniversários de hoje ── */}
+      <BirthdayBanner isAdmin={false} />
+
       {/* ── Par de cartões: Próximo Jogo + Próximo Treino ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <NextGameCard highlightPlayerId={linkedPlayer?.id ?? null} />
-        <NextTrainingCard training={nextTraining} note={trainingNote} />
+        <NextGameCard
+          highlightPlayerId={linkedPlayer?.id ?? null}
+          availabilityPlayerId={linkedPlayer?.id ?? null}
+        />
+        <NextTrainingCard training={nextTraining} note={trainingNote} rsvp={trainingRsvp} hasAttendance={hasTrainingAttendance} />
       </div>
 
       {/* ── Linha 2: Estatísticas (2/3) + Comunicados (1/3) ── */}
@@ -356,7 +451,7 @@ export default async function MinhaAreaPage() {
                     <div className="flex items-start gap-2.5">
                       {/* Avatar */}
                       <div
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
                         style={{ backgroundColor: "var(--club-primary, #1d4079)" }}
                       >
                         {initials(c.sender_name)}
@@ -364,10 +459,10 @@ export default async function MinhaAreaPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
                           <p className="text-xs font-semibold truncate">{c.sender_name}</p>
-                          <p className="text-[10px] text-muted-foreground shrink-0">{relTime(c.created_at)}</p>
+                          <p className="text-[11px] text-muted-foreground shrink-0">{relTime(c.created_at)}</p>
                         </div>
                         {c.sender_role && (
-                          <p className="text-[10px] text-muted-foreground capitalize">{c.sender_role}</p>
+                          <p className="text-[11px] text-muted-foreground capitalize">{c.sender_role}</p>
                         )}
                         <p className="text-xs text-foreground/80 mt-1 line-clamp-2 leading-relaxed">
                           {c.content}
@@ -410,7 +505,7 @@ export default async function MinhaAreaPage() {
             </div>
             <div>
               <p className="text-sm font-semibold">{label}</p>
-              <p className="text-[10px] text-muted-foreground">{desc}</p>
+              <p className="text-[11px] text-muted-foreground">{desc}</p>
             </div>
           </Link>
         ))}

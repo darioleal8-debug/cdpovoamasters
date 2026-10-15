@@ -18,6 +18,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/components/ui/toaster";
 import { CreatePlayerAccountModal } from "@/components/admin/create-player-account-modal";
 import { createClient } from "@/lib/supabase/client";
@@ -81,11 +82,16 @@ export default function GestaoDeContasPage() {
   const [createModal, setCreateModal]= useState(false);
 
   // edit modal
-  const [editUser,    setEditUser]   = useState<UserRow | null>(null);
-  const [editName,    setEditName]   = useState("");
-  const [editRole,    setEditRole]   = useState("");
-  const [editActive,  setEditActive] = useState(true);
-  const [editSaving,  setEditSaving] = useState(false);
+  const [editUser,        setEditUser]       = useState<UserRow | null>(null);
+  const [editName,        setEditName]       = useState("");
+  const [editRole,        setEditRole]       = useState("");
+  const [editActive,      setEditActive]     = useState(true);
+  const [editRolesExtra,  setEditRolesExtra] = useState<string[]>([]);
+  const [editSeasonId,    setEditSeasonId]   = useState("");
+  const [editNumber,      setEditNumber]     = useState("");
+  const [editPosition,    setEditPosition]   = useState("");
+  const [editSaving,      setEditSaving]     = useState(false);
+  const [seasons,         setSeasons]        = useState<{ id: string; name: string }[]>([]);
 
   // reset password modal
   const [resetUser,        setResetUser]        = useState<UserRow | null>(null);
@@ -155,7 +161,14 @@ export default function GestaoDeContasPage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    createClient()
+      .from("seasons")
+      .select("id, name")
+      .order("created_at", { ascending: false })
+      .then(({ data }) => { if (data) setSeasons(data as { id: string; name: string }[]); });
+  }, [load]);
 
   // ── Filtro ────────────────────────────────────────────────
   const filtered = users.filter((u) =>
@@ -169,6 +182,13 @@ export default function GestaoDeContasPage() {
     setEditName(u.name);
     setEditRole(u.role);
     setEditActive(u.active);
+    setEditRolesExtra(u.roles_extra ?? []);
+    // Pre-populate player fields from existing record
+    const p = playerMap[u.id];
+    setEditNumber(p?.number != null ? String(p.number) : "");
+    setEditPosition(p?.position ?? "");
+    // Pre-select active season
+    setEditSeasonId(seasons[0]?.id ?? "");
   }
 
   async function handleEdit(e: React.FormEvent) {
@@ -176,15 +196,23 @@ export default function GestaoDeContasPage() {
     if (!editUser) return;
     setEditSaving(true);
     try {
+      const isAlsoPlayer = editRole !== "jogador" && editRolesExtra.includes("jogador");
+      const body: Record<string, unknown> = {
+        user_id:     editUser.id,
+        name:        editName.trim(),
+        role:        editRole,
+        active:      editActive,
+        roles_extra: editRole === "jogador" ? [] : editRolesExtra,
+      };
+      if (isAlsoPlayer && editSeasonId) {
+        body.season_id     = editSeasonId;
+        body.jersey_number = editNumber ? Number(editNumber) : null;
+        body.position      = editPosition || null;
+      }
       const res = await fetch("/api/admin/users", {
         method:  "PATCH",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({
-          user_id: editUser.id,
-          name:    editName.trim(),
-          role:    editRole,
-          active:  editActive,
-        }),
+        body:    JSON.stringify(body),
       });
       const json = await res.json();
       if (res.ok) {
@@ -462,7 +490,12 @@ export default function GestaoDeContasPage() {
                     <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold w-fit ${ROLE_COLORS[u.role] ?? ""}`}>
                       {ROLE_LABELS[u.role] ?? u.role}
                     </span>
-                    {(u.roles_extra ?? []).includes("player") && (
+                    {(u.roles_extra ?? []).filter((r) => r !== "jogador").map((r) => (
+                      <span key={r} className="rounded-full px-2 py-0.5 text-[11px] font-semibold w-fit bg-purple-100 text-purple-800">
+                        + {ROLE_LABELS[r] ?? r}
+                      </span>
+                    ))}
+                    {u.role !== "jogador" && (u.roles_extra ?? []).includes("jogador") && (
                       <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold w-fit bg-green-100 text-green-800">
                         + Jogador
                       </span>
@@ -542,7 +575,7 @@ export default function GestaoDeContasPage() {
 
       {/* ── Modal: Editar Conta ────────────────────────── */}
       <Dialog open={!!editUser} onOpenChange={(v) => { if (!v) setEditUser(null); }}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Editar Conta</DialogTitle>
           </DialogHeader>
@@ -554,8 +587,12 @@ export default function GestaoDeContasPage() {
                   onChange={(e) => setEditName(e.target.value)} required />
               </div>
               <div className="space-y-1.5">
-                <Label>Tipo</Label>
-                <Select value={editRole} onValueChange={setEditRole}>
+                <Label>Tipo principal</Label>
+                <Select value={editRole} onValueChange={(v) => {
+                  setEditRole(v);
+                  // Jogador não tem papéis extra
+                  if (v === "jogador") setEditRolesExtra([]);
+                }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="jogador">Jogador</SelectItem>
@@ -566,6 +603,74 @@ export default function GestaoDeContasPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Papéis adicionais — só para contas não-jogador */}
+              {editRole !== "jogador" && (
+                <div className="space-y-2">
+                  <Label>Papéis adicionais</Label>
+                  <div className="rounded-lg border p-3 space-y-2">
+                    {[
+                      { value: "jogador",  label: "Também é Jogador" },
+                      ...(editRole !== "treinador" ? [{ value: "treinador", label: "Também é Treinador" }] : []),
+                    ].map(({ value, label }) => (
+                      <div key={value} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`extra-${value}`}
+                          checked={editRolesExtra.includes(value)}
+                          onCheckedChange={(checked) =>
+                            setEditRolesExtra((prev) =>
+                              checked ? [...prev, value] : prev.filter((r) => r !== value)
+                            )
+                          }
+                        />
+                        <Label htmlFor={`extra-${value}`} className="font-normal cursor-pointer">
+                          {label}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Campos de jogador — quando "Jogador" é papel extra */}
+              {editRole !== "jogador" && editRolesExtra.includes("jogador") && (
+                <div className="rounded-lg border border-green-200 bg-green-50/50 dark:bg-green-950/20 dark:border-green-800/40 p-3 space-y-3">
+                  <p className="text-xs font-semibold text-green-800 dark:text-green-300">
+                    Perfil de Jogador
+                  </p>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Temporada</Label>
+                    <Select value={editSeasonId} onValueChange={setEditSeasonId}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar temporada" /></SelectTrigger>
+                      <SelectContent>
+                        {seasons.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="edit-number" className="text-xs">Nº Camisola</Label>
+                      <Input id="edit-number" type="number" min={1} max={99}
+                        value={editNumber} onChange={(e) => setEditNumber(e.target.value)}
+                        placeholder="—" className="h-8 text-xs" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Posição</Label>
+                      <Select value={editPosition} onValueChange={setEditPosition}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="base">Base</SelectItem>
+                          <SelectItem value="extremo">Extremo</SelectItem>
+                          <SelectItem value="poste">Poste</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-1.5">
                 <Label>Estado</Label>
                 <Select value={editActive ? "ativo" : "inativo"}
