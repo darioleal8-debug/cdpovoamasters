@@ -26,6 +26,7 @@ export interface RawGame {
   locality: string;
   is_our_game: boolean;  // involves our team
   is_home: boolean;      // our team is home (visitado)
+  competition?: "Liga" | "Taça";  // competition label from file section
 }
 
 export interface ParseResult {
@@ -622,6 +623,7 @@ export function buildImportPayload(
           locality: g.locality,
           is_home: g.is_home,
           is_our_game: g.is_our_game,
+          competition: g.competition ?? "Liga",
         }),
         jornada: g.jornada,
         jogo_num: g.jogo_num,

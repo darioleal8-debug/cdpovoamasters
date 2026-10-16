@@ -61,14 +61,17 @@ function normHeader(s: unknown): string {
     .trim();
 }
 
-// Palavras-chave que marcam o FIM da secção Liga
+// Palavras-chave que marcam o FIM completo (não-calendário)
 const STOP_KEYWORDS = [
-  "taca", "tаça", "contactos", "contatos", "equipamentos",
+  "contactos", "contatos", "equipamentos",
   "material", "arbitros", "árbitros", "delegados",
 ];
 
 // Palavras-chave que identificam a secção Liga
 const LIGA_KEYWORDS = ["liga", "jogos", "campeonato"];
+
+// Palavras-chave que marcam início da secção Taça
+const TACA_SECTION_RE = /tac[ao]|copa\b|eliminat/i;
 
 // Colunas esperadas no cabeçalho INATEL
 const INATEL_COLS: Record<string, string[]> = {
@@ -94,6 +97,7 @@ interface LigaSection {
     time_raw: string;
     pavilion: string;
     locality: string;
+    competition: "Liga" | "Taça";
   }>;
   sheetUsed: string;
   sectionsSkipped: string[];
@@ -152,7 +156,7 @@ function extractLigaSection(
     return null;
   }
 
-  // ── 3. Extrair linhas de jogo ──────────────────────────────
+  // ── 3. Extrair linhas de jogo (Liga + Taça) ────────────────
   const get = (row: unknown[], key: string): string => {
     const idx = colMap[key] ?? -1;
     return idx >= 0 ? String(row[idx] ?? "").trim() : "";
@@ -163,6 +167,7 @@ function extractLigaSection(
   ];
   const rows: LigaSection["rows"] = [];
   let currentJornada = 0;
+  let currentCompetition: "Liga" | "Taça" = "Liga";
 
   for (let i = headerIdx + 1; i < rawRows.length; i++) {
     const row = rawRows[i];
@@ -171,22 +176,60 @@ function extractLigaSection(
 
     if (!rowNorm.replace(/[\s,]+/g, "")) continue; // skip empty
 
-    // Stop at other sections
+    // Stop at non-calendar sections (contactos, equipamentos, etc.)
     if (STOP_KEYWORDS.some((k) => rowNorm.includes(k))) {
       sectionsSkipped.push(rowStr.slice(0, 40));
       break;
     }
 
-    // Detect jornada header
+    // Re-detect column headers (each section may repeat the header row)
+    const cells = row.map(normHeader);
+    const reHomeIdx = findColIndex(cells, INATEL_COLS.home_team);
+    const reAwayIdx = findColIndex(cells, INATEL_COLS.away_team);
+    if (reHomeIdx >= 0 && reAwayIdx >= 0) {
+      colMap = {
+        jogo_num:  findColIndex(cells, INATEL_COLS.jogo_num),
+        home_team: reHomeIdx,
+        away_team: reAwayIdx,
+        date:      findColIndex(cells, INATEL_COLS.date),
+        time:      findColIndex(cells, INATEL_COLS.time),
+        pavilion:  findColIndex(cells, INATEL_COLS.pavilion),
+        locality:  findColIndex(cells, INATEL_COLS.locality),
+      };
+      continue;
+    }
+
+    // Detect competition section change (on rows without game data at col positions)
+    const homeCheck = get(row, "home_team");
+    const awayCheck = get(row, "away_team");
+    if (!homeCheck && !awayCheck) {
+      if (TACA_SECTION_RE.test(rowNorm)) {
+        currentCompetition = "Taça";
+        currentJornada = 0;
+        continue;
+      }
+      if (LIGA_KEYWORDS.some((k) => rowNorm.includes(k))) {
+        currentCompetition = "Liga";
+        currentJornada = 0;
+        continue;
+      }
+    }
+
+    // Detect jornada header (Jornada N ou Eliminatória N para Taça)
     const j = detectJornada(rowStr);
     if (j !== null) {
       currentJornada = j;
       continue;
     }
+    const elimMatch = rowStr.match(/eliminat[oó]ri[ao]\s*(\d+)/i);
+    if (elimMatch && !homeCheck) {
+      currentJornada = parseInt(elimMatch[1], 10);
+      continue;
+    }
 
     // Must have home AND away team
-    const homeRaw = get(row, "home_team");
-    const awayRaw = get(row, "away_team");
+    const homeRaw = homeCheck;
+    const awayRaw = awayCheck;
     if (!homeRaw || !awayRaw) continue;
 
     // Skip header-like rows (repeated column names)
@@ -217,14 +260,15 @@ function extractLigaSection(
     );
 
     rows.push({
-      jornada:   currentJornada,
-      jogo_num:  jogoNum ? parseInt(jogoNum, 10) || null : null,
-      home_team: homeRaw,
-      away_team: awayRaw,
-      date_raw:  dateRaw,
-      time_raw:  timeRaw,
+      jornada:     currentJornada,
+      jogo_num:    jogoNum ? parseInt(jogoNum, 10) || null : null,
+      home_team:   homeRaw,
+      away_team:   awayRaw,
+      date_raw:    dateRaw,
+      time_raw:    timeRaw,
       pavilion,
       locality,
+      competition: currentCompetition,
     });
   }
 
@@ -329,18 +373,19 @@ function regexParseFromLiga(
     const isOurGame = isHome || ourPattern.test(awayTeam);
 
     games.push({
-      jornada:   r.jornada,
-      jogo_num:  r.jogo_num ?? idx,
-      home_team: homeTeam,
-      away_team: awayTeam,
-      date_raw:  r.date_raw,
+      jornada:     r.jornada,
+      jogo_num:    r.jogo_num ?? idx,
+      home_team:   homeTeam,
+      away_team:   awayTeam,
+      date_raw:    r.date_raw,
       date,
       time,
-      pavilion:  r.pavilion,
-      locality:  r.locality,
+      pavilion:    r.pavilion,
+      locality:    r.locality,
       is_our_game: isOurGame,
-      is_home: isHome,
-      volta: 1,
+      is_home:     isHome,
+      volta:       1,
+      competition: r.competition ?? "Liga",
     });
 
     allTeams.add(homeTeam);
@@ -367,7 +412,7 @@ function regexParseFromLiga(
 type Competition = "Liga" | "Taça";
 
 async function detectCompetitions(
-  events: Array<{ title: string; event_date: string; event_time?: string | null; location?: string | null; opponent?: string | null; jornada?: number }>,
+  events: Array<{ title: string; event_date: string; event_time?: string | null; location?: string | null; opponent?: string | null; jornada?: number; description?: string | null }>,
   rawText: string,
   ligaSectionDetected: boolean,
   useAI: boolean,
@@ -375,10 +420,18 @@ async function detectCompetitions(
 ): Promise<Map<string, Competition>> {
   const map = new Map<string, Competition>();
 
-  // Liga section detected cleanly → all games are Liga, skip DeepSeek
+  // Liga section detected cleanly → read competition from description JSON
   if (ligaSectionDetected) {
     for (const evt of events) {
-      map.set(`${evt.event_date}|${evt.opponent ?? ""}`, "Liga");
+      const key = `${evt.event_date}|${evt.opponent ?? ""}`;
+      let comp: Competition = "Liga";
+      if (evt.description) {
+        try {
+          const d = JSON.parse(evt.description) as { competition?: string };
+          if (d.competition === "Taça") comp = "Taça";
+        } catch { /* ignore */ }
+      }
+      map.set(key, comp);
     }
     return map;
   }
