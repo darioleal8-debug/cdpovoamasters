@@ -590,15 +590,24 @@ export function buildImportPayload(
   const eventsToCreate: EventInsert[] = filteredGames
     .filter((g) => g.date !== null)
     .map((g) => {
-      const opponent = g.is_home ? g.away_team : g.home_team;
-      const homeAway = g.is_home ? "Casa" : "Fora";
       const jornStr = g.jornada > 0 ? `J${g.jornada} • ` : "";
       const location = [g.pavilion, g.locality].filter(Boolean).join(" — ");
+
+      let title: string;
+      let opponent: string;
+      if (g.is_our_game) {
+        opponent = g.is_home ? g.away_team : g.home_team;
+        const homeAway = g.is_home ? "Casa" : "Fora";
+        title = `${jornStr}${ourTeamName} vs ${opponent} (${homeAway})`;
+      } else {
+        opponent = g.away_team;
+        title = `${jornStr}${g.home_team} vs ${g.away_team}`;
+      }
 
       return {
         season_id: seasonId,
         type: "jogo" as const,
-        title: `${jornStr}${ourTeamName} vs ${opponent} (${homeAway})`,
+        title,
         location: location || "—",
         event_date: g.date!,
         event_time: g.time ?? "00:00",
@@ -612,6 +621,7 @@ export function buildImportPayload(
           pavilion: g.pavilion,
           locality: g.locality,
           is_home: g.is_home,
+          is_our_game: g.is_our_game,
         }),
         jornada: g.jornada,
         jogo_num: g.jogo_num,

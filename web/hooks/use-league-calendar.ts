@@ -16,6 +16,7 @@ interface GameMeta {
   pavilion: string;
   locality: string;
   is_home: boolean;
+  is_our_game?: boolean;
 }
 
 export interface LeagueGame {
@@ -54,14 +55,15 @@ function parseMeta(event: Event): GameMeta | null {
     const m = JSON.parse(event.description) as Partial<GameMeta>;
     if (!m.jornada || !m.home_team || !m.away_team) return null;
     return {
-      jornada:   Number(m.jornada),
-      volta:     Number(m.volta ?? 1),
-      jogo_num:  Number(m.jogo_num ?? 0),
-      home_team: m.home_team,
-      away_team: m.away_team,
-      pavilion:  m.pavilion  ?? "",
-      locality:  m.locality  ?? "",
-      is_home:   Boolean(m.is_home),
+      jornada:    Number(m.jornada),
+      volta:      Number(m.volta ?? 1),
+      jogo_num:   Number(m.jogo_num ?? 0),
+      home_team:  m.home_team,
+      away_team:  m.away_team,
+      pavilion:   m.pavilion  ?? "",
+      locality:   m.locality  ?? "",
+      is_home:    Boolean(m.is_home),
+      is_our_game: m.is_our_game,
     };
   } catch {
     return null;
@@ -88,7 +90,8 @@ function eventToLeagueGame(event: Event): LeagueGame | null {
     pavilion:         meta.pavilion,
     locality:         meta.locality,
     is_home:          meta.is_home,
-    is_our_game:      true, // só importamos os nossos jogos
+    // true por defeito: imports antigos só tinham os nossos jogos
+    is_our_game:      meta.is_our_game ?? true,
   };
 }
 
