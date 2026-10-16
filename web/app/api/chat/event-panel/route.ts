@@ -42,10 +42,10 @@ export async function GET(req: Request) {
   // ── Treino ────────────────────────────────────────────────────
   if (trainingId) {
     const { data: attendances } = await supabase
-      .from("training_attendances")
-      .select("attended, player_id")
+      .from("training_attendance")
+      .select("status, player_id")
       .eq("training_id", trainingId)
-      .eq("attended", true);
+      .in("status", ["present", "auto_present"]);
 
     const playerIds = (attendances ?? []).map((a) => a.player_id as string).filter(Boolean);
     const { data: roster } = playerIds.length > 0

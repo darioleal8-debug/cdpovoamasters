@@ -107,16 +107,16 @@ export async function GET(req: NextRequest) {
 
   if (nextTraining) {
     const { data: attendance } = await supabase
-      .from("training_attendances")
-      .select("player_id, attended")
+      .from("training_attendance")
+      .select("player_id, status")
       .eq("training_id", nextTraining.id);
 
-    type AttRow = { player_id: string; attended: boolean };
+    type AttRow = { player_id: string; status: string };
     const rows = (attendance ?? []) as unknown as AttRow[];
-    attendedCount = rows.filter((r) => r.attended).length;
+    attendedCount = rows.filter((r) => r.status === "present" || r.status === "auto_present").length;
 
     // Enriquecer com nome e foto via v_roster
-    const attendedIds = rows.filter((r) => r.attended).slice(0, 5).map((r) => r.player_id);
+    const attendedIds = rows.filter((r) => r.status === "present" || r.status === "auto_present").slice(0, 5).map((r) => r.player_id);
     if (attendedIds.length > 0) {
       const { data: attRoster } = await supabase
         .from("v_roster")
@@ -141,9 +141,10 @@ export async function GET(req: NextRequest) {
 
     for (const t of (recentTrainings ?? []) as Array<{ id: string }>) {
       const { count } = await supabase
-        .from("training_attendances")
+        .from("training_attendance")
         .select("id", { count: "exact", head: true })
-        .eq("training_id", t.id);
+        .eq("training_id", t.id)
+        .not("status", "is", null);
       if ((count ?? 0) === 0) missingAttCount++;
     }
   }
@@ -245,19 +246,19 @@ export async function GET(req: NextRequest) {
       const pid = playerRow.id;
       const [statsRes, attRes, payRes] = await Promise.all([
         supabase.from("player_game_stats").select("points").eq("player_id", pid),
-        supabase.from("training_attendances").select("attended").eq("player_id", pid),
+        supabase.from("training_attendance").select("status").eq("player_id", pid),
         supabase.from("player_payments").select("status").eq("player_id", pid).eq("season_id", sid),
       ]);
 
       const stats = (statsRes.data ?? []) as Array<{ points: number }>;
-      const att   = (attRes.data  ?? []) as Array<{ attended: boolean }>;
+      const att   = (attRes.data  ?? []) as Array<{ status: string }>;
       const pays  = (payRes.data  ?? []) as Array<{ status: string }>;
 
       const gamesPlayed   = stats.length;
       const totalPts      = stats.reduce((s, r) => s + (Number(r.points) || 0), 0);
       const avgPoints     = gamesPlayed > 0 ? Math.round((totalPts / gamesPlayed) * 10) / 10 : null;
       const attTotal      = att.length;
-      const attPct        = attTotal > 0 ? Math.round(att.filter((r) => r.attended).length / attTotal * 100) : null;
+      const attPct        = attTotal > 0 ? Math.round(att.filter((r) => r.status === "present" || r.status === "auto_present").length / attTotal * 100) : null;
       const hasLate       = pays.some((p) => p.status === "late" || p.status === "partial");
       const allPaid       = pays.length > 0 && pays.every((p) => p.status === "paid" || p.status === "exempt");
 
