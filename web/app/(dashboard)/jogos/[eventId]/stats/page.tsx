@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Radio, Trophy, Download, Eye, Upload, Dumbbell } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, MapPin, Radio, Trophy, Download, Eye, Upload, Users, Dumbbell } from "lucide-react";
 import type { PlayerGameStatsWithUser, PlayEventType } from "@/types/database";
 import { EventPhotoGallery } from "@/components/shared/event-photo-gallery";
 import { ImportStatsModal } from "@/components/games/import-stats-modal";
@@ -47,6 +47,205 @@ const EVENT_LABELS: Partial<Record<PlayEventType | string, string>> = {
   "game_start": "🏀 Início", "period_end": "Fim Período", "game_end": "🏁 Fim Jogo",
 };
 
+interface GameDetail {
+  id: string;
+  title: string;
+  event_date: string;
+  event_time: string | null;
+  location: string | null;
+  opponent: string | null;
+  competition: string | null;
+  game_type: string | null;
+}
+
+interface CallupEntry {
+  id: string;
+  player_id: string;
+  status: string | null;
+  players: {
+    user_id: string | null;
+    number: number | null;
+    name: string;
+  } | null;
+}
+
+function GameDetailFallback({ eventId }: { eventId: string }) {
+  const router = useRouter();
+  const [event,   setEvent]   = useState<GameDetail | null>(null);
+  const [callups, setCallups] = useState<CallupEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const supabase = createClient();
+    Promise.all([
+      supabase
+        .from("events")
+        .select("id, title, event_date, event_time, location, opponent, competition, game_type")
+        .eq("id", eventId)
+        .single(),
+      supabase
+        .from("game_callups")
+        .select("id, player_id, status, players(user_id, number, name)")
+        .eq("event_id", eventId)
+        .order("player_id"),
+    ]).then(([{ data: ev }, { data: cal }]) => {
+      setEvent(ev as GameDetail | null);
+      // game_callups.player_id is a many-to-one FK → players is a single object at runtime
+      setCallups((cal ?? []) as unknown as CallupEntry[]);
+      setLoading(false);
+    });
+  }, [eventId]);
+
+  if (loading) {
+    return (
+      <div className="space-y-4 p-4">
+        <Skeleton className="h-16 w-full rounded-xl" />
+        <Skeleton className="h-48 w-full rounded-xl" />
+      </div>
+    );
+  }
+
+  const fmtDate = (d: string, t?: string | null) => {
+    const day = new Date(d + "T00:00:00").toLocaleDateString("pt-PT", {
+      weekday: "long", day: "numeric", month: "long", year: "numeric",
+    });
+    return day.charAt(0).toUpperCase() + day.slice(1);
+  };
+
+  const confirmed = callups.filter((c) => c.status === "confirmed" || c.status === "called");
+  const pending   = callups.filter((c) => !c.status || c.status === "pending");
+  const declined  = callups.filter((c) => c.status === "declined");
+
+  return (
+    <div className="space-y-4 pb-8">
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon" onClick={() => router.back()}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div className="flex-1">
+          <h1 className="text-xl font-bold tracking-tight">
+            {event?.title ?? "Jogo"}
+          </h1>
+          {event?.competition && (
+            <p className="text-sm text-muted-foreground">{event.competition}</p>
+          )}
+        </div>
+        <Button
+          size="sm"
+          onClick={() => router.push(`/jogos/${eventId}/convocatoria`)}
+          style={{ backgroundColor: "var(--club-primary, #111111)", color: "var(--club-primary-fg, #fff)" }}
+        >
+          Convocatória
+        </Button>
+      </div>
+
+      {event && (
+        <Card>
+          <CardContent className="pt-5 space-y-3">
+            <div className="flex items-center gap-2 text-sm">
+              <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span>{fmtDate(event.event_date)}</span>
+            </div>
+            {event.event_time && (
+              <div className="flex items-center gap-2 text-sm">
+                <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span>{event.event_time.slice(0, 5).replace(":", "h")}</span>
+              </div>
+            )}
+            {event.location && (
+              <div className="flex items-center gap-2 text-sm">
+                <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span>{event.location}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2 text-sm">
+              <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span>{callups.length} convocados</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {callups.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Convocatória</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {confirmed.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-green-600 mb-1.5">
+                  Confirmados ({confirmed.length})
+                </p>
+                <div className="divide-y rounded-lg border overflow-hidden">
+                  {confirmed.map((c) => (
+                    <div key={c.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+                      <span className="font-mono font-bold w-6 text-center text-muted-foreground">
+                        {c.players?.number ?? "–"}
+                      </span>
+                      <span className="font-medium">
+                        {c.players?.name ?? "—"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {pending.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+                  Pendentes ({pending.length})
+                </p>
+                <div className="divide-y rounded-lg border overflow-hidden">
+                  {pending.map((c) => (
+                    <div key={c.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+                      <span className="font-mono font-bold w-6 text-center text-muted-foreground">
+                        {c.players?.number ?? "–"}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {c.players?.name ?? "—"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {declined.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-red-500 mb-1.5">
+                  Não disponíveis ({declined.length})
+                </p>
+                <div className="divide-y rounded-lg border overflow-hidden">
+                  {declined.map((c) => (
+                    <div key={c.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+                      <span className="font-mono font-bold w-6 text-center text-muted-foreground">
+                        {c.players?.number ?? "–"}
+                      </span>
+                      <span className="text-muted-foreground line-through">
+                        {c.players?.name ?? "—"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardContent className="pt-5">
+          <EventPhotoGallery
+            entityType="game"
+            entityId={eventId}
+            title="Fotografias do Jogo"
+          />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function GameStatsPage() {
   const params = useParams<{ eventId: string }>();
   const router = useRouter();
@@ -78,12 +277,7 @@ export default function GameStatsPage() {
   }
 
   if (!session) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[40vh] gap-4">
-        <p className="text-muted-foreground">Nenhuma sessão de jogo encontrada.</p>
-        <Button variant="outline" onClick={() => router.back()}>Voltar</Button>
-      </div>
-    );
+    return <GameDetailFallback eventId={params.eventId} />;
   }
 
   const mvp = getMvp(playerStats);

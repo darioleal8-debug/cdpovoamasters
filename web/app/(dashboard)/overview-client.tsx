@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { AlertTriangle } from "lucide-react";
 import { NextGameDashboard }  from "@/components/dashboard/next-game-dashboard";
 import { TasksCard }          from "@/components/dashboard/tasks-card";
 import { NextTrainingCard }   from "@/components/dashboard/next-training-card";
 import { ClubNoticesCard }    from "@/components/dashboard/club-notices-card";
 import { PlayerSeasonCard }   from "@/components/dashboard/player-season-card";
 import { BirthdayBanner }     from "@/components/birthday/birthday-banner";
+import { createClient }       from "@/lib/supabase/client";
 
 // ── Types ─────────────────────────────────────────────────────
 interface DashboardData {
@@ -212,6 +215,71 @@ function DashboardHeader({ seasonName, metrics, showMetrics, view, onViewChange,
   );
 }
 
+// ── TrainingConflictWarning ────────────────────────────────────
+interface ConflictRow {
+  conflict_date: string;
+  training_id:   string;
+  game_id:       string;
+  game_title:    string;
+}
+
+function TrainingConflictWarning({ seasonId }: { seasonId: string | null | undefined }) {
+  const [conflicts, setConflicts] = useState<ConflictRow[]>([]);
+
+  useEffect(() => {
+    if (!seasonId) return;
+    const supabase = createClient();
+    supabase
+      .rpc("get_training_game_conflicts", { p_season_id: seasonId })
+      .then(({ data }) => { if (data) setConflicts(data as ConflictRow[]); });
+  }, [seasonId]);
+
+  if (!conflicts.length) return null;
+
+  const fmtDate = (d: string) =>
+    new Date(d + "T00:00:00").toLocaleDateString("pt-PT", {
+      weekday: "long", day: "numeric", month: "long",
+    });
+
+  return (
+    <div
+      className="flex gap-3 rounded-2xl p-4"
+      style={{ background: "rgba(234,179,8,.08)", border: "1px solid rgba(234,179,8,.25)" }}
+      role="alert"
+    >
+      <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" style={{ color: "#CA8A04" }} />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold" style={{ color: "#92400E" }}>
+          {conflicts.length === 1
+            ? "Conflito treino/jogo"
+            : `${conflicts.length} conflitos treino/jogo`}
+        </p>
+        <ul className="mt-1 space-y-1">
+          {conflicts.map((c) => (
+            <li key={c.training_id + c.game_id} className="text-xs" style={{ color: "#92400E" }}>
+              <span className="capitalize">{fmtDate(c.conflict_date)}</span>
+              {" — "}
+              <Link
+                href={`/treinos`}
+                className="underline underline-offset-2 hover:opacity-80"
+              >
+                Treino
+              </Link>
+              {" e "}
+              <Link
+                href={`/jogos/${c.game_id}/convocatoria`}
+                className="underline underline-offset-2 hover:opacity-80"
+              >
+                {c.game_title}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 // ── TrainerView — extraído para fora do OverviewClient ─────────
 interface TrainerViewProps {
   data: DashboardData;
@@ -221,6 +289,7 @@ function TrainerView({ data }: TrainerViewProps) {
   return (
     <div className="grid gap-5 md:grid-cols-[1fr_340px]">
       <div className="flex flex-col gap-5 order-2 md:order-1">
+        <TrainingConflictWarning seasonId={data.season?.id} />
         <NextGameDashboard game={data.nextGame} />
         <TasksCard tasks={data.tasks} tasks_total={data.tasks_total} />
       </div>

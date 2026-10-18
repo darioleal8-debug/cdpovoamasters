@@ -177,7 +177,7 @@ export function NextGameDashboard({ game, loading }: Props) {
       {/* Ações — full-width em mobile, auto em tablet+ */}
       <div className="relative z-10 flex flex-col md:flex-row gap-2.5 md:gap-3">
         <Link
-          href={`/jogos/${game.id}/live`}
+          href={`/jogos/${game.id}/convocatoria`}
           className="flex items-center justify-center h-11 md:h-10 rounded-xl px-5 text-sm font-semibold transition-opacity hover:opacity-90"
           style={{ background: "var(--action, #F97316)", color: "#ffffff", touchAction: "manipulation" }}
         >
