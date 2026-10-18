@@ -21,6 +21,55 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 
+interface EventData {
+  game_type: string | null;
+  opponent: string | null;
+  description: string | null;
+  title: string | null;
+  event_date: string | null;
+  event_time: string | null;
+  location: string | null;
+  competition: string | null;
+}
+
+interface ActivePlayer {
+  player_id: string;
+  name: string | null;
+  number: number | null;
+}
+
+function resolveOpponent(ev: EventData | null): string {
+  if (!ev) return "";
+  if (ev.opponent) return ev.opponent;
+  if (ev.description) {
+    try {
+      const d = JSON.parse(ev.description) as { is_home?: boolean; home_team?: string; away_team?: string };
+      if (d.is_home === false && d.home_team) return d.home_team;
+      if (d.is_home === true && d.away_team) return d.away_team;
+      if (d.home_team) return d.home_team;
+    } catch { /* */ }
+  }
+  return "";
+}
+
+function formatGameInfo(ev: EventData | null, opponent: string): string {
+  if (!opponent) return "";
+  const parts: string[] = [`vs ${opponent}`];
+  if (ev?.description) {
+    try {
+      const d = JSON.parse(ev.description) as { is_home?: boolean };
+      if (d.is_home === true) parts.push("Casa");
+      else if (d.is_home === false) parts.push("Fora");
+    } catch { /* */ }
+  }
+  if (ev?.event_date) {
+    const [, m, d] = ev.event_date.split("-");
+    const timeStr = ev.event_time ? ev.event_time.slice(0, 5) : "";
+    parts.push(timeStr ? `${d}/${m} ${timeStr}` : `${d}/${m}`);
+  }
+  return parts.join(" · ");
+}
+
 export default function LiveGamePage() {
   const params = useParams<{ eventId: string }>();
   const router = useRouter();
@@ -56,16 +105,22 @@ export default function LiveGamePage() {
   // ── Modo de marcação mobile: landscape + fullscreen OU telemóvel em landscape ──
   const isMobileScoring = isLandscape && (isFullscreen || isMobileHeight);
 
-  // ── Friendly game flag ────────────────────────────────────
+  // ── Event data (opponent, game_type, etc.) ───────────────
   const [isFriendly, setIsFriendly] = useState(false);
+  const [eventData, setEventData] = useState<EventData | null>(null);
   useEffect(() => {
     const supabase = createClient();
     supabase
       .from("events")
-      .select("game_type")
+      .select("game_type, opponent, description, title, event_date, event_time, location, competition")
       .eq("id", params.eventId)
       .single()
-      .then(({ data }) => { if (data?.game_type === "friendly") setIsFriendly(true); });
+      .then(({ data }) => {
+        if (data) {
+          setEventData(data as EventData);
+          if (data.game_type === "friendly") setIsFriendly(true);
+        }
+      });
   }, [params.eventId]);
 
   const game = useLiveGame(params.eventId);
@@ -82,6 +137,28 @@ export default function LiveGamePage() {
   const [startingFive, setStartingFive] = useState<string[]>([]);
   const [periodDialog, setPeriodDialog] = useState(false);
   const [finishDialog, setFinishDialog] = useState(false);
+
+  const [editingOpponent, setEditingOpponent] = useState(false);
+  const [activePlayers, setActivePlayers] = useState<ActivePlayer[]>([]);
+  const [useActivePlayers, setUseActivePlayers] = useState(false);
+
+  // Pre-fill opponent from event data
+  useEffect(() => {
+    const resolved = resolveOpponent(eventData);
+    if (resolved) setOpponentName(resolved);
+  }, [eventData]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load active roster when no callups exist
+  useEffect(() => {
+    if (!loading && !session && roster.length === 0) {
+      const supabase = createClient();
+      supabase
+        .from("v_active_roster")
+        .select("player_id, name, number")
+        .order("number", { ascending: true, nullsFirst: false })
+        .then(({ data }) => { if (data) setActivePlayers(data as ActivePlayer[]); });
+    }
+  }, [loading, session, roster.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!loading && !session) setStartDialog(true);
@@ -141,6 +218,7 @@ export default function LiveGamePage() {
   const tokens = prefs.dark ? DARK_TOKENS : LIGHT_TOKENS;
   const isLive = session?.status === "live";
   const isFinished = session?.status === "finished";
+  const resolvedOpponent = resolveOpponent(eventData);
 
   // ── Shared layout props ───────────────────────────────────
   const layoutProps = session ? {
@@ -368,38 +446,126 @@ export default function LiveGamePage() {
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>🏀 Iniciar Jogo</DialogTitle></DialogHeader>
           <div className="space-y-4">
+            {/* Adversário */}
             <div className="space-y-1.5">
-              <Label>Nome do adversário</Label>
-              <Input placeholder="Lions BC" value={opponentName} onChange={(e) => setOpponentName(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>5 inicial (seleciona até 5)</Label>
-              <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
-                {roster.map((p) => (
-                  <button key={p.user_id}
-                    onClick={() => setStartingFive((prev) =>
-                      prev.includes(p.user_id)
-                        ? prev.filter((id) => id !== p.user_id)
-                        : prev.length < 5 ? [...prev, p.user_id] : prev
-                    )}
-                    className={`text-xs rounded-md px-2.5 py-1.5 border transition-all ${
-                      startingFive.includes(p.user_id)
-                        ? "bg-cdpovoa-primary text-white border-cdpovoa-primary font-bold"
-                        : "border-border hover:border-cdpovoa-primary"
-                    }`}>
-                    #{p.jersey_number} {p.user.name.split(" ")[0]}
+              <Label>Adversário</Label>
+              {resolvedOpponent && !editingOpponent ? (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="font-medium">{formatGameInfo(eventData, resolvedOpponent)}</span>
+                  <button
+                    type="button"
+                    onClick={() => setEditingOpponent(true)}
+                    className="text-xs text-muted-foreground underline hover:text-foreground shrink-0"
+                  >
+                    Editar
                   </button>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">{startingFive.length}/5 selecionados</p>
+                </div>
+              ) : (
+                <Input
+                  placeholder="Lions BC"
+                  value={opponentName}
+                  onChange={(e) => setOpponentName(e.target.value)}
+                  autoFocus={editingOpponent}
+                />
+              )}
             </div>
+            {/* Seleção de jogadores */}
+            {roster.length === 0 ? (
+              <div className="space-y-2">
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-sm font-medium text-amber-800">Ainda não há convocatória para este jogo.</p>
+                  <div className="mt-2 flex gap-3">
+                    <a
+                      href={`/jogos/${params.eventId}/convocatoria`}
+                      className="text-xs text-amber-700 underline hover:text-amber-900"
+                    >
+                      → Ir à convocatória
+                    </a>
+                    {!useActivePlayers && activePlayers.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setUseActivePlayers(true)}
+                        className="text-xs text-amber-700 underline hover:text-amber-900"
+                      >
+                        Escolher do plantel
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {useActivePlayers && (
+                  <div className="space-y-1.5">
+                    <Label>5 inicial — plantel ativo (seleciona até 5)</Label>
+                    <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+                      {activePlayers.map((p) => (
+                        <button
+                          key={p.player_id}
+                          type="button"
+                          onClick={() => setStartingFive((prev) =>
+                            prev.includes(p.player_id)
+                              ? prev.filter((id) => id !== p.player_id)
+                              : prev.length < 5 ? [...prev, p.player_id] : prev
+                          )}
+                          className={`text-xs rounded-md px-2.5 py-1.5 border transition-all ${
+                            startingFive.includes(p.player_id)
+                              ? "bg-cdpovoa-primary text-white border-cdpovoa-primary font-bold"
+                              : "border-border hover:border-cdpovoa-primary"
+                          }`}
+                        >
+                          {p.number ? `#${p.number} ` : ""}{(p.name ?? "?").split(" ")[0]}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{startingFive.length}/5 selecionados</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <Label>5 inicial (seleciona até 5)</Label>
+                <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+                  {roster.map((p) => (
+                    <button
+                      key={p.user_id}
+                      type="button"
+                      onClick={() => setStartingFive((prev) =>
+                        prev.includes(p.user_id)
+                          ? prev.filter((id) => id !== p.user_id)
+                          : prev.length < 5 ? [...prev, p.user_id] : prev
+                      )}
+                      className={`text-xs rounded-md px-2.5 py-1.5 border transition-all ${
+                        startingFive.includes(p.user_id)
+                          ? "bg-cdpovoa-primary text-white border-cdpovoa-primary font-bold"
+                          : "border-border hover:border-cdpovoa-primary"
+                      }`}
+                    >
+                      #{p.jersey_number} {p.user.name.split(" ")[0]}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">{startingFive.length}/5 selecionados</p>
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button disabled={recording}
+            <Button
+              disabled={recording}
               onClick={async () => {
-                const ok = await startGame(opponentName || "Adversário", startingFive);
-                if (ok) setStartDialog(false);
-              }}>
+                const nameToUse = opponentName || resolvedOpponent || "Adversário";
+                const didEditOpponent = editingOpponent && opponentName && opponentName !== resolvedOpponent;
+                const ok = await startGame(
+                  nameToUse,
+                  startingFive,
+                  useActivePlayers ? activePlayers.map((p) => p.player_id) : undefined
+                );
+                if (ok) {
+                  if (didEditOpponent) {
+                    const supabase = createClient();
+                    await supabase.from("events").update({ opponent: opponentName }).eq("id", params.eventId);
+                  }
+                  setStartDialog(false);
+                }
+              }}
+            >
               {recording ? "A iniciar…" : "Iniciar Jogo"}
             </Button>
           </DialogFooter>

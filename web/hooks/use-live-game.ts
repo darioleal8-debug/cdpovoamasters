@@ -104,7 +104,7 @@ export function useLiveGame(
 
     if (!callups || callups.length === 0) {
       setRoster([]);
-      return;
+      return [];
     }
 
     const playerIds = callups.map((c) => c.player_id as string);
@@ -118,7 +118,7 @@ export function useLiveGame(
 
     if (!playersData || playersData.length === 0) {
       setRoster([]);
-      return;
+      return [];
     }
 
     // Step 3: for players linked to an auth account, fetch extra data in parallel
@@ -161,6 +161,7 @@ export function useLiveGame(
     });
 
     setRoster(items as unknown as PlayerWithUser[]);
+    return items as unknown as PlayerWithUser[];
   }, [eventId]);
 
   const loadPlays = useCallback(async (sessionId: string) => {
@@ -248,7 +249,7 @@ export function useLiveGame(
       .from("game_sessions")
       .select("*")
       .eq("event_id", eventId)
-      .single();
+      .maybeSingle();
     if (data) {
       setSession(data as GameSession);
       setClockSecs(computeClockSecs(data as GameSession));
@@ -347,11 +348,19 @@ export function useLiveGame(
 
   async function startGame(
     opponentName: string,
-    startingFiveIds: string[]
+    startingFiveIds: string[],
+    callupPlayerIds?: string[]
   ): Promise<boolean> {
     if (!seasonId) return false;
     setRecording(true);
     try {
+      let rosterToUse = roster;
+      if (callupPlayerIds && callupPlayerIds.length > 0) {
+        await supabase.from("game_callups").insert(
+          callupPlayerIds.map((pid) => ({ game_id: eventId, player_id: pid }))
+        );
+        rosterToUse = await loadRoster(seasonId);
+      }
       const { data, error } = await supabase
         .from("game_sessions")
         .insert({
@@ -381,9 +390,9 @@ export function useLiveGame(
           away_score_after: 0,
           description: "Início do jogo",
         }),
-        roster.length > 0
+        rosterToUse.length > 0
           ? supabase.from("player_game_stats").insert(
-              roster.map((p) => ({
+              rosterToUse.map((p) => ({
                 game_session_id: data.id,
                 season_id: seasonId,
                 player_id: p.user_id,
