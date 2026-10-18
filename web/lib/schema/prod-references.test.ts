@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
 // Factos verificados na BD de produção em 2026-10-13 (audit/evidence/prod/*):
@@ -66,7 +66,6 @@ describe("RSVP de treinos (minor da revisão + bug novo)", () => {
 
 // players.name foi removida (041): nenhum ficheiro da app a pode pedir — não só os da lista acima.
 describe("nenhum ficheiro pede players.name", () => {
-  const { readdirSync, statSync } = require("node:fs") as typeof import("node:fs");
   const ROOT = path.join(__dirname, "..", "..");
   const walk = (d: string): string[] =>
     readdirSync(d).flatMap((n) => {
