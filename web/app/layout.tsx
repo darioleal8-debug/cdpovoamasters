@@ -44,7 +44,6 @@ export default function RootLayout({
         <meta name="theme-color" content="#F97316" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
         <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem("theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t)}catch(e){}` }} />
       </head>
       <body className={`${barlow.variable} ${barlowCondensed.variable} font-sans`}>

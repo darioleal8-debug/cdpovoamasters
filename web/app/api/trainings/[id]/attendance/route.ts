@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
+import { MANAGERS } from "@/lib/auth/roles";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
@@ -41,8 +43,9 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 // Body: { records: [{ player_id, status }] }
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: training_id } = await params;
-  const { supabase, user } = await getSupabase();
-  if (!user) return fail("Não autenticado", 401);
+  const auth = await authorize(MANAGERS);
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   let body: { records: { player_id: string; status: string }[] };
   try { body = await req.json(); } catch { return fail("JSON inválido"); }

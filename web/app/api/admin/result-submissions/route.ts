@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
+import { ADMIN } from "@/lib/auth/roles";
 import { createClient } from "@/lib/supabase/server";
 import { getPendingSubmissions } from "@/lib/competitions-data";
 
@@ -6,19 +8,9 @@ export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-
-    const { data: profile } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.role !== "admin") {
-      return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
-    }
+    // Sessão + conta ativa + admin (papel ativo)
+    const auth = await authorize(ADMIN);
+    if (!auth.ok) return auth.response;
 
     const submissions = await getPendingSubmissions();
     return NextResponse.json({ submissions });

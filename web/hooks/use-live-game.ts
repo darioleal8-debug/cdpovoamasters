@@ -112,7 +112,7 @@ export function useLiveGame(
     // Step 2: fetch players rows (name, jersey number, optional user_id)
     const { data: playersData } = await supabase
       .from("players")
-      .select("id, name, number, user_id")
+      .select("id, number, user_id") // players.name foi removida (041); o nome vem de users (STA-01)
       .in("id", playerIds)
       .order("number", { ascending: true });
 
@@ -153,7 +153,7 @@ export function useLiveGame(
         age: null,
         user: {
           id: uid,
-          name: userData?.name ?? (p.name as string),
+          name: userData?.name ?? "—",
           email: "",
           status: "ativo",
         },
@@ -960,6 +960,12 @@ export function useLiveGame(
     if (!session) return false;
 
     if (session.clock_running) await stopClock();
+
+    // Gravar o acumulado do último período (antes só o nextPeriod gravava — faltava o P4) (STA-08)
+    await supabase.from("game_period_scores").upsert(
+      { game_session_id: session.id, period: session.current_period, home_score: session.home_score, away_score: session.away_score },
+      { onConflict: "game_session_id,period" }
+    );
 
     await supabase.from("player_court_stints")
       .update({ exit_clock_secs: 0, exit_home_score: session.home_score, exit_away_score: session.away_score })

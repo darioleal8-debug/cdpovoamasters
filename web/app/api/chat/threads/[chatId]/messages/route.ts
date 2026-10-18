@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
 import { createServerClient } from "@supabase/ssr";
 import { createClient as createSupabase } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
@@ -51,14 +52,16 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ chatId: string }> }
 ) {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   const authUser = await getAuthUser();
   if (!authUser) return fail("Não autenticado", 401);
 
   const { chatId } = await params;
   const admin = adminClient();
 
-  const { data: caller } = await admin
-    .from("users").select("id, role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
   if (!caller) return fail("Perfil não encontrado", 404);
 
   const chat = await canSeeChat(admin, chatId, caller.id, caller.role);
@@ -94,7 +97,7 @@ export async function GET(
 
   // Leituras por mensagem (para "lido por N")
   const msgIds = page.map((m: { id: string }) => m.id);
-  let readsByMsg = new Map<string, number>();
+  const readsByMsg = new Map<string, number>();
   if (msgIds.length > 0) {
     const { data: reads } = await admin
       .from("chat_message_reads")
@@ -154,6 +157,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ chatId: string }> }
 ) {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   const authUser = await getAuthUser();
   if (!authUser) return fail("Não autenticado", 401);
 
@@ -167,8 +173,7 @@ export async function POST(
   if (!content) return fail("Mensagem vazia");
 
   const admin = adminClient();
-  const { data: caller } = await admin
-    .from("users").select("id, role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
   if (!caller) return fail("Perfil não encontrado", 404);
 
   const chat = await canSeeChat(admin, chatId, caller.id, caller.role);
@@ -219,14 +224,16 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ chatId: string }> }
 ) {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   const authUser = await getAuthUser();
   if (!authUser) return fail("Não autenticado", 401);
 
   const { chatId } = await params;
   const admin = adminClient();
 
-  const { data: caller } = await admin
-    .from("users").select("id, role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
   if (!caller || caller.role !== "admin") return fail("Sem permissão", 403);
 
   const { error } = await admin.from("chat_messages").delete().eq("chat_id", chatId);

@@ -1,16 +1,18 @@
 "use client";
 
+import { RoleSwitcherChip } from "@/components/auth/role-switcher";
 import { PlayerSidebar } from "./player-sidebar";
 import { PlayerBottomNav } from "./player-bottom-nav";
 import { useActivityTracker } from "@/hooks/use-activity-tracker";
 
 interface Props {
   playerName: string;
-  userRole:   "admin" | "treinador" | "jogador";
+  availableRoles: string[];
+  activeRole:     string;
   children:   React.ReactNode;
 }
 
-export function PlayerShell({ playerName, userRole, children }: Props) {
+export function PlayerShell({ playerName, availableRoles, activeRole, children }: Props) {
   useActivityTracker();
   return (
     <div
@@ -19,7 +21,7 @@ export function PlayerShell({ playerName, userRole, children }: Props) {
     >
       {/* Sidebar — tablet+ only (hidden on mobile, shown md+) */}
       <div className="hidden md:flex w-64 flex-none">
-        <PlayerSidebar playerName={playerName} userRole={userRole} />
+        <PlayerSidebar playerName={playerName} availableRoles={availableRoles} activeRole={activeRole} />
       </div>
 
       {/* Main content */}
@@ -40,6 +42,9 @@ export function PlayerShell({ playerName, userRole, children }: Props) {
           >
             Área do Jogador
           </span>
+          <div className="ml-auto">
+            <RoleSwitcherChip roles={availableRoles} activeRole={activeRole} />
+          </div>
         </header>
 
         <main

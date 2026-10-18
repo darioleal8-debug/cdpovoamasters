@@ -34,8 +34,7 @@ export interface AttendanceStatsResponse {
     games_pct:    number | null;
     global_pct:   number | null;
   };
-  is_privileged:   boolean;
-  current_user_id: string;
+  is_privileged: boolean;
 }
 
 export interface PlayerDetailSession {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -8,16 +9,9 @@ function fail(msg: string, status = 400) {
 }
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return fail("Não autenticado", 401);
-
-  // Verificar que é admin
-  const { data: profile } = await supabase
-    .from("users").select("role").eq("id", user.id).single();
-  if (!profile || !["admin", "treinador", "tesoureiro"].includes(profile.role)) {
-    return fail("Sem permissão", 403);
-  }
+  // Sessão + conta ativa + admin/treinador/tesoureiro (papel ativo)
+  const auth = await authorize(["admin", "treinador", "tesoureiro"]);
+  if (!auth.ok) return auth.response;
 
   const sp = req.nextUrl.searchParams;
   const days = Math.min(365, Math.max(7, parseInt(sp.get("days") ?? "30") || 30));
@@ -67,7 +61,7 @@ export async function GET(req: NextRequest) {
   ]);
 
   // ── 2. Últimos logins via Auth Admin API (com paginação) ──────
-  let authUsers: Array<{ id: string; last_sign_in_at: string | null }> = [];
+  const authUsers: Array<{ id: string; last_sign_in_at: string | null }> = [];
   try {
     let page = 1;
     while (true) {

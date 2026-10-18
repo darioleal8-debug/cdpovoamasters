@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -31,9 +32,10 @@ export async function POST(
 ) {
   const { id: trainingId } = await params;
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return fail("Não autenticado", 401);
+  // Sessão + conta ativa
+  const auth = await authorize();
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   let body: { lat?: unknown; lng?: unknown; accuracy?: unknown };
   try { body = await req.json(); }
@@ -136,74 +138,25 @@ export async function POST(
   }
 
   const now = new Date().toISOString();
-
-  // Tentativa 1: registo completo com GPS
-  const fullRow = {
-    training_id:    trainingId,
-    player_id:      playerId,
-    status:         "auto_present" as const,
-    method:         hasGps ? "gps_checkin" : "no_gps",
-    gps_lat:        lat,
-    gps_lng:        lng,
-    gps_accuracy_m: accuracy,
-    gps_validated:  gpsValidated,
-    gps_distance_m: gpsDistanceM,
-    gps_status:     hasGps ? (gpsValidated !== null ? "ok" : "ok") : "unavailable",
-    auto_timestamp: now,
-    updated_at:     now,
-    updated_by:     user.id,
-  };
-
-  function isSchemaError(msg: string) {
-    return (
-      msg.includes("schema cache") ||
-      msg.includes("column") ||
-      msg.includes("PGRST204") ||
-      msg.includes("PGRST200") ||
-      msg.includes("42703")
-    );
-  }
-
-  let { error: upsertErr } = await db
+  const { error: upsertErr } = await db
     .from("training_attendance")
-    .upsert(fullRow, { onConflict: "training_id,player_id" });
-
-  // Tentativa 2: sem campos GPS (mantém presença mesmo que schema esteja desatualizado)
-  if (upsertErr && isSchemaError(upsertErr.message)) {
-    console.warn("[checkin] schema error on full row, retrying without GPS fields:", upsertErr.message);
-    const { error: e2 } = await db
-      .from("training_attendance")
-      .upsert(
-        {
-          training_id: trainingId,
-          player_id:   playerId,
-          status:      "auto_present",
-          method:      hasGps ? "gps_checkin" : "no_gps",
-          updated_at:  now,
-          updated_by:  user.id,
-        },
-        { onConflict: "training_id,player_id" }
-      );
-    upsertErr = e2 ?? null;
-  }
-
-  // Tentativa 3: mínimo absoluto (só status)
-  if (upsertErr && isSchemaError(upsertErr.message)) {
-    console.warn("[checkin] schema error on partial row, retrying with minimal fields:", upsertErr.message);
-    const { error: e3 } = await db
-      .from("training_attendance")
-      .upsert(
-        {
-          training_id: trainingId,
-          player_id:   playerId,
-          status:      "auto_present",
-          updated_at:  now,
-          updated_by:  user.id,
-        },
-        { onConflict: "training_id,player_id" }
-      );
-    upsertErr = e3 ?? null;
-  }
+    .upsert(
+      {
+        training_id:    trainingId,
+        player_id:      playerId,
+        status:         "auto_present",
+        method:         hasGps ? "gps_checkin" : "no_gps",
+        gps_lat:        lat,
+        gps_lng:        lng,
+        gps_accuracy_m: accuracy,
+        gps_validated:  gpsValidated,
+        gps_distance_m: gpsDistanceM,
+        auto_timestamp: now,
+        updated_at:     now,
+        updated_by:     user.id,
+      },
+      { onConflict: "training_id,player_id" }
+    );
 
   if (upsertErr) {
     console.error("[checkin] upsert error:", upsertErr.message);

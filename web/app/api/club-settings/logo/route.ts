@@ -1,22 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import { authorize } from "@/lib/auth/guards";
+import { ADMIN } from "@/lib/auth/roles";
 import { createClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
 // ─── POST /api/club-settings/logo ───────────────────────
 export async function POST(req: NextRequest) {
-  // Autenticação via cookie
-  const cookieStore = await cookies();
-  const authClient = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
-  );
-  const { data: { user } } = await authClient.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  // Só admin altera a identidade do clube (SEC-16)
+  const auth = await authorize(ADMIN);
+  if (!auth.ok) return auth.response;
 
   // Cliente admin para storage (bypass RLS)
   const admin = createClient(
@@ -37,12 +31,12 @@ export async function POST(req: NextRequest) {
   if (file.size > MAX_SIZE) {
     return NextResponse.json({ error: "Ficheiro demasiado grande (máx. 2 MB)" }, { status: 400 });
   }
-  const ALLOWED = ["image/png", "image/jpeg", "image/jpg", "image/svg+xml", "image/webp"];
-  if (!ALLOWED.includes(file.type)) {
-    return NextResponse.json({ error: "Formato não suportado (PNG, JPG, SVG, WEBP)" }, { status: 400 });
+  // SVG excluído: pode conter scripts e é servido de um bucket público (SEC-16)
+  const EXT_BY_MIME: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/jpg": "jpg", "image/webp": "webp" };
+  const ext = EXT_BY_MIME[file.type];
+  if (!ext) {
+    return NextResponse.json({ error: "Formato não suportado (PNG, JPG, WEBP)" }, { status: 400 });
   }
-
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "png";
   const path = `club_default.${ext}`;
 
   // Upload para Supabase Storage (substitui automaticamente ficheiro anterior)
@@ -94,14 +88,8 @@ export async function POST(req: NextRequest) {
 
 // ─── DELETE /api/club-settings/logo ──────────────────────
 export async function DELETE() {
-  const cookieStore = await cookies();
-  const authClient = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
-  );
-  const { data: { user } } = await authClient.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  const auth = await authorize(ADMIN);
+  if (!auth.ok) return auth.response;
 
   const admin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

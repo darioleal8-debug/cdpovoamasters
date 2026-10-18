@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAuthorizedCron } from "@/lib/cron-auth";
 import { createClient } from "@supabase/supabase-js";
 import { sendLatePaymentEmail } from "@/lib/email";
+import { isLateReminderDay, LATE_REMINDER_DAY } from "@/lib/payments/late-reminder-schedule";
 
 export const runtime = "nodejs";
 
@@ -12,15 +14,27 @@ function adminClient() {
   );
 }
 
-export async function POST(req: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = req.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+// GET — Vercel Cron (diário, vercel.json): só envia no dia do aviso mensal.
+export async function GET(req: NextRequest) {
+  if (!isAuthorizedCron(req)) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
+  if (!isLateReminderDay()) {
+    return NextResponse.json({ ok: true, skipped: true, message: `Aviso só ao dia ${LATE_REMINDER_DAY}` });
+  }
+  return sendLateReminders();
+}
 
+// POST — disparo manual (com CRON_SECRET), em qualquer dia.
+export async function POST(req: NextRequest) {
+  // Fail-closed (QUO-04)
+  if (!isAuthorizedCron(req)) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+  return sendLateReminders();
+}
+
+async function sendLateReminders() {
   const db = adminClient();
 
   const { data: season } = await db

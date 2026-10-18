@@ -1,15 +1,26 @@
 // Tokens de ativação auto-contidos via HMAC-SHA256.
 // Não requerem base de dados — o token codifica userId + expiração + assinatura.
-// A assinatura usa SUPABASE_SERVICE_ROLE_KEY como secret (já disponível no servidor).
+// A assinatura usa ACTIVATION_SECRET (dedicado). A SUPABASE_SERVICE_ROLE_KEY já não é usada:
+// esteve exposta no histórico git (SEC-11) e quem a tivesse podia forjar ativações.
 
 import { createHmac, timingSafeEqual } from "crypto";
 
 export const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
 
+const DEV_ONLY_SECRET = "dev-only-activation-secret-not-for-production";
+
 function secret(): string {
-  const s = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!s) throw new Error("SUPABASE_SERVICE_ROLE_KEY não configurada");
-  return s;
+  const s = process.env.ACTIVATION_SECRET?.trim();
+  if (s) return s;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("ACTIVATION_SECRET não configurada");
+  }
+  return DEV_ONLY_SECRET;
+}
+
+/** Verdadeiro se é possível emitir tokens. Chamar ANTES de criar contas (evita contas meio criadas). */
+export function isActivationConfigured(): boolean {
+  return !!process.env.ACTIVATION_SECRET?.trim() || process.env.NODE_ENV !== "production";
 }
 
 // Formato: base64url( userId : expiresAt : hmac(userId:expiresAt) )

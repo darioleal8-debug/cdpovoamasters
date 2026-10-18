@@ -1,5 +1,7 @@
 "use client";
+import { todayInClubTz } from "@/lib/time/club-time";
 
+import { parseAmountDue } from "@/lib/payments/update-fields";
 import { useState, useEffect } from "react";
 import { Loader2, Pencil, Plus, Trash2, AlertTriangle } from "lucide-react";
 import {
@@ -77,7 +79,7 @@ export function RegisterPaymentModal({ open, onClose, onSave, onDelete, players,
   const [status,      setStatus]      = useState<PlayerPaymentStatus>(existing?.status ?? "paid");
   const [method,      setMethod]      = useState<PlayerPaymentMethod | "">(existing?.method ?? "");
   const [notes,       setNotes]       = useState(existing?.notes ?? "");
-  const [paymentDate, setPaymentDate] = useState(existing?.payment_date ?? today.toISOString().slice(0, 10));
+  const [paymentDate, setPaymentDate] = useState(existing?.payment_date ?? todayInClubTz(today));
   const [saving,      setSaving]      = useState(false);
   const [deleting,    setDeleting]    = useState(false);
   const [confirmDel,  setConfirmDel]  = useState(false);
@@ -93,7 +95,7 @@ export function RegisterPaymentModal({ open, onClose, onSave, onDelete, players,
     setStatus(ex?.status ?? "paid");
     setMethod(ex?.method ?? "");
     setNotes(ex?.notes   ?? "");
-    setPaymentDate(ex?.payment_date ?? today.toISOString().slice(0, 10));
+    setPaymentDate(ex?.payment_date ?? todayInClubTz(today));
     setConfirmDel(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -116,7 +118,7 @@ export function RegisterPaymentModal({ open, onClose, onSave, onDelete, players,
       month:          selMonth,
       reference_year: selYear,
       amount:         parseFloat(amount)    || 0,
-      amount_due:     parseFloat(amountDue) || 20,
+      amount_due:     parseAmountDue(amountDue), // 0 é válido (isenção) — QUO-07
       status,
       method:       method ? method as PlayerPaymentMethod : null,
       notes:        notes.trim() || null,

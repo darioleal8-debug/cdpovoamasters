@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
+import { MANAGERS } from "@/lib/auth/roles";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -77,15 +79,10 @@ export async function POST(
 ) {
   const { id: eventId } = await params;
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return fail("Não autenticado", 401);
-
-  const { data: profile } = await supabase
-    .from("users").select("role").eq("id", user.id).single();
-  if (!profile || !["admin", "treinador"].includes(profile.role)) {
-    return fail("Sem permissão", 403);
-  }
+  // Sessão + conta ativa + gestão desportiva (papel ativo)
+  const auth = await authorize(MANAGERS);
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   let body: { home_score?: unknown; away_score?: unknown };
   try { body = await req.json(); }

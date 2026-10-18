@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
+import { ADMIN } from "@/lib/auth/roles";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
 
@@ -13,19 +15,10 @@ export async function POST(
     const body = await req.json().catch(() => ({}));
     const reason = typeof body.reason === "string" ? body.reason.trim() : null;
 
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-
-    const { data: profile } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.role !== "admin") {
-      return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
-    }
+    // Sessão + conta ativa + admin (papel ativo)
+    const auth = await authorize(ADMIN);
+    if (!auth.ok) return auth.response;
+    const { user } = auth;
 
     const admin = await createAdminClient();
     const { data: submission } = await admin

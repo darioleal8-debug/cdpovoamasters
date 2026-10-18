@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
@@ -47,6 +48,9 @@ function genTempPassword(): string {
 
 // POST /api/admin/users/reset-password
 export async function POST(req: NextRequest) {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   const authUser = await getAuthUser();
   if (!authUser) return fail("Não autenticado", 401);
 
@@ -59,13 +63,8 @@ export async function POST(req: NextRequest) {
 
   const admin = adminClient();
 
-  // Verificar que o caller é admin (usando service role para contornar RLS)
-  const { data: caller, error: callerError } = await admin
-    .from("users").select("role, email").eq("id", authUser.id).single();
-
-  if (callerError) {
-    console.error(`[reset-password] Erro ao verificar role do caller (id=${authUser.id}):`, callerError.message);
-  }
+  // Verificar que o caller é admin
+  const caller = authz.profile; // papel ativo (authorize)
 
   if (caller?.role !== "admin") {
     console.warn(`[reset-password] Acesso negado — caller id=${authUser.id} email=${authUser.email} role=${caller?.role ?? "null"}`);

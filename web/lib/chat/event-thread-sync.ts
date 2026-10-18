@@ -148,7 +148,8 @@ export async function ensureTrainingThread(
   const { data: attendance } = await admin
     .from("training_attendance")
     .select("player:players(user_id)")
-    .eq("training_id", trainingId);
+    .eq("training_id", trainingId)
+    .in("status", ["present", "late"]);
 
   type AttRow = { player: Array<{ user_id: string | null }> | null };
   const attendeeIds = ((attendance ?? []) as AttRow[])

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
+import { MANAGERS } from "@/lib/auth/roles";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import {
@@ -344,7 +346,7 @@ function regexParseFromLiga(
   ourTeam: string
 ): AIParseResult {
   const ourPattern = new RegExp(
-    ourTeam.normalize("NFD").replace(/[̀-ͯ]/g, ""),
+    ourTeam.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
     "i"
   );
 
@@ -369,8 +371,10 @@ function regexParseFromLiga(
       continue;
     }
 
-    const isHome = ourPattern.test(homeTeam);
-    const isOurGame = isHome || ourPattern.test(awayTeam);
+    // Padrão construído sem acentos → comparar também sem acentos (CONV-10)
+    const noAccents = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const isHome = ourPattern.test(noAccents(homeTeam));
+    const isOurGame = isHome || ourPattern.test(noAccents(awayTeam));
 
     games.push({
       jornada:     r.jornada,
@@ -539,8 +543,10 @@ ${JSON.stringify({ operation: "competition_detection", games: ambiguousGames }, 
 export async function POST(req: NextRequest) {
   console.log("[import-calendar] POST received");
 
-  const { user, supabase } = await getUser();
-  if (!user) return fail("Não autenticado. Por favor faz login.", null, 401);
+  // Escreve eventos e chama IA: só gestão (CONV-07, SEC-17)
+  const auth = await authorize(MANAGERS);
+  if (!auth.ok) return auth.response;
+  const { user, supabase } = auth;
 
   let formData: FormData;
   try {
@@ -558,6 +564,9 @@ export async function POST(req: NextRequest) {
   const reportOnly = formData.get("report_only") === "true";
 
   if (!file) return fail("Nenhum ficheiro recebido.");
+  // Limite de tamanho antes do parsing (xlsx@0.18 vulnerável a ReDoS/prototype pollution — SEC-17)
+  const MAX_BYTES = 5 * 1024 * 1024;
+  if (file.size > MAX_BYTES) return fail("Ficheiro demasiado grande (máx. 5 MB).");
   if (!seasonId && !reportOnly) return fail("Seleciona uma temporada antes de importar.");
 
   const filename = file.name;

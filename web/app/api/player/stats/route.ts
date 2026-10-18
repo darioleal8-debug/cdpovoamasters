@@ -40,24 +40,33 @@ export async function GET(req: NextRequest) {
 
   if (!player) return NextResponse.json({ season: null, last5: null });
 
-  // All season stats (for season average)
-  const { data: seasonRows } = await supabase
-    .from("player_stats")
-    .select("pontos, ressaltos, assistencias")
-    .eq("player_id", player.id)
-    .eq("season_id", seasonId);
-
-  // Last 5 games (most recently recorded)
-  const { data: last5Rows } = await supabase
-    .from("player_stats")
-    .select("pontos, ressaltos, assistencias")
+  // player_stats existe em produção mas está vazia e nada a escreve (STA-04):
+  // a fonte real são os totais por jogo em player_game_stats, só de jogos terminados.
+  const { data: gameRows } = await supabase
+    .from("player_game_stats")
+    .select("pts, reb_off, reb_def, ast, game_session:game_sessions!inner(status, event:events(event_date))")
     .eq("player_id", player.id)
     .eq("season_id", seasonId)
-    .order("created_at", { ascending: false })
-    .limit(5);
+    .eq("game_session.status", "finished");
+
+  type GameRow = {
+    pts: number; reb_off: number; reb_def: number; ast: number;
+    game_session: { event: { event_date: string } | null } | null;
+  };
+  const rows = ((gameRows ?? []) as unknown as GameRow[])
+    .map((r) => ({
+      pontos: r.pts ?? 0,
+      ressaltos: (r.reb_off ?? 0) + (r.reb_def ?? 0),
+      assistencias: r.ast ?? 0,
+      date: r.game_session?.event?.event_date ?? "",
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  const seasonRows = rows;
+  const last5Rows = rows.slice(0, 5);
 
   return NextResponse.json({
-    season: calcStats((seasonRows ?? []) as StatRow[]),
-    last5:  calcStats((last5Rows  ?? []) as StatRow[]),
+    season: calcStats(seasonRows),
+    last5:  calcStats(last5Rows),
   });
 }

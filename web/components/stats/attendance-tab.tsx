@@ -253,20 +253,15 @@ function SortTh({
 // ── Main component ────────────────────────────────────────────────────────────
 
 interface AttendanceTabProps {
-  seasonId:        string | null;
-  highlightUserId?: string;
+  seasonId: string | null;
 }
 
-export function AttendanceTab({ seasonId, highlightUserId }: AttendanceTabProps) {
+export function AttendanceTab({ seasonId }: AttendanceTabProps) {
   const { data, loading } = useAttendanceStats(seasonId);
   const [sortKey, setSortKey] = useState<SortKey>("global_pct");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [filter, setFilter]   = useState<"ambos" | "treinos" | "jogos">("ambos");
   const [selected, setSelected] = useState<PlayerAttendanceStat | null>(null);
-
-  const myPlayer = highlightUserId
-    ? (data?.players ?? []).find((p) => p.user_id === highlightUserId) ?? null
-    : null;
 
   function handleSort(key: SortKey) {
     if (key === sortKey) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -310,57 +305,6 @@ export function AttendanceTab({ seasonId, highlightUserId }: AttendanceTabProps)
           loading={loading}
         />
       </div>
-
-      {/* As minhas estatísticas — callout para jogadores */}
-      {myPlayer && (
-        <div
-          className="rounded-xl p-4"
-          style={{
-            background: "rgba(249,115,22,.06)",
-            border:     "1px solid rgba(249,115,22,.2)",
-          }}
-        >
-          <p className="text-[11px] font-bold uppercase tracking-widest mb-3"
-            style={{ color: "var(--action,#F97316)" }}>
-            As minhas estatísticas
-          </p>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <p className="text-[11px] text-muted-foreground mb-0.5">Treinos</p>
-              <p className="text-xl font-black tabular-nums"
-                style={{ color: pctColor(myPlayer.training?.pct ?? null) }}>
-                {myPlayer.training && myPlayer.training.total > 0
-                  ? `${myPlayer.training.pct}%`
-                  : "—"}
-              </p>
-              {myPlayer.training && myPlayer.training.total > 0 && (
-                <p className="text-[11px] text-muted-foreground tabular-nums">
-                  {myPlayer.training.present}/{myPlayer.training.total}
-                </p>
-              )}
-            </div>
-            <div>
-              <p className="text-[11px] text-muted-foreground mb-0.5">Jogos</p>
-              <p className="text-xl font-black tabular-nums"
-                style={{ color: pctColor(myPlayer.games?.pct ?? null) }}>
-                {myPlayer.games != null ? fmtPct(myPlayer.games.pct) : "—"}
-              </p>
-              {myPlayer.games && (
-                <p className="text-[11px] text-muted-foreground tabular-nums">
-                  {myPlayer.games.present}/{myPlayer.games.total_with_stats}
-                </p>
-              )}
-            </div>
-            <div>
-              <p className="text-[11px] text-muted-foreground mb-0.5">Global</p>
-              <p className="text-xl font-black tabular-nums"
-                style={{ color: pctColor(myPlayer.global_pct) }}>
-                {fmtPct(myPlayer.global_pct)}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Filter chips */}
       <div className="flex gap-2">
@@ -445,18 +389,14 @@ export function AttendanceTab({ seasonId, highlightUserId }: AttendanceTabProps)
                     className="cursor-pointer transition-colors"
                     style={{
                       borderTop:  idx > 0 ? "1px solid var(--line,#E4E7EE)" : undefined,
-                      background: p.user_id === highlightUserId ? "rgba(249,115,22,.05)" : "transparent",
+                      background: "transparent",
                     }}
                     onClick={() => setSelected(p)}
                     onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLElement).style.background = p.user_id === highlightUserId
-                        ? "rgba(249,115,22,.1)"
-                        : "var(--paper,#F6F7F9)";
+                      (e.currentTarget as HTMLElement).style.background = "var(--paper,#F6F7F9)";
                     }}
                     onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLElement).style.background = p.user_id === highlightUserId
-                        ? "rgba(249,115,22,.05)"
-                        : "transparent";
+                      (e.currentTarget as HTMLElement).style.background = "transparent";
                     }}
                   >
                     {/* Jogador */}

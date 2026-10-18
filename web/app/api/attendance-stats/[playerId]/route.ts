@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
+import { hasAnyRole, MANAGERS } from "@/lib/auth/roles";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
@@ -24,18 +26,14 @@ export async function GET(
   const seasonId = req.nextUrl.searchParams.get("seasonId");
   if (!seasonId) return fail("seasonId é obrigatório");
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return fail("Não autenticado", 401);
+  // Sessão + conta ativa; o papel vem de authorize() (papel ativo)
+  const auth = await authorize();
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
 
   const db = adminDb();
 
-  // Auth check: admin/treinador/seccionista sees any player; jogador only own data
-  const { data: profile } = await db
-    .from("users").select("role").eq("id", user.id).single();
-  if (!profile) return fail("Perfil não encontrado", 403);
-
-  const isPrivileged = ["admin", "treinador", "seccionista"].includes(profile.role);
+  const isPrivileged = hasAnyRole(auth.profile, MANAGERS);
 
   if (!isPrivileged) {
     const { data: ownProfile } = await db

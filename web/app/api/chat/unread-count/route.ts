@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
@@ -31,6 +32,9 @@ function fail(msg: string, status = 400) {
 // ─── GET /api/chat/unread-count ─────────────────────────────
 // Endpoint leve para badges nas sidebars — não devolve pré-visualizações.
 export async function GET() {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   const authUser = await getAuthUser();
   if (!authUser) return fail("Não autenticado", 401);
 

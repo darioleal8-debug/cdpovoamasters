@@ -25,10 +25,22 @@ export function LoginForm() {
   const supabase = createClient();
 
   useEffect(() => {
-    const p = new URLSearchParams(window.location.search);
-    if (p.get("activated") === "1")      setJustActivated(true);
-    if (p.get("password-reset") === "1") setPasswordReset(true);
-  }, []);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("activated") === "1") setJustActivated(true);
+    if (params.get("password-reset") === "1") setPasswordReset(true);
+    // Conta desativada com sessão ainda válida: terminar a sessão aqui (os layouts server não podem apagar cookies)
+    const reason = params.get("reason");
+    if (reason === "link_invalido") setError("O link expirou ou já foi usado. Pede um novo em \"Esqueci-me\".");
+    if (reason === "inactive" || reason === "noprofile") {
+      supabase.auth.signOut().finally(() =>
+        setError(
+          reason === "inactive"
+            ? "A tua conta está desativada. Fala com o administrador do clube."
+            : "A tua conta não está associada a nenhum clube. Fala com o administrador."
+        )
+      );
+    }
+  }, [supabase]);
 
   // Move foco para o resumo de erro quando aparece
   useEffect(() => {

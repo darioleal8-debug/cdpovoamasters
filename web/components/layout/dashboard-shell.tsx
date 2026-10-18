@@ -12,10 +12,11 @@ interface Props {
   userEmail:      string;
   userRole:       UserRole;
   userRolesExtra: UserRole[];
+  availableRoles: UserRole[];
   children:       React.ReactNode;
 }
 
-export function DashboardShell({ userName, userEmail, userRole, userRolesExtra, children }: Props) {
+export function DashboardShell({ userName, userEmail, userRole, userRolesExtra, availableRoles, children }: Props) {
   useActivityTracker();
 
   return (
@@ -40,7 +41,7 @@ export function DashboardShell({ userName, userEmail, userRole, userRolesExtra, 
 
       {/* ── Coluna principal ─────────────────────────────────────── */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <Header userName={userName} userEmail={userEmail} userRole={userRole} />
+        <Header userName={userName} userEmail={userEmail} userRole={userRole} availableRoles={availableRoles} />
 
         {/*
          * Área de scroll do conteúdo.

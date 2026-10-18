@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { authorize } from "@/lib/auth/guards";
+import { MANAGERS } from "@/lib/auth/roles";
+import { createAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -24,12 +26,10 @@ function avg(sum: number, games: number): number {
 }
 
 export async function POST(req: NextRequest) {
-  // Auth check
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  // Auth: só gestão desportiva (SEC-15) — revela situação de quotas e envia dados à DeepSeek
+  const auth = await authorize(MANAGERS);
+  if (!auth.ok) return auth.response;
+  const supabase = auth.supabase;
 
   const key = process.env.DEEPSEEK_API_KEY;
   if (!key)

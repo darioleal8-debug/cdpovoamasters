@@ -7,6 +7,7 @@ export interface AppUser {
   email:      string;
   name:       string;
   role:       "admin" | "treinador" | "jogador" | "seccionista";
+  available_roles?: string[];
   phone:      string | null;
   birth_date: string | null;
   photo_url:  string | null;

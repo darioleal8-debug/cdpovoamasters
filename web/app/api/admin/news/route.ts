@@ -1,26 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
+import { ADMIN } from "@/lib/auth/roles";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
-async function checkAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data: profile } = await supabase
-    .from("users")
-    .select("role, roles_extra")
-    .eq("email", user.email!)
-    .single();
-  const roles = [profile?.role, ...(profile?.roles_extra ?? [])].filter(Boolean);
-  return roles.includes("admin") ? user : null;
+// Sessão + conta ativa + admin (papel ativo); antes procurava o perfil por email
+async function checkAdmin() {
+  const auth = await authorize(ADMIN);
+  return auth.ok ? { user: auth.user, supabase: auth.supabase } : null;
 }
 
 // GET — list all (including drafts)
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const user = await checkAdmin(supabase);
-    if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const checked = await checkAdmin();
+    if (!checked) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const { supabase, user } = checked;
 
     const { data, error } = await supabase
       .from("news")
@@ -37,9 +33,9 @@ export async function GET() {
 // POST — create
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const user = await checkAdmin(supabase);
-    if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const checked = await checkAdmin();
+    if (!checked) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const { supabase, user } = checked;
 
     const body = await req.json();
     const { slug, title, excerpt, body: articleBody, category, published_at, is_published, is_featured } = body;

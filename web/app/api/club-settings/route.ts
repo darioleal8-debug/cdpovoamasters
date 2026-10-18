@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
+import { ADMIN } from "@/lib/auth/roles";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
@@ -40,9 +42,10 @@ export async function GET() {
 
 // ─── PATCH /api/club-settings — atualizar cores/nome ─────
 export async function PATCH(req: Request) {
-  const supabase = await getSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  // Definições do clube: só admin (matriz de papéis; antes dava 500 cru da RLS a não-admins)
+  const auth = await authorize(ADMIN);
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   let body: Record<string, string>;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "JSON inválido" }, { status: 400 }); }

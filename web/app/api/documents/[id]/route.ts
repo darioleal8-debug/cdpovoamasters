@@ -1,27 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { authorize } from "@/lib/auth/guards";
+import { ADMIN } from "@/lib/auth/roles";
+import { createAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
-async function checkAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data: profile } = await supabase
-    .from("users")
-    .select("role, roles_extra")
-    .eq("id", user.id)
-    .single();
-  const roles = [profile?.role, ...(profile?.roles_extra ?? [])].filter(Boolean) as string[];
-  return roles.includes("admin") ? user : null;
-}
-
 export async function PATCH(req: NextRequest, { params }: RouteCtx) {
   const { id } = await params;
-  const supabase = await createClient();
-  const user = await checkAdmin(supabase);
-  if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  // Sessão + conta ativa + admin (papel ativo)
+  const auth = await authorize(ADMIN);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
 
   const adminClient = await createAdminClient();
   const formData = await req.formData();
@@ -84,9 +75,10 @@ export async function PATCH(req: NextRequest, { params }: RouteCtx) {
 
 export async function DELETE(_req: NextRequest, { params }: RouteCtx) {
   const { id } = await params;
-  const supabase = await createClient();
-  const user = await checkAdmin(supabase);
-  if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  // Sessão + conta ativa + admin (papel ativo)
+  const auth = await authorize(ADMIN);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
 
   const adminClient = await createAdminClient();
   const { error } = await adminClient

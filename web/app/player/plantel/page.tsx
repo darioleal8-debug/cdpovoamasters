@@ -1,4 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
+import { authorize } from "@/lib/auth/guards";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { User } from "lucide-react";
 import { POSITION_LABELS } from "@/lib/utils";
@@ -7,6 +9,9 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Plantel" };
 
 export default async function PlayerPlantelPage() {
+  // Verificação própria: na navegação cliente o layout não volta a correr (revisão final, Importante 3)
+  const authz = await authorize();
+  if (!authz.ok) redirect(authz.response.status === 401 ? "/login" : "/login?reason=inactive");
   const admin = await createAdminClient();
 
   // Temporada activa, ou a mais recente como fallback

@@ -358,7 +358,6 @@ export default function PlayerEstatisticasPage() {
         </p>
         <AttendanceTab
           seasonId={seasonId}
-          highlightUserId={currentUserId ?? undefined}
         />
       </section>
 

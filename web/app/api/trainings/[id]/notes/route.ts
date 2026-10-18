@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
-import { canManageContent } from "@/lib/permissions";
+import { authorize } from "@/lib/auth/guards";
+import { MANAGERS } from "@/lib/auth/roles";
 
 export const runtime = "nodejs";
 
@@ -12,23 +11,13 @@ function fail(msg: string, status = 400) {
   return NextResponse.json({ success: false, error: msg }, { status });
 }
 
-async function getSupabase() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
-  );
-  const { data: { user } } = await supabase.auth.getUser();
-  return { supabase, user };
-}
-
 // ─── GET /api/trainings/[id]/notes ───────────────────────
 // Leitura permitida a qualquer utilizador autenticado (admin, treinador, jogador).
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { supabase, user } = await getSupabase();
-  if (!user) return fail("Não autenticado", 401);
+  const auth = await authorize();
+  if (!auth.ok) return auth.response;
+  const { supabase } = auth;
 
   const { data, error } = await supabase
     .from("training_notes")
@@ -44,13 +33,10 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 // Apenas admin/treinador podem criar notas.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: training_id } = await params;
-  const { supabase, user } = await getSupabase();
-  if (!user) return fail("Não autenticado", 401);
-
-  const { data: caller } = await supabase.from("users").select("role").eq("id", user.id).single();
-  if (!caller || !canManageContent(caller.role)) {
-    return fail("Apenas administradores e treinadores podem adicionar notas", 403);
-  }
+  // Sessão + conta ativa + gestão desportiva (papel ativo)
+  const auth = await authorize(MANAGERS);
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   let body: { note_text: string };
   try { body = await req.json(); } catch { return fail("JSON inválido"); }

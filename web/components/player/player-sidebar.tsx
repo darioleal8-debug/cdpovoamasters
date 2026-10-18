@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { RoleSwitcherChip } from "@/components/auth/role-switcher";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowLeft, BarChart2, BarChart3, Calendar, CreditCard, Dumbbell, Home, LogOut, MessageSquare, Trophy, User, Users } from "lucide-react";
+import { BarChart2, Calendar, CreditCard, Dumbbell, Home, LogOut, MessageSquare, Trophy, User, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useClubSettings } from "@/lib/club-context";
 import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
@@ -18,7 +19,6 @@ const PLAYER_NAV = [
   { href: "/player/meus-jogos",      label: "Os Meus Jogos",      icon: Calendar },
   { href: "/player/meus-treinos",    label: "Os Meus Treinos",    icon: Dumbbell },
   { href: "/player/assiduidade",    label: "A Minha Assiduidade", icon: BarChart2 },
-  { href: "/player/estatisticas",   label: "Estatísticas",        icon: BarChart3 },
   { href: "/player/meus-pagamentos", label: "Os Meus Pagamentos", icon: CreditCard },
   { href: "/player/palmares",        label: "Palmarés",           icon: Trophy },
   { href: "/player/chat",            label: "Chat",               icon: MessageSquare },
@@ -27,16 +27,17 @@ const PLAYER_NAV = [
 
 export function PlayerSidebar({
   playerName,
-  userRole,
+  availableRoles = [],
+  activeRole = "jogador",
 }: {
   playerName?: string;
-  userRole?: "admin" | "treinador" | "jogador";
+  availableRoles?: string[];
+  activeRole?: string;
 }) {
   const { settings } = useClubSettings();
   const router  = useRouter();
   const supabase = createClient();
   const unreadChatCount = useUnreadChatCount();
-  const isManager = userRole === "admin" || userRole === "treinador";
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -77,15 +78,9 @@ export function PlayerSidebar({
 
       {/* Navegação */}
       <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-4">
-        {isManager && (
-          <div className="mb-3">
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-3 rounded-md px-3 py-2 text-xs font-medium text-white/40 hover:text-white/75 transition-colors"
-            >
-              <ArrowLeft className="h-3.5 w-3.5 shrink-0" />
-              <span>Voltar ao Dashboard</span>
-            </Link>
+        {availableRoles.length > 1 && (
+          <div className="mb-3 px-3">
+            <RoleSwitcherChip roles={availableRoles} activeRole={activeRole} />
           </div>
         )}
 

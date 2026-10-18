@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
+import { hasAnyRole, MANAGERS } from "@/lib/auth/roles";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
@@ -20,11 +22,15 @@ export async function GET(req: NextRequest) {
   const seasonId = req.nextUrl.searchParams.get("seasonId");
   if (!seasonId) return fail("seasonId é obrigatório");
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return fail("Não autenticado", 401);
+  // Sessão + conta ativa; o papel vem de authorize() (papel ativo)
+  const auth = await authorize();
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
 
   const db = adminDb();
+
+  const isPrivileged = hasAnyRole(auth.profile, MANAGERS);
+  if (!isPrivileged) return fail("Sem permissão", 403);
 
   const today = new Date().toISOString().slice(0, 10);
 

@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PlayerShell } from "@/components/player/player-shell";
+import { readActiveRoleCookie } from "@/lib/auth/guards";
+import { applyActiveRole, availableRoles } from "@/lib/auth/active-role";
+import type { UserRole } from "@/types/database";
 
 const DEFAULT_PRIMARY   = "#111111";
 const DEFAULT_SECONDARY = "#F28C28";
@@ -26,7 +29,7 @@ export default async function PlayerLayout({ children }: { children: React.React
 
   // Fetch club colors in parallel with profile — eliminates sidebar theme flash
   const [{ data: profile }, { data: settingsRow }, { data: kitsRows }] = await Promise.all([
-    supabase.from("users").select("name, role, active").eq("id", user.id).single(),
+    supabase.from("users").select("name, role, roles_extra, active").eq("id", user.id).single(),
     supabase.from("club_settings").select("club_name, primary_color, secondary_color, accent_color").eq("id", "default").maybeSingle(),
     supabase.from("team_kits").select("team_name, jersey_home_color, shorts_home_color, jersey_away_color"),
   ]);
@@ -51,23 +54,25 @@ export default async function PlayerLayout({ children }: { children: React.React
     }
   `;
 
-  // Sem perfil (admin original sem registo) → dashboard
-  if (!profile) redirect("/dashboard");
+  // Sem perfil no clube → /login termina a sessão (evita ciclo /player ⇄ /dashboard)
+  if (!profile) redirect("/login?reason=noprofile");
+
+  if (!profile.active) redirect("/login?reason=inactive");
+
+  const real      = { role: profile.role as UserRole, roles_extra: profile.roles_extra };
+  const roles     = availableRoles(real);
+  const effective = applyActiveRole(real, await readActiveRoleCookie());
 
   // Seccionista não é jogador — redirecionar para a área de jogos
-  if (profile.role === "seccionista") redirect("/jogos");
-  // Conta inativa: signout antes de ir para /login para evitar loop
-  // (middleware veria sessão válida e redirigiria de volta para /player)
-  if (!profile.active) redirect("/api/auth/signout");
+  if (effective.role === "seccionista") redirect("/jogos");
 
   const playerName = profile.name || user.email || "Jogador";
-  const userRole   = profile.role as "admin" | "treinador" | "jogador";
 
   return (
     <>
       {/* Inject club CSS variables before first paint to prevent sidebar theme flash */}
       <style dangerouslySetInnerHTML={{ __html: clubCss }} />
-      <PlayerShell playerName={playerName} userRole={userRole}>
+      <PlayerShell playerName={playerName} availableRoles={roles} activeRole={effective.role}>
         {children}
       </PlayerShell>
     </>

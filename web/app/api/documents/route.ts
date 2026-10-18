@@ -1,24 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { authorize } from "@/lib/auth/guards";
+import { ADMIN, hasAnyRole } from "@/lib/auth/roles";
+import { createAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
-async function resolveUser(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { user: null, isAdmin: false };
-  const { data: profile } = await supabase
-    .from("users")
-    .select("role, roles_extra")
-    .eq("id", user.id)
-    .single();
-  const roles = [profile?.role, ...(profile?.roles_extra ?? [])].filter(Boolean) as string[];
-  return { user, isAdmin: roles.includes("admin") };
-}
-
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const { user, isAdmin } = await resolveUser(supabase);
+    // Sessão + conta ativa; admin segundo o papel ativo
+    const auth = await authorize();
+    if (!auth.ok) return auth.response;
+    const { user } = auth;
+    const isAdmin = hasAnyRole(auth.profile, ADMIN);
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const adminClient = await createAdminClient();
@@ -66,8 +59,11 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { user, isAdmin } = await resolveUser(supabase);
+    // Sessão + conta ativa; admin segundo o papel ativo
+    const auth = await authorize();
+    if (!auth.ok) return auth.response;
+    const { user } = auth;
+    const isAdmin = hasAnyRole(auth.profile, ADMIN);
     if (!user || !isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const formData  = await req.formData();

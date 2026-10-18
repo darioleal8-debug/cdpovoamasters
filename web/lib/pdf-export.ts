@@ -1,4 +1,5 @@
 import type { GameSession, PlayerGameStatsWithUser, GamePeriodScore } from "@/types/database";
+import { toPeriodPartials } from "@/lib/live/period-scores";
 
 function pct(made: number, att: number): string {
   return att > 0 ? `${Math.round((made / att) * 100)}%` : "—";
@@ -55,14 +56,16 @@ export async function generateGamePDF(
   let y = 40;
 
   // ── Pontuação por período ─────────────────────────────────
-  if (periodScores.length > 0) {
-    const pLabels = periodScores.map((p) => `P${p.period}`);
+  // game_period_scores guarda acumulados; o PDF mostra parciais (STA-08)
+  const partials = toPeriodPartials(periodScores);
+  if (partials.length > 0) {
+    const pLabels = partials.map((p) => `P${p.period}`);
     autoTable(doc, {
       startY: y,
       head: [["", ...pLabels, "TOTAL"]],
       body: [
-        ["CD Póvoa Masters", ...periodScores.map((p) => p.home_score), session.home_score],
-        [session.opponent_name, ...periodScores.map((p) => p.away_score), session.away_score],
+        ["CD Póvoa Masters", ...partials.map((p) => p.home_score), session.home_score],
+        [session.opponent_name, ...partials.map((p) => p.away_score), session.away_score],
       ],
       styles: { fontSize: 9, halign: "center" as const },
       headStyles: { fillColor: [0, 51, 102] as [number, number, number], textColor: [255, 255, 255] as [number, number, number], fontStyle: "bold" as const },

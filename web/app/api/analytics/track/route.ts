@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ ok: false }, { status: 401 });
+  // Sessão + conta ativa
+  const auth = await authorize();
+  if (!auth.ok) return NextResponse.json({ ok: false }, { status: auth.response.status });
+  const { supabase, user } = auth;
 
   let body: { event_type?: string; page?: string; action?: string; metadata?: Record<string, unknown> };
   try {

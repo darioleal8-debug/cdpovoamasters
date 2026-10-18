@@ -1,11 +1,12 @@
+import { todayInClubTz } from "@/lib/time/club-time";
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { authorize } from "@/lib/auth/guards";
 
 export const runtime = "nodejs";
 
 // ── Helpers ─────────────────────────────────────────────────
 function daysUntil(dateStr: string): number {
-  const today = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00").getTime();
+  const today = new Date(todayInClubTz() + "T00:00:00").getTime();
   return Math.round((new Date(dateStr + "T00:00:00").getTime() - today) / 86_400_000);
 }
 
@@ -21,14 +22,15 @@ function truncateNames(names: string[], total: number): string {
 
 // ── GET /api/dashboard?season_id=… ──────────────────────────
 export async function GET(req: NextRequest) {
-  const supabase   = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Sessão + conta ativa; o perfil já traz o papel ativo
+  const auth = await authorize();
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   const sp        = req.nextUrl.searchParams;
   const seasonId  = sp.get("season_id");
-  const today     = new Date().toISOString().slice(0, 10);
-  const ago14     = new Date(Date.now() - 14 * 86_400_000).toISOString().slice(0, 10);
+  const today     = todayInClubTz();
+  const ago14     = todayInClubTz(new Date(Date.now() - 14 * 86_400_000));
 
   // Temporada de contexto (ou activa)
   const seasonRes = seasonId
@@ -109,14 +111,15 @@ export async function GET(req: NextRequest) {
     const { data: attendance } = await supabase
       .from("training_attendance")
       .select("player_id, status")
-      .eq("training_id", nextTraining.id);
+      .eq("training_id", nextTraining.id)
+      .in("status", ["present", "late"]);
 
     type AttRow = { player_id: string; status: string };
-    const rows = (attendance ?? []) as unknown as AttRow[];
-    attendedCount = rows.filter((r) => r.status === "present" || r.status === "auto_present").length;
+    const rows = (attendance ?? []) as AttRow[];
+    attendedCount = rows.length;
 
     // Enriquecer com nome e foto via v_roster
-    const attendedIds = rows.filter((r) => r.status === "present" || r.status === "auto_present").slice(0, 5).map((r) => r.player_id);
+    const attendedIds = rows.slice(0, 5).map((r) => r.player_id);
     if (attendedIds.length > 0) {
       const { data: attRoster } = await supabase
         .from("v_roster")
@@ -139,13 +142,15 @@ export async function GET(req: NextRequest) {
       .eq("season_id", sid)
       .gte("date", ago14).lt("date", today);
 
-    for (const t of (recentTrainings ?? []) as Array<{ id: string }>) {
-      const { count } = await supabase
+    // Uma só query em vez de uma por treino (PERF-08)
+    const recentIds = ((recentTrainings ?? []) as Array<{ id: string }>).map((t) => t.id);
+    if (recentIds.length > 0) {
+      const { data: marked } = await supabase
         .from("training_attendance")
-        .select("id", { count: "exact", head: true })
-        .eq("training_id", t.id)
-        .not("status", "is", null);
-      if ((count ?? 0) === 0) missingAttCount++;
+        .select("training_id")
+        .in("training_id", recentIds);
+      const withAttendance = new Set(((marked ?? []) as Array<{ training_id: string }>).map((r) => r.training_id));
+      missingAttCount = recentIds.filter((id) => !withAttendance.has(id)).length;
     }
   }
 
@@ -224,8 +229,7 @@ export async function GET(req: NextRequest) {
   tasks.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity] || b.count - a.count);
 
   // Dados do jogador (para utilizadores com roles_extra: ["player"])
-  const { data: userProfile } = await supabase
-    .from("users").select("role, roles_extra").eq("id", user.id).single();
+  const userProfile = auth.profile; // papel ativo (authorize)
 
   let playerData: {
     games_played: number;
@@ -235,7 +239,7 @@ export async function GET(req: NextRequest) {
   } | null = null;
 
   const isPlayer = userProfile?.role === "jogador" ||
-    (Array.isArray(userProfile?.roles_extra) && userProfile?.roles_extra.includes("player"));
+    (Array.isArray(userProfile?.roles_extra) && userProfile?.roles_extra.includes("jogador"));
 
   if (isPlayer) {
     // Encontrar o player_id deste utilizador na temporada corrente
@@ -245,20 +249,20 @@ export async function GET(req: NextRequest) {
     if (playerRow) {
       const pid = playerRow.id;
       const [statsRes, attRes, payRes] = await Promise.all([
-        supabase.from("player_game_stats").select("points").eq("player_id", pid),
+        supabase.from("player_game_stats").select("pts").eq("player_id", pid),
         supabase.from("training_attendance").select("status").eq("player_id", pid),
         supabase.from("player_payments").select("status").eq("player_id", pid).eq("season_id", sid),
       ]);
 
-      const stats = (statsRes.data ?? []) as Array<{ points: number }>;
+      const stats = (statsRes.data ?? []) as Array<{ pts: number }>;
       const att   = (attRes.data  ?? []) as Array<{ status: string }>;
       const pays  = (payRes.data  ?? []) as Array<{ status: string }>;
 
       const gamesPlayed   = stats.length;
-      const totalPts      = stats.reduce((s, r) => s + (Number(r.points) || 0), 0);
+      const totalPts      = stats.reduce((s, r) => s + (Number(r.pts) || 0), 0);
       const avgPoints     = gamesPlayed > 0 ? Math.round((totalPts / gamesPlayed) * 10) / 10 : null;
       const attTotal      = att.length;
-      const attPct        = attTotal > 0 ? Math.round(att.filter((r) => r.status === "present" || r.status === "auto_present").length / attTotal * 100) : null;
+      const attPct        = attTotal > 0 ? Math.round(att.filter((r) => r.status === "present" || r.status === "late").length / attTotal * 100) : null;
       const hasLate       = pays.some((p) => p.status === "late" || p.status === "partial");
       const allPaid       = pays.length > 0 && pays.every((p) => p.status === "paid" || p.status === "exempt");
 

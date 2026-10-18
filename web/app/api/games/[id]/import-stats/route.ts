@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
@@ -35,6 +36,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   const { id: eventId } = await params;
 
   const authUser = await getAuthUser();
@@ -42,11 +46,7 @@ export async function POST(
 
   const db = adminClient();
 
-  const { data: profile } = await db
-    .from("users")
-    .select("role")
-    .eq("id", authUser.id)
-    .single();
+  const profile = authz.profile; // papel ativo (authorize)
 
   if (!profile || !["admin", "treinador"].includes(profile.role)) {
     return fail("Sem permissão", 403);
@@ -88,8 +88,9 @@ export async function POST(
   if (!session) return fail("Sessão de jogo não encontrada", 404);
 
   // Load roster for this season
+  // players.name foi removida (041): nome via v_roster (id = players.id) (STA-01)
   const { data: players } = await db
-    .from("players")
+    .from("v_roster")
     .select("id, name, number")
     .eq("season_id", session.season_id);
 

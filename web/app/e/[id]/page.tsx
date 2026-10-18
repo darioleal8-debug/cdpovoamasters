@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import { authorize } from "@/lib/auth/guards";
+import { hasAnyRole, MANAGERS } from "@/lib/auth/roles";
 import { createClient as createAdmin } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Calendar, Clock, LogIn, MapPin } from "lucide-react";
@@ -159,21 +160,12 @@ export default async function EventSharePage({ params }: Props) {
   const ev = await fetchEventMeta(id);
   if (!ev) notFound();
 
-  // User session — cookie-based client
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
   // Privilege check only (no player lookup — that runs client-side so the
   // browser session is used directly, avoiding server-side cookie/RLS edge-cases).
-  let isPrivileged = false;
-  if (user) {
-    const db = adminDb();
-    const { data: roleRow } = await db
-      .from("users").select("role").eq("id", user.id).maybeSingle();
-    isPrivileged = ["admin", "treinador", "seccionista"].includes(
-      (roleRow as { role: string } | null)?.role ?? ""
-    );
-  }
+  // Página pública: sem sessão continua a funcionar; com sessão, conta ativa + papel ativo.
+  const auth = await authorize();
+  const user = auth.ok ? auth.user : null;
+  const isPrivileged = auth.ok && hasAnyRole(auth.profile, MANAGERS);
 
   const bgColor = ev.kind === "game" ? "var(--club-primary, #111111)" : "#3b5f92";
 

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { canManageContent } from "@/lib/permissions";
+import { authorize } from "@/lib/auth/guards";
+import { MANAGERS } from "@/lib/auth/roles";
 
 export const runtime = "nodejs";
 
@@ -78,13 +79,9 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 // ─── POST /api/games/[id]/callups ────────────────────────
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: game_id } = await params;
-  const { supabase, user } = await getSupabase();
-  if (!user) return fail("Não autenticado", 401);
-
-  const { data: caller } = await supabase.from("users").select("role").eq("id", user.id).single();
-  if (!caller || !canManageContent(caller.role)) {
-    return fail("Apenas administradores e treinadores podem convocar jogadores", 403);
-  }
+  const auth = await authorize(MANAGERS);
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   let body: { player_id: string };
   try { body = await req.json(); } catch { return fail("JSON inválido"); }

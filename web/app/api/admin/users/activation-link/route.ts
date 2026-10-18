@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import { createActivationToken, activationLink as buildLink, TOKEN_TTL_MS } from "@/lib/activation-token";
+import { createActivationToken, activationLink as buildLink, TOKEN_TTL_MS, isActivationConfigured } from "@/lib/activation-token";
 import { sendActivationEmail } from "@/lib/email";
 
 export const runtime = "nodejs";
@@ -41,6 +42,9 @@ function fail(msg: string, status = 400) {
 // Gera (ou regenera) um link de ativação para um jogador inativo.
 // Funciona SEM base de dados graças a tokens HMAC.
 export async function POST(req: NextRequest) {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   const authUser = await getAuthUser();
   if (!authUser) return fail("Não autenticado", 401);
 
@@ -54,8 +58,7 @@ export async function POST(req: NextRequest) {
   const admin = adminClient();
 
   // Verificar permissão
-  const { data: caller } = await admin
-    .from("users").select("role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
 
   if (!caller || !["admin", "treinador"].includes(caller.role)) {
     return fail("Sem permissão", 403);
@@ -71,6 +74,8 @@ export async function POST(req: NextRequest) {
   if (!target) return fail("Utilizador não encontrado", 404);
   if (target.role !== "jogador") return fail("Apenas jogadores precisam de link de ativação", 400);
   if (target.active) return fail("A conta já está ativa. Não é necessário um link de ativação.", 400);
+
+  if (!isActivationConfigured()) return fail("Configuração em falta no servidor: ACTIVATION_SECRET. Não é possível emitir links de ativação.", 500);
 
   // Gerar novo token HMAC
   const token = createActivationToken(userId);
@@ -98,7 +103,7 @@ export async function POST(req: NextRequest) {
     emailError       = result.error ?? null;
   }
 
-  console.log(`[activation-link] Novo link para ${target.email}: ${link}`);
+  console.log("[activation-link] Novo link de ativação gerado");
 
   return NextResponse.json({
     activationLink:  link,

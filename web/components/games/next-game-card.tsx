@@ -1,3 +1,4 @@
+import { todayInClubTz } from "@/lib/time/club-time";
 import { createClient } from "@/lib/supabase/server";
 import { Calendar, Clock, MapPin, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +13,7 @@ const POSITION_LABELS: Record<string, string> = {
 };
 
 function dateLabel(dateStr: string): string {
-  const todayMs  = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00").getTime();
+  const todayMs  = new Date(todayInClubTz() + "T00:00:00").getTime();
   const gameMs   = new Date(dateStr + "T00:00:00").getTime();
   const diffDays = Math.round((gameMs - todayMs) / 86_400_000);
   if (diffDays === 0) return "Hoje";
@@ -41,7 +42,7 @@ export async function NextGameCard({
   availabilityPlayerId?: string | null;
 }) {
   const supabase = await createClient();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInClubTz();
 
   const { data: game } = await supabase
     .from("events")
@@ -103,7 +104,7 @@ export async function NextGameCard({
             Próximo Jogo
           </span>
           <Badge
-            className="text-[10px] font-semibold"
+            className="text-[11px] font-semibold"
             style={{
               backgroundColor: isToday ? "var(--club-secondary, #F28C28)" : "rgba(255,255,255,0.15)",
               color: "#fff",
@@ -193,7 +194,7 @@ export async function NextGameCard({
                 >
                   {/* Avatar */}
                   <div
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
                     style={{ backgroundColor: isHighlighted ? "var(--club-secondary, #F28C28)" : "var(--club-primary, #111111)" }}
                   >
                     {p.photo_url ? (
@@ -208,7 +209,7 @@ export async function NextGameCard({
                       {p.number ? `#${p.number} ` : ""}{p.name.split(" ")[0]}
                     </p>
                     {p.position && (
-                      <p className="text-[10px] text-muted-foreground leading-tight">
+                      <p className="text-[11px] text-muted-foreground leading-tight">
                         {POSITION_LABELS[p.position] ?? p.position}
                       </p>
                     )}

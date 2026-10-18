@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { banDurationFor } from "@/lib/auth/session-revocation";
+import { authorize } from "@/lib/auth/guards";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import { createActivationToken, activationLink as buildLink } from "@/lib/activation-token";
+import { createActivationToken, activationLink as buildLink, isActivationConfigured } from "@/lib/activation-token";
 import { sendActivationEmail } from "@/lib/email";
 
 export const runtime = "nodejs";
@@ -58,13 +60,15 @@ function validateBirthDate(dateStr: string): string | null {
 
 // ─── GET /api/admin/users ─────────────────────────────────
 export async function GET() {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   const authUser = await getAuthUser();
   if (!authUser) return fail("Não autenticado", 401);
 
   const admin = adminClient();
 
-  const { data: caller } = await admin
-    .from("users").select("role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
 
   if (!caller || !["admin", "treinador"].includes(caller.role)) {
     return fail("Sem permissão", 403);
@@ -105,6 +109,9 @@ export async function GET() {
 
 // ─── POST /api/admin/users ────────────────────────────────
 export async function POST(req: NextRequest) {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   const authUser = await getAuthUser();
   if (!authUser) return fail("Não autenticado", 401);
 
@@ -164,14 +171,18 @@ export async function POST(req: NextRequest) {
 
   const admin = adminClient();
 
-  const { data: caller } = await admin
-    .from("users").select("role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
 
   if (!caller || !["admin", "treinador"].includes(caller.role)) {
     return fail("Sem permissão — apenas admin ou treinador podem criar contas", 403);
   }
   if (caller.role === "treinador" && role !== "jogador") {
     return fail("Treinadores só podem criar contas de jogador", 403);
+  }
+
+  // Validar a configuração ANTES de criar seja o que for (revisão final, Importante 6)
+  if (role === "jogador" && !isActivationConfigured()) {
+    return fail("Configuração em falta no servidor: ACTIVATION_SECRET. Não é possível emitir links de ativação.", 500);
   }
 
   // ── Criar utilizador Auth ────────────────────────────────
@@ -232,36 +243,12 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (playerError) {
-      // 23505 = unique_violation em uq_player_name_season — já existe
-      // um jogador com este nome nesta temporada (ex: criado manualmente
-      // em /jogadores). Em vez de falhar, ligamos a esse registo.
-      if (playerError.code === "23505") {
-        const { data: linked, error: linkError } = await admin
-          .from("players")
-          .update({
-            user_id: newUserId,
-            ...(jersey_number ? { number: Number(jersey_number) } : {}),
-            ...(position      ? { position }                      : {}),
-          })
-          .eq("name", name)
-          .eq("season_id", season_id)
-          .is("user_id", null)
-          .select()
-          .single();
-
-        if (linkError || !linked) {
-          playerCreationError =
-            "Já existe um jogador com este nome nesta temporada, associado a outra conta. " +
-            "Liga manualmente em Gestão de Jogadores.";
-          console.error("[api/admin/users] Conflito ao ligar jogador:", linkError?.message ?? playerError.message);
-        } else {
-          playerRecord = linked;
-          console.log("[api/admin/users] Jogador existente ligado à nova conta:", linked.id);
-        }
-      } else {
-        playerCreationError = playerError.message;
-        console.error("[api/admin/users] Erro ao criar jogador:", playerError.message);
-      }
+      // players.name já não existe (041) e (user_id, season_id) é único: um conflito aqui
+      // significa que este utilizador já tem perfil nesta época — não há registo "por nome" a ligar.
+      playerCreationError = playerError.code === "23505"
+        ? "Este utilizador já tem perfil de jogador nesta temporada."
+        : playerError.message;
+      console.error("[api/admin/users] Erro ao criar jogador:", playerError.message);
     } else {
       playerRecord = newPlayer;
     }
@@ -298,8 +285,8 @@ export async function POST(req: NextRequest) {
     emailSent        = emailResult.success && !emailDevFallback;
     emailError       = emailResult.error ?? null;
 
-    console.log(`[api/admin/users] Link de ativação para ${email}:`);
-    console.log(`  ${link}`);
+    // O link (com token) nunca vai para os logs — é devolvido apenas ao admin na resposta (QUAL-11)
+    console.log(`[api/admin/users] Link de ativação gerado (email enviado: ${emailSent})`);
   }
 
   return NextResponse.json({
@@ -315,6 +302,9 @@ export async function POST(req: NextRequest) {
 
 // ─── PATCH /api/admin/users ───────────────────────────────
 export async function PATCH(req: NextRequest) {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   const authUser = await getAuthUser();
   if (!authUser) return fail("Não autenticado", 401);
 
@@ -330,8 +320,7 @@ export async function PATCH(req: NextRequest) {
   if (!user_id) return fail("user_id é obrigatório");
 
   const admin = adminClient();
-  const { data: caller } = await admin
-    .from("users").select("role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
 
   if (caller?.role !== "admin") {
     return fail("Apenas o administrador pode alterar contas", 403);
@@ -386,11 +375,28 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
+  // Desativar também corta a sessão no Auth (senão o refresh do token mantinha o acesso)
+  if (active !== undefined) {
+    const { error: banError } = await admin.auth.admin.updateUserById(user_id, {
+      ban_duration: banDurationFor(Boolean(active)),
+    });
+    if (banError) {
+      console.error("[api/admin/users] Falha ao (des)banir no Auth:", banError.message);
+      return NextResponse.json(
+        { success: true, warning: "Conta atualizada, mas não foi possível terminar/repor a sessão no Auth." },
+        { status: 200 }
+      );
+    }
+  }
+
   return NextResponse.json({ success: true });
 }
 
 // ─── DELETE /api/admin/users ──────────────────────────────
 export async function DELETE(req: NextRequest) {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   const authUser = await getAuthUser();
   if (!authUser) return fail("Não autenticado", 401);
 
@@ -400,8 +406,7 @@ export async function DELETE(req: NextRequest) {
   if (userId === authUser.id) return fail("Não podes eliminar a tua própria conta", 400);
 
   const admin = adminClient();
-  const { data: caller } = await admin
-    .from("users").select("role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
 
   if (caller?.role !== "admin") return fail("Apenas o administrador pode eliminar contas", 403);
 

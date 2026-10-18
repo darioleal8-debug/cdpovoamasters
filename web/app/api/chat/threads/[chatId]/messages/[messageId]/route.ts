@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
@@ -34,14 +35,16 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ chatId: string; messageId: string }> }
 ) {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   const authUser = await getAuthUser();
   if (!authUser) return fail("Não autenticado", 401);
 
   const { chatId, messageId } = await params;
   const admin = adminClient();
 
-  const { data: caller } = await admin
-    .from("users").select("id, role").eq("id", authUser.id).single();
+  const caller = authz.profile; // papel ativo (authorize)
   if (!caller) return fail("Perfil não encontrado", 404);
 
   const { data: message } = await admin

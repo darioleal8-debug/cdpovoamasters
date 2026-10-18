@@ -1,4 +1,6 @@
-import { createClient } from "@/lib/supabase/server";
+import { todayInClubTz } from "@/lib/time/club-time";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { authorize } from "@/lib/auth/guards";
 import { redirect } from "next/navigation";
 import {
   AlertTriangle, BarChart2, Calendar, Clock, CreditCard,
@@ -9,9 +11,9 @@ import { NextGameCard } from "@/components/games/next-game-card";
 import { StatsSection } from "@/components/player/stats-section";
 import { AvailabilityPrompt } from "@/components/player/availability-prompt";
 import { GpsCheckinButton } from "@/components/trainings/gps-checkin-button";
-import { BirthdayBanner } from "@/components/birthday/birthday-banner";
 import { lisbonDateTime } from "@/lib/event-time";
 import type { AvailabilityRosterRow } from "@/types/availability";
+import { BirthdayBanner } from "@/components/birthday/birthday-banner";
 import Link from "next/link";
 
 export const metadata = { title: "Minha Área" };
@@ -50,7 +52,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 function dateLabel(dateStr: string): string {
-  const todayMs = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00").getTime();
+  const todayMs = new Date(todayInClubTz() + "T00:00:00").getTime();
   const tMs     = new Date(dateStr + "T00:00:00").getTime();
   const diff    = Math.round((tMs - todayMs) / 86_400_000);
   if (diff === 0) return "Hoje";
@@ -211,9 +213,11 @@ function NextTrainingCard({
 // ── Página principal ──────────────────────────────────────────────────────────
 
 export default async function MinhaAreaPage() {
+  // Verificação própria: na navegação cliente o layout não volta a correr (revisão final, Importante 3)
+  const authz = await authorize();
+  if (!authz.ok) redirect(authz.response.status === 401 ? "/login" : "/login?reason=inactive");
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const user = authz.user;
 
   const { data: profile } = await supabase
     .from("users")
@@ -221,7 +225,7 @@ export default async function MinhaAreaPage() {
     .eq("id", user.id)
     .single();
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInClubTz();
 
   const { data: activeSeason } = await supabase
     .from("seasons")
@@ -229,13 +233,24 @@ export default async function MinhaAreaPage() {
     .eq("status", "ativa")
     .maybeSingle();
 
-  const { data: linkedPlayer } = await supabase
-    .from("players")
-    .select("id")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // Um perfil por época: primeiro o da época ativa (UX-19); senão o mais recente
+  let linkedPlayer: { id: string } | null = null;
+  if (activeSeason) {
+    const { data } = await supabase
+      .from("players").select("id")
+      .eq("user_id", user.id).eq("season_id", activeSeason.id)
+      .maybeSingle();
+    linkedPlayer = data;
+  }
+  if (!linkedPlayer) {
+    const { data } = await supabase
+      .from("players").select("id")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    linkedPlayer = data;
+  }
 
   // ── Pagamentos em atraso ──────────────────────────────────
   let isPaymentLate = false;
@@ -314,22 +329,25 @@ export default async function MinhaAreaPage() {
     hasTrainingAttendance = att !== null;
   }
 
-  // ── Comunicados (chat de equipa, importante = true) ───────
+  // ── Comunicados (canal 'announcement', onde o admin publica — UX-12) ───────
+  // Lido com service role: é para todos os membros ativos (authorize() acima garante sessão ativa).
   let comunicados: ComunicadoRow[] = [];
   try {
-    const { data: teamChat } = await supabase
+    const admin = await createAdminClient();
+    const { data: teamChat } = await admin
       .from("chats")
       .select("id")
-      .eq("type", "team")
+      .eq("type", "announcement")
+      .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
 
     if (teamChat?.id) {
-      const { data: msgs } = await supabase
+      const { data: msgs } = await admin
         .from("chat_messages")
         .select("id, content, created_at, sender_id")
         .eq("chat_id", teamChat.id)
-        .eq("importante", true)
+        .eq("is_system", false)
         .is("hidden_at", null)
         .order("created_at", { ascending: false })
         .limit(3);

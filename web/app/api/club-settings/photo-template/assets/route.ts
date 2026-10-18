@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -10,17 +11,16 @@ function fail(msg: string, status = 400) {
 // POST /api/club-settings/photo-template/assets
 // body: FormData { file: File, type: "background" | "logo" }
 export async function POST(req: NextRequest) {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return fail("Não autenticado", 401);
 
   const admin = await createAdminClient();
 
-  const { data: profile } = await admin
-    .from("users")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+  const profile = authz.profile; // papel ativo (authorize)
   if (profile?.role !== "admin") return fail("Sem permissão", 403);
 
   let fd: FormData;

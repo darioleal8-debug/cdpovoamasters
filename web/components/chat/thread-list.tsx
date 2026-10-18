@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { MessageCircle, Search, Users } from "lucide-react";
 import { EventThreadCard } from "./event-thread-card";
 import { NewChatDialog } from "./new-chat-dialog";
@@ -300,10 +301,10 @@ export function ThreadList({ currentUser, activeChatId, onSelect, threads, loadi
                     <p className="text-[12px]" style={{ color: "rgba(169,180,199,.35)" }}>
                       Os fios de treino e jogo aparecem aqui automaticamente.
                     </p>
-                    <a href="/player/meus-jogos" className="text-[12px] font-semibold px-3 py-1.5 rounded-xl"
+                    <Link href="/player/meus-jogos" className="text-[12px] font-semibold px-3 py-1.5 rounded-xl"
                       style={{ background: "rgba(249,115,22,.1)", color: "var(--action,#F97316)" }}>
                       Ver os meus jogos
-                    </a>
+                    </Link>
                   </>
                 ) : (
                   <>

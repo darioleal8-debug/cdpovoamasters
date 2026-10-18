@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
@@ -44,18 +45,17 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  await params; // eslint-disable-line @typescript-eslint/no-unused-expressions
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
+  await params;
 
   const authUser = await getAuthUser();
   if (!authUser) return fail("Não autenticado", 401);
 
   const db = adminClient();
 
-  const { data: profile } = await db
-    .from("users")
-    .select("role")
-    .eq("id", authUser.id)
-    .single();
+  const profile = authz.profile; // papel ativo (authorize)
 
   if (!profile || !["admin", "treinador"].includes(profile.role)) {
     return fail("Sem permissão", 403);

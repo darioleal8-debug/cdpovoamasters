@@ -1,4 +1,5 @@
 "use client";
+import { todayInClubTz } from "@/lib/time/club-time";
 
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -65,7 +66,7 @@ export function CellPopover({ active, seasonId, onClose, onQuickSave, onOpenEdit
   async function quickSave(newStatus: "paid" | "exempt") {
     if (!seasonId) return;
     setSaving(newStatus);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayInClubTz();
     await onQuickSave({
       season_id:      seasonId,
       player_id:      player.player_id ?? undefined,

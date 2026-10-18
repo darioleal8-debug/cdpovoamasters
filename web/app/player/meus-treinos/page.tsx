@@ -1,3 +1,4 @@
+import { todayInClubTz } from "@/lib/time/club-time";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Clock, Dumbbell, MapPin, BookOpen, Pin, CalendarDays, CheckCircle2, XCircle, MessageSquare, Users } from "lucide-react";
@@ -70,7 +71,7 @@ export default async function MeusTreinosPage() {
 
   // Hora actual em Lisboa (Portugal usa Europe/Lisbon — UTC+1 no verão, UTC+0 no inverno)
   const lisbonNowStr = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Lisbon" });
-  const today    = lisbonNowStr.slice(0, 10);  // "2026-10-12"
+  const today    = todayInClubTz();            // "2026-10-12"
   const nowHHMM  = lisbonNowStr.slice(11, 16); // "21:35"
 
   function addMinutes(hhmm: string, minutes: number): string {

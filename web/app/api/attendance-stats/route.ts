@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
+import { hasAnyRole, MANAGERS } from "@/lib/auth/roles";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
@@ -20,28 +22,32 @@ export async function GET(req: NextRequest) {
   const seasonId = req.nextUrl.searchParams.get("seasonId");
   if (!seasonId) return fail("seasonId é obrigatório");
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return fail("Não autenticado", 401);
+  // Sessão + conta ativa; o papel vem de authorize() (papel ativo)
+  const auth = await authorize();
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
 
   const db = adminDb();
 
-  const { data: profile } = await db
-    .from("users")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-  if (!profile) return fail("Perfil não encontrado", 403);
-
-  const isPrivileged = ["admin", "treinador", "seccionista"].includes(profile.role);
+  const isPrivileged = hasAnyRole(auth.profile, MANAGERS);
 
   // Players for season (from the players table, which has the data)
+  // players.name foi removida (041): o nome vem de users
   const { data: playersList } = await db
     .from("players")
-    .select("id, name, number, user_id")
+    .select("id, number, user_id")
     .eq("season_id", seasonId);
 
-  const profiles = playersList ?? [];
+  const userIds = [...new Set((playersList ?? []).map((p) => p.user_id as string | null).filter((id): id is string => !!id))];
+  const { data: userRows } = userIds.length
+    ? await db.from("users").select("id, name").in("id", userIds)
+    : { data: [] as { id: string; name: string | null }[] };
+  const nameByUser = new Map((userRows ?? []).map((u) => [u.id as string, u.name as string | null]));
+
+  const profiles = (playersList ?? []).map((p) => ({
+    ...p,
+    name: p.user_id ? nameByUser.get(p.user_id as string) ?? null : null,
+  }));
 
   // Training stats from view (player_id references players.id — now correctly matched)
   const { data: trainingStats } = await db
@@ -81,8 +87,10 @@ export async function GET(req: NextRequest) {
     playerGameSessions.get(row.player_id)!.add(row.game_session_id);
   }
 
-  // All authenticated users see full team data
-  const visibleProfiles = profiles;
+  // Build combined stats — if player role, restrict to own data
+  const visibleProfiles = isPrivileged
+    ? profiles
+    : profiles.filter((p) => p.user_id === user.id);
 
   const players = visibleProfiles.map((p) => {
     const t = trainingMap.get(p.id);
@@ -162,6 +170,5 @@ export async function GET(req: NextRequest) {
       global_pct:   avg(globalPcts),
     },
     is_privileged: isPrivileged,
-    current_user_id: user.id,
   });
 }

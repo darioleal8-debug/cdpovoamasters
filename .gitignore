@@ -27,3 +27,7 @@ node_modules
 /tailwind.config.ts
 /tsconfig.json
 /tsconfig.tsbuildinfo
+
+# Artefactos gerados
+*.tsbuildinfo
+trace.txt

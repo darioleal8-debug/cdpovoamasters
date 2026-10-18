@@ -1,22 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { authorize } from "@/lib/auth/guards";
+import { hasAnyRole, MANAGERS } from "@/lib/auth/roles";
 
 export const runtime = "nodejs";
 
 function fail(msg: string, status = 400) {
   return NextResponse.json({ error: msg }, { status });
-}
-
-async function getSupabase() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
-  );
-  const { data: { user } } = await supabase.auth.getUser();
-  return { supabase, user };
 }
 
 // ─── GET /api/trainings/[id]/rsvp ────────────────────────────────────────────
@@ -26,8 +15,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: trainingId } = await params;
-  const { supabase, user } = await getSupabase();
-  if (!user) return fail("Não autenticado", 401);
+  // Sessão + conta ativa; auth.profile traz o papel ativo
+  const auth = await authorize();
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   // Sumário via view
   const { data: summary, error: sumErr } = await supabase
@@ -38,14 +29,26 @@ export async function GET(
 
   if (sumErr) return fail(sumErr.message, 500);
 
-  // RSVP próprio (jogador atual)
-  const { data: playerRecord } = await supabase
-    .from("players")
-    .select("id")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // RSVP próprio: perfil da época do treino; senão o registo mais recente
+  // (mesmo critério do POST — user_id ainda não ligado ao perfil da época atual)
+  const { data: trainingRow } = await supabase
+    .from("trainings").select("season_id").eq("id", trainingId).maybeSingle();
+  let playerRecord: { id: string } | null = null;
+  if (trainingRow) {
+    const { data: p1 } = await supabase
+      .from("players").select("id")
+      .eq("user_id", user.id).eq("season_id", trainingRow.season_id)
+      .maybeSingle();
+    playerRecord = p1;
+  }
+  if (!playerRecord) {
+    const { data: p2 } = await supabase
+      .from("players").select("id")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false }).limit(1)
+      .maybeSingle();
+    playerRecord = p2;
+  }
 
   let own = null;
   if (playerRecord) {
@@ -68,8 +71,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: trainingId } = await params;
-  const { supabase, user } = await getSupabase();
-  if (!user) return fail("Não autenticado", 401);
+  // Sessão + conta ativa; auth.profile traz o papel ativo
+  const auth = await authorize();
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   let body: { status?: string; reason_code?: string | null; reason_text?: string | null };
   try { body = await req.json(); }
@@ -95,7 +100,7 @@ export async function POST(
   if (tErr || !training) return fail("Treino não encontrado", 404);
 
   // Bloquear alterações apenas depois de o treino ter começado
-  const { data: isTrainer } = await supabase.rpc("is_trainer_or_above");
+  const isTrainer = hasAnyRole(auth.profile, MANAGERS);
   if (!isTrainer) {
     const trainingStart = new Date(`${training.date}T${training.start_time}`);
     if (new Date() > trainingStart) {

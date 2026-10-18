@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
+import { MANAGERS } from "@/lib/auth/roles";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
@@ -41,8 +43,9 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 // ─── PUT /api/trainings/[id] ─────────────────────────────
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { supabase, user } = await getSupabase();
-  if (!user) return fail("Não autenticado", 401);
+  const auth = await authorize(MANAGERS);
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return fail("JSON inválido"); }
@@ -66,8 +69,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 // ─── DELETE /api/trainings/[id] ──────────────────────────
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { supabase, user } = await getSupabase();
-  if (!user) return fail("Não autenticado", 401);
+  const auth = await authorize(MANAGERS);
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   const { error } = await supabase.from("trainings").delete().eq("id", id);
   if (error) return fail(error.message, 500);

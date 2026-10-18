@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
+import { MANAGERS } from "@/lib/auth/roles";
 import { createClient as createSupabase } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/server";
 import { ensureGameThread, ensureTrainingThread, archiveOldEventThreads } from "@/lib/chat/event-thread-sync";
 
 export const runtime = "nodejs";
@@ -21,9 +22,9 @@ function fail(msg: string, status = 400) {
 // Body: { event_id?: string; training_id?: string; action?: "archive_old" }
 // Chamado: criação de evento/treino, job de arquivamento
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return fail("Não autenticado", 401);
+  // Cria/arquiva fios com service role: só gestão (SEC-26)
+  const auth = await authorize(MANAGERS);
+  if (!auth.ok) return auth.response;
 
   let body: { event_id?: string; training_id?: string; action?: string };
   try { body = await req.json(); } catch { return fail("JSON inválido"); }

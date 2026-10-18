@@ -1,4 +1,6 @@
+import { todayInClubTz } from "@/lib/time/club-time";
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import crypto from "crypto";
 
@@ -10,6 +12,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Sessão + conta ativa (revisão final, Crítico 1); as verificações de papel abaixo mantêm-se
+  const authz = await authorize();
+  if (!authz.ok) return authz.response;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -17,21 +22,7 @@ export async function POST(
   const { id: trainingId } = await params;
   const adminClient = await createAdminClient();
 
-  // Jogador deve ter registo na temporada ativa
-  const { data: player } = await adminClient
-    .from("players")
-    .select("id, season_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!player) {
-    return NextResponse.json(
-      { error: "Sem perfil de jogador associado. Contacta o teu treinador." },
-      { status: 404 }
-    );
-  }
-
-  // Buscar treino
+  // Buscar treino primeiro: o perfil do jogador é o da época do treino (PRES-08)
   const { data: training } = await adminClient
     .from("trainings")
     .select("id, date, season_id")
@@ -42,8 +33,24 @@ export async function POST(
     return NextResponse.json({ error: "Treino não encontrado." }, { status: 404 });
   }
 
+  // Um perfil por época (UNIQUE user_id, season_id): sem este filtro maybeSingle() falhava
+  // para quem jogou mais de uma época
+  const { data: player } = await adminClient
+    .from("players")
+    .select("id, season_id")
+    .eq("user_id", user.id)
+    .eq("season_id", training.season_id)
+    .maybeSingle();
+
+  if (!player) {
+    return NextResponse.json(
+      { error: "Não tens perfil de jogador na temporada deste treino. Contacta o teu treinador." },
+      { status: 404 }
+    );
+  }
+
   // Validar que o treino é HOJE
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInClubTz();
   if (training.date !== today) {
     return NextResponse.json(
       { error: "A auto-presença por fotografia só está disponível no dia do treino." },
@@ -51,13 +58,6 @@ export async function POST(
     );
   }
 
-  // Jogador deve pertencer à mesma temporada do treino
-  if (player.season_id !== training.season_id) {
-    return NextResponse.json(
-      { error: "Não pertences à temporada deste treino." },
-      { status: 403 }
-    );
-  }
 
   // Verificar se já tem presença registada
   const { data: existing } = await adminClient

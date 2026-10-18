@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorize } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { lisbonDateTime } from "@/lib/event-time";
 
@@ -18,9 +19,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: gameId } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return fail("Não autenticado", 401);
+  // Sessão + conta ativa
+  const auth = await authorize();
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   const { data: game } = await supabase
     .from("events")
@@ -63,9 +65,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: gameId } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return fail("Não autenticado", 401);
+  // Sessão + conta ativa
+  const auth = await authorize();
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   let body: { status?: string; reason_code?: string | null; reason_text?: string | null };
   try { body = await req.json(); }

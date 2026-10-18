@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { shouldRedirectFromLogin } from "@/lib/auth/session-cookie";
+import { safeNextPath } from "@/lib/auth/safe-next";
 
 // Rotas protegidas que requerem sessão activa
 const PROTECTED_PREFIXES = [
@@ -91,12 +93,11 @@ export async function middleware(request: NextRequest) {
 
   // /login com sessão válida confirmada → dashboard (ou redirectTo se seguro)
   // Só redireciona se getUser() confirmar utilizador real; nunca por simples presença de cookie
-  if (path.startsWith("/login") && user) {
+  // reason=inactive|noprofile: o /login termina a sessão — redirecionar aqui criava um ciclo
+  if (path.startsWith("/login") && user && shouldRedirectFromLogin(true, request.nextUrl.searchParams)) {
     const redirectTo = request.nextUrl.searchParams.get("redirectTo");
-    const dest =
-      redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//")
-        ? redirectTo
-        : "/dashboard";
+    const safe = safeNextPath(redirectTo);
+    const dest = safe === "/" ? "/dashboard" : safe;
     return buildRedirect(new URL(dest, request.url));
   }
 
