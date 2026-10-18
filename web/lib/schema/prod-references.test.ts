@@ -63,3 +63,20 @@ describe("RSVP de treinos (minor da revisão + bug novo)", () => {
     expect(src).not.toMatch(/"announcement"\)\s*\.maybeSingle\(\)/);
   });
 });
+
+// players.name foi removida (041): nenhum ficheiro da app a pode pedir — não só os da lista acima.
+describe("nenhum ficheiro pede players.name", () => {
+  const { readdirSync, statSync } = require("node:fs") as typeof import("node:fs");
+  const ROOT = path.join(__dirname, "..", "..");
+  const walk = (d: string): string[] =>
+    readdirSync(d).flatMap((n) => {
+      const p = path.join(d, n);
+      if (statSync(p).isDirectory()) return n === "node_modules" || n.startsWith(".") ? [] : walk(p);
+      return /\.(ts|tsx)$/.test(n) && !n.includes(" 2.") && !n.endsWith(".test.ts") ? [p] : [];
+    });
+  const offenders = ["app", "components", "hooks", "lib"]
+    .flatMap((d) => walk(path.join(ROOT, d)))
+    .filter((p) => /from\("players"\)[\s\S]{0,80}select\("[^"]*\bname\b/.test(readFileSync(p, "utf8")))
+    .map((p) => path.relative(ROOT, p));
+  it("lista vazia", () => expect(offenders).toEqual([]));
+});

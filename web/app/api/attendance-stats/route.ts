@@ -32,12 +32,22 @@ export async function GET(req: NextRequest) {
   const isPrivileged = hasAnyRole(auth.profile, MANAGERS);
 
   // Players for season (from the players table, which has the data)
+  // players.name foi removida (041): o nome vem de users
   const { data: playersList } = await db
     .from("players")
-    .select("id, name, number, user_id")
+    .select("id, number, user_id")
     .eq("season_id", seasonId);
 
-  const profiles = playersList ?? [];
+  const userIds = [...new Set((playersList ?? []).map((p) => p.user_id as string | null).filter((id): id is string => !!id))];
+  const { data: userRows } = userIds.length
+    ? await db.from("users").select("id, name").in("id", userIds)
+    : { data: [] as { id: string; name: string | null }[] };
+  const nameByUser = new Map((userRows ?? []).map((u) => [u.id as string, u.name as string | null]));
+
+  const profiles = (playersList ?? []).map((p) => ({
+    ...p,
+    name: p.user_id ? nameByUser.get(p.user_id as string) ?? null : null,
+  }));
 
   // Training stats from view (player_id references players.id — now correctly matched)
   const { data: trainingStats } = await db
