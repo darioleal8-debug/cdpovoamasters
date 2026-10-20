@@ -1,5 +1,24 @@
 // ─── Tipos para o sistema de competições públicas ─────────────────────────────
 
+export interface LeagueTeam {
+  id: string;
+  name: string;
+  normalized_name: string;
+  slug: string | null;
+  short_name: string | null;
+  sigla: string | null;
+  logo_url: string | null;
+  home_pavilion: string | null;
+  locality: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
+  ccd_number: string | null;
+  is_our_team: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+
 export interface Competition {
   id: string;
   name: string;

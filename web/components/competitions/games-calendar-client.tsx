@@ -18,11 +18,14 @@ interface Props {
   games: PublicGame[];
   competitionSlug: string;
   mode?: "calendar" | "results";
+  teams?: string[];
+  initialTeam?: string;
 }
 
-export function GamesCalendarClient({ games, competitionSlug, mode = "calendar" }: Props) {
+export function GamesCalendarClient({ games, competitionSlug, mode = "calendar", teams, initialTeam }: Props) {
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedJornada, setSelectedJornada] = useState<number | "all">("all");
+  const [selectedTeam, setSelectedTeam] = useState<string | "all">(initialTeam ?? "all");
 
   const counts = useMemo(() => ({
     all:         games.length,
@@ -49,6 +52,7 @@ export function GamesCalendarClient({ games, competitionSlug, mode = "calendar" 
     if (filter === "with_result") result = result.filter((g) => g.result_status === "approved");
     if (filter === "no_result")   result = result.filter((g) => g.result_status === "no_result");
     if (selectedJornada !== "all") result = result.filter((g) => g.syntheticJornada === selectedJornada);
+    if (selectedTeam !== "all")    result = result.filter((g) => g.home_team === selectedTeam || g.away_team === selectedTeam);
 
     return result;
   }, [games, filter, selectedJornada, mode]);
@@ -112,6 +116,34 @@ export function GamesCalendarClient({ games, competitionSlug, mode = "calendar" 
           );
         })}
       </div>
+
+      {/* Selector de equipa */}
+      {teams && teams.length > 0 && (
+        <div style={{ marginBottom: "16px" }}>
+          <select
+            value={selectedTeam}
+            onChange={(e) => setSelectedTeam(e.target.value)}
+            style={{
+              padding: "7px 12px",
+              borderRadius: "6px",
+              border: "1px solid #D4CEC7",
+              background: selectedTeam !== "all" ? "#1A1612" : "transparent",
+              color: selectedTeam !== "all" ? "#F97316" : "#6F675F",
+              fontFamily: "var(--font-barlow, sans-serif)",
+              fontSize: "13px",
+              fontWeight: 600,
+              cursor: "pointer",
+              minHeight: "44px",
+              minWidth: "180px",
+            }}
+          >
+            <option value="all">Todas as equipas</option>
+            {teams.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Selector de jornadas */}
       {jornadas.length > 1 && (

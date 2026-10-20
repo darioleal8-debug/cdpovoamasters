@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import { computeStandings, parseGameMeta, type Competition, type LeagueGameResult, type PublicGame, type StandingRow } from "@/types/competitions";
+import { computeStandings, parseGameMeta, type Competition, type LeagueGameResult, type LeagueTeam, type PublicGame, type StandingRow } from "@/types/competitions";
 
 // ─── Competition ─────────────────────────────────────────────────────────────
 
@@ -33,6 +33,26 @@ export async function getLeagueTeams(competitionKey: string): Promise<string[]> 
     .select("name")
     .order("name", { ascending: true });
   return (data ?? []).map((t) => t.name);
+}
+
+export async function getLeagueTeamsWithDetails(): Promise<LeagueTeam[]> {
+  const supabase = await createAdminClient();
+  const { data } = await supabase
+    .from("league_teams")
+    .select("*")
+    .order("is_our_team", { ascending: false })
+    .order("name");
+  return (data ?? []) as LeagueTeam[];
+}
+
+export async function getTeamBySlug(slug: string): Promise<LeagueTeam | null> {
+  const supabase = await createAdminClient();
+  const { data } = await supabase
+    .from("league_teams")
+    .select("*")
+    .eq("slug", slug)
+    .maybeSingle();
+  return (data as LeagueTeam) ?? null;
 }
 
 // ─── Games (events + merged result/submission state) ─────────────────────────

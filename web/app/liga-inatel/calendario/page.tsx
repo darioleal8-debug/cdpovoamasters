@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getCompetitionBySlug, getCompetitionGames } from "@/lib/competitions-data";
+import { getCompetitionBySlug, getCompetitionGames, getTeamNames } from "@/lib/competitions-data";
 import { CourtBg } from "@/components/competitions/court-bg";
 import { GamesCalendarClient } from "@/components/competitions/games-calendar-client";
 
@@ -21,10 +21,10 @@ export default async function CalendarioPage() {
     );
   }
 
-  const games = await getCompetitionGames(
-    competition.competition_key ?? "Liga",
-    competition.season_id
-  );
+  const [games, teamNames] = await Promise.all([
+    getCompetitionGames(competition.competition_key ?? "Liga", competition.season_id),
+    getTeamNames(),
+  ]);
 
   const maxW = { maxWidth: "1200px", margin: "0 auto", padding: "0 20px", width: "100%" };
 
@@ -76,6 +76,7 @@ export default async function CalendarioPage() {
           games={games}
           competitionSlug="liga-inatel"
           mode="calendar"
+          teams={teamNames}
         />
       </div>
     </div>

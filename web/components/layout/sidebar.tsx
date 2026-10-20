@@ -45,7 +45,7 @@ const managementItems = [
   { label: "Documentos",       href: "/documentos",    icon: FolderOpen },
   { label: "Histórico",        href: "/historico",     icon: History   },
   { label: "Palmarés",         href: "/palmares",      icon: Trophy    },
-  { label: "Liga INATEL",      href: "/liga-inatel",   icon: Shield    },
+  { label: "Liga INATEL",      href: "/liga",          icon: Shield    },
 ];
 
 const adminOnlyItems = [
