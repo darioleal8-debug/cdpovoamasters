@@ -56,8 +56,8 @@ export default async function EquipasPage() {
             >
               <div
                 style={{
-                  background: team.is_our_team ? "#1A1612" : "#FFFDFA",
-                  border: `1px solid ${team.is_our_team ? "#F97316" : "#E8E0D6"}`,
+                  background: "#FFFDFA",
+                  border: "1px solid #E8E0D6",
                   borderRadius: "8px",
                   padding: "16px 20px",
                   display: "flex",
@@ -80,11 +80,11 @@ export default async function EquipasPage() {
                 {/* Initials badge */}
                 <div style={{
                   width: "44px", height: "44px", borderRadius: "8px", flexShrink: 0,
-                  background: team.is_our_team ? "#F97316" : "#F0EAE1",
+                  background: "#F0EAE1",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))",
                   fontWeight: 800, fontSize: "14px", letterSpacing: "0.04em",
-                  color: team.is_our_team ? "#15110E" : "#6F675F",
+                  color: "#6F675F",
                 }}>
                   {(team.sigla ?? team.name.split(" ").map((w) => w[0]).join("").slice(0, 3).toUpperCase())}
                 </div>
@@ -94,29 +94,18 @@ export default async function EquipasPage() {
                     fontFamily: "var(--font-barlow-condensed, sans-serif)",
                     fontWeight: 700, fontSize: "15px",
                     letterSpacing: "0.02em", textTransform: "uppercase",
-                    color: team.is_our_team ? "#F6F2EC" : "#1A1612",
+                    color: "#1A1612",
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                     margin: 0,
                   }}>
                     {team.name}
-                    {team.is_our_team && (
-                      <span style={{
-                        marginLeft: "6px",
-                        fontFamily: "var(--font-ibm-mono, monospace)",
-                        fontSize: "9px", fontWeight: 500,
-                        letterSpacing: "0.1em", color: "#F97316",
-                        verticalAlign: "middle",
-                      }}>
-                        ★
-                      </span>
-                    )}
                   </p>
                   {(team.locality || team.home_pavilion) && (
                     <p style={{
                       fontFamily: "var(--font-ibm-mono, monospace)",
                       fontSize: "10px", fontWeight: 500,
                       letterSpacing: "0.06em", textTransform: "uppercase",
-                      color: team.is_our_team ? "#B9AFA4" : "#8C837A",
+                      color: "#8C837A",
                       margin: "2px 0 0",
                       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                     }}>
@@ -130,7 +119,7 @@ export default async function EquipasPage() {
                     style={{ marginLeft: "auto", flexShrink: 0 }}
                     width="16" height="16" viewBox="0 0 16 16" fill="none"
                   >
-                    <path d="M6 3l5 5-5 5" stroke={team.is_our_team ? "#F97316" : "#C2A882"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M6 3l5 5-5 5" stroke="#C2A882" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 )}
               </div>

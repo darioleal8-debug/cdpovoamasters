@@ -20,7 +20,7 @@ const ibmMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: { default: "Liga INATEL", template: "%s · Liga INATEL" },
-  description: "Classificação, calendário e resultados da Liga INATEL de basquetebol — CD Póvoa Masters.",
+  description: "Classificação, calendário e resultados da Liga INATEL de basquetebol.",
   openGraph: { siteName: "HoopHub · Liga INATEL", locale: "pt_PT" },
 };
 
@@ -162,7 +162,7 @@ export default function LigaInatelLayout({ children }: { children: React.ReactNo
         }}
       >
         <p>
-          CD Póvoa Masters · Liga INATEL de basquetebol ·{" "}
+          Liga INATEL de basquetebol ·{" "}
           <a
             href="https://www.hoophub.pt"
             style={{ color: "#F97316", textDecoration: "none" }}

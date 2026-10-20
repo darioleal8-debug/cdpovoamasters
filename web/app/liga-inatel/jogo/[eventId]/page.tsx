@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
-import { getOurTeamName } from "@/lib/competitions-data";
 import { parseGameMeta } from "@/types/competitions";
 
 export const revalidate = 60;
@@ -43,7 +42,7 @@ export async function generateMetadata({ params }: { params: Promise<{ eventId: 
   const { eventId } = await params;
   const { event } = await getGameData(eventId);
   const meta = parseGameMeta(event?.description ?? null);
-  const home = meta?.home_team ?? "CD Póvoa Masters";
+  const home = meta?.home_team ?? "Equipa A";
   const away = meta?.away_team ?? "Adversário";
   return {
     title: `${home} vs ${away}`,
@@ -53,15 +52,12 @@ export async function generateMetadata({ params }: { params: Promise<{ eventId: 
 
 export default async function GameDetailPage({ params }: { params: Promise<{ eventId: string }> }) {
   const { eventId } = await params;
-  const [{ event, result, session }, ourTeam] = await Promise.all([
-    getGameData(eventId),
-    getOurTeamName(),
-  ]);
+  const { event, result, session } = await getGameData(eventId);
 
   if (!event) notFound();
 
   const meta = parseGameMeta(event.description ?? null);
-  const homeTeam = meta?.home_team ?? ourTeam;
+  const homeTeam = meta?.home_team ?? "—";
   const awayTeam = meta?.away_team ?? (event.opponent ?? "Adversário");
   const d = new Date(event.event_date + "T12:00:00");
   const dateLabel = `${WEEKDAY[d.getDay()]}, ${d.getDate()} de ${MONTH[d.getMonth()]} de ${d.getFullYear()}`;
@@ -71,8 +67,6 @@ export default async function GameDetailPage({ params }: { params: Promise<{ eve
 
   const homeWon = hasResult && result!.home_score > result!.away_score;
   const awayWon = hasResult && result!.away_score > result!.home_score;
-  const isOurHome = homeTeam === ourTeam || homeTeam.toLowerCase().includes("póvoa");
-  const weWon = hasResult && ((isOurHome && homeWon) || (!isOurHome && awayWon));
 
   return (
     <div className="space-y-6">
@@ -91,7 +85,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ eve
         )}
 
         <div className="flex items-center justify-center gap-4 flex-wrap">
-          <h2 className={`text-lg font-bold text-right flex-1 ${isOurHome ? "text-orange-600 dark:text-orange-400" : ""}`}>
+          <h2 className="text-lg font-bold text-right flex-1">
             {homeTeam}
           </h2>
 
@@ -115,9 +109,9 @@ export default async function GameDetailPage({ params }: { params: Promise<{ eve
                   <span className="text-muted-foreground mx-2 text-3xl">–</span>
                   <span className={awayWon ? "" : "text-muted-foreground"}>{result!.away_score}</span>
                 </div>
-                {weWon !== undefined && (
-                  <p className={`text-sm font-semibold ${weWon ? "text-green-600 dark:text-green-400" : "text-red-500"}`}>
-                    {weWon ? "Vitória" : "Derrota"}
+                {homeWon !== undefined && (
+                  <p className="text-sm font-semibold text-muted-foreground">
+                    {homeWon ? `${homeTeam} venceu` : awayWon ? `${awayTeam} venceu` : "Empate"}
                   </p>
                 )}
               </div>
@@ -126,7 +120,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ eve
             )}
           </div>
 
-          <h2 className={`text-lg font-bold text-left flex-1 ${!isOurHome ? "text-orange-600 dark:text-orange-400" : ""}`}>
+          <h2 className="text-lg font-bold text-left flex-1">
             {awayTeam}
           </h2>
         </div>

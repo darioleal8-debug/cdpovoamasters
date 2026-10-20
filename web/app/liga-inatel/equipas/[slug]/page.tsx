@@ -86,11 +86,11 @@ export default async function TeamPage({
           <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
             <div style={{
               width: "60px", height: "60px", borderRadius: "10px", flexShrink: 0,
-              background: team.is_our_team ? "#F97316" : "rgba(249,115,22,.15)",
+              background: "rgba(249,115,22,.15)",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))",
               fontWeight: 800, fontSize: "18px", letterSpacing: "0.04em",
-              color: team.is_our_team ? "#15110E" : "#F97316",
+              color: "#F97316",
             }}>
               {initials}
             </div>

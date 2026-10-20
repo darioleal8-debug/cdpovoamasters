@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getCompetitionBySlug, getCompetitionGames, getStandings, getOurTeamName } from "@/lib/competitions-data";
+import { getCompetitionBySlug, getCompetitionGames, getStandings } from "@/lib/competitions-data";
 import { createAdminClient } from "@/lib/supabase/server";
 import { CourtBg } from "@/components/competitions/court-bg";
 import { TeamMono, teamAbbr } from "@/components/competitions/team-mono";
@@ -11,7 +11,7 @@ import type { PublicGame } from "@/types/competitions";
 
 export const metadata: Metadata = {
   title: "Liga INATEL",
-  description: "Página oficial da Liga INATEL de basquetebol — CD Póvoa Masters.",
+  description: "Classificação, calendário e resultados da Liga INATEL de basquetebol.",
 };
 
 export const revalidate = 60;
@@ -39,10 +39,9 @@ export default async function LigaInatelHomePage() {
     );
   }
 
-  const [games, standings, ourTeam] = await Promise.all([
+  const [games, standings] = await Promise.all([
     getCompetitionGames(competition.competition_key ?? "Liga", competition.season_id),
     getStandings(competition.id),
-    getOurTeamName(),
   ]);
 
   const supabase = await createAdminClient();
@@ -110,7 +109,7 @@ export default async function LigaInatelHomePage() {
                   marginBottom: "12px",
                 }}
               >
-                CD PÓVOA MASTERS · {season?.name ?? "ÉPOCA 2024/25"}
+                LIGA INATEL · {season?.name ?? "ÉPOCA 2024/25"}
               </p>
 
               <h1
@@ -336,7 +335,7 @@ export default async function LigaInatelHomePage() {
                 marginTop: "16px",
               }}
             >
-              <StandingsTable standings={standings} ourTeamName={ourTeam} limit={5} mini />
+              <StandingsTable standings={standings} limit={5} mini />
             </div>
             {standings.length > 5 && (
               <p style={{ textAlign: "center", marginTop: "8px", fontSize: "12px", color: "#8C837A" }}>
