@@ -3,7 +3,7 @@ import { authorize } from "@/lib/auth/guards";
 
 export async function GET() {
   const auth = await authorize(["admin"]);
-  if ("status" in auth) return auth;
+  if (!auth.ok) return auth.response;
 
   const { data, error } = await auth.supabase
     .from("league_teams")
@@ -17,7 +17,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const auth = await authorize(["admin"]);
-  if ("status" in auth) return auth;
+  if (!auth.ok) return auth.response;
 
   const body = await req.json() as {
     name: string;

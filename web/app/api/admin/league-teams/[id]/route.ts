@@ -6,7 +6,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await authorize(["admin"]);
-  if ("status" in auth) return auth;
+  if (!auth.ok) return auth.response;
 
   const { id } = await params;
   const body = await req.json() as Partial<{
@@ -47,7 +47,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await authorize(["admin"]);
-  if ("status" in auth) return auth;
+  if (!auth.ok) return auth.response;
 
   const { id } = await params;
 
