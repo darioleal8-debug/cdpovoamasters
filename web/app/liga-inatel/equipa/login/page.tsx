@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
 
-export default function DelegateLoginPage() {
+function DelegateLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -217,5 +217,13 @@ export default function DelegateLoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function DelegateLoginPage() {
+  return (
+    <Suspense>
+      <DelegateLoginContent />
+    </Suspense>
   );
 }
