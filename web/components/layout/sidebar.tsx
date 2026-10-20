@@ -51,6 +51,7 @@ const managementItems = [
 const adminOnlyItems = [
   { label: "Utilização",       href: "/utilizacao",    icon: ActivitySquare },
   { label: "Notícias",         href: "/noticias-admin", icon: Newspaper },
+  { label: "Delegados Liga",   href: "/liga/delegados", icon: UserCog },
 ];
 
 const playerAreaItems = [
