@@ -121,7 +121,7 @@ export default async function DelegateDashboardPage() {
 
   if (!membership) redirect("/liga-inatel/equipa/login");
 
-  const team = membership.league_teams as {
+  const team = membership.league_teams as unknown as {
     id: string; name: string; slug: string | null; sigla: string | null;
     locality: string | null; home_pavilion: string | null;
   };
