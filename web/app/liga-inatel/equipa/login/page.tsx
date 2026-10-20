@@ -1,16 +1,23 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
 
 export default function DelegateLoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (searchParams.get("msg") === "admin_required") {
+      setError("Não tens permissão para aceder à área de admin.");
+    }
+  }, [searchParams]);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,11 +39,16 @@ export default function DelegateLoginPage() {
       const res = await fetch("/api/liga/auth/set-cookie", { method: "POST" });
       if (!res.ok) {
         await supabase.auth.signOut();
-        setError("Esta conta não tem acesso de delegado. Contacte o administrador.");
+        setError("Esta conta não tem acesso à liga. Contacte o administrador.");
         return;
       }
 
-      router.push("/liga-inatel/equipa");
+      const json = await res.json();
+      if (json.role === "liga_admin") {
+        router.push("/liga-inatel/admin");
+      } else {
+        router.push("/liga-inatel/equipa");
+      }
       router.refresh();
     } finally {
       setLoading(false);

@@ -16,6 +16,7 @@ function isProtected(path: string) {
 }
 
 // Rotas de delegado: requerem sessão Supabase + cookie hh_user_type=league_delegate
+// Rotas de liga admin: requerem sessão Supabase + cookie hh_user_type=liga_admin
 const DELEGATE_LOGIN = "/liga-inatel/equipa/login";
 
 function isDelegateRoute(path: string) {
@@ -23,6 +24,10 @@ function isDelegateRoute(path: string) {
     (path === "/liga-inatel/equipa" || path.startsWith("/liga-inatel/equipa/")) &&
     !path.startsWith(DELEGATE_LOGIN)
   );
+}
+
+function isLigaAdminRoute(path: string) {
+  return path === "/liga-inatel/admin" || path.startsWith("/liga-inatel/admin/");
 }
 
 // Prefixo dos cookies de sessão do Supabase (base + chunks .0 .1 …)
@@ -99,6 +104,17 @@ export async function middleware(request: NextRequest) {
   // Rota protegida sem sessão válida → login
   if (isProtected(path) && !user) {
     return buildRedirect(new URL("/login", request.url));
+  }
+
+  // Rota de liga admin: requer sessão + cookie liga_admin
+  if (isLigaAdminRoute(path)) {
+    if (!user) {
+      return buildRedirect(new URL(`${DELEGATE_LOGIN}?msg=admin_required`, request.url));
+    }
+    const userTypeCookie = request.cookies.get("hh_user_type")?.value;
+    if (userTypeCookie !== "liga_admin") {
+      return buildRedirect(new URL(`${DELEGATE_LOGIN}?msg=admin_required`, request.url));
+    }
   }
 
   // Rota de delegado: requer sessão + cookie league_delegate
