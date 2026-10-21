@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/server";
 
 const BUCKET = "club-logos";
 const MAX_SIZE = 2 * 1024 * 1024; // 2 MB
@@ -9,17 +8,16 @@ const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"]
 // PATCH /api/liga/equipa/logo
 // O delegado de equipa actualiza o logo da sua equipa
 export async function PATCH(req: Request) {
-  // 1. Validar sessão e obter o team_id do utilizador
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
 
+  // 1. Validar sessão
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
 
-  const adminClient = await createAdminClient();
-
-  const { data: membership } = await adminClient
+  // 2. Obter team_id (RLS: p1_ltm_select_self permite SELECT própria linha)
+  const { data: membership } = await supabase
     .from("league_team_members")
     .select("team_id")
     .eq("user_id", user.id)
@@ -29,7 +27,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Sem acesso de equipa" }, { status: 403 });
   }
 
-  // 2. Ler o ficheiro do multipart form
+  // 3. Ler o ficheiro do multipart form
   let formData: FormData;
   try {
     formData = await req.formData();
@@ -48,12 +46,12 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Ficheiro demasiado grande (máx. 2 MB)" }, { status: 400 });
   }
 
-  // 3. Upload para o bucket club-logos
+  // 4. Upload para o bucket (RLS: team_member_upload/update_league_logo)
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
   const path = `league/${membership.team_id}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  const { error: uploadErr } = await adminClient.storage
+  const { error: uploadErr } = await supabase.storage
     .from(BUCKET)
     .upload(path, buffer, {
       contentType: file.type,
@@ -64,11 +62,11 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: uploadErr.message }, { status: 500 });
   }
 
-  const { data: publicData } = adminClient.storage.from(BUCKET).getPublicUrl(path);
+  const { data: publicData } = supabase.storage.from(BUCKET).getPublicUrl(path);
   const logoUrl = publicData.publicUrl;
 
-  // 4. Actualizar league_teams.logo_url
-  const { error: updateErr } = await adminClient
+  // 5. Actualizar league_teams.logo_url (RLS: team_member_update_logo)
+  const { error: updateErr } = await supabase
     .from("league_teams")
     .update({ logo_url: logoUrl, updated_at: new Date().toISOString() })
     .eq("id", membership.team_id);
