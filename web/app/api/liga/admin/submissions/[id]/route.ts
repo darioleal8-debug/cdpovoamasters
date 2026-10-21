@@ -79,6 +79,27 @@ export async function PATCH(
       valor_novo: { home_score: sub.home_score, away_score: sub.away_score, source: `submission:${id}` },
       motivo: motivo.trim(),
     });
+
+    // Gerar notícia em background (fire-and-forget; falhas não bloqueiam a aprovação)
+    const isTestGame = await (async () => {
+      try {
+        const { data: ev } = await adminClient.from("events").select("description").eq("id", sub.event_id).single();
+        const meta = JSON.parse(ev?.description ?? "{}") as { is_test?: boolean };
+        return meta.is_test === true;
+      } catch { return false; }
+    })();
+
+    if (!isTestGame) {
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.hoophub.pt";
+      fetch(`${baseUrl}/api/liga/admin/generate-news`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: req.headers.get("cookie") ?? "",
+        },
+        body: JSON.stringify({ game_id: sub.event_id }),
+      }).catch(() => {/* fire-and-forget */});
+    }
   } else {
     // Auditoria de rejeição
     await adminClient.from("liga_resultado_audit").insert({

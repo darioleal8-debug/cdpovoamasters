@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getCompetitionBySlug, getCompetitionGames, getStandings } from "@/lib/competitions-data";
+import { getCompetitionBySlug, getCompetitionGames, getStandings, getLatestNoticias } from "@/lib/competitions-data";
 import { createAdminClient } from "@/lib/supabase/server";
 import { CourtBg } from "@/components/competitions/court-bg";
 import { TeamMono, teamAbbr } from "@/components/competitions/team-mono";
@@ -8,6 +8,7 @@ import { ScoreTicker } from "@/components/competitions/score-ticker";
 import { ScoreCard } from "@/components/competitions/score-card";
 import { StandingsTable } from "@/components/competitions/standings-table";
 import type { PublicGame } from "@/types/competitions";
+import { NoticiasSection } from "@/components/liga/noticias-section";
 
 export const metadata: Metadata = {
   title: "Liga INATEL",
@@ -39,9 +40,10 @@ export default async function LigaInatelHomePage() {
     );
   }
 
-  const [games, standings] = await Promise.all([
+  const [games, standings, noticias] = await Promise.all([
     getCompetitionGames(competition.competition_key ?? "Liga", competition.season_id),
     getStandings(competition.id),
+    getLatestNoticias(4),
   ]);
 
   const supabase = await createAdminClient();
@@ -491,6 +493,9 @@ export default async function LigaInatelHomePage() {
           )}
         </div>
       </section>
+
+      {/* ── NOTÍCIAS ── */}
+      <NoticiasSection noticias={noticias} />
     </div>
   );
 }

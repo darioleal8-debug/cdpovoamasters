@@ -1,27 +1,55 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-const BUCKET = "game-sheets";
-const MAX_SIZE = 10 * 1024 * 1024;
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const DEEPSEEK_API = "https://api.deepseek.com/v1/chat/completions";
+const BUCKET = "folhas-jogo";
+const MAX_SIZE = 15 * 1024 * 1024; // 15 MB
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const ALLOWED_TYPES = [...IMAGE_TYPES, "application/pdf"];
+
+// Endpoint sem /v1 conforme documentação actualizada
+const DEEPSEEK_API = "https://api.deepseek.com/chat/completions";
 const DEEPSEEK_MODEL = "deepseek-flash";
 
-const SYSTEM_PROMPT = `És um assistente especializado em ler folhas de jogo oficiais de basquetebol da Liga INATEL.
-Dado a imagem de uma folha de jogo, extrai:
-- home_score: pontuação final da equipa da casa (número inteiro)
-- away_score: pontuação final da equipa visitante (número inteiro)
-- home_team: nome da equipa da casa (string)
-- away_team: nome da equipa visitante (string)
-- periods: array com parciais por período [{home, away}] se legível
+const VISION_PROMPT = `Analisa esta folha de jogo oficial de basquetebol da Liga INATEL.
+Extrai os dados e responde APENAS com JSON válido no seguinte formato:
+{
+  "equipa_casa": "nome completo da equipa da casa",
+  "equipa_fora": "nome completo da equipa visitante",
+  "pontos_casa": número inteiro,
+  "pontos_fora": número inteiro,
+  "parciais": [{"periodo": 1, "casa": num, "fora": num}, ...],
+  "prolongamento": false,
+  "data": "YYYY-MM-DD ou null",
+  "pavilhao": "nome do pavilhão ou null",
+  "arbitros": ["nome1", "nome2"],
+  "jogadores": [
+    {"equipa": "casa|fora", "numero": num, "nome": "...", "pontos": num, "faltas": num}
+  ],
+  "confianca": 0.0,
+  "avisos": []
+}
+Se não conseguires ler um campo com confiança, usa null. Não inventes dados.`;
 
-Responde APENAS com JSON válido no formato:
-{"home_team":"...","away_team":"...","home_score":0,"away_score":0,"periods":[]}
+const TEXT_PROMPT = `Analisa o seguinte texto extraído de uma folha de jogo de basquetebol da Liga INATEL e extrai os dados estruturados.
+Responde APENAS com JSON válido no seguinte formato:
+{
+  "equipa_casa": "nome completo da equipa da casa",
+  "equipa_fora": "nome completo da equipa visitante",
+  "pontos_casa": número inteiro,
+  "pontos_fora": número inteiro,
+  "parciais": [{"periodo": 1, "casa": num, "fora": num}, ...],
+  "prolongamento": false,
+  "data": "YYYY-MM-DD ou null",
+  "pavilhao": "nome do pavilhão ou null",
+  "arbitros": ["nome1", "nome2"],
+  "jogadores": [
+    {"equipa": "casa|fora", "numero": num, "nome": "...", "pontos": num, "faltas": num}
+  ],
+  "confianca": 0.0,
+  "avisos": []
+}
+Texto da folha:\n\n`;
 
-Se não conseguires ler algum campo, usa null para esse campo.`;
-
-// POST /api/liga/equipa/game-sheet/scan
-// Upload da foto + OCR via DeepSeek Vision
 export async function POST(req: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -34,6 +62,9 @@ export async function POST(req: Request) {
     .maybeSingle();
   if (!membership) return NextResponse.json({ error: "Sem acesso de equipa" }, { status: 403 });
 
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) return NextResponse.json({ error: "DEEPSEEK_API_KEY não configurada" }, { status: 500 });
+
   let formData: FormData;
   try { formData = await req.formData(); }
   catch { return NextResponse.json({ error: "Payload inválido" }, { status: 400 }); }
@@ -41,97 +72,121 @@ export async function POST(req: Request) {
   const file = formData.get("photo") as File | null;
   if (!file) return NextResponse.json({ error: "Campo 'photo' não encontrado" }, { status: 400 });
   if (!ALLOWED_TYPES.includes(file.type))
-    return NextResponse.json({ error: "Formato não suportado (use JPEG, PNG ou WebP)" }, { status: 400 });
+    return NextResponse.json({ error: `Tipo não suportado: ${file.type}. Use JPEG, PNG, WebP ou PDF.` }, { status: 400 });
   if (file.size > MAX_SIZE)
-    return NextResponse.json({ error: "Ficheiro demasiado grande (máx. 10 MB)" }, { status: 400 });
+    return NextResponse.json({ error: `Ficheiro demasiado grande (máx. ${MAX_SIZE / 1024 / 1024} MB)` }, { status: 400 });
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-  const photoPath = `${user.id}/${Date.now()}.${ext}`;
+  const ext = file.type === "application/pdf" ? "pdf"
+    : file.type === "image/png" ? "png"
+    : file.type === "image/webp" ? "webp"
+    : "jpg";
 
-  // Upload para storage (RLS: team_member_upload_game_sheet)
+  // Guardar ficheiro no bucket folhas-jogo
+  const epoch = new Date().getFullYear();
+  const gameId = (formData.get("game_id") as string | null) ?? "unknown";
+  const photoPath = `${user.id}/${epoch}/${gameId}/${Date.now()}.${ext}`;
+
   const { error: uploadErr } = await supabase.storage
     .from(BUCKET)
     .upload(photoPath, buffer, { contentType: file.type, upsert: false });
   if (uploadErr)
     return NextResponse.json({ error: `Erro no upload: ${uploadErr.message}` }, { status: 500 });
 
-  // Gerar URL assinado para passar ao DeepSeek (válido 5 min)
-  const { data: signedData, error: signErr } = await supabase.storage
-    .from(BUCKET)
-    .createSignedUrl(photoPath, 300);
-  if (signErr || !signedData?.signedUrl)
-    return NextResponse.json({ error: "Erro ao gerar URL da imagem" }, { status: 500 });
-
-  // Chamar DeepSeek Vision
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey)
-    return NextResponse.json({ error: "DEEPSEEK_API_KEY não configurada" }, { status: 500 });
-
-  let extracted: {
-    home_team: string | null;
-    away_team: string | null;
-    home_score: number | null;
-    away_score: number | null;
-    periods: { home: number; away: number }[];
-  } | null = null;
+  // Extrair dados via DeepSeek
+  let extracted: Record<string, unknown> | null = null;
 
   try {
-    const dsRes = await fetch(DEEPSEEK_API, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: DEEPSEEK_MODEL,
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "image_url",
-                image_url: { url: signedData.signedUrl },
-              },
-              { type: "text", text: SYSTEM_PROMPT },
-            ],
-          },
-        ],
-        temperature: 0,
-        max_tokens: 512,
-      }),
-    });
+    if (file.type === "application/pdf") {
+      // PDF com camada de texto → extrair com pdf-parse
+      let pdfText = "";
+      try {
+        const pdfParse = (await import("pdf-parse")).default;
+        const parsed = await pdfParse(buffer);
+        pdfText = parsed.text?.trim() ?? "";
+      } catch {
+        pdfText = "";
+      }
 
-    if (!dsRes.ok) {
-      const errText = await dsRes.text();
-      return NextResponse.json(
-        { error: `DeepSeek API error ${dsRes.status}: ${errText}` },
-        { status: 502 }
-      );
-    }
+      if (!pdfText || pdfText.length < 50) {
+        // PDF digitalizado sem texto: não consegue processar
+        return NextResponse.json({
+          error: "PDF digitalizado sem camada de texto. Tire uma fotografia em vez de enviar o PDF, ou exporte o PDF como imagem.",
+          photo_path: photoPath,
+          fallback_manual: true,
+        }, { status: 422 });
+      }
 
-    const dsJson = await dsRes.json() as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const raw = dsJson.choices?.[0]?.message?.content ?? "";
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      extracted = JSON.parse(jsonMatch[0]);
+      const res = await fetch(DEEPSEEK_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: DEEPSEEK_MODEL,
+          messages: [{ role: "user", content: TEXT_PROMPT + pdfText }],
+          response_format: { type: "json_object" },
+          temperature: 0,
+          max_tokens: 1024,
+        }),
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        return NextResponse.json({ error: `DeepSeek error ${res.status}: ${t}` }, { status: 502 });
+      }
+      const json = await res.json() as { choices?: { message?: { content?: string } }[] };
+      const raw = json.choices?.[0]?.message?.content ?? "{}";
+      extracted = JSON.parse(raw);
+
+    } else {
+      // Imagem → enviar como base64 ao DeepSeek Vision
+      const b64 = buffer.toString("base64");
+      const mimeType = file.type as "image/jpeg" | "image/png" | "image/webp";
+
+      const res = await fetch(DEEPSEEK_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: DEEPSEEK_MODEL,
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "image_url", image_url: { url: `data:${mimeType};base64,${b64}` } },
+                { type: "text", text: VISION_PROMPT },
+              ],
+            },
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0,
+          max_tokens: 1024,
+        }),
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        return NextResponse.json({ error: `DeepSeek error ${res.status}: ${t}` }, { status: 502 });
+      }
+      const json = await res.json() as { choices?: { message?: { content?: string } }[] };
+      const raw = json.choices?.[0]?.message?.content ?? "{}";
+      extracted = JSON.parse(raw);
     }
   } catch (e) {
-    return NextResponse.json(
-      { error: `Erro ao processar imagem: ${String(e)}` },
-      { status: 502 }
-    );
+    // OCR falhou, mas o ficheiro foi guardado — retornar photo_path para o delegado preencher manualmente
+    return NextResponse.json({
+      error: `Erro ao processar: ${String(e)}`,
+      photo_path: photoPath,
+      fallback_manual: true,
+    }, { status: 422 });
   }
 
   return NextResponse.json({
     ok: true,
     photo_path: photoPath,
-    home_team: extracted?.home_team ?? null,
-    away_team: extracted?.away_team ?? null,
-    home_score: extracted?.home_score ?? null,
-    away_score: extracted?.away_score ?? null,
-    periods: extracted?.periods ?? [],
+    equipa_casa: extracted?.equipa_casa ?? null,
+    equipa_fora: extracted?.equipa_fora ?? null,
+    pontos_casa: extracted?.pontos_casa ?? null,
+    pontos_fora: extracted?.pontos_fora ?? null,
+    parciais: extracted?.parciais ?? [],
+    confianca: extracted?.confianca ?? 0,
+    avisos: extracted?.avisos ?? [],
+    extraction_raw: extracted,
   });
 }
