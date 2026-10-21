@@ -602,17 +602,22 @@ export interface TrainingAttendance {
   status: AttendanceStatus;
   updated_at: string;
   updated_by: string | null;
-  method: "manual" | "photo" | "gps" | "gps_checkin" | "no_gps" | null;
-  // Auto-Presença
+  method: "gps_checkin" | "manual_no_gps" | "staff" | "manual" | "photo" | "gps" | "no_gps" | null;
+  // Auto-Presença GPS
   photo_url: string | null;
   gps_lat: number | null;
   gps_lng: number | null;
-  gps_validated: boolean | null;
+  gps_accuracy_m: number | null;
+  gps_validated: boolean;
+  gps_status: "ok" | "out_of_range" | "no_venue_coords" | "permission_denied" | "timeout" | "unavailable" | "unsupported" | "skipped" | null;
   gps_distance_m: number | null;
   auto_timestamp: string | null;
   validated_by: string | null;
   validated_at: string | null;
   photo_hash: string | null;
+  // deprecated — usar gps_lat/gps_lng
+  checkin_lat: number | null;
+  checkin_lng: number | null;
 }
 
 export interface TrainingNote {

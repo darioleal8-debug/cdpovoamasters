@@ -54,12 +54,33 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return fail("records[] obrigatório");
   }
 
+  const now = new Date().toISOString();
+
+  // Step 1: insert new rows with safe defaults (ignoreDuplicates avoids overwriting GPS data)
+  await supabase
+    .from("training_attendance")
+    .upsert(
+      body.records.map((r) => ({
+        training_id,
+        player_id:    r.player_id,
+        status:       r.status,
+        method:       "staff",
+        gps_validated: false,
+        updated_at:   now,
+        updated_by:   user.id,
+      })),
+      { onConflict: "training_id,player_id", ignoreDuplicates: true },
+    );
+
+  // Step 2: update existing rows — only status + validation cols (preserves GPS data)
   const rows = body.records.map((r) => ({
     training_id,
-    player_id:  r.player_id,
-    status:     r.status,
-    updated_at: new Date().toISOString(),
-    updated_by: user.id,
+    player_id:    r.player_id,
+    status:       r.status,
+    validated_by: user.id,
+    validated_at: now,
+    updated_at:   now,
+    updated_by:   user.id,
   }));
 
   const { error } = await supabase
