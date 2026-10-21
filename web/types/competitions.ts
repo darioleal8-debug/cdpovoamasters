@@ -14,6 +14,7 @@ export interface LeagueTeam {
   contact_phone: string | null;
   ccd_number: string | null;
   is_our_team: boolean;
+  is_placeholder: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -149,6 +150,7 @@ export interface GameMeta {
   locality?: string;
   is_home?: boolean;
   jogo_num?: number;
+  serie?: string;
 }
 
 export function parseGameMeta(description: string | null): GameMeta | null {
@@ -165,6 +167,7 @@ export function parseGameMeta(description: string | null): GameMeta | null {
       pavilion:  m.pavilion  ?? undefined,
       locality:  m.locality  ?? undefined,
       is_home:   Boolean(m.is_home),
+      serie:     m.serie ?? undefined,
     };
   } catch {
     return null;

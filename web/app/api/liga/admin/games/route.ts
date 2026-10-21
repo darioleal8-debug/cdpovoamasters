@@ -22,10 +22,11 @@ export async function GET() {
   const [eventsRes, resultsRes, submissionsRes] = await Promise.all([
     adminClient
       .from("events")
-      .select("id, event_date, event_time, location, description, opponent")
+      .select("id, event_date, event_time, location, description, opponent, original_scheduled_at")
       .eq("type", "jogo")
       .eq("competition", competition.competition_key ?? "Liga")
       .eq("season_id", competition.season_id)
+      .is("deleted_at", null)
       .order("event_date"),
     adminClient.from("league_game_results").select("*"),
     adminClient
@@ -50,6 +51,7 @@ export async function GET() {
   const games = (eventsRes.data ?? []).map((e: {
     id: string; event_date: string; event_time: string | null;
     location: string | null; description: string | null; opponent: string | null;
+    original_scheduled_at: string | null;
   }) => {
     const meta = parseGameMeta(e.description ?? null);
     const result = resultMap.get(e.id) ?? null;
@@ -65,6 +67,8 @@ export async function GET() {
       away_team: meta?.away_team ?? (e.opponent ?? "Adversário"),
       jornada: meta?.jornada ?? null,
       volta: meta?.volta ?? null,
+      serie: meta?.serie ?? null,
+      original_scheduled_at: e.original_scheduled_at ?? null,
       result: result ? { home_score: (result as unknown as {home_score: number}).home_score, away_score: (result as unknown as {away_score: number}).away_score } : null,
       result_id: result ? (result as unknown as {id: string}).id : null,
       result_status: result ? "approved" : pendingCount > 0 ? "pending" : "no_result",

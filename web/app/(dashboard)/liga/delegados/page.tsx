@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 
-type Team = { id: string; name: string; sigla: string | null };
+type Team = { id: string; name: string; sigla: string | null; is_placeholder: boolean };
 type Delegate = {
   id: string;
   user_id: string;
@@ -39,7 +39,7 @@ export default function LigaDelegadosPage() {
       }
       const [delJson, teamsJson] = await Promise.all([delRes.json(), teamsRes.json()]);
       setDelegates(delJson.delegates ?? []);
-      setTeams((teamsJson.teams ?? []).filter((t: Team & { name: string }) => !t.name.startsWith("Vencedor Jogo")));
+      setTeams((teamsJson.teams ?? []).filter((t: Team) => !t.is_placeholder));
     } catch {
       setError("Erro de rede.");
     } finally {

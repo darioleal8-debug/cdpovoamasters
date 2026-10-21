@@ -31,6 +31,7 @@ export async function getLeagueTeams(competitionKey: string): Promise<string[]> 
   const { data } = await supabase
     .from("league_teams")
     .select("name")
+    .eq("is_placeholder", false)
     .order("name", { ascending: true });
   return (data ?? []).map((t) => t.name);
 }
@@ -88,6 +89,7 @@ export async function getCompetitionGames(
       .eq("type", "jogo")
       .eq("competition", competitionKey)
       .eq("season_id", seasonId)
+      .is("deleted_at", null)
       .order("event_date", { ascending: true }),
 
     supabase
@@ -220,7 +222,11 @@ export async function getStandingsWithForm(competitionId: string): Promise<Stand
 
 export async function getTeamNames(): Promise<string[]> {
   const supabase = await createAdminClient();
-  const { data } = await supabase.from("league_teams").select("name").order("name");
+  const { data } = await supabase
+    .from("league_teams")
+    .select("name")
+    .eq("is_placeholder", false)
+    .order("name");
   return (data ?? []).map((t) => t.name);
 }
 

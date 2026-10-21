@@ -85,8 +85,8 @@ export default function LigaAdminPage() {
   if (loading) return <div className="p-8 text-center text-sm text-muted-foreground">A carregar…</div>;
   if (error)   return <div className="p-8 text-center text-sm text-red-500">{error}</div>;
 
-  const realTeams = teams.filter((t) => !t.name.startsWith("Vencedor Jogo"));
-  const placeholders = teams.filter((t) => t.name.startsWith("Vencedor Jogo"));
+  const realTeams = teams.filter((t) => !t.is_placeholder);
+  const placeholders = teams.filter((t) => t.is_placeholder);
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-4xl">

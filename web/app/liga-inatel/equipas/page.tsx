@@ -12,7 +12,7 @@ export const revalidate = 300;
 
 export default async function EquipasPage() {
   const teams = await getLeagueTeamsWithDetails();
-  const realTeams = teams.filter((t) => !t.name.startsWith("Vencedor Jogo"));
+  const realTeams = teams.filter((t) => !t.is_placeholder);
 
   const maxW = { maxWidth: "1200px", margin: "0 auto", padding: "0 20px", width: "100%" };
 

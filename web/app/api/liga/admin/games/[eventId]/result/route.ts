@@ -77,5 +77,39 @@ export async function POST(
     motivo: motivo.trim(),
   });
 
+  // Resolver marcadores: se este jogo tem jogo_num, actualiza eventos futuros que
+  // referenciam 'Vencedor Jogo N' como home_team ou away_team.
+  if (meta?.jogo_num && eventRes.data.season_id) {
+    const placeholder = `Vencedor Jogo ${meta.jogo_num}`;
+    const winner = home_score > away_score ? homeTeamName : awayTeamName;
+
+    const { data: futureEvents } = await adminClient
+      .from("events")
+      .select("id, description, opponent")
+      .eq("season_id", eventRes.data.season_id)
+      .eq("game_type", "official")
+      .neq("id", eventId);
+
+    if (futureEvents) {
+      for (const fe of futureEvents) {
+        if (!fe.description) continue;
+        let parsed: Record<string, unknown>;
+        try { parsed = JSON.parse(fe.description as string); } catch { continue; }
+
+        let changed = false;
+        if (parsed.home_team === placeholder) { parsed.home_team = winner; changed = true; }
+        if (parsed.away_team === placeholder) { parsed.away_team = winner; changed = true; }
+
+        if (changed) {
+          const updates: { description: string; opponent?: string } = {
+            description: JSON.stringify(parsed),
+          };
+          if ((fe.opponent as string | null) === placeholder) updates.opponent = winner;
+          await adminClient.from("events").update(updates).eq("id", fe.id);
+        }
+      }
+    }
+  }
+
   return NextResponse.json({ result: newResult });
 }
