@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCompetitionBySlug, getCompetitionGames } from "@/lib/competitions-data";
 import type { PublicGame } from "@/types/competitions";
 import { DelegateSignOut } from "@/components/liga/delegate-sign-out";
+import { TeamLogoUpload } from "@/components/liga/team-logo-upload";
 
 export const revalidate = 60;
 
@@ -115,7 +116,7 @@ export default async function DelegateDashboardPage() {
 
   const { data: membership } = await supabase
     .from("league_team_members")
-    .select("id, team_id, role, league_teams(id, name, slug, sigla, locality, home_pavilion)")
+    .select("id, team_id, role, league_teams(id, name, slug, sigla, locality, home_pavilion, logo_url)")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -123,7 +124,7 @@ export default async function DelegateDashboardPage() {
 
   const team = membership.league_teams as unknown as {
     id: string; name: string; slug: string | null; sigla: string | null;
-    locality: string | null; home_pavilion: string | null;
+    locality: string | null; home_pavilion: string | null; logo_url: string | null;
   };
 
   const competition = await getCompetitionBySlug("liga-inatel");
@@ -240,6 +241,18 @@ export default async function DelegateDashboardPage() {
             </div>
           </section>
         )}
+
+        {/* Logo da equipa */}
+        <section style={{ marginBottom: "32px" }}>
+          <h2 style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted, #6F675F)", margin: "0 0 12px" }}>
+            Identidade visual
+          </h2>
+          <TeamLogoUpload
+            teamId={team.id}
+            teamName={team.name}
+            currentLogoUrl={team.logo_url ?? null}
+          />
+        </section>
 
         {/* Fase 3 teaser */}
         <div

@@ -38,6 +38,15 @@ type AuditRecord = {
   motivo: string; created_at: string;
 };
 
+type TeamAccessMember = {
+  id: string; user_id: string; email: string; role: string; created_at: string;
+};
+type TeamAccess = {
+  team_id: string; team_name: string; team_slug: string | null;
+  team_sigla: string | null; logo_url: string | null;
+  members: TeamAccessMember[];
+};
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmtDate(d: string, t: string | null) {
@@ -133,6 +142,27 @@ export default function LigaAdminPage() {
   const [loadingDeleted, setLoadingDeleted]   = useState(false);
   const [showDeleted, setShowDeleted]         = useState(false);
   const [restoring, setRestoring]             = useState<string | null>(null);
+
+  // Team access tab
+  const [activeTab, setActiveTab]             = useState<"games" | "access">("games");
+  const [teamAccess, setTeamAccess]           = useState<TeamAccess[]>([]);
+  const [loadingAccess, setLoadingAccess]     = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createTeamId, setCreateTeamId]       = useState("");
+  const [createEmail, setCreateEmail]         = useState("");
+  const [createPassword, setCreatePassword]   = useState("");
+  const [createLoading, setCreateLoading]     = useState(false);
+  const [createError, setCreateError]         = useState<string | null>(null);
+  const [resetUserId, setResetUserId]         = useState<string | null>(null);
+  const [resetEmail, setResetEmail]           = useState("");
+  const [resetPassword, setResetPassword]     = useState("");
+  const [resetLoading, setResetLoading]       = useState(false);
+  const [resetError, setResetError]           = useState<string | null>(null);
+  const [removeUserId, setRemoveUserId]       = useState<string | null>(null);
+  const [removeEmail, setRemoveEmail]         = useState("");
+  const [removeTeamName, setRemoveTeamName]   = useState("");
+  const [removeLoading, setRemoveLoading]     = useState(false);
+  const [removeError, setRemoveError]         = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -307,6 +337,73 @@ export default function LigaAdminPage() {
     if (next && deletedGames.length === 0) await loadDeletedGames();
   }
 
+  async function loadTeamAccess() {
+    setLoadingAccess(true);
+    try {
+      const res = await fetch("/api/liga/admin/team-access");
+      if (!res.ok) return;
+      const json = await res.json();
+      setTeamAccess(json.teams ?? []);
+    } finally { setLoadingAccess(false); }
+  }
+
+  function openCreateModal(teamId: string) {
+    setCreateTeamId(teamId);
+    setCreateEmail(""); setCreatePassword(""); setCreateError(null);
+    setShowCreateModal(true);
+  }
+
+  async function handleCreateAccess() {
+    if (!createEmail.trim() || !createPassword) return;
+    setCreateLoading(true); setCreateError(null);
+    try {
+      const res = await fetch("/api/liga/admin/team-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ team_id: createTeamId, email: createEmail.trim(), password: createPassword }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setCreateError(json.error ?? "Erro ao criar acesso."); return; }
+      setShowCreateModal(false);
+      await loadTeamAccess();
+    } finally { setCreateLoading(false); }
+  }
+
+  function openResetModal(userId: string, email: string) {
+    setResetUserId(userId); setResetEmail(email); setResetPassword(""); setResetError(null);
+  }
+
+  async function handleResetPassword() {
+    if (!resetUserId || resetPassword.length < 8) return;
+    setResetLoading(true); setResetError(null);
+    try {
+      const res = await fetch(`/api/liga/admin/team-access/${resetUserId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: resetPassword }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setResetError(json.error ?? "Erro ao redefinir password."); return; }
+      setResetUserId(null);
+    } finally { setResetLoading(false); }
+  }
+
+  function openRemoveModal(userId: string, email: string, teamName: string) {
+    setRemoveUserId(userId); setRemoveEmail(email); setRemoveTeamName(teamName); setRemoveError(null);
+  }
+
+  async function handleRemoveAccess() {
+    if (!removeUserId) return;
+    setRemoveLoading(true); setRemoveError(null);
+    try {
+      const res = await fetch(`/api/liga/admin/team-access/${removeUserId}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) { setRemoveError(json.error ?? "Erro ao remover acesso."); return; }
+      setRemoveUserId(null);
+      await loadTeamAccess();
+    } finally { setRemoveLoading(false); }
+  }
+
   // Derived filter data
   const jornadas = [...new Set(games.map(g => g.jornada).filter(Boolean) as number[])].sort((a, b) => a - b);
   const teams = [...new Set([...games.map(g => g.home_team), ...games.map(g => g.away_team)])].sort();
@@ -354,6 +451,26 @@ export default function LigaAdminPage() {
           <SignOutBtn />
         </div>
       </div>
+
+      {/* ── Tab switcher ── */}
+      <div style={{ display: "flex", gap: "0", marginBottom: "24px", borderBottom: "2px solid #E8E0D6" }}>
+        {(["games", "access"] as const).map(tab => (
+          <button key={tab}
+            onClick={() => { setActiveTab(tab); if (tab === "access" && teamAccess.length === 0) loadTeamAccess(); }}
+            style={{
+              padding: "8px 20px", fontWeight: 700, fontSize: "12px",
+              letterSpacing: "0.06em", textTransform: "uppercase",
+              border: "none", background: "none", cursor: "pointer",
+              color: activeTab === tab ? "#F97316" : "#8C837A",
+              borderBottom: `2px solid ${activeTab === tab ? "#F97316" : "transparent"}`,
+              marginBottom: "-2px",
+            }}>
+            {tab === "games" ? "Jogos" : "Acessos das Equipas"}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "games" && <>
 
       {/* ── Filters ── */}
       <div style={{
@@ -727,6 +844,102 @@ export default function LigaAdminPage() {
           </div>
         )}
       </div>
+      </>}
+
+      {/* ── Team access section ── */}
+      {activeTab === "access" && (
+        <div>
+          {loadingAccess && (
+            <p style={{ fontSize: "14px", color: "#8C837A", padding: "40px 0", textAlign: "center" }}>A carregar acessos…</p>
+          )}
+          {!loadingAccess && teamAccess.map(t => (
+            <div key={t.team_id} style={{
+              marginBottom: "12px", borderRadius: "10px",
+              border: "1px solid #E8E0D6", background: "#FFFDFA", overflow: "hidden",
+            }}>
+              {/* Team header */}
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "12px 16px", background: "#F9F6F0", borderBottom: "1px solid #E8E0D6",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  {t.logo_url ? (
+                    <img src={t.logo_url} alt={t.team_name}
+                      style={{ width: "28px", height: "28px", borderRadius: "6px", objectFit: "contain" }} />
+                  ) : (
+                    <div style={{
+                      width: "28px", height: "28px", borderRadius: "6px",
+                      background: "#F97316", display: "flex", alignItems: "center",
+                      justifyContent: "center", fontSize: "10px", fontWeight: 900, color: "#fff",
+                    }}>
+                      {(t.team_sigla ?? t.team_name).slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <span style={{ fontWeight: 700, fontSize: "14px", color: "#1A1612" }}>{t.team_name}</span>
+                  {t.members.length === 0 && (
+                    <span style={{ fontSize: "11px", color: "#9CA3AF", fontStyle: "italic" }}>sem acesso</span>
+                  )}
+                </div>
+                <button
+                  onClick={() => openCreateModal(t.team_id)}
+                  style={{
+                    padding: "5px 12px", fontSize: "11px", fontWeight: 700,
+                    border: "1.5px solid #F97316", borderRadius: "6px",
+                    background: "transparent", color: "#F97316", cursor: "pointer",
+                  }}
+                >
+                  + Criar acesso
+                </button>
+              </div>
+
+              {/* Members list */}
+              {t.members.length > 0 && (
+                <div style={{ padding: "0 16px" }}>
+                  {t.members.map(m => (
+                    <div key={m.id} style={{
+                      display: "flex", alignItems: "center", gap: "12px",
+                      padding: "10px 0", borderBottom: "1px solid #F0EAE1",
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontWeight: 600, fontSize: "13px", color: "#1A1612", margin: "0 0 2px",
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {m.email}
+                        </p>
+                        <p style={{ fontSize: "11px", color: "#9CA3AF", margin: 0 }}>
+                          {m.role === "team_manager" ? "Delegado" : m.role}
+                          {" · "}criado em {new Date(m.created_at).toLocaleDateString("pt-PT")}
+                        </p>
+                      </div>
+                      <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                        <button
+                          onClick={() => openResetModal(m.user_id, m.email)}
+                          style={{
+                            padding: "4px 10px", fontSize: "11px", fontWeight: 600,
+                            border: "1.5px solid #D1C9C0", borderRadius: "5px",
+                            background: "#FFFDFA", color: "#6B7280", cursor: "pointer",
+                          }}
+                        >
+                          Password
+                        </button>
+                        <button
+                          onClick={() => openRemoveModal(m.user_id, m.email, t.team_name)}
+                          style={{
+                            padding: "4px 10px", fontSize: "11px", fontWeight: 600,
+                            border: "1.5px solid #FCA5A5", borderRadius: "5px",
+                            background: "#FFF5F5", color: "#DC2626", cursor: "pointer",
+                          }}
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Edit game modal ── */}
       {editingGame && (
@@ -913,6 +1126,167 @@ export default function LigaAdminPage() {
                 }}
               >
                 {deleting ? "A eliminar…" : "Eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Create access modal ── */}
+      {showCreateModal && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,.45)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 1000, padding: "16px",
+        }}
+          onClick={() => !createLoading && setShowCreateModal(false)}
+        >
+          <div style={{
+            background: "#FFFDFA", borderRadius: "12px", padding: "24px",
+            width: "100%", maxWidth: "420px", boxShadow: "0 20px 60px rgba(0,0,0,.2)",
+          }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 style={{
+              fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "11px",
+              fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase",
+              color: "#F97316", margin: "0 0 4px",
+            }}>Criar Acesso de Equipa</h2>
+            <p style={{ fontSize: "12px", color: "#6B7280", margin: "0 0 20px" }}>
+              {teamAccess.find(t => t.team_id === createTeamId)?.team_name}
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div>
+                <label style={labelStyle}>Email</label>
+                <input type="email" value={createEmail}
+                  onChange={e => setCreateEmail(e.target.value)}
+                  placeholder="delegado@equipa.pt"
+                  style={{ ...inputStyle, width: "100%", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <label style={labelStyle}>Password inicial (mín. 8 caracteres)</label>
+                <input type="password" value={createPassword}
+                  onChange={e => setCreatePassword(e.target.value)}
+                  placeholder="••••••••"
+                  style={{ ...inputStyle, width: "100%", boxSizing: "border-box" }} />
+              </div>
+            </div>
+
+            {createError && (
+              <p style={{ fontSize: "12px", color: "#DC2626", marginTop: "10px" }}>{createError}</p>
+            )}
+
+            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "20px" }}>
+              <button onClick={() => setShowCreateModal(false)} disabled={createLoading} style={{ ...btnSecondary }}>
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreateAccess}
+                disabled={createLoading || !createEmail.trim() || createPassword.length < 8}
+                style={{ ...btnPrimary, opacity: (createLoading || !createEmail.trim() || createPassword.length < 8) ? 0.5 : 1 }}
+              >
+                {createLoading ? "A criar…" : "Criar acesso"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Reset password modal ── */}
+      {resetUserId && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,.45)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 1000, padding: "16px",
+        }}
+          onClick={() => !resetLoading && setResetUserId(null)}
+        >
+          <div style={{
+            background: "#FFFDFA", borderRadius: "12px", padding: "24px",
+            width: "100%", maxWidth: "380px", boxShadow: "0 20px 60px rgba(0,0,0,.2)",
+          }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 style={{
+              fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "11px",
+              fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase",
+              color: "#F97316", margin: "0 0 4px",
+            }}>Redefinir Password</h2>
+            <p style={{ fontSize: "12px", color: "#6B7280", margin: "0 0 20px" }}>{resetEmail}</p>
+
+            <div>
+              <label style={labelStyle}>Nova password (mín. 8 caracteres)</label>
+              <input type="password" value={resetPassword}
+                onChange={e => setResetPassword(e.target.value)}
+                placeholder="••••••••"
+                style={{ ...inputStyle, width: "100%", boxSizing: "border-box" }} />
+            </div>
+
+            {resetError && (
+              <p style={{ fontSize: "12px", color: "#DC2626", marginTop: "10px" }}>{resetError}</p>
+            )}
+
+            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "20px" }}>
+              <button onClick={() => setResetUserId(null)} disabled={resetLoading} style={{ ...btnSecondary }}>
+                Cancelar
+              </button>
+              <button
+                onClick={handleResetPassword}
+                disabled={resetLoading || resetPassword.length < 8}
+                style={{ ...btnPrimary, opacity: (resetLoading || resetPassword.length < 8) ? 0.5 : 1 }}
+              >
+                {resetLoading ? "A guardar…" : "Guardar password"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Remove access confirm modal ── */}
+      {removeUserId && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,.45)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 1000, padding: "16px",
+        }}
+          onClick={() => !removeLoading && setRemoveUserId(null)}
+        >
+          <div style={{
+            background: "#FFFDFA", borderRadius: "12px", padding: "24px",
+            width: "100%", maxWidth: "380px", boxShadow: "0 20px 60px rgba(0,0,0,.2)",
+          }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 style={{
+              fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "11px",
+              fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase",
+              color: "#DC2626", margin: "0 0 4px",
+            }}>Remover Acesso</h2>
+            <p style={{ fontSize: "13px", fontWeight: 600, color: "#1A1612", margin: "0 0 4px" }}>
+              {removeEmail}
+            </p>
+            <p style={{ fontSize: "12px", color: "#6B7280", margin: "0 0 16px" }}>
+              Equipa: {removeTeamName}
+            </p>
+            <p style={{ fontSize: "13px", color: "#DC2626", margin: "0 0 16px" }}>
+              Esta acção irá eliminar permanentemente o utilizador e o seu acesso.
+            </p>
+
+            {removeError && (
+              <p style={{ fontSize: "12px", color: "#DC2626", marginTop: "8px" }}>{removeError}</p>
+            )}
+
+            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "20px" }}>
+              <button onClick={() => setRemoveUserId(null)} disabled={removeLoading} style={{ ...btnSecondary }}>
+                Cancelar
+              </button>
+              <button
+                onClick={handleRemoveAccess}
+                disabled={removeLoading}
+                style={{ ...btnPrimary, background: "#DC2626", opacity: removeLoading ? 0.5 : 1 }}
+              >
+                {removeLoading ? "A remover…" : "Remover acesso"}
               </button>
             </div>
           </div>
