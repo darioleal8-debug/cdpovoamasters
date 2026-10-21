@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Calendar, Clock, MapPin, Shield, Trophy, Map, ChevronDown } from "lucide-react";
+import { Calendar, Clock, MapPin, Shield, Trophy, Map as MapIcon, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -173,7 +173,7 @@ function GameCard({
             rel="noopener noreferrer"
             className="flex items-center gap-1 text-orange-500 hover:text-orange-600"
           >
-            <Map className="h-3 w-3" />
+            <MapIcon className="h-3 w-3" />
             Mapa
           </a>
         )}
