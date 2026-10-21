@@ -100,6 +100,7 @@ export interface PublicGame {
   pending_count: number;        // quantas submissões pendentes existem para este jogo
   live_game_url: string | null; // /live/[session_id] se ao vivo
   is_our_game: boolean;         // envolve CD Póvoa Masters
+  is_test: boolean;             // jogo de teste — não mostrar em páginas públicas
 }
 
 // ─── Utilitários ─────────────────────────────────────────────────────────────
@@ -151,6 +152,7 @@ export interface GameMeta {
   is_home?: boolean;
   jogo_num?: number;
   serie?: string;
+  is_test?: boolean;
 }
 
 export function parseGameMeta(description: string | null): GameMeta | null {
@@ -168,6 +170,7 @@ export function parseGameMeta(description: string | null): GameMeta | null {
       locality:  m.locality  ?? undefined,
       is_home:   Boolean(m.is_home),
       serie:     m.serie ?? undefined,
+      is_test:   m.is_test === true,
     };
   } catch {
     return null;

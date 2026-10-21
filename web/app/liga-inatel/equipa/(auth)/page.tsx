@@ -5,6 +5,7 @@ import { getCompetitionBySlug, getCompetitionGames } from "@/lib/competitions-da
 import type { PublicGame } from "@/types/competitions";
 import { DelegateSignOut } from "@/components/liga/delegate-sign-out";
 import { TeamLogoUpload } from "@/components/liga/team-logo-upload";
+import { SubmitResultFlow } from "@/components/liga/submit-result-flow";
 
 export const revalidate = 60;
 
@@ -132,6 +133,7 @@ export default async function DelegateDashboardPage() {
 
   if (competition?.season_id) {
     const all = await getCompetitionGames(competition.competition_key ?? "Liga", competition.season_id);
+    // inclui is_test para o delegado poder testar a submissão
     games = all.filter(
       (g) => g.home_team === team.name || g.away_team === team.name
     );
@@ -139,7 +141,8 @@ export default async function DelegateDashboardPage() {
 
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = games.filter((g) => g.event_date >= today).slice(0, 5);
-  const past = games.filter((g) => g.event_date < today).reverse().slice(0, 10);
+  const pastAll = games.filter((g) => g.event_date < today).reverse();
+  const past = pastAll.slice(0, 10);
 
   const siglaOrInitials =
     team.sigla ??
@@ -254,22 +257,13 @@ export default async function DelegateDashboardPage() {
           />
         </section>
 
-        {/* Fase 3 teaser */}
-        <div
-          style={{
-            borderRadius: "12px",
-            border: "1.5px dashed #D1C9C0",
-            padding: "20px 16px",
-            textAlign: "center",
-          }}
-        >
-          <p style={{ fontSize: "13px", fontWeight: 600, color: "var(--fg, #15110E)", margin: "0 0 4px" }}>
-            Submissão de resultados via foto
-          </p>
-          <p style={{ fontSize: "12px", color: "var(--muted, #6F675F)", margin: 0 }}>
-            Em breve poderás fotografar a folha de jogo e submeter o resultado automaticamente.
-          </p>
-        </div>
+        {/* Submissão de resultados */}
+        <section style={{ marginBottom: "32px" }}>
+          <h2 style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted, #6F675F)", margin: "0 0 12px" }}>
+            Resultados
+          </h2>
+          <SubmitResultFlow games={pastAll} teamName={team.name} />
+        </section>
 
         <p style={{ marginTop: "24px", textAlign: "center" }}>
           <Link href="/liga-inatel" style={{ fontSize: "12px", color: "#F97316", textDecoration: "none" }}>

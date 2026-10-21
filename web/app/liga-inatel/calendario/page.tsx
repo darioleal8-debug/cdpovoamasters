@@ -21,10 +21,11 @@ export default async function CalendarioPage() {
     );
   }
 
-  const [games, teamNames] = await Promise.all([
+  const [allGames, teamNames] = await Promise.all([
     getCompetitionGames(competition.competition_key ?? "Liga", competition.season_id),
     getTeamNames(),
   ]);
+  const games = allGames.filter((g) => !g.is_test);
 
   const maxW = { maxWidth: "1200px", margin: "0 auto", padding: "0 20px", width: "100%" };
 
