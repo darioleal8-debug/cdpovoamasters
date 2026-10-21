@@ -29,7 +29,7 @@ export async function GET() {
     // Tabela ainda não existe — devolver defaults silenciosamente
     return NextResponse.json({
       id: "default",
-      club_name: "CD Póvoa Masters",
+      club_name: "CD Póvoa",
       logo_url: null,
       primary_color: "#111111",
       secondary_color: "#F28C28",

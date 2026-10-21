@@ -557,7 +557,7 @@ export async function POST(req: NextRequest) {
 
   const file       = formData.get("file") as File | null;
   const seasonId   = formData.get("season_id") as string | null;
-  const ourTeam    = (formData.get("our_team") as string) || "CD Póvoa Masters";
+  const ourTeam    = (formData.get("our_team") as string) || "CD Póvoa";
   const dryRun     = formData.get("dry_run") === "true";
   const importAll  = formData.get("import_all") === "true";
   const useAI      = formData.get("use_ai") === "true";

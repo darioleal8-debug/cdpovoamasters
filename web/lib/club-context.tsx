@@ -53,7 +53,7 @@ const DEFAULT_SECONDARY = "#F28C28";
 const DEFAULT_ACCENT    = "#ffffff";
 
 const DEFAULTS: ClubSettings = {
-  club_name:       "CD Póvoa Masters",
+  club_name:       "CD Póvoa",
   logo_url:        null,
   primary_color:   DEFAULT_PRIMARY,
   secondary_color: DEFAULT_SECONDARY,

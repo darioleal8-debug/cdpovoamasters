@@ -150,7 +150,7 @@ export default function ImportarCalendarioPage() {
 
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [seasonId, setSeasonId] = useState<string>("");
-  const [ourTeam, setOurTeam] = useState("CD Póvoa Masters");
+  const [ourTeam, setOurTeam] = useState("CD Póvoa");
   const [importAll, setImportAll] = useState(false);
   const [useAI, setUseAI] = useState(true);
   const [file, setFile] = useState<File | null>(null);
@@ -416,7 +416,7 @@ export default function ImportarCalendarioPage() {
               <Input
                 value={ourTeam}
                 onChange={(e) => setOurTeam(e.target.value)}
-                placeholder="CD Póvoa Masters"
+                placeholder="CD Póvoa"
               />
             </div>
           </div>

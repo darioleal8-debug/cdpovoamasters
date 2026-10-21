@@ -49,7 +49,7 @@ export async function generateGamePDF(
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
-  doc.text("CD Póvoa Masters", 14, 31);
+  doc.text("CD Póvoa", 14, 31);
   doc.text(session.opponent_name, pageW - 14, 31, { align: "right" });
 
   doc.setTextColor(0, 0, 0);
@@ -64,7 +64,7 @@ export async function generateGamePDF(
       startY: y,
       head: [["", ...pLabels, "TOTAL"]],
       body: [
-        ["CD Póvoa Masters", ...partials.map((p) => p.home_score), session.home_score],
+        ["CD Póvoa", ...partials.map((p) => p.home_score), session.home_score],
         [session.opponent_name, ...partials.map((p) => p.away_score), session.away_score],
       ],
       styles: { fontSize: 9, halign: "center" as const },
@@ -97,7 +97,7 @@ export async function generateGamePDF(
     head: [["EQUIPA", "PTS", "REB", "AST", "STL", "BLK", "TOV", "FC", "FD",
       "2P/A", "2P%", "3P/A", "3P%", "LL/A", "LL%", "EFF"]],
     body: [
-      ["CD Póvoa Masters",
+      ["CD Póvoa",
         totPts, totReb, totAst, totStl, totBlk, totTov, totFC, totFD,
         `${tot2M}/${tot2A}`, pct(tot2M, tot2A),
         `${tot3M}/${tot3A}`, pct(tot3M, tot3A),

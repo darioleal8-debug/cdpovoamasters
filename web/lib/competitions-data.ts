@@ -23,7 +23,7 @@ export async function getOurTeamName(): Promise<string> {
     .select("name")
     .eq("is_our_team", true)
     .single();
-  return data?.name ?? "CD Póvoa Masters";
+  return data?.name ?? "CD Póvoa";
 }
 
 export async function getLeagueTeams(competitionKey: string): Promise<string[]> {

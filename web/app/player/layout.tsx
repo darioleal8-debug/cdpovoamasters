@@ -34,7 +34,7 @@ export default async function PlayerLayout({ children }: { children: React.React
     supabase.from("team_kits").select("team_name, jersey_home_color, shorts_home_color, jersey_away_color"),
   ]);
 
-  const clubName  = settingsRow?.club_name ?? "CD Póvoa Masters";
+  const clubName  = settingsRow?.club_name ?? "CD Póvoa";
   const clubKit   = (kitsRows ?? []).find((k: { team_name: string }) => k.team_name.toLowerCase() === clubName.toLowerCase()) as { jersey_home_color: string; shorts_home_color: string; jersey_away_color: string } | undefined;
   const primary   = clubKit?.jersey_home_color   ?? settingsRow?.primary_color   ?? DEFAULT_PRIMARY;
   const secondary = clubKit?.shorts_home_color   ?? settingsRow?.secondary_color ?? DEFAULT_SECONDARY;

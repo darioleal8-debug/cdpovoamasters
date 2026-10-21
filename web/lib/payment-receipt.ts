@@ -141,7 +141,7 @@ export async function sendAndLogPaymentReceipt(opts: {
     ?? await generateReceiptNumber(admin, referenceYear, month);
 
   // ── 7. Obter info de temporada e quotas pagas ─────────────────
-  let clubName   = "CD Póvoa Masters";
+  let clubName   = "CD Póvoa";
   let temporada  = `${referenceYear}/${String(referenceYear + 1).slice(2)}`;
   let pagos      = 1;
   let totalMeses = 10;

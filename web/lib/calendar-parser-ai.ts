@@ -526,7 +526,7 @@ const INATEL_SCHEMA = `{
 
 export async function parseExcelWithAI(
   csvTable: string,
-  ourTeam = "CD Póvoa Masters",
+  ourTeam = "CD Póvoa",
   apiKey?: string
 ): Promise<AIParseResult> {
   const lines  = csvTable.split("\n").length;
@@ -654,7 +654,7 @@ function mergeINATEL(results: INATELCalendarResult[]): INATELCalendarResult {
 
 export async function parseCalendarWithAI(
   rawText: string,
-  ourTeam = "CD Póvoa Masters",
+  ourTeam = "CD Póvoa",
   apiKey?: string
 ): Promise<AIParseResult> {
   const chunks  = chunkByJornada(rawText.trim());

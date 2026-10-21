@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
       .maybeSingle();
 
     // Obter info de temporada e quotas pagas
-    let clubName   = "CD Póvoa Masters";
+    let clubName   = "CD Póvoa";
     let temporada  = `${payment.reference_year}/${String(payment.reference_year + 1).slice(2)}`;
     let pagos      = 1;
     let totalMeses = 10;
