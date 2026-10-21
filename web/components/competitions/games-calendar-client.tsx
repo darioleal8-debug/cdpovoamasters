@@ -310,8 +310,6 @@ function GamesCalendarInner({ games, competitionSlug, mode = "calendar", teams, 
   );
 }
 
-} // end GamesCalendarInner
-
 export function GamesCalendarClient(props: Props) {
   return (
     <Suspense>
