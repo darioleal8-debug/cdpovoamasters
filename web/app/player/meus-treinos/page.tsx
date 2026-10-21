@@ -1,4 +1,5 @@
 import { todayInClubTz } from "@/lib/time/club-time";
+import { isAttendanceOpen, attendanceCloseHHMM } from "@/lib/time/attendance-window";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Clock, Dumbbell, MapPin, BookOpen, Pin, CalendarDays, CheckCircle2, XCircle, MessageSquare, Users } from "lucide-react";
@@ -70,30 +71,38 @@ export default async function MeusTreinosPage() {
     .from("seasons").select("id").eq("status", "ativa").maybeSingle();
 
   // Hora actual em Lisboa (Portugal usa Europe/Lisbon — UTC+1 no verão, UTC+0 no inverno)
-  const lisbonNowStr = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Lisbon" });
-  const today    = todayInClubTz();            // "2026-10-12"
-  const nowHHMM  = lisbonNowStr.slice(11, 16); // "21:35"
+  const nowDate      = new Date();
+  const lisbonNowStr = nowDate.toLocaleString("sv-SE", { timeZone: "Europe/Lisbon" });
+  const today        = todayInClubTz();
+  const yesterday    = todayInClubTz(new Date(nowDate.getTime() - 86_400_000));
+  const nowHHMM      = lisbonNowStr.slice(11, 16);
 
-  function addMinutes(hhmm: string, minutes: number): string {
-    const [h, m] = hhmm.split(":").map(Number);
-    const total = h * 60 + m + minutes;
-    return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
-  }
-
-  const [{ data: upcoming }, { data: past }] = season
+  const [{ data: upcomingRaw }, { data: pastRaw }] = season
     ? await Promise.all([
         supabase.from("trainings")
           .select("id, date, start_time, end_time, location, type, notes, rsvp_deadline_hours")
-          .eq("season_id", season.id).gte("date", today)
-          .order("date", { ascending: true }).limit(20),
+          .eq("season_id", season.id).gte("date", yesterday)
+          .order("date", { ascending: true }).limit(21),
         supabase.from("trainings")
           .select("id, date, start_time, end_time, location, type, notes, rsvp_deadline_hours")
-          .eq("season_id", season.id).lt("date", today)
+          .eq("season_id", season.id).lt("date", yesterday)
           .order("date", { ascending: false }).limit(10),
       ])
     : [{ data: [] }, { data: [] }];
 
-  const allTrainings = [...(upcoming ?? []), ...(past ?? [])] as TrainingRow[];
+  // Move yesterday's trainings with a closed window into the past bucket
+  const upcoming: TrainingRow[] = [];
+  const pastExtra: TrainingRow[] = [];
+  for (const t of (upcomingRaw ?? []) as TrainingRow[]) {
+    if (t.date < today && !isAttendanceOpen(t, nowDate)) {
+      pastExtra.push(t);
+    } else {
+      upcoming.push(t);
+    }
+  }
+  const past: TrainingRow[] = [...pastExtra, ...((pastRaw ?? []) as TrainingRow[])];
+
+  const allTrainings = [...upcoming, ...past];
   const trainingIds = allTrainings.map((t) => t.id);
 
   // Registo de jogador
@@ -219,19 +228,18 @@ export default async function MeusTreinosPage() {
     const attendanceInfo = myAttendance ? ATTENDANCE_STATUS[myAttendance.status] : null;
     const isToday = t.date === today;
 
-    // Janela de check-in GPS: start_time → end_time + 30 min
     const startHHMM = t.start_time?.slice(0, 5) ?? null;
-    const endHHMM   = t.end_time?.slice(0, 5)   ?? null;
-    const closeHHMM = endHHMM
-      ? addMinutes(endHHMM, 30)
-      : startHHMM ? addMinutes(startHHMM, 120) : null;
 
-    const checkinOpen   = isToday && !!startHHMM && nowHHMM >= startHHMM && (!closeHHMM || nowHHMM <= closeHHMM);
-    const checkinBefore = isToday && !!startHHMM && nowHHMM < startHHMM;
-    const checkinClosed = isToday && !!closeHHMM && nowHHMM > closeHHMM;
+    const checkinOpen   = isAttendanceOpen(t, nowDate);
+    const closeHHMM     = checkinOpen ? attendanceCloseHHMM(t) : null;
+    // still before training starts (today or future)
+    const checkinBefore = !checkinOpen && !!startHHMM &&
+                          (t.date > today || (t.date === today && nowHHMM < startHHMM));
+    // window has closed after the training
+    const checkinClosed = !checkinOpen && !checkinBefore && !!startHHMM && t.date <= today;
 
     const showCheckinButton = checkinOpen  && playerRecord !== null && !myAttendance;
-    const showFutureNotice  = !isPast && !isToday && playerRecord !== null && !myAttendance;
+    const showFutureNotice  = checkinBefore && t.date > today && playerRecord !== null && !myAttendance;
     const showAttendanceBadge = isPast || (myAttendance && myAttendance.status !== null);
 
     const deadlineIso = computeDeadline(t);
@@ -458,20 +466,20 @@ export default async function MeusTreinosPage() {
 
       <div className="space-y-3">
         <h2 className="text-base font-semibold">Próximos Treinos</h2>
-        {(upcoming ?? []).length === 0
+        {upcoming.length === 0
           ? <p className="text-sm text-muted-foreground">Sem treinos agendados.</p>
           : (
             <TreinosPaginationWrapper initialCount={5} label="treinos">
-              {(upcoming as TrainingRow[]).map((t) => <TrainingCard key={t.id} t={t} />)}
+              {upcoming.map((t) => <TrainingCard key={t.id} t={t} />)}
             </TreinosPaginationWrapper>
           )}
       </div>
 
-      {(past ?? []).length > 0 && (
+      {past.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-base font-semibold text-muted-foreground">Treinos Anteriores</h2>
           <TreinosPaginationWrapper initialCount={5} label="treinos anteriores">
-            {(past as TrainingRow[]).map((t) => <TrainingCard key={t.id} t={t} isPast />)}
+            {past.map((t) => <TrainingCard key={t.id} t={t} isPast />)}
           </TreinosPaginationWrapper>
         </div>
       )}

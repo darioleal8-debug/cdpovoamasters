@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { todayInClubTz } from "@/lib/time/club-time";
 import { redirect, notFound } from "next/navigation";
 import { ArrowLeft, Calendar, Check, Clock, HelpCircle, MapPin, X } from "lucide-react";
 import Link from "next/link";
@@ -68,7 +69,7 @@ export default async function TrainingDetailPage({ params }: Props) {
 
   if (!training) notFound();
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInClubTz();
   const isPast = (training.date as string) < today;
 
   // Lock RSVP changes once the training has started

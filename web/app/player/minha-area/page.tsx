@@ -12,6 +12,7 @@ import { StatsSection } from "@/components/player/stats-section";
 import { AvailabilityPrompt } from "@/components/player/availability-prompt";
 import { GpsCheckinButton } from "@/components/trainings/gps-checkin-button";
 import { lisbonDateTime } from "@/lib/event-time";
+import { isAttendanceOpen, attendanceCloseHHMM } from "@/lib/time/attendance-window";
 import type { AvailabilityRosterRow } from "@/types/availability";
 import { BirthdayBanner } from "@/components/birthday/birthday-banner";
 import Link from "next/link";
@@ -24,6 +25,7 @@ type TrainingRow = {
   id:         string;
   date:       string;
   start_time: string | null;
+  end_time:   string | null;
   location:   string | null;
   type:       string | null;
   notes:      string | null;
@@ -55,8 +57,9 @@ function dateLabel(dateStr: string): string {
   const todayMs = new Date(todayInClubTz() + "T00:00:00").getTime();
   const tMs     = new Date(dateStr + "T00:00:00").getTime();
   const diff    = Math.round((tMs - todayMs) / 86_400_000);
-  if (diff === 0) return "Hoje";
-  if (diff === 1) return "Amanhã";
+  if (diff === 0)  return "Hoje";
+  if (diff === 1)  return "Amanhã";
+  if (diff === -1) return "Ontem";
   return `Em ${diff} dias`;
 }
 
@@ -86,13 +89,19 @@ function NextTrainingCard({
   note,
   rsvp,
   hasAttendance = false,
+  checkinOpen = false,
+  closeHHMM = null,
 }: {
   training:      TrainingRow | null;
   note:          string | null;
   /** null = utilizador sem perfil de jogador → não mostra os botões */
   rsvp:          TrainingRsvpProps;
-  /** true se a presença GPS/manual já foi registada hoje */
+  /** true se a presença GPS/manual já foi registada */
   hasAttendance?: boolean;
+  /** true se a janela de check-in está aberta agora */
+  checkinOpen?:  boolean;
+  /** hora de fecho da janela em formato HH:MM */
+  closeHHMM?:   string | null;
 }) {
   const TRAINING_BG = "#3b5f92";
 
@@ -174,12 +183,17 @@ function NextTrainingCard({
         </div>
       )}
 
-      {/* ── Marcar Presença GPS — só no dia do treino ── */}
-      {isToday && rsvp !== null && !hasAttendance && (
+      {/* ── Marcar Presença GPS — durante a janela de check-in ── */}
+      {checkinOpen && rsvp !== null && !hasAttendance && (
         <div className="border-b bg-background px-5 py-4">
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
             Presença
           </p>
+          {closeHHMM && (
+            <p className="mb-2 text-xs text-muted-foreground">
+              Confirma a tua presença — fecha às {closeHHMM}h.
+            </p>
+          )}
           <GpsCheckinButton trainingId={training.id} />
         </div>
       )}
@@ -264,13 +278,15 @@ export default async function MinhaAreaPage() {
     isPaymentLate = (paymentSummary?.months_late ?? 0) > 0;
   }
 
-  // ── Próximo treino ────────────────────────────────────────
+  // ── Próximo treino (inclui ontem para cobrir a janela pós-treino de 3h) ──────
+  const now = new Date();
+  const yesterday = todayInClubTz(new Date(now.getTime() - 86_400_000));
   const { data: nextTrainingRaw } = activeSeason?.id
     ? await supabase
         .from("trainings")
-        .select("id, date, start_time, location, type, notes, rsvp_deadline_hours")
+        .select("id, date, start_time, end_time, location, type, notes, rsvp_deadline_hours")
         .eq("season_id", activeSeason.id)
-        .gte("date", today)
+        .gte("date", yesterday)
         .order("date", { ascending: true })
         .limit(1)
         .maybeSingle()
@@ -316,9 +332,12 @@ export default async function MinhaAreaPage() {
     };
   }
 
-  // ── Presença no treino de hoje ───────────────────────────
+  // ── Presença durante a janela de check-in ───────────────
+  const checkinOpen = nextTraining ? isAttendanceOpen(nextTraining, now) : false;
+  const closeHHMM   = checkinOpen && nextTraining ? attendanceCloseHHMM(nextTraining) : null;
+
   let hasTrainingAttendance = false;
-  if (nextTraining && linkedPlayer?.id && nextTraining.date === today) {
+  if (nextTraining && linkedPlayer?.id && checkinOpen) {
     const { data: att } = await supabase
       .from("training_attendance")
       .select("id")
@@ -437,7 +456,7 @@ export default async function MinhaAreaPage() {
           highlightPlayerId={linkedPlayer?.id ?? null}
           availabilityPlayerId={linkedPlayer?.id ?? null}
         />
-        <NextTrainingCard training={nextTraining} note={trainingNote} rsvp={trainingRsvp} hasAttendance={hasTrainingAttendance} />
+        <NextTrainingCard training={nextTraining} note={trainingNote} rsvp={trainingRsvp} hasAttendance={hasTrainingAttendance} checkinOpen={checkinOpen} closeHHMM={closeHHMM} />
       </div>
 
       {/* ── Linha 2: Estatísticas (2/3) + Comunicados (1/3) ── */}
