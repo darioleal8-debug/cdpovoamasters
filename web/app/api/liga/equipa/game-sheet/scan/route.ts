@@ -101,7 +101,10 @@ export async function POST(req: Request) {
       // PDF com camada de texto → extrair com pdf-parse
       let pdfText = "";
       try {
-        const pdfParse = (await import("pdf-parse")).default;
+        // pdf-parse ESM não tem .default — aceitar ambas as formas
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mod = await import("pdf-parse") as any;
+        const pdfParse: (b: Buffer) => Promise<{ text: string }> = mod.default ?? mod;
         const parsed = await pdfParse(buffer);
         pdfText = parsed.text?.trim() ?? "";
       } catch {
