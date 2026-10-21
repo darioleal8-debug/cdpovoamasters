@@ -32,6 +32,7 @@ export async function getLeagueTeams(competitionKey: string): Promise<string[]> 
     .from("league_teams")
     .select("name")
     .eq("is_placeholder", false)
+    .eq("is_our_team", false)
     .order("name", { ascending: true });
   return (data ?? []).map((t) => t.name);
 }
@@ -226,6 +227,7 @@ export async function getTeamNames(): Promise<string[]> {
     .from("league_teams")
     .select("name")
     .eq("is_placeholder", false)
+    .eq("is_our_team", false)
     .order("name");
   return (data ?? []).map((t) => t.name);
 }
