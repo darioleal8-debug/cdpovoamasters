@@ -48,12 +48,29 @@ export async function NextGameCard({
     .from("events")
     .select("id, title, event_date, event_time, location")
     .eq("type", "jogo")
+    .eq("is_club_game", true)
+    .is("deleted_at", null)
     .gte("event_date", today)
     .order("event_date", { ascending: true })
     .limit(1)
     .maybeSingle();
 
-  if (!game) return null;
+  if (!game) {
+    return (
+      <div className="overflow-hidden rounded-xl border shadow-sm flex flex-col">
+        <div
+          className="px-5 py-5"
+          style={{ backgroundColor: "var(--club-primary, #111111)", color: "#fff" }}
+        >
+          <span className="text-[0.65rem] font-bold uppercase tracking-widest opacity-60">
+            Próximo Jogo
+          </span>
+          <p className="mt-3 text-sm opacity-70">Sem jogos agendados.</p>
+        </div>
+        <div className="bg-background flex-1 px-5 py-4" />
+      </div>
+    );
+  }
 
   // players.name foi removido na migration 041 — enriquecer via v_roster
   const { data: callupsRaw } = await supabase
