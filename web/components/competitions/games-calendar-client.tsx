@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, Suspense } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import type { PublicGame } from "@/types/competitions";
 import { TeamMono, teamAbbr } from "./team-mono";
@@ -22,25 +23,46 @@ interface Props {
   initialTeam?: string;
 }
 
-export function GamesCalendarClient({ games, competitionSlug, mode = "calendar", teams, initialTeam }: Props) {
+// Inner component uses useSearchParams (requires Suspense)
+function GamesCalendarInner({ games, competitionSlug, mode = "calendar", teams, initialTeam }: Props) {
+  const searchParams = useSearchParams();
+  const router       = useRouter();
+  const pathname     = usePathname();
+
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedJornada, setSelectedJornada] = useState<number | "all">("all");
   const [selectedTeam, setSelectedTeam] = useState<string | "all">(initialTeam ?? "all");
+  const [showOnlyCdPovoa, setShowOnlyCdPovoaState] = useState(() =>
+    searchParams.get("filtro") === "cdpovoa"
+  );
+
+  function setShowOnlyCdPovoa(next: boolean) {
+    setShowOnlyCdPovoaState(next);
+    const params = new URLSearchParams(searchParams.toString());
+    if (next) params.set("filtro", "cdpovoa");
+    else params.delete("filtro");
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }
+
+  const baseGames = useMemo(
+    () => showOnlyCdPovoa ? games.filter((g) => g.is_our_game) : games,
+    [games, showOnlyCdPovoa]
+  );
 
   const counts = useMemo(() => ({
-    all:         games.length,
-    with_result: games.filter((g) => g.result_status === "approved").length,
-    no_result:   games.filter((g) => g.result_status === "no_result").length,
-  }), [games]);
+    all:         baseGames.length,
+    with_result: baseGames.filter((g) => g.result_status === "approved").length,
+    no_result:   baseGames.filter((g) => g.result_status === "no_result").length,
+  }), [baseGames]);
 
   const jornadas = useMemo(() => {
     const set = new Set<number>();
-    for (const g of games) if (g.syntheticJornada) set.add(g.syntheticJornada);
+    for (const g of baseGames) if (g.syntheticJornada) set.add(g.syntheticJornada);
     return Array.from(set).sort((a, b) => a - b);
-  }, [games]);
+  }, [baseGames]);
 
   const filtered = useMemo(() => {
-    let result = [...games];
+    let result = [...baseGames];
 
     if (mode === "results") {
       result = result.filter((g) => g.result_status === "approved" || g.result_status === "pending");
@@ -55,7 +77,7 @@ export function GamesCalendarClient({ games, competitionSlug, mode = "calendar",
     if (selectedTeam !== "all")    result = result.filter((g) => g.home_team === selectedTeam || g.away_team === selectedTeam);
 
     return result;
-  }, [games, filter, selectedJornada, mode]);
+  }, [baseGames, filter, selectedJornada, mode, selectedTeam]);
 
   const grouped = useMemo(() => {
     const map = new Map<number, PublicGame[]>();
@@ -73,8 +95,41 @@ export function GamesCalendarClient({ games, competitionSlug, mode = "calendar",
     { key: "no_result",   label: "Sem resultado" },
   ];
 
+  const ourGamesCount = useMemo(() => games.filter(g => g.is_our_game).length, [games]);
+
   return (
     <div>
+      {/* Toggle Toda a Liga / Só CD Póvoa */}
+      {ourGamesCount > 0 && (
+        <div style={{ display: "flex", gap: "6px", marginBottom: "16px", flexWrap: "wrap" }}>
+          {([
+            { key: false, label: "Toda a Liga" },
+            { key: true,  label: "Só CD Póvoa" },
+          ] as { key: boolean; label: string }[]).map(({ key, label }) => {
+            const active = showOnlyCdPovoa === key;
+            return (
+              <button
+                key={String(key)}
+                onClick={() => setShowOnlyCdPovoa(key)}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: "6px",
+                  padding: "7px 14px", borderRadius: "999px",
+                  border: `2px solid ${active ? "#F97316" : "#D4CEC7"}`,
+                  background: active ? "#F97316" : "transparent",
+                  cursor: "pointer",
+                  fontFamily: "var(--font-barlow, sans-serif)",
+                  fontSize: "13px", fontWeight: 600,
+                  color: active ? "#fff" : "#6F675F",
+                  transition: "all .15s", minHeight: "44px",
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Filtros em pílula */}
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "20px" }}>
         {FILTERS.map((f) => {
@@ -243,7 +298,7 @@ export function GamesCalendarClient({ games, competitionSlug, mode = "calendar",
                 {/* Linhas de jogos */}
                 <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
                   {jornadaGames.map((g) => (
-                    <GameRow key={g.id} game={g} competitionSlug={competitionSlug} />
+                    <GameRow key={g.id} game={g} competitionSlug={competitionSlug} highlightOurs={!showOnlyCdPovoa} />
                   ))}
                 </div>
               </section>
@@ -255,7 +310,18 @@ export function GamesCalendarClient({ games, competitionSlug, mode = "calendar",
   );
 }
 
-function GameRow({ game, competitionSlug }: { game: PublicGame; competitionSlug: string }) {
+} // end GamesCalendarInner
+
+export function GamesCalendarClient(props: Props) {
+  return (
+    <Suspense>
+      <GamesCalendarInner {...props} />
+    </Suspense>
+  );
+}
+
+function GameRow({ game, competitionSlug, highlightOurs = false }: { game: PublicGame; competitionSlug: string; highlightOurs?: boolean }) {
+  const isOurGame = highlightOurs && game.is_our_game;
   const { event_date, event_time, home_team, away_team, result, result_status, syntheticJornada, id } = game;
   const hasResult = result_status === "approved";
   const isLive    = result_status === "live";
@@ -272,14 +338,15 @@ function GameRow({ game, competitionSlug }: { game: PublicGame; competitionSlug:
         gap: "8px",
         padding: "10px 16px",
         borderRadius: "6px",
-        background: "#FFFDFA",
+        background: isOurGame ? "#FFFAF5" : "#FFFDFA",
         border: "1px solid #F0EAE1",
+        borderLeft: isOurGame ? "3px solid #F97316" : "1px solid #F0EAE1",
         minHeight: "52px",
         cursor: hasResult || isLive ? "pointer" : "default",
         transition: "background .12s",
       }}
       onMouseEnter={(e) => { if (hasResult || isLive) (e.currentTarget as HTMLElement).style.background = "#FFF4EA"; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "#FFFDFA"; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = isOurGame ? "#FFFAF5" : "#FFFDFA"; }}
     >
       {/* Col 1: data */}
       <div style={{ textAlign: "center" }}>

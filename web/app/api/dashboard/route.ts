@@ -52,14 +52,17 @@ export async function GET(req: NextRequest) {
   const [
     playersRes, nextGameRes, nextTrainingRes,
     latePayRes, incompleteRes, rosterSizeRes,
+    ourTeamRes,
   ] = await Promise.all([
     // Contagem de jogadores
     supabase.from("players").select("id", { count: "exact", head: true }).eq("season_id", sid),
 
-    // Próximo jogo
+    // Próximo jogo do CD Póvoa (is_club_game = true)
     supabase.from("events")
       .select("id,title,event_date,event_time,location,competition,opponent")
       .eq("type", "jogo").eq("season_id", sid)
+      .eq("is_club_game", true)
+      .is("deleted_at", null)
       .gte("event_date", today)
       .order("event_date", { ascending: true }).limit(1).maybeSingle(),
 
@@ -87,12 +90,30 @@ export async function GET(req: NextRequest) {
 
     // Tamanho do plantel (para callup)
     supabase.from("players").select("id", { count: "exact", head: true }).eq("season_id", sid),
+
+    // Nome da equipa do clube na liga (para V/D)
+    supabase.from("league_teams").select("name").eq("is_our_team", true).maybeSingle(),
   ]);
 
-  const nextGame     = nextGameRes.data ?? null;
-  const nextTraining = nextTrainingRes.data ?? null;
-  const playerCount  = playersRes.count ?? 0;
-  const rosterSize   = rosterSizeRes.count ?? 0;
+  const nextGame      = nextGameRes.data ?? null;
+  const nextTraining  = nextTrainingRes.data ?? null;
+  const playerCount   = playersRes.count ?? 0;
+  const rosterSize    = rosterSizeRes.count ?? 0;
+  const ourTeamName   = ourTeamRes.data?.name ?? null;
+
+  // Vitórias / Derrotas da temporada actual
+  let wins = 0, losses = 0;
+  if (ourTeamName) {
+    const { data: gameResults } = await supabase
+      .from("league_game_results")
+      .select("home_team_name, away_team_name, home_score, away_score")
+      .or(`home_team_name.eq.${ourTeamName},away_team_name.eq.${ourTeamName}`);
+    for (const r of gameResults ?? []) {
+      const isHome = r.home_team_name === ourTeamName;
+      const homeWon = r.home_score > r.away_score;
+      if (isHome ? homeWon : !homeWon) wins++; else losses++;
+    }
+  }
 
   // Contagem de convocados para o próximo jogo
   let callupCount = 0;
@@ -306,8 +327,8 @@ export async function GET(req: NextRequest) {
       : null,
     metrics: {
       players: playerCount,
-      wins:    0,
-      losses:  0,
+      wins,
+      losses,
       draws:   0,
     },
     tasks:       tasks.slice(0, 5),
