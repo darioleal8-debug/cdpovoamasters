@@ -34,7 +34,7 @@ export interface LeagueGame {
   away_team: string;
   pavilion: string;
   locality: string;
-  is_home: boolean;   // a nossa equipa é visitada (casa)
+  is_home: boolean;   // true = nossa equipa joga em casa
   is_our_game: boolean;
 }
 
@@ -70,9 +70,20 @@ function parseMeta(event: Event): GameMeta | null {
   }
 }
 
-function eventToLeagueGame(event: Event): LeagueGame | null {
+// ourTeamName: if known, derive is_our_game + is_home from team names (robust)
+// otherwise fall back to stored JSON flags
+function eventToLeagueGame(event: Event, ourTeamName: string | null): LeagueGame | null {
   const meta = parseMeta(event);
   if (!meta) return null;
+
+  const isOurGame = ourTeamName
+    ? meta.home_team === ourTeamName || meta.away_team === ourTeamName
+    : (meta.is_our_game ?? false);
+
+  // is_home = nossa equipa é a equipa da casa
+  const isHome = ourTeamName
+    ? meta.home_team === ourTeamName
+    : Boolean(meta.is_home);
 
   return {
     id:               event.id,
@@ -89,9 +100,8 @@ function eventToLeagueGame(event: Event): LeagueGame | null {
     away_team:        meta.away_team,
     pavilion:         meta.pavilion,
     locality:         meta.locality,
-    is_home:          meta.is_home,
-    // true por defeito: imports antigos só tinham os nossos jogos
-    is_our_game:      meta.is_our_game ?? true,
+    is_home:          isHome,
+    is_our_game:      isOurGame,
   };
 }
 
@@ -101,8 +111,7 @@ export function useLeagueCalendar(seasonId: string | null) {
   const [rawGames, setRawGames] = useState<LeagueGame[]>([]);
   const [loading, setLoading]   = useState(true);
 
-  // Filtros
-  const [showOnlyOurs, setShowOnlyOurs]     = useState(false);
+  // Filtro por jornada (ainda exposto para o seletor no UI)
   const [selectedJornada, setSelectedJornada] = useState<number | "all">("all");
 
   const supabase = createClient();
@@ -111,23 +120,32 @@ export function useLeagueCalendar(seasonId: string | null) {
     if (!seasonId) { setRawGames([]); setLoading(false); return; }
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from("events")
-      .select("*")
-      .eq("season_id", seasonId)
-      .eq("type", "jogo")
-      .not("description", "is", null)
-      .order("event_date", { ascending: true })
-      .order("event_time", { ascending: true });
+    const [eventsRes, teamRes] = await Promise.all([
+      supabase
+        .from("events")
+        .select("*")
+        .eq("season_id", seasonId)
+        .eq("type", "jogo")
+        .not("description", "is", null)
+        .order("event_date", { ascending: true })
+        .order("event_time", { ascending: true }),
+      supabase
+        .from("league_teams")
+        .select("name")
+        .eq("is_our_team", true)
+        .maybeSingle(),
+    ]);
 
-    if (error) {
+    if (eventsRes.error) {
       toast({ title: "Erro ao carregar calendário", variant: "destructive" });
       setLoading(false);
       return;
     }
 
-    const games = (data ?? [])
-      .map((e) => eventToLeagueGame(e as Event))
+    const ourTeamName = teamRes.data?.name ?? null;
+
+    const games = (eventsRes.data ?? [])
+      .map((e) => eventToLeagueGame(e as Event, ourTeamName))
       .filter((g): g is LeagueGame => g !== null);
 
     // Deduplicar por data + home + away
@@ -140,13 +158,11 @@ export function useLeagueCalendar(seasonId: string | null) {
     });
 
     // Calcular syntheticJornada: garante unicidade global entre voltas
-    // Ex: volta 1 J1-J18 → synthetic 1-18; volta 2 J1-J18 → synthetic 19-36
     const maxJornadaPerVolta = new Map<number, number>();
     for (const g of unique) {
       const prev = maxJornadaPerVolta.get(g.volta) ?? 0;
       if (g.jornada > prev) maxJornadaPerVolta.set(g.volta, g.jornada);
     }
-    // offset acumulado por volta (volta 1 → 0, volta 2 → max(volta1), volta 3 → max(volta1)+max(volta2))
     const offsets = new Map<number, number>();
     let acc = 0;
     for (const volta of [...maxJornadaPerVolta.keys()].sort((a, b) => a - b)) {
@@ -166,7 +182,7 @@ export function useLeagueCalendar(seasonId: string | null) {
 
     setRawGames(unique);
     setLoading(false);
-  }, [seasonId]);
+  }, [seasonId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load(); }, [load]);
 
@@ -187,13 +203,11 @@ export function useLeagueCalendar(seasonId: string | null) {
     return meta;
   }, [rawGames]);
 
-  // Jogos filtrados
+  // Jogos filtrados (só por jornada — "apenas os nossos" passou para a Agenda)
   const filteredGames = useMemo(() => {
-    let gs = rawGames;
-    if (showOnlyOurs)              gs = gs.filter((g) => g.is_our_game);
-    if (selectedJornada !== "all") gs = gs.filter((g) => g.syntheticJornada === selectedJornada);
-    return gs;
-  }, [rawGames, showOnlyOurs, selectedJornada]);
+    if (selectedJornada === "all") return rawGames;
+    return rawGames.filter((g) => g.syntheticJornada === selectedJornada);
+  }, [rawGames, selectedJornada]);
 
   // Agrupados por syntheticJornada
   const jornadas = useMemo((): LeagueJornada[] => {
@@ -224,15 +238,15 @@ export function useLeagueCalendar(seasonId: string | null) {
     next_game:      rawGames.find(
       (g) => g.is_our_game && g.event_date >= new Date().toISOString().slice(0, 10)
     ) ?? null,
-  }), [rawGames]);
+  }), [rawGames, allJornadas]);
 
   return {
     jornadas,
     allJornadas,
     jornadaMeta,
+    rawGames,   // exposto para a LeagueAgenda
     stats,
     loading,
-    showOnlyOurs,    setShowOnlyOurs,
     selectedJornada, setSelectedJornada,
     refresh: load,
   };

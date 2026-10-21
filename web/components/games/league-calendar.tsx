@@ -35,8 +35,6 @@ function GameRow({ game, expanded, kitsByTeam }: { game: LeagueGame; expanded: b
 
   const homeKit = kitsByTeam?.[game.home_team.toLowerCase()];
   const awayKit = kitsByTeam?.[game.away_team.toLowerCase()];
-  // Para os nossos jogos: usar kit casa/fora consoante o mando
-  const ourKit  = kitsByTeam?.[isHome ? game.home_team.toLowerCase() : game.away_team.toLowerCase()];
 
   return (
     <div
@@ -109,7 +107,7 @@ function GameRow({ game, expanded, kitsByTeam }: { game: LeagueGame; expanded: b
         </div>
       )}
 
-      {/* Badge Competição */}
+      {/* Badge Competição — só nos nossos jogos */}
       {isOurs && game.competition && (
         <div className="shrink-0">
           <Badge
@@ -129,7 +127,7 @@ function GameRow({ game, expanded, kitsByTeam }: { game: LeagueGame; expanded: b
         </div>
       )}
 
-      {/* Badge Casa / Fora */}
+      {/* Badge Casa / Fora — só nos nossos jogos */}
       {isOurs && (
         <div className="shrink-0">
           <Badge
@@ -208,7 +206,7 @@ function JornadaSection({
             Jornada {jornada.jornada}
             {jornada.volta > 1 && (
               <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                {jornada.volta}ª Volta
+                · {jornada.volta}ª Volta
               </span>
             )}
           </span>
@@ -218,13 +216,20 @@ function JornadaSection({
               {dateLabel}
             </span>
           )}
-          {hasOurGame && (
+          {hasOurGame ? (
             <Badge
               variant="outline"
               className="w-fit gap-1 border-cdpovoa-primary/40 bg-cdpovoa-primary/5 text-cdpovoa-primary text-[11px]"
             >
               <Trophy className="h-2.5 w-2.5" />
               O nosso jogo
+            </Badge>
+          ) : (
+            <Badge
+              variant="outline"
+              className="w-fit text-[11px] text-muted-foreground border-muted-foreground/30"
+            >
+              Folga
             </Badge>
           )}
         </div>
@@ -353,8 +358,6 @@ interface LeagueCalendarProps {
   jornadaMeta?: Record<number, { jornada: number; volta: number }>;
   stats: Stats;
   loading: boolean;
-  showOnlyOurs: boolean;
-  onToggleOurs: (v: boolean) => void;
   selectedJornada: number | "all";
   onSelectJornada: (v: number | "all") => void;
   kitsByTeam?: Record<string, TeamKit>;
@@ -366,8 +369,6 @@ export function LeagueCalendar({
   jornadaMeta,
   stats,
   loading,
-  showOnlyOurs,
-  onToggleOurs,
   selectedJornada,
   onSelectJornada,
   kitsByTeam,
@@ -417,20 +418,6 @@ export function LeagueCalendar({
       {/* Filtros */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2">
-          {/* Toggle: apenas os nossos */}
-          <button
-            onClick={() => onToggleOurs(!showOnlyOurs)}
-            className={cn(
-              "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
-              showOnlyOurs
-                ? "border-cdpovoa-primary bg-cdpovoa-primary text-white"
-                : "border-border bg-background hover:bg-muted"
-            )}
-          >
-            <Shield className="h-3.5 w-3.5" />
-            Apenas os nossos jogos
-          </button>
-
           {/* Seletor de jornada */}
           <Select
             value={String(selectedJornada)}
@@ -447,7 +434,7 @@ export function LeagueCalendar({
                 const meta = jornadaMeta?.[n];
                 const label = meta
                   ? meta.volta > 1
-                    ? `J${meta.jornada} — ${meta.volta}ª Volta`
+                    ? `J${meta.jornada} · ${meta.volta}ª Volta`
                     : `Jornada ${meta.jornada}`
                   : `Jornada ${n}`;
                 return (
@@ -483,10 +470,7 @@ export function LeagueCalendar({
           <Button
             variant="link"
             size="sm"
-            onClick={() => {
-              onToggleOurs(false);
-              onSelectJornada("all");
-            }}
+            onClick={() => onSelectJornada("all")}
           >
             Limpar filtros
           </Button>
