@@ -110,7 +110,7 @@ export async function POST(req: Request) {
   const { error: insertErr } = await adminClient.from("league_team_members").insert({
     user_id: created.user.id,
     team_id: body.team_id,
-    role: "team_manager",
+    role: "delegate",
     created_by: auth.user.id,
   });
 

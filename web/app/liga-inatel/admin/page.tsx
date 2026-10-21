@@ -906,7 +906,7 @@ export default function LigaAdminPage() {
                           {m.email}
                         </p>
                         <p style={{ fontSize: "11px", color: "#9CA3AF", margin: 0 }}>
-                          {m.role === "team_manager" ? "Delegado" : m.role}
+                          {(m.role === "team_manager" || m.role === "delegate") ? "Delegado" : m.role}
                           {" · "}criado em {new Date(m.created_at).toLocaleDateString("pt-PT")}
                         </p>
                       </div>
