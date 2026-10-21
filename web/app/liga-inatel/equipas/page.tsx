@@ -42,6 +42,10 @@ export default async function EquipasPage() {
         </div>
       </CourtBg>
 
+      <style>{`
+        .team-card { background:#FFFDFA; border:1px solid #E8E0D6; border-radius:8px; padding:16px 20px; display:flex; align-items:center; gap:14px; transition:transform .12s, box-shadow .12s; }
+        .team-card--link:hover .team-card { transform:translateY(-2px); box-shadow:0 6px 20px rgba(26,22,18,.12); }
+      `}</style>
       <div style={{ ...maxW, padding: "32px 20px 48px" }}>
         <div style={{
           display: "grid",
@@ -52,30 +56,12 @@ export default async function EquipasPage() {
             <Link
               key={team.id}
               href={team.slug ? `/liga-inatel/equipas/${team.slug}` : "#"}
+              className={team.slug ? "team-card--link" : undefined}
               style={{ textDecoration: "none" }}
             >
               <div
-                style={{
-                  background: "#FFFDFA",
-                  border: "1px solid #E8E0D6",
-                  borderRadius: "8px",
-                  padding: "16px 20px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "14px",
-                  transition: "transform .12s, box-shadow .12s",
-                  cursor: team.slug ? "pointer" : "default",
-                }}
-                onMouseEnter={(e) => {
-                  if (team.slug) {
-                    (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
-                    (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 20px rgba(26,22,18,.12)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.transform = "";
-                  (e.currentTarget as HTMLElement).style.boxShadow = "";
-                }}
+                className="team-card"
+                style={{ cursor: team.slug ? "pointer" : "default" }}
               >
                 {/* Initials badge */}
                 <div style={{
