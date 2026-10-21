@@ -76,8 +76,8 @@ export async function POST(
 
   const openMs  = new Date(`${trainingDateStr}T${startHHMM}:00`).getTime();
   const closeMs = endHHMM
-    ? new Date(`${trainingDateStr}T${endHHMM}:00`).getTime() + 120 * 60_000
-    : openMs + 240 * 60_000;
+    ? new Date(`${trainingDateStr}T${endHHMM}:00`).getTime() + 180 * 60_000
+    : openMs + 180 * 60_000;
 
   // Hora de fecho em formato HH:MM (no sistema "Lisboa como UTC", .toISOString() dá hora local)
   const closeTimeStr = new Date(closeMs).toISOString().slice(11, 16);
@@ -86,7 +86,7 @@ export async function POST(
     return fail(`O check-in ainda não está aberto. Abre às ${startHHMM}h.`);
   }
   if (nowMs > closeMs) {
-    return fail(`O check-in fechou às ${closeTimeStr}h (2 horas após o fim do treino).`);
+    return fail(`O check-in fechou às ${closeTimeStr}h (3 horas após o fim do treino).`);
   }
 
   // Buscar jogador — season-specific, com fallback
