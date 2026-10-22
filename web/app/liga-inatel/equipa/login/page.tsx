@@ -13,6 +13,14 @@ function DelegateLoginContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const rawRedirect = searchParams.get("redirect");
+  const delegateRedirect =
+    rawRedirect &&
+    rawRedirect.startsWith("/liga-inatel") &&
+    !rawRedirect.startsWith("/liga-inatel/admin")
+      ? rawRedirect
+      : "/liga-inatel/equipa";
+
   useEffect(() => {
     if (searchParams.get("msg") === "admin_required") {
       setError("Não tens permissão para aceder à área de admin.");
@@ -47,7 +55,7 @@ function DelegateLoginContent() {
       if (json.role === "liga_admin") {
         router.push("/liga-inatel/admin");
       } else {
-        router.push("/liga-inatel/equipa");
+        router.push(delegateRedirect);
       }
       router.refresh();
     } finally {

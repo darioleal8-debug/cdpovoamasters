@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Barlow_Condensed, IBM_Plex_Mono } from "next/font/google";
 import { CompNav } from "@/components/competitions/comp-nav";
+import { LigaHeaderButtons } from "@/components/liga/liga-header-buttons";
 
 // Peso 800 (não carregado no root layout)
 const bcHeavy = Barlow_Condensed({
@@ -107,19 +108,12 @@ export default function LigaInatelLayout({ children }: { children: React.ReactNo
           </Link>
 
           {/* Nav */}
-          <div style={{ flex: 1, overflow: "hidden" }}>
+          <div className="liga-nav-wrap">
             <CompNav />
           </div>
 
-          {/* CTA */}
-          <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-            <Link
-              href="/liga-inatel/resultados/submeter"
-              className="liga-cta-btn"
-            >
-              + Resultado
-            </Link>
-          </div>
+          {/* CTAs + hamburger (client, session-aware) */}
+          <LigaHeaderButtons />
         </div>
       </header>
 
@@ -142,6 +136,27 @@ export default function LigaInatelLayout({ children }: { children: React.ReactNo
           white-space: nowrap;
         }
         .liga-cta-btn:hover { background: #FB8A3C; }
+        .liga-nav-wrap { flex: 1; overflow: hidden; }
+        .liga-desktop-cta { display: flex; align-items: center; gap: 8px; }
+        .liga-hamburger {
+          display: none;
+          align-items: center;
+          padding: 4px;
+          background: none;
+          border: none;
+          cursor: pointer;
+          flex-shrink: 0;
+        }
+        .liga-hamburger:focus-visible {
+          outline: 2px solid #F97316;
+          outline-offset: 2px;
+          border-radius: 4px;
+        }
+        @media (max-width: 640px) {
+          .liga-nav-wrap { display: none; }
+          .liga-desktop-cta { display: none; }
+          .liga-hamburger { display: flex; }
+        }
       `}</style>
 
       {/* Conteúdo */}
