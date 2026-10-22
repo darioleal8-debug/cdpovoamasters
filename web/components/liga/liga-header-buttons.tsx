@@ -31,7 +31,6 @@ const CTA_FONT: React.CSSProperties = {
 
 export function LigaHeaderButtons() {
   const pathname = usePathname();
-  // Default null (not logged in) — renders the button immediately, no layout shift
   const [team, setTeam] = useState<TeamInfo | null>(null);
   const [menuOpen,     setMenuOpen]     = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -47,14 +46,12 @@ export function LigaHeaderButtons() {
     async function check() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
       type Row = { team_id: string; league_teams: TeamInfo | null };
       const { data } = await supabase
         .from("league_team_members")
         .select("team_id, league_teams(name, short_name, sigla, logo_url)")
         .eq("user_id", user.id)
         .maybeSingle();
-
       const t = (data as Row | null)?.league_teams ?? null;
       if (t) setTeam(t);
     }
@@ -73,10 +70,18 @@ export function LigaHeaderButtons() {
     return () => document.removeEventListener("mousedown", onOutside);
   }, [dropdownOpen]);
 
-  // Close mobile menu on navigation
+  // Close overlay on navigation and ESC
   useEffect(() => { setMenuOpen(false); }, [pathname]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenuOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
 
-  // Prevent body scroll when mobile menu is open
+  // Prevent body scroll when menu open
   useEffect(() => {
     document.body.style.overflow = menuOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
@@ -98,8 +103,6 @@ export function LigaHeaderButtons() {
     ? (team.sigla ?? team.short_name ?? team.name.split(" ")[0])
     : null;
 
-  // ── Shared button styles ──────────────────────────────────────────────────
-
   const secondaryBtn: React.CSSProperties = {
     ...CTA_FONT,
     display: "inline-flex",
@@ -116,13 +119,10 @@ export function LigaHeaderButtons() {
     transition: "background .15s",
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
-
   return (
     <>
-      {/* ── Desktop CTAs (hidden on mobile via CSS) ───── */}
+      {/* ── Desktop CTAs (≥769px) ─────────────────────────────── */}
       <div className="liga-desktop-cta">
-        {/* Área de Equipa / Team dropdown */}
         {team ? (
           <div ref={dropdownRef} style={{ position: "relative" }}>
             <button
@@ -169,44 +169,45 @@ export function LigaHeaderButtons() {
             )}
           </div>
         ) : (
-          <Link
-            href="/liga-inatel/equipa/login"
-            aria-label="Entrar na área de equipa"
-            style={secondaryBtn}
-          >
+          <Link href="/liga-inatel/equipa/login" aria-label="Entrar na área de equipa" style={secondaryBtn}>
             <ShieldCheck size={13} aria-hidden />
             Área de Equipa
           </Link>
         )}
 
-        {/* + Resultado */}
         <Link href={resultadosHref} className="liga-cta-btn">
           + Resultado
         </Link>
       </div>
 
-      {/* ── Hamburger (visible on mobile via CSS) ─────── */}
-      <button
-        className="liga-hamburger"
-        onClick={() => setMenuOpen((v) => !v)}
-        aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
-        aria-expanded={menuOpen}
-      >
-        <span aria-hidden style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-          {[0, 1, 2].map((i) => (
-            <span key={i} style={{
-              display: "block", width: "22px", height: "2px",
-              background: "#F6F2EC", borderRadius: "1px",
-              transition: "transform .2s, opacity .2s",
-              ...(menuOpen && i === 0 ? { transform: "translateY(7px) rotate(45deg)" } : {}),
-              ...(menuOpen && i === 1 ? { opacity: 0 } : {}),
-              ...(menuOpen && i === 2 ? { transform: "translateY(-7px) rotate(-45deg)" } : {}),
-            }} />
-          ))}
-        </span>
-      </button>
+      {/* ── Mobile bar: compact CTA + hamburger (≤768px) ─────── */}
+      <div className="liga-mobile-bar">
+        <Link href={resultadosHref} className="liga-cta-btn liga-cta-compact">
+          + Resultado
+        </Link>
 
-      {/* ── Mobile overlay ────────────────────────────── */}
+        <button
+          className="liga-hamburger"
+          onClick={() => setMenuOpen((v) => !v)}
+          aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
+          aria-expanded={menuOpen}
+        >
+          <span aria-hidden style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+            {[0, 1, 2].map((i) => (
+              <span key={i} style={{
+                display: "block", width: "22px", height: "2px",
+                background: "#F6F2EC", borderRadius: "1px",
+                transition: "transform .2s, opacity .2s",
+                ...(menuOpen && i === 0 ? { transform: "translateY(7px) rotate(45deg)" } : {}),
+                ...(menuOpen && i === 1 ? { opacity: 0 } : {}),
+                ...(menuOpen && i === 2 ? { transform: "translateY(-7px) rotate(-45deg)" } : {}),
+              }} />
+            ))}
+          </span>
+        </button>
+      </div>
+
+      {/* ── Mobile overlay ────────────────────────────────────── */}
       {menuOpen && (
         <div
           role="dialog"
@@ -215,7 +216,7 @@ export function LigaHeaderButtons() {
             position: "fixed", inset: 0, zIndex: 49,
             background: "rgba(21,17,14,.97)",
             display: "flex", flexDirection: "column",
-            paddingTop: "53px", // header height on mobile
+            paddingTop: "52px",
             overflowY: "auto",
           }}
         >
@@ -256,7 +257,6 @@ export function LigaHeaderButtons() {
             ) : (
               <Link
                 href="/liga-inatel/equipa/login"
-                aria-label="Entrar na área de equipa"
                 style={{
                   display: "flex", alignItems: "center", gap: "8px",
                   padding: "16px 0",

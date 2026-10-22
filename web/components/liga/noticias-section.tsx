@@ -9,7 +9,7 @@ function fmtDate(iso: string | null): string {
 }
 
 export function NoticiasSection({ noticias }: { noticias: NoticiaPublic[] }) {
-  if (noticias.length === 0) return null;
+  const isEmpty = noticias.length === 0;
 
   return (
     <section
@@ -46,7 +46,22 @@ export function NoticiasSection({ noticias }: { noticias: NoticiaPublic[] }) {
         </span>
       </div>
 
-      {/* Artigos */}
+      {/* Artigos ou estado vazio */}
+      {isEmpty ? (
+        <div
+          style={{
+            padding: "32px 0",
+            textAlign: "center",
+            color: "#8C837A",
+            fontFamily: "var(--font-ibm-mono, monospace)",
+            fontSize: "12px",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+          }}
+        >
+          As notícias aparecem aqui após cada resultado aprovado.
+        </div>
+      ) : (
       <div
         style={{
           display: "grid",
@@ -146,6 +161,7 @@ export function NoticiasSection({ noticias }: { noticias: NoticiaPublic[] }) {
           </article>
         ))}
       </div>
+      )}
     </section>
   );
 }

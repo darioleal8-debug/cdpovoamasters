@@ -55,10 +55,11 @@ export default function LigaInatelLayout({ children }: { children: React.ReactNo
             maxWidth: "1200px",
             width: "100%",
             margin: "0 auto",
-            padding: "0 20px",
+            padding: "0 max(20px, env(safe-area-inset-right)) 0 max(20px, env(safe-area-inset-left))",
             display: "flex",
             alignItems: "stretch",
             gap: "16px",
+            minHeight: "52px",
           }}
         >
           {/* Logo */}
@@ -118,44 +119,99 @@ export default function LigaInatelLayout({ children }: { children: React.ReactNo
       </header>
 
       <style>{`
+        /* ── Botão CTA laranja ── */
         .liga-cta-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 8px 14px;
-          border-radius: 4px;
-          background: #F97316;
-          color: #15110E;
+          display: inline-flex; align-items: center; gap: 6px;
+          padding: 8px 14px; border-radius: 4px;
+          background: #F97316; color: #15110E;
           text-decoration: none;
           font-family: var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif));
-          font-weight: 800;
-          font-size: 12px;
-          letter-spacing: 0.07em;
-          text-transform: uppercase;
-          transition: background .15s;
-          white-space: nowrap;
+          font-weight: 800; font-size: 12px; letter-spacing: 0.07em;
+          text-transform: uppercase; transition: background .15s; white-space: nowrap;
+          min-height: 36px;
         }
         .liga-cta-btn:hover { background: #FB8A3C; }
+        .liga-cta-compact { padding: 6px 10px; font-size: 11px; }
+
+        /* ── Header layout ── */
         .liga-nav-wrap { flex: 1; overflow: hidden; }
         .liga-desktop-cta { display: flex; align-items: center; gap: 8px; }
+        .liga-mobile-bar  { display: none; align-items: center; gap: 8px; flex-shrink: 0; }
         .liga-hamburger {
-          display: none;
-          align-items: center;
-          padding: 4px;
-          background: none;
-          border: none;
-          cursor: pointer;
-          flex-shrink: 0;
+          display: flex; align-items: center; justify-content: center;
+          padding: 8px; min-width: 44px; min-height: 44px;
+          background: none; border: none; cursor: pointer; flex-shrink: 0;
         }
-        .liga-hamburger:focus-visible {
-          outline: 2px solid #F97316;
-          outline-offset: 2px;
-          border-radius: 4px;
+        .liga-hamburger:focus-visible { outline: 2px solid #F97316; outline-offset: 2px; border-radius: 4px; }
+
+        /* ── Hero grid ── */
+        .liga-hero-grid {
+          display: grid; grid-template-columns: 1fr auto; gap: 32px; align-items: start;
         }
-        @media (max-width: 640px) {
-          .liga-nav-wrap { display: none; }
+        /* ── Próximo jogo card ── */
+        .liga-next-card {
+          background: rgba(255,253,250,.06); border: 1px solid rgba(249,115,22,.3);
+          border-radius: 8px; overflow: hidden;
+          min-width: 220px; max-width: 280px; flex-shrink: 0;
+        }
+        /* ── Nome de equipa no card (truncado por defeito) ── */
+        .liga-next-team-name {
+          font-family: var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif));
+          font-weight: 700; font-size: 13px; letter-spacing: 0.04em;
+          text-transform: uppercase; color: #F6F2EC;
+          flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        /* ── Stats row ── */
+        .liga-stats-row { display: flex; gap: 32px; flex-wrap: wrap; }
+        .liga-stat-value {
+          font-family: var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif));
+          font-weight: 800; font-size: 32px; color: #F6F2EC;
+          line-height: 1; font-variant-numeric: tabular-nums;
+        }
+        /* ── Grid secções (classificação + próxima jornada) ── */
+        .liga-section-grid {
+          display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+          gap: 40px; align-items: start;
+        }
+        /* ── Localização nos cartões ── */
+        .liga-card-location {
+          font-family: var(--font-ibm-mono, monospace); font-size: 10px;
+          letter-spacing: 0.05em; color: #8C837A;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+          text-transform: uppercase;
+        }
+        /* ── Localização nas linhas de jornada ── */
+        .liga-row-location {
+          font-family: var(--font-ibm-mono, monospace); font-size: 10px;
+          letter-spacing: 0.05em; color: #8C837A; margin-top: 4px;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+          text-transform: uppercase;
+        }
+
+        /* ── Mobile ≤768px ── */
+        @media (max-width: 768px) {
+          .liga-nav-wrap    { display: none; }
           .liga-desktop-cta { display: none; }
-          .liga-hamburger { display: flex; }
+          .liga-mobile-bar  { display: flex; }
+
+          /* Hero empilhado */
+          .liga-hero-grid { grid-template-columns: 1fr; gap: 20px; }
+          /* Card a 100% */
+          .liga-next-card { min-width: 0; max-width: 100%; width: 100%; }
+          /* Nomes das equipas podem quebrar */
+          .liga-next-team-name {
+            white-space: normal; overflow: visible; text-overflow: clip;
+            display: -webkit-box; -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical; overflow: hidden;
+          }
+          /* Stats: 3 colunas iguais */
+          .liga-stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 8px; }
+          .liga-stat-value { font-size: 22px; }
+          /* Secções em coluna única */
+          .liga-section-grid { grid-template-columns: 1fr; gap: 32px; }
+          /* Localizações quebram linha */
+          .liga-card-location { white-space: normal; word-break: break-word; }
+          .liga-row-location  { white-space: normal; word-break: break-word; }
         }
       `}</style>
 
@@ -166,7 +222,7 @@ export default function LigaInatelLayout({ children }: { children: React.ReactNo
       <footer
         style={{
           background: "#15110E",
-          padding: "24px 20px",
+          padding: "24px max(20px, env(safe-area-inset-right)) max(24px, calc(12px + env(safe-area-inset-bottom))) max(20px, env(safe-area-inset-left))",
           textAlign: "center",
           fontFamily: "var(--font-ibm-mono, monospace)",
           fontSize: "11px",

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getCompetitionBySlug, getCompetitionGames, getStandings, getLatestNoticias } from "@/lib/competitions-data";
 import { createAdminClient } from "@/lib/supabase/server";
+import { todayInClubTz } from "@/lib/time/club-time";
 import { CourtBg } from "@/components/competitions/court-bg";
 import { TeamMono, teamAbbr } from "@/components/competitions/team-mono";
 import { ScoreTicker } from "@/components/competitions/score-ticker";
@@ -25,6 +26,14 @@ function fmtDay(s: string) {
   return { wd: PT_DAYS_FULL[d.getDay()].slice(0,3).toUpperCase(), day: d.getDate(), mon: PT_MONTHS[d.getMonth()] };
 }
 
+/** Retorna "HOJE" / "AMANHÃ" quando aplicável, ou o label normal */
+function dayLabel(dateStr: string, todayStr: string, tomorrowStr: string): string {
+  if (dateStr === todayStr) return "HOJE";
+  if (dateStr === tomorrowStr) return "AMANHÃ";
+  const { wd, day, mon } = fmtDay(dateStr);
+  return `${wd} ${day} ${mon}`;
+}
+
 function teamAbbrTicker(name: string): string {
   return teamAbbr(name).slice(0, 2);
 }
@@ -40,42 +49,49 @@ export default async function LigaInatelHomePage() {
     );
   }
 
-  const [games, standings, noticias] = await Promise.all([
+  // Datas de hoje e amanhã em hora de Lisboa
+  const now = new Date();
+  const todayStr    = todayInClubTz(now);
+  const tomorrowDate = new Date(now.getTime() + 86_400_000);
+  const tomorrowStr  = todayInClubTz(tomorrowDate);
+
+  const supabase = await createAdminClient();
+
+  const [games, standings, noticias, seasonRes, teamsRes] = await Promise.all([
     getCompetitionGames(competition.competition_key ?? "Liga", competition.season_id),
     getStandings(competition.id),
     getLatestNoticias(4),
+    supabase.from("seasons").select("name").eq("id", competition.season_id).single(),
+    supabase.from("league_teams").select("name, logo_url").not("logo_url", "is", null),
   ]);
 
-  const supabase = await createAdminClient();
-  const { data: season } = await supabase.from("seasons").select("name").eq("id", competition.season_id).single();
+  const season = seasonRes.data;
+  const logoMap = new Map<string, string | null>(
+    (teamsRes.data ?? []).map((t) => [t.name, t.logo_url ?? null])
+  );
 
-  const now = new Date();
   const approvedGames: PublicGame[] = games.filter((g) => g.result_status === "approved");
   const futureGames: PublicGame[] = games
-    .filter((g) => new Date(g.event_date) >= now)
+    .filter((g) => new Date(g.event_date + "T23:59:59") >= now)
     .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime());
 
   const nextGame = futureGames[0] ?? null;
 
-  // Últimos resultados: última jornada com resultados aprovados
   const maxResultJornada = approvedGames.length > 0
     ? Math.max(...approvedGames.map((g) => g.syntheticJornada))
     : 0;
   const lastJornadaResults = approvedGames.filter((g) => g.syntheticJornada === maxResultJornada);
 
-  // Stats do hero
   const gamesPlayed = approvedGames.length;
   const totalPts = approvedGames.reduce((s, g) => s + (g.result?.home_score ?? 0) + (g.result?.away_score ?? 0), 0);
   const avgPts = gamesPlayed > 0 ? (totalPts / (2 * gamesPlayed)).toFixed(1) : null;
   const maxJornada = games.length > 0 ? Math.max(...games.map((g) => g.syntheticJornada)) : 0;
 
-  // Ticker
   const tickerItems = approvedGames.map(
     (g) =>
       `J${g.syntheticJornada} · ${teamAbbrTicker(g.home_team)} ${g.result!.home_score}–${g.result!.away_score} ${teamAbbrTicker(g.away_team)}`
   );
 
-  // Próxima jornada
   const nextFutureJornada = futureGames.length > 0
     ? Math.min(...futureGames.map((g) => g.syntheticJornada).filter(Boolean))
     : null;
@@ -89,15 +105,8 @@ export default async function LigaInatelHomePage() {
     <div>
       {/* ── HERO ── */}
       <CourtBg minHeight="340px">
-        <div style={{ ...maxW, padding: "48px 20px" }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr auto",
-              gap: "32px",
-              alignItems: "start",
-            }}
-          >
+        <div style={{ ...maxW, padding: "40px 20px" }}>
+          <div className="liga-hero-grid">
             {/* Esquerda: título + stats */}
             <div>
               <p
@@ -118,12 +127,13 @@ export default async function LigaInatelHomePage() {
                 style={{
                   fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))",
                   fontWeight: 800,
-                  fontSize: "clamp(56px, 10vw, 120px)",
+                  fontSize: "clamp(40px, 10vw, 120px)",
                   lineHeight: 0.88,
                   letterSpacing: "0.04em",
                   textTransform: "uppercase",
                   color: "#F6F2EC",
                   margin: "0 0 24px",
+                  textWrap: "balance",
                 }}
               >
                 LIGA /
@@ -132,14 +142,11 @@ export default async function LigaInatelHomePage() {
                 <span style={{ color: "#F97316" }}>MASTERS</span>
               </h1>
 
-              {/* Stats */}
-              <div style={{ display: "flex", gap: "32px", flexWrap: "wrap" }}>
+              {/* Stats — 3 colunas em mobile */}
+              <div className="liga-stats-row">
                 {gamesPlayed > 0 ? (
                   <>
-                    <Stat
-                      label="Jornada"
-                      value={maxResultJornada > 0 ? `${maxResultJornada}/${maxJornada || "—"}` : "—"}
-                    />
+                    <Stat label="Jornada"         value={maxResultJornada > 0 ? `${maxResultJornada}/${maxJornada || "—"}` : "—"} />
                     <Stat label="Jogos disputados" value={String(gamesPlayed)} />
                     {avgPts && <Stat label="Pts / jogo" value={avgPts} />}
                   </>
@@ -165,19 +172,9 @@ export default async function LigaInatelHomePage() {
               </div>
             </div>
 
-            {/* Direita: próximo jogo card */}
+            {/* Próximo jogo card */}
             {nextGame && (
-              <div
-                style={{
-                  background: "rgba(255,253,250,.06)",
-                  border: "1px solid rgba(249,115,22,.3)",
-                  borderRadius: "8px",
-                  overflow: "hidden",
-                  minWidth: "220px",
-                  maxWidth: "280px",
-                  flexShrink: 0,
-                }}
-              >
+              <div className="liga-next-card">
                 <div
                   style={{
                     background: "#F97316",
@@ -185,6 +182,7 @@ export default async function LigaInatelHomePage() {
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
+                    gap: "8px",
                   }}
                 >
                   <span
@@ -195,6 +193,7 @@ export default async function LigaInatelHomePage() {
                       letterSpacing: "0.1em",
                       color: "#15110E",
                       textTransform: "uppercase",
+                      whiteSpace: "nowrap",
                     }}
                   >
                     PRÓXIMO JOGO{nextGame.syntheticJornada ? ` · J${nextGame.syntheticJornada}` : ""}
@@ -206,15 +205,15 @@ export default async function LigaInatelHomePage() {
                       fontWeight: 500,
                       letterSpacing: "0.06em",
                       color: "#7A3400",
+                      whiteSpace: "nowrap",
                     }}
                   >
-                    {fmtDay(nextGame.event_date).day} {fmtDay(nextGame.event_date).mon}
+                    {dayLabel(nextGame.event_date, todayStr, tomorrowStr)}
                     {nextGame.event_time ? ` · ${nextGame.event_time.slice(0, 5)}` : ""}
                   </span>
                 </div>
 
                 <div style={{ padding: "16px 14px 12px" }}>
-                  {/* Equipa de casa */}
                   {[{ name: nextGame.home_team }, { name: nextGame.away_team }].map((t, i) => (
                     <div
                       key={i}
@@ -226,21 +225,8 @@ export default async function LigaInatelHomePage() {
                         borderBottom: i === 0 ? "1px solid rgba(249,115,22,.2)" : undefined,
                       }}
                     >
-                      <TeamMono name={t.name} size={40} />
-                      <span
-                        style={{
-                          fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))",
-                          fontWeight: 700,
-                          fontSize: "13px",
-                          letterSpacing: "0.04em",
-                          textTransform: "uppercase",
-                          color: "#F6F2EC",
-                          flex: 1,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
+                      <TeamMono name={t.name} size={40} logoUrl={logoMap.get(t.name) ?? null} />
+                      <span className="liga-next-team-name">
                         {t.name}
                       </span>
                       {i === 0 && (
@@ -251,6 +237,7 @@ export default async function LigaInatelHomePage() {
                             fontSize: "13px",
                             letterSpacing: "0.08em",
                             color: "#F97316",
+                            flexShrink: 0,
                           }}
                         >
                           VS
@@ -260,20 +247,7 @@ export default async function LigaInatelHomePage() {
                   ))}
 
                   {nextGame.location && (
-                    <p
-                      style={{
-                        marginTop: "10px",
-                        fontFamily: "var(--font-ibm-mono, monospace)",
-                        fontSize: "10px",
-                        fontWeight: 500,
-                        letterSpacing: "0.06em",
-                        textTransform: "uppercase",
-                        color: "#B9AFA4",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
+                    <p className="liga-card-location" style={{ marginTop: "10px" }}>
                       {nextGame.location}
                     </p>
                   )}
@@ -305,7 +279,12 @@ export default async function LigaInatelHomePage() {
             }}
           >
             {lastJornadaResults.map((g) => (
-              <ScoreCard key={g.id} game={g} />
+              <ScoreCard
+                key={g.id}
+                game={g}
+                homeLogo={logoMap.get(g.home_team) ?? null}
+                awayLogo={logoMap.get(g.away_team) ?? null}
+              />
             ))}
           </div>
         </section>
@@ -313,14 +292,7 @@ export default async function LigaInatelHomePage() {
 
       {/* ── CLASSIFICAÇÃO + PRÓXIMA JORNADA ── */}
       <section style={{ ...maxW, padding: "48px 20px" }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-            gap: "40px",
-            alignItems: "start",
-          }}
-        >
+        <div className="liga-section-grid">
           {/* Classificação resumida */}
           <div>
             <SectionTitle
@@ -360,14 +332,16 @@ export default async function LigaInatelHomePage() {
               />
               <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "16px" }}>
                 {nextJornadaGames.map((g) => {
-                  const { wd, day, mon } = fmtDay(g.event_date);
+                  const { day, mon } = fmtDay(g.event_date);
+                  const label = dayLabel(g.event_date, todayStr, tomorrowStr);
+                  const isSpecial = label === "HOJE" || label === "AMANHÃ";
                   return (
                     <div
                       key={g.id}
                       style={{
                         display: "flex",
                         gap: "12px",
-                        alignItems: "center",
+                        alignItems: "stretch",
                         background: "#FFFDFA",
                         borderRadius: "8px",
                         boxShadow: "0 1px 0 rgba(26,22,18,.06), 0 4px 12px -6px rgba(26,22,18,.15)",
@@ -382,33 +356,56 @@ export default async function LigaInatelHomePage() {
                           textAlign: "center",
                           flexShrink: 0,
                           minWidth: "58px",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "2px",
                         }}
                       >
-                        <div
-                          style={{
-                            fontFamily: "var(--font-ibm-mono, monospace)",
-                            fontSize: "9px",
-                            fontWeight: 500,
-                            letterSpacing: "0.1em",
-                            textTransform: "uppercase",
-                            color: "#F97316",
-                            lineHeight: 1.3,
-                          }}
-                        >
-                          {wd}
-                        </div>
-                        <div
-                          style={{
-                            fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))",
-                            fontWeight: 700,
-                            fontSize: "28px",
-                            color: "#F6F2EC",
-                            lineHeight: 1,
-                            fontVariantNumeric: "tabular-nums",
-                          }}
-                        >
-                          {day}
-                        </div>
+                        {isSpecial ? (
+                          <div
+                            style={{
+                              fontFamily: "var(--font-ibm-mono, monospace)",
+                              fontSize: "9px",
+                              fontWeight: 500,
+                              letterSpacing: "0.1em",
+                              textTransform: "uppercase",
+                              color: "#F97316",
+                              lineHeight: 1,
+                            }}
+                          >
+                            {label}
+                          </div>
+                        ) : (
+                          <>
+                            <div
+                              style={{
+                                fontFamily: "var(--font-ibm-mono, monospace)",
+                                fontSize: "9px",
+                                fontWeight: 500,
+                                letterSpacing: "0.1em",
+                                textTransform: "uppercase",
+                                color: "#F97316",
+                                lineHeight: 1.3,
+                              }}
+                            >
+                              {label.split(" ")[0]}
+                            </div>
+                            <div
+                              style={{
+                                fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))",
+                                fontWeight: 700,
+                                fontSize: "28px",
+                                color: "#F6F2EC",
+                                lineHeight: 1,
+                                fontVariantNumeric: "tabular-nums",
+                              }}
+                            >
+                              {day}
+                            </div>
+                          </>
+                        )}
                         {g.event_time ? (
                           <div
                             style={{
@@ -423,21 +420,23 @@ export default async function LigaInatelHomePage() {
                             {g.event_time.slice(0, 5)}
                           </div>
                         ) : (
-                          <div
-                            style={{
-                              fontFamily: "var(--font-ibm-mono, monospace)",
-                              fontSize: "9px",
-                              color: "#6F675F",
-                              letterSpacing: "0.06em",
-                              textTransform: "uppercase",
-                            }}
-                          >
-                            {mon}
-                          </div>
+                          !isSpecial && (
+                            <div
+                              style={{
+                                fontFamily: "var(--font-ibm-mono, monospace)",
+                                fontSize: "9px",
+                                color: "#6F675F",
+                                letterSpacing: "0.06em",
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              {mon}
+                            </div>
+                          )
                         )}
                       </div>
 
-                      {/* Equipas */}
+                      {/* Equipas + pavilhão */}
                       <div style={{ padding: "12px 12px 12px 0", flex: 1, minWidth: 0 }}>
                         <div
                           style={{
@@ -468,19 +467,7 @@ export default async function LigaInatelHomePage() {
                           vs {g.away_team}
                         </div>
                         {g.location && (
-                          <div
-                            style={{
-                              fontFamily: "var(--font-ibm-mono, monospace)",
-                              fontSize: "10px",
-                              letterSpacing: "0.05em",
-                              color: "#8C837A",
-                              marginTop: "4px",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                              textTransform: "uppercase",
-                            }}
-                          >
+                          <div className="liga-row-location">
                             {g.location}
                           </div>
                         )}
@@ -516,18 +503,7 @@ function Stat({ label, value }: { label: string; value: string }) {
       >
         {label}
       </div>
-      <div
-        style={{
-          fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))",
-          fontWeight: 800,
-          fontSize: "32px",
-          color: "#F6F2EC",
-          lineHeight: 1,
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {value}
-      </div>
+      <div className="liga-stat-value">{value}</div>
     </div>
   );
 }

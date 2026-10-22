@@ -10,9 +10,11 @@ function fmtShort(s: string) {
 
 interface Props {
   game: PublicGame;
+  homeLogo?: string | null;
+  awayLogo?: string | null;
 }
 
-export function ScoreCard({ game }: Props) {
+export function ScoreCard({ game, homeLogo, awayLogo }: Props) {
   const { result, home_team, away_team, event_date, location, syntheticJornada } = game;
   if (!result) return null;
   const homeWon = result.home_score > result.away_score;
@@ -65,8 +67,8 @@ export function ScoreCard({ game }: Props) {
       <div style={{ padding: "10px 16px 0" }}>
         {(
           [
-            { name: home_team,  score: result.home_score, won: homeWon },
-            { name: away_team, score: result.away_score, won: !homeWon },
+            { name: home_team, score: result.home_score, won: homeWon,  logo: homeLogo ?? null },
+            { name: away_team, score: result.away_score, won: !homeWon, logo: awayLogo ?? null },
           ] as const
         ).map((t, i) => (
           <div
@@ -88,7 +90,7 @@ export function ScoreCard({ game }: Props) {
                 flexShrink: 0,
               }}
             />
-            <TeamMono name={t.name} size={34} />
+            <TeamMono name={t.name} size={34} logoUrl={t.logo} />
             <span
               style={{
                 flex: 1,
@@ -128,17 +130,8 @@ export function ScoreCard({ game }: Props) {
         <>
           <div style={{ margin: "8px 16px 0", borderTop: "1px dashed #E9E2D8" }} />
           <div
-            style={{
-              padding: "7px 16px",
-              fontFamily: "var(--font-ibm-mono, monospace)",
-              fontSize: "11px",
-              color: "#6F675F",
-              letterSpacing: "0.05em",
-              textTransform: "uppercase",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
+            className="liga-card-location"
+          style={{ padding: "7px 16px", color: "#6F675F", fontSize: "11px" }}
           >
             {location}
           </div>
