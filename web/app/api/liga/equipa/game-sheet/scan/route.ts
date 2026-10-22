@@ -1,54 +1,202 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { parseJsonSafe, validateQuarters, penalizeConfidence } from "@/lib/liga/game-sheet-scan";
+import type { ScanExtraction, QuarterScore, PlayerScan } from "@/lib/liga/game-sheet-scan";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const BUCKET = "folhas-jogo";
-const MAX_SIZE = 15 * 1024 * 1024; // 15 MB
+const MAX_SIZE = 15 * 1024 * 1024;
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const ALLOWED_TYPES = [...IMAGE_TYPES, "application/pdf"];
 
-// Endpoint sem /v1 conforme documentação actualizada
 const DEEPSEEK_API = "https://api.deepseek.com/chat/completions";
-const DEEPSEEK_MODEL = "deepseek-flash";
+const DEEPSEEK_MODEL = process.env.DEEPSEEK_VISION_MODEL ?? "deepseek-flash";
 
-const VISION_PROMPT = `Analisa esta folha de jogo oficial de basquetebol da Liga INATEL.
-Extrai os dados e responde APENAS com JSON válido no seguinte formato:
+// DeepSeek: thinking mode is ON by default in deepseek-flash.
+// Disable it explicitly — otherwise reasoning tokens consume max_tokens before the JSON is emitted.
+const THINKING_OFF = { thinking: { type: "disabled" } };
+
+// ── Logging ──────────────────────────────────────────────────────────────────
+
+function logCall(
+  label: string,
+  status: number,
+  finishReason: string | undefined,
+  usage: { prompt_tokens?: number; completion_tokens?: number } | undefined,
+  durationMs: number,
+  contentSnippet: string,
+) {
+  console.log(
+    `[game-sheet/scan] ${label} | HTTP ${status} | finish=${finishReason ?? "?"} | ` +
+    `tokens=${usage?.prompt_tokens ?? "?"}p/${usage?.completion_tokens ?? "?"}c | ${durationMs}ms | ` +
+    `content_preview=${contentSnippet.slice(0, 500)}`,
+  );
+}
+
+// ── DeepSeek helper ──────────────────────────────────────────────────────────
+
+async function callDeepSeek(
+  apiKey: string,
+  messages: object[],
+  maxTokens = 4096,
+): Promise<{ content: string; finishReason: string; usage?: object; durationMs: number; httpStatus: number }> {
+  const t0 = Date.now();
+  const res = await fetch(DEEPSEEK_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: DEEPSEEK_MODEL,
+      messages,
+      response_format: { type: "json_object" },
+      temperature: 0,
+      max_tokens: maxTokens,
+      ...THINKING_OFF,
+    }),
+  });
+  const durationMs = Date.now() - t0;
+  const httpStatus = res.status;
+
+  if (!res.ok) {
+    const body = await res.text();
+    return { content: body, finishReason: "error", durationMs, httpStatus };
+  }
+
+  const json = await res.json() as {
+    choices?: { message?: { content?: string }; finish_reason?: string }[];
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
+  };
+
+  const choice = json.choices?.[0];
+  const content = choice?.message?.content ?? "";
+  const finishReason = choice?.finish_reason ?? "unknown";
+
+  logCall("ok", httpStatus, finishReason, json.usage, durationMs, content);
+  return { content, finishReason, usage: json.usage, durationMs, httpStatus };
+}
+
+// ── Parse com retry ──────────────────────────────────────────────────────────
+
+async function callAndParse(
+  apiKey: string,
+  messages: object[],
+  label: string,
+): Promise<{ data: Record<string, unknown>; reason?: string }> {
+  const first = await callDeepSeek(apiKey, messages);
+
+  if (first.httpStatus >= 400) {
+    const reason = `erro DeepSeek ${first.httpStatus}: ${first.content.slice(0, 200)}`;
+    console.error(`[game-sheet/scan] ${label} HTTP error:`, reason);
+    return { data: {}, reason };
+  }
+
+  if (first.finishReason === "length") {
+    console.error(`[game-sheet/scan] ${label} truncated (finish_reason=length)`);
+    return { data: {}, reason: "resposta truncada — o modelo atingiu o limite de tokens" };
+  }
+
+  try {
+    return { data: parseJsonSafe(first.content) };
+  } catch (e) {
+    console.error(`[game-sheet/scan] ${label} JSON parse failed, retrying:`, String(e));
+    // Retry com instrução mais explícita
+    const retry = await callDeepSeek(apiKey, [
+      ...messages,
+      { role: "assistant", content: first.content },
+      { role: "user", content: "Responde APENAS com o JSON pedido, sem texto adicional, sem markdown." },
+    ]);
+    if (retry.finishReason === "length")
+      return { data: {}, reason: "resposta truncada após retry" };
+    try {
+      return { data: parseJsonSafe(retry.content) };
+    } catch {
+      return { data: {}, reason: "JSON inválido após retry — preenche manualmente" };
+    }
+  }
+}
+
+// ── Buscar nomes das equipas a partir do game_id ─────────────────────────────
+
+async function fetchTeamNames(
+  gameId: string,
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<{ home: string | null; away: string | null }> {
+  try {
+    const { data } = await supabase
+      .from("events")
+      .select("description, title")
+      .eq("id", gameId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!data) return { home: null, away: null };
+    const meta = JSON.parse(data.description ?? "{}") as { home_team?: string; away_team?: string };
+    return { home: meta.home_team ?? null, away: meta.away_team ?? null };
+  } catch {
+    return { home: null, away: null };
+  }
+}
+
+// ── Prompts ──────────────────────────────────────────────────────────────────
+
+function makeScoresPrompt(homeTeam: string | null, awayTeam: string | null): string {
+  const context = homeTeam && awayTeam
+    ? `\nEste jogo é ${homeTeam} (equipa da casa) vs ${awayTeam} (equipa visitante).`
+    : "";
+
+  return `Analisa esta folha de jogo oficial de basquetebol da Liga INATEL (normalmente manuscrita, modelo FIBA).${context}
+
+Extrai APENAS: resultado final e parciais por período. Responde EXCLUSIVAMENTE com JSON válido:
 {
-  "equipa_casa": "nome completo da equipa da casa",
-  "equipa_fora": "nome completo da equipa visitante",
-  "pontos_casa": número inteiro,
-  "pontos_fora": número inteiro,
-  "parciais": [{"periodo": 1, "casa": num, "fora": num}, ...],
+  "equipa_casa": "nome",
+  "equipa_fora": "nome",
+  "pontos_casa": 80,
+  "pontos_fora": 72,
+  "parciais": [{"periodo": 1, "casa": 20, "fora": 18}, ...],
   "prolongamento": false,
   "data": "YYYY-MM-DD ou null",
-  "pavilhao": "nome do pavilhão ou null",
-  "arbitros": ["nome1", "nome2"],
-  "jogadores": [
-    {"equipa": "casa|fora", "numero": num, "nome": "...", "pontos": num, "faltas": num}
-  ],
-  "confianca": 0.0,
+  "pavilhao": "nome ou null",
+  "arbitros": ["nome1"],
+  "confianca": 0.9,
   "avisos": []
 }
 Se não conseguires ler um campo com confiança, usa null. Não inventes dados.`;
+}
 
-const TEXT_PROMPT = `Analisa o seguinte texto extraído de uma folha de jogo de basquetebol da Liga INATEL e extrai os dados estruturados.
-Responde APENAS com JSON válido no seguinte formato:
+const PLAYERS_PROMPT = `Da mesma folha de jogo, extrai agora a lista de jogadores.
+ATENÇÃO: a pontuação individual pode não estar escrita directamente — pode ser necessário deduzir da coluna de marcação corrida (running score) cruzando com o número do jogador.
+Responde EXCLUSIVAMENTE com JSON válido:
 {
-  "equipa_casa": "nome completo da equipa da casa",
-  "equipa_fora": "nome completo da equipa visitante",
-  "pontos_casa": número inteiro,
-  "pontos_fora": número inteiro,
-  "parciais": [{"periodo": 1, "casa": num, "fora": num}, ...],
+  "jogadores": [
+    {"equipa": "casa|fora", "numero": 7, "nome": "Nome Apelido", "pontos": 12, "faltas": 3, "lances_livres": 2, "triplos": 1}
+  ]
+}
+Se não conseguires ler, usa null nos campos numéricos. Não inventes dados.`;
+
+function makeTextPrompt(text: string, homeTeam: string | null, awayTeam: string | null): string {
+  const context = homeTeam && awayTeam
+    ? `\nEste jogo é ${homeTeam} (casa) vs ${awayTeam} (fora).`
+    : "";
+  return `Analisa o seguinte texto de uma folha de jogo de basquetebol da Liga INATEL.${context}
+Responde EXCLUSIVAMENTE com JSON válido:
+{
+  "equipa_casa": "nome",
+  "equipa_fora": "nome",
+  "pontos_casa": 80,
+  "pontos_fora": 72,
+  "parciais": [{"periodo": 1, "casa": 20, "fora": 18}],
   "prolongamento": false,
   "data": "YYYY-MM-DD ou null",
-  "pavilhao": "nome do pavilhão ou null",
-  "arbitros": ["nome1", "nome2"],
-  "jogadores": [
-    {"equipa": "casa|fora", "numero": num, "nome": "...", "pontos": num, "faltas": num}
-  ],
-  "confianca": 0.0,
+  "pavilhao": "nome ou null",
+  "arbitros": [],
+  "jogadores": [{"equipa": "casa|fora", "numero": 7, "nome": "...", "pontos": 12, "faltas": 3}],
+  "confianca": 0.9,
   "avisos": []
 }
-Texto da folha:\n\n`;
+Texto:\n\n${text}`;
+}
+
+// ── Handler principal ─────────────────────────────────────────────────────────
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -82,7 +230,7 @@ export async function POST(req: Request) {
     : file.type === "image/webp" ? "webp"
     : "jpg";
 
-  // Guardar ficheiro no bucket folhas-jogo
+  // Upload para o bucket
   const epoch = new Date().getFullYear();
   const gameId = (formData.get("game_id") as string | null) ?? "unknown";
   const photoPath = `${user.id}/${epoch}/${gameId}/${Date.now()}.${ext}`;
@@ -93,103 +241,131 @@ export async function POST(req: Request) {
   if (uploadErr)
     return NextResponse.json({ error: `Erro no upload: ${uploadErr.message}` }, { status: 500 });
 
-  // Extrair dados via DeepSeek
-  let extracted: Record<string, unknown> | null = null;
+  // Buscar nomes das equipas para enriquecer o prompt
+  const { home: homeTeam, away: awayTeam } = await fetchTeamNames(gameId, supabase);
+
+  // ── Extracção ─────────────────────────────────────────────────────────────
+
+  let extraction: Partial<ScanExtraction> = {};
+  let globalReason: string | undefined;
 
   try {
     if (file.type === "application/pdf") {
-      // PDF com camada de texto → extrair com pdf-parse
+      // PDF com camada de texto
       let pdfText = "";
       try {
-        // pdf-parse ESM não tem .default — aceitar ambas as formas
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const mod = await import("pdf-parse") as any;
         const pdfParse: (b: Buffer) => Promise<{ text: string }> = mod.default ?? mod;
-        const parsed = await pdfParse(buffer);
-        pdfText = parsed.text?.trim() ?? "";
-      } catch {
-        pdfText = "";
-      }
+        pdfText = (await pdfParse(buffer)).text?.trim() ?? "";
+      } catch { pdfText = ""; }
 
       if (!pdfText || pdfText.length < 50) {
-        // PDF digitalizado sem texto: não consegue processar
         return NextResponse.json({
-          error: "PDF digitalizado sem camada de texto. Tire uma fotografia em vez de enviar o PDF, ou exporte o PDF como imagem.",
+          error: "PDF digitalizado sem camada de texto. Tire uma fotografia em vez de enviar o PDF.",
+          reason: "pdf_sem_texto",
           photo_path: photoPath,
           fallback_manual: true,
         }, { status: 422 });
       }
 
-      const res = await fetch(DEEPSEEK_API, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model: DEEPSEEK_MODEL,
-          messages: [{ role: "user", content: TEXT_PROMPT + pdfText }],
-          response_format: { type: "json_object" },
-          temperature: 0,
-          max_tokens: 1024,
-        }),
-      });
-      if (!res.ok) {
-        const t = await res.text();
-        return NextResponse.json({ error: `DeepSeek error ${res.status}: ${t}` }, { status: 502 });
-      }
-      const json = await res.json() as { choices?: { message?: { content?: string } }[] };
-      const raw = json.choices?.[0]?.message?.content ?? "{}";
-      extracted = JSON.parse(raw);
+      const { data, reason } = await callAndParse(
+        apiKey,
+        [{ role: "user", content: makeTextPrompt(pdfText, homeTeam, awayTeam) }],
+        "pdf",
+      );
+      if (reason) globalReason = reason;
+      extraction = data as Partial<ScanExtraction>;
 
     } else {
-      // Imagem → enviar como base64 ao DeepSeek Vision
+      // Imagem — 2 chamadas separadas
       const b64 = buffer.toString("base64");
       const mimeType = file.type as "image/jpeg" | "image/png" | "image/webp";
+      const dataUrl = `data:${mimeType};base64,${b64}`;
 
-      const res = await fetch(DEEPSEEK_API, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model: DEEPSEEK_MODEL,
-          messages: [
-            {
+      // Chamada A: resultado + parciais (obrigatória)
+      const { data: scoresData, reason: scoresReason } = await callAndParse(
+        apiKey,
+        [{
+          role: "user",
+          content: [
+            { type: "image_url", image_url: { url: dataUrl } },
+            { type: "text", text: makeScoresPrompt(homeTeam, awayTeam) },
+          ],
+        }],
+        "scores",
+      );
+
+      if (scoresReason) {
+        globalReason = scoresReason;
+        extraction = {};
+      } else {
+        extraction = scoresData as Partial<ScanExtraction>;
+
+        // Chamada B: jogadores (opcional — falha silenciosa)
+        try {
+          const { data: playersData, reason: playersReason } = await callAndParse(
+            apiKey,
+            [{
               role: "user",
               content: [
-                { type: "image_url", image_url: { url: `data:${mimeType};base64,${b64}` } },
-                { type: "text", text: VISION_PROMPT },
+                { type: "image_url", image_url: { url: dataUrl } },
+                { type: "text", text: PLAYERS_PROMPT },
               ],
-            },
-          ],
-          response_format: { type: "json_object" },
-          temperature: 0,
-          max_tokens: 1024,
-        }),
-      });
-      if (!res.ok) {
-        const t = await res.text();
-        return NextResponse.json({ error: `DeepSeek error ${res.status}: ${t}` }, { status: 502 });
+            }],
+            "players",
+          );
+          if (!playersReason && Array.isArray(playersData.jogadores)) {
+            extraction.jogadores = playersData.jogadores as PlayerScan[];
+          }
+        } catch (e) {
+          console.error("[game-sheet/scan] players call failed (non-blocking):", String(e));
+        }
       }
-      const json = await res.json() as { choices?: { message?: { content?: string } }[] };
-      const raw = json.choices?.[0]?.message?.content ?? "{}";
-      extracted = JSON.parse(raw);
     }
   } catch (e) {
-    // OCR falhou, mas o ficheiro foi guardado — retornar photo_path para o delegado preencher manualmente
+    console.error("[game-sheet/scan] unexpected error:", String(e));
     return NextResponse.json({
       error: `Erro ao processar: ${String(e)}`,
+      reason: "erro_inesperado",
       photo_path: photoPath,
       fallback_manual: true,
     }, { status: 422 });
   }
 
+  if (globalReason) {
+    return NextResponse.json({
+      error: "Não foi possível ler a folha automaticamente — preenche manualmente.",
+      reason: globalReason,
+      photo_path: photoPath,
+      fallback_manual: true,
+    }, { status: 422 });
+  }
+
+  // Validação dos parciais
+  const parciais = (extraction.parciais ?? []) as QuarterScore[];
+  const homeFinal = (extraction.pontos_casa ?? 0) as number;
+  const awayFinal = (extraction.pontos_fora ?? 0) as number;
+
+  const quarterWarnings = validateQuarters(parciais, homeFinal, awayFinal);
+  const avisos = [...(extraction.avisos ?? []), ...quarterWarnings];
+  const confianca = penalizeConfidence((extraction.confianca ?? 0) as number, quarterWarnings);
+
   return NextResponse.json({
     ok: true,
     photo_path: photoPath,
-    equipa_casa: extracted?.equipa_casa ?? null,
-    equipa_fora: extracted?.equipa_fora ?? null,
-    pontos_casa: extracted?.pontos_casa ?? null,
-    pontos_fora: extracted?.pontos_fora ?? null,
-    parciais: extracted?.parciais ?? [],
-    confianca: extracted?.confianca ?? 0,
-    avisos: extracted?.avisos ?? [],
-    extraction_raw: extracted,
+    equipa_casa:  extraction.equipa_casa  ?? homeTeam ?? null,
+    equipa_fora:  extraction.equipa_fora  ?? awayTeam ?? null,
+    pontos_casa:  extraction.pontos_casa  ?? null,
+    pontos_fora:  extraction.pontos_fora  ?? null,
+    parciais,
+    prolongamento: extraction.prolongamento ?? false,
+    jogadores:    extraction.jogadores    ?? [],
+    arbitros:     extraction.arbitros     ?? [],
+    data:         extraction.data         ?? null,
+    pavilhao:     extraction.pavilhao     ?? null,
+    confianca,
+    avisos,
+    extraction_raw: extraction,
   });
 }

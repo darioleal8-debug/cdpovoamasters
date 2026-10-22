@@ -28,29 +28,30 @@ const s = {
   numInput: { width: "100%", padding: "12px", fontSize: "28px", fontWeight: 800, textAlign: "center" as const, borderRadius: "10px", border: "1.5px solid var(--border,#E8E0D4)", background: "var(--card,#fff)", fontFamily: "var(--font-ibm-mono,monospace)", boxSizing: "border-box" as const },
 };
 
-// Comprimir imagem com Canvas se > 2 MB
-async function compressImage(file: File): Promise<File> {
+/**
+ * Normaliza SEMPRE a imagem: corrige orientação EXIF, redimensiona lado maior a 2000px,
+ * exporta como JPEG qualidade 0.9. Melhora a precisão do OCR e o tamanho do upload.
+ */
+async function normalizeImage(file: File): Promise<File> {
   const MAX_PX = 2000;
-  const MAX_BYTES = 2 * 1024 * 1024;
-  if (file.size <= MAX_BYTES) return file;
 
   return new Promise<File>((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      let { width, height } = img;
-      if (width > MAX_PX) { height = Math.round(height * MAX_PX / width); width = MAX_PX; }
+    createImageBitmap(file, { imageOrientation: "from-image" }).then((bitmap) => {
+      let { width, height } = bitmap;
+      const scale = Math.min(1, MAX_PX / Math.max(width, height));
+      width  = Math.round(width  * scale);
+      height = Math.round(height * scale);
+
       const canvas = document.createElement("canvas");
       canvas.width = width; canvas.height = height;
-      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+      canvas.getContext("2d")!.drawImage(bitmap, 0, 0, width, height);
+      bitmap.close();
+
       canvas.toBlob((blob) => {
         if (!blob) { resolve(file); return; }
         resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }));
-      }, "image/jpeg", 0.85);
-    };
-    img.onerror = reject;
-    img.src = url;
+      }, "image/jpeg", 0.9);
+    }).catch(reject);
   });
 }
 
@@ -76,6 +77,8 @@ interface ScanResult {
   confianca?: number;
   avisos?: string[];
   fallback_manual?: boolean;
+  /** Razão legível para o delegado quando o OCR falha */
+  reason?: string;
 }
 
 export function SubmitResultFlow({ games, teamName }: Props) {
@@ -110,7 +113,6 @@ export function SubmitResultFlow({ games, teamName }: Props) {
     setProcessing(true); setError(null);
 
     let file = raw;
-    let preview: string | null = null;
 
     try {
       if (HEIC_TYPES.includes(raw.type) || raw.name.toLowerCase().endsWith(".heic") || raw.name.toLowerCase().endsWith(".heif")) {
@@ -118,11 +120,11 @@ export function SubmitResultFlow({ games, teamName }: Props) {
       }
 
       if (IMAGE_TYPES.includes(file.type)) {
-        file = await compressImage(file);
-        preview = URL.createObjectURL(file);
-        setPhotoPreview(preview);
+        // Normaliza sempre: corrige orientação EXIF + redimensiona + JPEG 0.9
+        file = await normalizeImage(file);
+        setPhotoPreview(URL.createObjectURL(file));
       } else if (file.type === PDF_TYPE || raw.type === PDF_TYPE) {
-        file = raw; // enviar PDF directamente
+        file = raw;
       }
 
       const fd = new FormData();
@@ -133,7 +135,8 @@ export function SubmitResultFlow({ games, teamName }: Props) {
       const json: ScanResult & { error?: string } = await res.json();
 
       if (json.fallback_manual || !res.ok) {
-        setError(json.error ?? "Não foi possível ler automaticamente — preenche manualmente.");
+        const reason = json.reason ? ` (${json.reason})` : "";
+        setError((json.error ?? "Não foi possível ler automaticamente — preenche manualmente.") + reason);
         setScanResult({ photo_path: json.photo_path });
         setStep("confirm");
         return;
@@ -281,9 +284,16 @@ export function SubmitResultFlow({ games, teamName }: Props) {
               </button>
             </div>
 
-            <p style={{ fontSize: "11px", color: "var(--muted,#6F675F)", margin: "10px 0 0", textAlign: "center" }}>
-              JPEG · PNG · WebP · HEIC (iPhone) · PDF até 15 MB
-            </p>
+            {/* Dicas para uma boa fotografia */}
+            <div style={{ margin: "14px 0 0", padding: "10px 12px", background: "var(--card,#fff)", borderRadius: "8px", border: "1px solid var(--border,#E8E0D4)" }}>
+              <p style={{ fontSize: "11px", fontWeight: 700, color: "var(--muted,#6F675F)", margin: "0 0 4px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Dicas para melhor leitura</p>
+              <ul style={{ margin: 0, padding: "0 0 0 14px", listStyle: "disc" }}>
+                {["Folha inteira no enquadramento", "Sem sombras, boa iluminação", "De frente, sem inclinação", "Câmara paralela à folha"].map((tip) => (
+                  <li key={tip} style={{ fontSize: "11px", color: "var(--muted,#6F675F)", marginBottom: "2px" }}>{tip}</li>
+                ))}
+              </ul>
+              <p style={{ fontSize: "10px", color: "var(--muted,#6F675F)", margin: "6px 0 0" }}>JPEG · PNG · WebP · HEIC (iPhone) · PDF até 15 MB</p>
+            </div>
 
             <div style={{ display: "flex", gap: "10px", marginTop: "14px" }}>
               <button onClick={() => { setStep("select"); setError(null); }} style={s.btn()}>← Voltar</button>
@@ -307,21 +317,22 @@ export function SubmitResultFlow({ games, teamName }: Props) {
             )}
 
             {/* Indicador de confiança */}
-            {scanResult?.confianca != null && scanResult.confianca > 0 && (
-              <div style={{
-                display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px",
-                padding: "8px 12px", borderRadius: "8px",
-                background: scanResult.confianca >= 0.8 ? "#F0FDF4" : scanResult.confianca >= 0.5 ? "#FFFBEB" : "#FEF2F2",
-                border: `1px solid ${scanResult.confianca >= 0.8 ? "#BBF7D0" : scanResult.confianca >= 0.5 ? "#FDE68A" : "#FECACA"}`,
-              }}>
-                <span style={{ fontSize: "12px" }}>
-                  {scanResult.confianca >= 0.8 ? "✓" : scanResult.confianca >= 0.5 ? "⚠" : "!"}
-                </span>
-                <span style={{ fontSize: "12px", color: "var(--fg,#15110E)" }}>
-                  Confiança: {Math.round(scanResult.confianca * 100)}% — revê os valores antes de submeter
-                </span>
-              </div>
-            )}
+            {scanResult?.confianca != null && scanResult.confianca > 0 && (() => {
+              const c = scanResult.confianca;
+              const low = c < 0.7;
+              const bg  = c >= 0.8 ? "#F0FDF4" : c >= 0.5 ? "#FFFBEB" : "#FEF2F2";
+              const bc  = c >= 0.8 ? "#BBF7D0" : c >= 0.5 ? "#FDE68A" : "#FECACA";
+              return (
+                <div style={{ marginBottom: "12px", padding: "8px 12px", borderRadius: "8px", background: bg, border: `1px solid ${bc}` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "12px" }}>{c >= 0.8 ? "✓" : c >= 0.5 ? "⚠" : "!"}</span>
+                    <span style={{ fontSize: "12px", color: "var(--fg,#15110E)", fontWeight: low ? 700 : 400 }}>
+                      Confiança: {Math.round(c * 100)}%{low ? " — VERIFICA OS VALORES COM ATENÇÃO" : " — revê os valores antes de submeter"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Avisos do OCR */}
             {scanResult?.avisos && scanResult.avisos.length > 0 && (
