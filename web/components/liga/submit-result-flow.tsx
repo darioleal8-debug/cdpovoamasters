@@ -96,7 +96,10 @@ export function SubmitResultFlow({ games, teamName }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const eligibleGames = games.filter(
-    (g) => !g.result && new Date(g.event_date) < new Date()
+    (g) =>
+      !g.result &&
+      g.result_status !== "pending" &&
+      new Date(g.event_date) < new Date()
   );
 
   function reset() {

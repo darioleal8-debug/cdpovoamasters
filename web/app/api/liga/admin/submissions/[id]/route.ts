@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
 import { createAdminClient } from "@/lib/supabase/server";
@@ -90,15 +91,28 @@ export async function PATCH(
     })();
 
     if (!isTestGame) {
+      const gameId = sub.event_id;
+      const cookieHeader = req.headers.get("cookie") ?? "";
       const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.hoophub.pt";
-      fetch(`${baseUrl}/api/liga/admin/generate-news`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Cookie: req.headers.get("cookie") ?? "",
-        },
-        body: JSON.stringify({ game_id: sub.event_id }),
-      }).catch(() => {/* fire-and-forget */});
+
+      // after() garante que o fetch corre após o response ser enviado,
+      // mesmo numa serverless function — substitui o fire-and-forget que
+      // terminava antes do DeepSeek responder.
+      after(async () => {
+        try {
+          const r = await fetch(`${baseUrl}/api/liga/admin/generate-news`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Cookie: cookieHeader },
+            body: JSON.stringify({ game_id: gameId }),
+          });
+          if (!r.ok) {
+            const t = await r.text();
+            console.error(`[submissions/approve] generate-news falhou (${r.status}): ${t.slice(0, 300)}`);
+          }
+        } catch (e) {
+          console.error("[submissions/approve] generate-news exception:", String(e));
+        }
+      });
     }
   } else {
     // Auditoria de rejeição

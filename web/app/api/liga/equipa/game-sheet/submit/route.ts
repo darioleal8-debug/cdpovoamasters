@@ -40,19 +40,43 @@ export async function POST(req: Request) {
     .maybeSingle();
   if (!event) return NextResponse.json({ error: "Jogo não encontrado" }, { status: 404 });
 
-  const { error: insertErr } = await supabase.from("result_submissions").insert({
-    event_id: body.event_id,
+  const payload = {
     home_team_name: body.home_team_name,
     away_team_name: body.away_team_name,
     home_score: body.home_score,
     away_score: body.away_score,
     submitted_by_name: teamName,
     submitted_by_team: teamName,
+    submitted_by_user_id: user.id,
     photo_url: body.photo_path ?? null,
     notes: body.notes ?? null,
-  });
+    extraction_raw: body.extraction_raw ?? null,
+  };
 
-  if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+  // Idempotência: se já existe pendente para este jogo, actualiza-a em vez de criar outra.
+  const { data: existing } = await supabase
+    .from("result_submissions")
+    .select("id")
+    .eq("event_id", body.event_id)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  let writeErr: { message: string } | null = null;
+
+  if (existing) {
+    const { error } = await supabase
+      .from("result_submissions")
+      .update({ ...payload, submitted_at: new Date().toISOString() })
+      .eq("id", existing.id);
+    writeErr = error;
+  } else {
+    const { error } = await supabase
+      .from("result_submissions")
+      .insert({ event_id: body.event_id, ...payload, status: "pending" });
+    writeErr = error;
+  }
+
+  if (writeErr) return NextResponse.json({ error: writeErr.message }, { status: 500 });
 
   return NextResponse.json({ ok: true });
 }
