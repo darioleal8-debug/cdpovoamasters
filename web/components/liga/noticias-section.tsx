@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { NoticiaPublic } from "@/lib/competitions-data";
 
 const PT_MONTHS_LONG = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
@@ -44,6 +45,21 @@ export function NoticiasSection({ noticias }: { noticias: NoticiaPublic[] }) {
         >
           Últimas notícias
         </span>
+        <Link
+          href="/noticias"
+          style={{
+            fontFamily: "var(--font-barlow-condensed, sans-serif)",
+            fontWeight: 600,
+            fontSize: "13px",
+            letterSpacing: "0.04em",
+            color: "#C2530A",
+            textDecoration: "none",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
+          }}
+        >
+          Todas →
+        </Link>
       </div>
 
       {/* Artigos ou estado vazio */}
@@ -99,7 +115,7 @@ export function NoticiasSection({ noticias }: { noticias: NoticiaPublic[] }) {
                   margin: "0 0 8px",
                 }}
               >
-                Liga INATEL · {fmtDate(n.publicado_em ?? n.created_at)}
+                Liga INATEL · {fmtDate(n.published_at ?? n.created_at)}
               </p>
 
               {/* Título */}
@@ -115,7 +131,7 @@ export function NoticiasSection({ noticias }: { noticias: NoticiaPublic[] }) {
                   margin: "0 0 10px",
                 }}
               >
-                {n.titulo}
+                {n.title}
               </h2>
 
               {/* Entrada / lide */}
@@ -129,17 +145,15 @@ export function NoticiasSection({ noticias }: { noticias: NoticiaPublic[] }) {
                   flex: 1,
                 }}
               >
-                {n.entrada}
+                {n.excerpt}
               </p>
             </div>
 
-            {/* Corpo expandido (primeiros 300 chars) */}
+            {/* Corpo expandido (primeiros 300 chars) + link de detalhe */}
             <div
               style={{
-                padding: "0 20px 18px",
+                padding: "14px 20px 18px",
                 borderTop: "1px solid rgba(26,22,18,.07)",
-                marginTop: "2px",
-                paddingTop: "14px",
               }}
             >
               <p
@@ -148,15 +162,30 @@ export function NoticiasSection({ noticias }: { noticias: NoticiaPublic[] }) {
                   fontSize: "12px",
                   color: "#6F675F",
                   lineHeight: 1.6,
-                  margin: 0,
+                  margin: "0 0 10px",
                   display: "-webkit-box",
                   WebkitLineClamp: 4,
                   WebkitBoxOrient: "vertical" as const,
                   overflow: "hidden",
                 }}
               >
-                {n.corpo}
+                {n.body}
               </p>
+
+              <Link
+                href={`/noticias/${n.slug}`}
+                style={{
+                  fontFamily: "var(--font-barlow-condensed, sans-serif)",
+                  fontWeight: 700,
+                  fontSize: "12px",
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  color: "#C2530A",
+                  textDecoration: "none",
+                }}
+              >
+                Ler mais →
+              </Link>
             </div>
           </article>
         ))}

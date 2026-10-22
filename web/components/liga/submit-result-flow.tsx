@@ -337,6 +337,29 @@ export function SubmitResultFlow({ games, teamName }: Props) {
               );
             })()}
 
+            {/* Aviso: equipas lidas na folha não correspondem ao jogo selecionado */}
+            {scanResult?.equipa_casa != null && selectedGame && (() => {
+              const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+              const casaOk = normalize(selectedGame.home_team).includes(normalize(scanResult.equipa_casa!)) ||
+                             normalize(scanResult.equipa_casa!).includes(normalize(selectedGame.home_team));
+              const foraOk = normalize(selectedGame.away_team).includes(normalize(scanResult.equipa_fora ?? "")) ||
+                             normalize(scanResult.equipa_fora ?? "").includes(normalize(selectedGame.away_team));
+              if (casaOk && foraOk) return null;
+              return (
+                <div style={{ marginBottom: "12px", padding: "8px 12px", background: "#FEF3C7", borderRadius: "8px", border: "1px solid #FCD34D" }}>
+                  <p style={{ fontSize: "12px", color: "#92400E", margin: 0, fontWeight: 600 }}>
+                    ⚠ Equipas da folha não coincidem com o jogo selecionado
+                  </p>
+                  <p style={{ fontSize: "11px", color: "#92400E", margin: "4px 0 0" }}>
+                    Folha: {scanResult.equipa_casa} vs {scanResult.equipa_fora ?? "?"} · Jogo: {selectedGame.home_team} vs {selectedGame.away_team}
+                  </p>
+                  <p style={{ fontSize: "11px", color: "#92400E", margin: "2px 0 0" }}>
+                    Confirma que carregaste a folha correcta antes de submeter.
+                  </p>
+                </div>
+              );
+            })()}
+
             {/* Avisos do OCR */}
             {scanResult?.avisos && scanResult.avisos.length > 0 && (
               <div style={{ marginBottom: "12px", padding: "8px 12px", background: "#FFFBEB", borderRadius: "8px", border: "1px solid #FDE68A" }}>

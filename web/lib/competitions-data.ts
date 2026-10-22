@@ -294,25 +294,28 @@ export async function getSubmission(id: string): Promise<AdminSubmission | null>
   return (data as unknown as AdminSubmission) ?? null;
 }
 
-// ─── Notícias ─────────────────────────────────────────────────────────────────
+// ─── Notícias Liga INATEL ─────────────────────────────────────────────────────
+// Lê da tabela `news` (category='Liga INATEL'). A tabela `noticias` está deprecated.
 
 export type NoticiaPublic = {
   id: string;
+  slug: string;
   game_id: string | null;
-  titulo: string;
-  entrada: string;
-  corpo: string;
-  publicado_em: string | null;
+  title: string;
+  excerpt: string;
+  body: string;
+  published_at: string | null;
   created_at: string;
 };
 
 export async function getLatestNoticias(limit = 4): Promise<NoticiaPublic[]> {
   const supabase = await createAdminClient();
   const { data } = await supabase
-    .from("noticias")
-    .select("id, game_id, titulo, entrada, corpo, publicado_em, created_at")
-    .eq("estado", "publicado")
-    .order("publicado_em", { ascending: false })
+    .from("news")
+    .select("id, slug, game_id, title, excerpt, body, published_at, created_at")
+    .eq("category", "Liga INATEL")
+    .eq("is_published", true)
+    .order("published_at", { ascending: false })
     .limit(limit);
   return (data ?? []) as NoticiaPublic[];
 }

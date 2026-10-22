@@ -117,6 +117,8 @@ export default function LigaAdminPage() {
   const [saveMsg, setSaveMsg]         = useState<string | null>(null);
   const [subActing, setSubActing]     = useState<string | null>(null);
   const [subMotivo, setSubMotivo]     = useState<Record<string, string>>({});
+  const [regenerating, setRegenerating] = useState<string | null>(null);
+  const [regenMsg, setRegenMsg]       = useState<Record<string, string>>({});
 
   // Edit game modal
   const [editingGame, setEditingGame]         = useState<AdminGame | null>(null);
@@ -250,6 +252,26 @@ export default function LigaAdminPage() {
       await load();
       await loadAudit(eventId);
     } finally { setSubActing(null); }
+  }
+
+  async function handleRegenerateNews(gameId: string) {
+    setRegenerating(gameId);
+    setRegenMsg(m => ({ ...m, [gameId]: "" }));
+    try {
+      const res = await fetch("/api/liga/admin/generate-news", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ game_id: gameId }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setRegenMsg(m => ({ ...m, [gameId]: `Erro: ${json.error ?? "falhou"}` }));
+      } else {
+        setRegenMsg(m => ({ ...m, [gameId]: "✓ Notícia gerada/actualizada." }));
+      }
+    } finally {
+      setRegenerating(null);
+    }
   }
 
   function openEditModal(game: AdminGame, e: React.MouseEvent) {
@@ -677,6 +699,34 @@ export default function LigaAdminPage() {
                       >
                         {saving ? "A guardar…" : "Guardar resultado"}
                       </button>
+
+                      {/* Regenerar notícia — só para jogos com resultado aprovado */}
+                      {selectedGame.result_status === "approved" && (
+                        <div style={{ marginTop: "10px" }}>
+                          <button
+                            onClick={() => handleRegenerateNews(selectedGame.id)}
+                            disabled={regenerating === selectedGame.id}
+                            style={{
+                              padding: "7px 14px",
+                              background: regenerating === selectedGame.id ? "#D1C9C0" : "#FFFDFA",
+                              color: regenerating === selectedGame.id ? "#8C837A" : "#1A1612",
+                              fontWeight: 600, fontSize: "12px",
+                              border: "1.5px solid #E8E0D6", borderRadius: "6px",
+                              cursor: regenerating === selectedGame.id ? "not-allowed" : "pointer",
+                            }}
+                          >
+                            {regenerating === selectedGame.id ? "A gerar…" : "⟳ Regenerar notícia"}
+                          </button>
+                          {regenMsg[selectedGame.id] && (
+                            <p style={{
+                              fontSize: "11px", marginTop: "5px",
+                              color: regenMsg[selectedGame.id].startsWith("✓") ? "#065F46" : "#DC2626",
+                            }}>
+                              {regenMsg[selectedGame.id]}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Submissions */}

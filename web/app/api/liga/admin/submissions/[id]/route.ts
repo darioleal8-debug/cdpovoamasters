@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
 import { createAdminClient } from "@/lib/supabase/server";
+import { generateLigaNews } from "@/lib/liga/generate-news";
 
 export async function PATCH(
   req: Request,
@@ -34,11 +35,15 @@ export async function PATCH(
 
   if (!sub) return NextResponse.json({ error: "Submissão não encontrada" }, { status: 404 });
 
-  // Atualizar status da submissão
+  const now = new Date().toISOString();
+
+  // Atualizar status da submissão + campos de revisão
   await adminClient
     .from("result_submissions")
     .update({
       status: action === "approve" ? "approved" : "rejected",
+      reviewed_at: now,
+      reviewed_by: auth.user.id,
       rejection_reason: action === "reject" ? (rejection_reason?.trim() || motivo.trim()) : null,
     })
     .eq("id", id);
@@ -57,7 +62,7 @@ export async function PATCH(
       .eq("event_id", sub.event_id)
       .maybeSingle();
 
-    // UPSERT resultado oficial
+    // UPSERT resultado oficial com approved_by
     await adminClient
       .from("league_game_results")
       .upsert({
@@ -67,7 +72,8 @@ export async function PATCH(
         away_team_name: sub.away_team_name,
         home_score: sub.home_score,
         away_score: sub.away_score,
-        approved_at: new Date().toISOString(),
+        approved_at: now,
+        approved_by: auth.user.id,
       }, { onConflict: "event_id" });
 
     // Auditoria
@@ -81,7 +87,7 @@ export async function PATCH(
       motivo: motivo.trim(),
     });
 
-    // Gerar notícia em background (fire-and-forget; falhas não bloqueiam a aprovação)
+    // Verificar se é jogo de teste
     const isTestGame = await (async () => {
       try {
         const { data: ev } = await adminClient.from("events").select("description").eq("id", sub.event_id).single();
@@ -92,25 +98,12 @@ export async function PATCH(
 
     if (!isTestGame) {
       const gameId = sub.event_id;
-      const cookieHeader = req.headers.get("cookie") ?? "";
-      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.hoophub.pt";
-
-      // after() garante que o fetch corre após o response ser enviado,
-      // mesmo numa serverless function — substitui o fire-and-forget que
-      // terminava antes do DeepSeek responder.
+      // after() garante execução após o response, sem bloquear o admin.
+      // Usa generateLigaNews diretamente (service role) — sem depender do cookie/sessão.
       after(async () => {
-        try {
-          const r = await fetch(`${baseUrl}/api/liga/admin/generate-news`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Cookie: cookieHeader },
-            body: JSON.stringify({ game_id: gameId }),
-          });
-          if (!r.ok) {
-            const t = await r.text();
-            console.error(`[submissions/approve] generate-news falhou (${r.status}): ${t.slice(0, 300)}`);
-          }
-        } catch (e) {
-          console.error("[submissions/approve] generate-news exception:", String(e));
+        const result = await generateLigaNews(gameId);
+        if (!result.ok) {
+          console.error(`[submissions/approve] generateLigaNews falhou para game_id=${gameId}: ${result.error}`);
         }
       });
     }
