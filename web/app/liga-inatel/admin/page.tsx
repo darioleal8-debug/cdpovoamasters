@@ -152,12 +152,10 @@ export default function LigaAdminPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createTeamId, setCreateTeamId]       = useState("");
   const [createEmail, setCreateEmail]         = useState("");
-  const [createPassword, setCreatePassword]   = useState("");
   const [createLoading, setCreateLoading]     = useState(false);
   const [createError, setCreateError]         = useState<string | null>(null);
   const [resetUserId, setResetUserId]         = useState<string | null>(null);
   const [resetEmail, setResetEmail]           = useState("");
-  const [resetPassword, setResetPassword]     = useState("");
   const [resetLoading, setResetLoading]       = useState(false);
   const [resetError, setResetError]           = useState<string | null>(null);
   const [removeUserId, setRemoveUserId]       = useState<string | null>(null);
@@ -371,18 +369,18 @@ export default function LigaAdminPage() {
 
   function openCreateModal(teamId: string) {
     setCreateTeamId(teamId);
-    setCreateEmail(""); setCreatePassword(""); setCreateError(null);
+    setCreateEmail(""); setCreateError(null);
     setShowCreateModal(true);
   }
 
   async function handleCreateAccess() {
-    if (!createEmail.trim() || !createPassword) return;
+    if (!createEmail.trim()) return;
     setCreateLoading(true); setCreateError(null);
     try {
       const res = await fetch("/api/liga/admin/team-access", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ team_id: createTeamId, email: createEmail.trim(), password: createPassword }),
+        body: JSON.stringify({ team_id: createTeamId, email: createEmail.trim() }),
       });
       const json = await res.json();
       if (!res.ok) { setCreateError(json.error ?? "Erro ao criar acesso."); return; }
@@ -392,17 +390,17 @@ export default function LigaAdminPage() {
   }
 
   function openResetModal(userId: string, email: string) {
-    setResetUserId(userId); setResetEmail(email); setResetPassword(""); setResetError(null);
+    setResetUserId(userId); setResetEmail(email); setResetError(null);
   }
 
   async function handleResetPassword() {
-    if (!resetUserId || resetPassword.length < 8) return;
+    if (!resetUserId) return;
     setResetLoading(true); setResetError(null);
     try {
       const res = await fetch(`/api/liga/admin/team-access/${resetUserId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: resetPassword }),
+        body: JSON.stringify({}),
       });
       const json = await res.json();
       if (!res.ok) { setResetError(json.error ?? "Erro ao redefinir password."); return; }
@@ -1214,13 +1212,9 @@ export default function LigaAdminPage() {
                   placeholder="delegado@equipa.pt"
                   style={{ ...inputStyle, width: "100%", boxSizing: "border-box" }} />
               </div>
-              <div>
-                <label style={labelStyle}>Password inicial (mín. 8 caracteres)</label>
-                <input type="password" value={createPassword}
-                  onChange={e => setCreatePassword(e.target.value)}
-                  placeholder="••••••••"
-                  style={{ ...inputStyle, width: "100%", boxSizing: "border-box" }} />
-              </div>
+              <p style={{ fontSize: "12px", color: "#6B7280", margin: 0 }}>
+                Será gerada uma palavra-passe segura automaticamente e enviada por email.
+              </p>
             </div>
 
             {createError && (
@@ -1233,8 +1227,8 @@ export default function LigaAdminPage() {
               </button>
               <button
                 onClick={handleCreateAccess}
-                disabled={createLoading || !createEmail.trim() || createPassword.length < 8}
-                style={{ ...btnPrimary, opacity: (createLoading || !createEmail.trim() || createPassword.length < 8) ? 0.5 : 1 }}
+                disabled={createLoading || !createEmail.trim()}
+                style={{ ...btnPrimary, opacity: (createLoading || !createEmail.trim()) ? 0.5 : 1 }}
               >
                 {createLoading ? "A criar…" : "Criar acesso"}
               </button>
@@ -1262,16 +1256,15 @@ export default function LigaAdminPage() {
               fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "11px",
               fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase",
               color: "#F97316", margin: "0 0 4px",
-            }}>Redefinir Password</h2>
-            <p style={{ fontSize: "12px", color: "#6B7280", margin: "0 0 20px" }}>{resetEmail}</p>
+            }}>Regenerar Password</h2>
+            <p style={{ fontSize: "12px", color: "#6B7280", margin: "0 0 16px" }}>{resetEmail}</p>
 
-            <div>
-              <label style={labelStyle}>Nova password (mín. 8 caracteres)</label>
-              <input type="password" value={resetPassword}
-                onChange={e => setResetPassword(e.target.value)}
-                placeholder="••••••••"
-                style={{ ...inputStyle, width: "100%", boxSizing: "border-box" }} />
-            </div>
+            <p style={{ fontSize: "13px", color: "#3D3630", margin: "0 0 4px" }}>
+              Será gerada uma nova palavra-passe segura e enviada por email para este delegado.
+            </p>
+            <p style={{ fontSize: "12px", color: "#6B7280", margin: "0 0 4px" }}>
+              O delegado terá de definir uma nova palavra-passe pessoal no próximo acesso.
+            </p>
 
             {resetError && (
               <p style={{ fontSize: "12px", color: "#DC2626", marginTop: "10px" }}>{resetError}</p>
@@ -1283,10 +1276,10 @@ export default function LigaAdminPage() {
               </button>
               <button
                 onClick={handleResetPassword}
-                disabled={resetLoading || resetPassword.length < 8}
-                style={{ ...btnPrimary, opacity: (resetLoading || resetPassword.length < 8) ? 0.5 : 1 }}
+                disabled={resetLoading}
+                style={{ ...btnPrimary, opacity: resetLoading ? 0.5 : 1 }}
               >
-                {resetLoading ? "A guardar…" : "Guardar password"}
+                {resetLoading ? "A enviar…" : "Regenerar e enviar email"}
               </button>
             </div>
           </div>

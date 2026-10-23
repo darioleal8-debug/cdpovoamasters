@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
 import { createAdminClient } from "@/lib/supabase/server";
+import { generateSecurePassword } from "@/lib/liga/password";
+import { sendLigaCredentialsEmail } from "@/lib/liga/email-credentials";
 
 // GET /api/liga/admin/team-access
-// Devolve todas as equipas não-placeholder com os seus membros e emails
 export async function GET() {
   const auth = await authorizeAsLigaAdmin();
   if (!auth.ok) return auth.response;
@@ -25,9 +26,7 @@ export async function GET() {
   const teams = teamsRes.data ?? [];
   const members = membersRes.data ?? [];
 
-  // Recolher user_ids únicos para fazer lookup de emails
   const userIds = [...new Set(members.map((m) => m.user_id))];
-
   const emailMap: Record<string, string> = {};
   for (const uid of userIds) {
     const { data } = await adminClient.auth.admin.getUserById(uid);
@@ -55,33 +54,22 @@ export async function GET() {
 }
 
 // POST /api/liga/admin/team-access
-// Cria utilizador Auth + insere em league_team_members
+// Cria utilizador Auth com password automática + envia credenciais por email
 export async function POST(req: Request) {
   const auth = await authorizeAsLigaAdmin();
   if (!auth.ok) return auth.response;
 
-  const body = (await req.json()) as {
-    team_id: string;
-    email: string;
-    password: string;
-  };
+  const body = (await req.json()) as { team_id: string; email: string };
 
-  if (!body.team_id || !body.email || !body.password) {
+  if (!body.team_id || !body.email?.trim()) {
     return NextResponse.json(
-      { error: "team_id, email e password são obrigatórios" },
-      { status: 400 }
-    );
-  }
-  if (body.password.length < 8) {
-    return NextResponse.json(
-      { error: "A password tem de ter pelo menos 8 caracteres" },
+      { error: "team_id e email são obrigatórios" },
       { status: 400 }
     );
   }
 
   const adminClient = await createAdminClient();
 
-  // Verificar que a equipa existe e não é placeholder
   const { data: team } = await adminClient
     .from("league_teams")
     .select("id, name, is_placeholder")
@@ -92,11 +80,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Equipa não encontrada" }, { status: 404 });
   }
 
-  // Criar utilizador Auth com email já confirmado
+  const password = generateSecurePassword();
+
   const { data: created, error: createErr } = await adminClient.auth.admin.createUser({
-    email: body.email,
-    password: body.password,
+    email: body.email.trim(),
+    password,
     email_confirm: true,
+    user_metadata: { must_change_password: true },
   });
 
   if (createErr || !created.user) {
@@ -106,7 +96,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // Inserir em league_team_members
   const { error: insertErr } = await adminClient.from("league_team_members").insert({
     user_id: created.user.id,
     team_id: body.team_id,
@@ -115,9 +104,25 @@ export async function POST(req: Request) {
   });
 
   if (insertErr) {
-    // Tentar reverter a criação do utilizador
     await adminClient.auth.admin.deleteUser(created.user.id);
     return NextResponse.json({ error: insertErr.message }, { status: 500 });
+  }
+
+  // Enviar credenciais por email — rollback se falhar
+  const emailResult = await sendLigaCredentialsEmail({
+    to: body.email.trim(),
+    password,
+    teamName: team.name,
+  });
+
+  if (!emailResult.ok) {
+    // Reverter: apagar utilizador e membro
+    await adminClient.from("league_team_members").delete().eq("user_id", created.user.id);
+    await adminClient.auth.admin.deleteUser(created.user.id);
+    return NextResponse.json(
+      { error: `Utilizador criado mas email falhou: ${emailResult.error}. Acesso revertido.` },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({
