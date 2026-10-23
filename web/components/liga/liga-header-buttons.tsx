@@ -266,7 +266,7 @@ export function LigaHeaderButtons() {
                 }}
               >
                 <ShieldCheck size={16} aria-hidden />
-                Área de Equipa
+                Login
               </Link>
             )}
 
