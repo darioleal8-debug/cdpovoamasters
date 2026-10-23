@@ -275,7 +275,7 @@ async function buildImagePrompt(
 // Parsing robusto: remove fences markdown, extrai primeiro {...}, faz JSON.parse
 function safeParseJson(raw: string): { prompt?: string; negative_prompt?: string } | null {
   // Remove ```json ... ``` ou ``` ... ```
-  let cleaned = raw
+  const cleaned = raw
     .replace(/^```(?:json)?\s*/im, "")
     .replace(/\s*```\s*$/m, "")
     .trim();
