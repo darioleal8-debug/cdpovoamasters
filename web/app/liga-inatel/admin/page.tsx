@@ -9,6 +9,8 @@ import { useRouter } from "next/navigation";
 type AdminNoticia = {
   id: string; slug: string; title: string;
   cover_image_url: string | null;
+  image_status: string | null;
+  image_prompt: string | null;
   published_at: string | null; is_published: boolean;
   home_team_name: string | null; away_team_name: string | null;
   game_id: string | null;
@@ -162,6 +164,10 @@ export default function LigaAdminPage() {
   const [uploadingId, setUploadingId]         = useState<string | null>(null);
   const [removingId, setRemovingId]           = useState<string | null>(null);
   const [noticiaMsg, setNoticiaMsg]           = useState<Record<string, string>>({});
+  const [regenModal, setRegenModal]           = useState<{ id: string; currentPrompt: string | null } | null>(null);
+  const [regenModalPrompt, setRegenModalPrompt] = useState("");
+  const [regenLoading, setRegenLoading]       = useState(false);
+  const [batchLoading, setBatchLoading]       = useState(false);
   const [teamAccess, setTeamAccess]           = useState<TeamAccess[]>([]);
   const [loadingAccess, setLoadingAccess]     = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -372,7 +378,7 @@ export default function LigaAdminPage() {
     if (next && deletedGames.length === 0) await loadDeletedGames();
   }
 
-  async function loadNoticias() {
+  const loadNoticias = useCallback(async () => {
     setLoadingNoticias(true);
     try {
       const res = await fetch("/api/liga/admin/news");
@@ -380,6 +386,66 @@ export default function LigaAdminPage() {
       const json = await res.json();
       setNoticias(json.news ?? []);
     } finally { setLoadingNoticias(false); }
+  }, []);
+
+  // Polling: actualiza notícias enquanto alguma tem image_status='pending'
+  const hasPendingImages = noticias.some(n => n.image_status === "pending");
+  useEffect(() => {
+    if (activeTab !== "noticias" || !hasPendingImages) return;
+    let cancelled = false;
+    const timer = setInterval(async () => {
+      if (cancelled) return;
+      try {
+        const res = await fetch("/api/liga/admin/news");
+        if (!res.ok || cancelled) return;
+        const json = await res.json();
+        if (!cancelled) setNoticias(json.news ?? []);
+      } catch { /* ignore */ }
+    }, 4000);
+    return () => { cancelled = true; clearInterval(timer); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, hasPendingImages]);
+
+  async function handleRegen(id: string, customPrompt?: string) {
+    setRegenLoading(true);
+    setNoticiaMsg(m => ({ ...m, [id]: "" }));
+    try {
+      const res = await fetch(`/api/liga/admin/news/${id}/generate-image`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(customPrompt ? { custom_prompt: customPrompt } : {}),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setNoticias(prev => prev.map(n => n.id === id ? { ...n, image_status: "pending" } : n));
+        setNoticiaMsg(m => ({ ...m, [id]: "⏳ A gerar imagem…" }));
+      } else {
+        setNoticiaMsg(m => ({ ...m, [id]: `Erro: ${json.error ?? "falhou"}` }));
+      }
+    } finally {
+      setRegenLoading(false);
+      setRegenModal(null);
+    }
+  }
+
+  async function handleBatchGen() {
+    setBatchLoading(true);
+    try {
+      const res = await fetch("/api/liga/admin/news/generate-images-batch", { method: "POST" });
+      const json = await res.json();
+      if (res.ok && json.count > 0) {
+        setNoticias(prev => prev.map(n =>
+          !n.cover_image_url && n.image_status !== "pending"
+            ? { ...n, image_status: "pending" }
+            : n
+        ));
+        setNoticiaMsg(() => ({ _batch: `⏳ ${json.count} notícia(s) enfileirada(s).` }));
+      } else if (res.ok) {
+        setNoticiaMsg(() => ({ _batch: "Todas as notícias já têm imagem." }));
+      } else {
+        setNoticiaMsg(() => ({ _batch: `Erro: ${json.error ?? "falhou"}` }));
+      }
+    } finally { setBatchLoading(false); }
   }
 
   async function handleImageUpload(id: string, file: File) {
@@ -958,10 +1024,27 @@ export default function LigaAdminPage() {
       {/* ── Notícias section ── */}
       {activeTab === "noticias" && (
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-            <p style={{ fontSize: "13px", color: "#8C837A", margin: 0 }}>
-              Imagens de destaque das notícias da Liga INATEL.
-            </p>
+          {/* Header com acções globais */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <button
+                onClick={handleBatchGen}
+                disabled={batchLoading}
+                style={{
+                  padding: "6px 14px", fontSize: "12px", fontWeight: 700,
+                  border: "1.5px solid #6366F1", borderRadius: "6px",
+                  background: "transparent", color: batchLoading ? "#D1C9C0" : "#6366F1",
+                  cursor: batchLoading ? "not-allowed" : "pointer",
+                }}
+              >
+                {batchLoading ? "A enfileirar…" : "⚡ Gerar imagens em falta"}
+              </button>
+              {noticiaMsg._batch && (
+                <span style={{ fontSize: "11px", color: noticiaMsg._batch.startsWith("⏳") ? "#065F46" : noticiaMsg._batch.startsWith("Erro") ? "#DC2626" : "#6B7280" }}>
+                  {noticiaMsg._batch}
+                </span>
+              )}
+            </div>
             <button
               onClick={loadNoticias}
               style={{ fontSize: "12px", color: "#8C837A", background: "none", border: "none", cursor: "pointer" }}
@@ -982,10 +1065,13 @@ export default function LigaAdminPage() {
             {noticias.map(n => {
               const isUploading = uploadingId === n.id;
               const isRemoving  = removingId === n.id;
+              const isPending   = n.image_status === "pending";
+              const isReady     = n.image_status === "ready";
+              const isFailed    = n.image_status === "failed";
               const msg = noticiaMsg[n.id];
               return (
                 <div key={n.id} style={{
-                  display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap",
+                  display: "flex", gap: "12px", alignItems: "flex-start", flexWrap: "wrap",
                   padding: "12px 16px", borderRadius: "8px",
                   border: "1px solid #E8E0D6", background: "#FFFDFA",
                 }}>
@@ -1001,7 +1087,9 @@ export default function LigaAdminPage() {
                         style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     ) : (
                       <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <span style={{ fontSize: "8px", color: "#fff", fontWeight: 800, letterSpacing: "0.06em" }}>SEM IMG</span>
+                        <span style={{ fontSize: "8px", color: "#fff", fontWeight: 800, letterSpacing: "0.06em" }}>
+                          {isPending ? "…" : "SEM IMG"}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -1009,27 +1097,76 @@ export default function LigaAdminPage() {
                   {/* Info */}
                   <div style={{ flex: 1, minWidth: "160px" }}>
                     <p style={{
-                      fontSize: "13px", fontWeight: 600, color: "#1A1612", margin: "0 0 2px",
+                      fontSize: "13px", fontWeight: 600, color: "#1A1612", margin: "0 0 4px",
                       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                     }}>{n.title}</p>
-                    <p style={{ fontSize: "10px", color: "#8C837A", margin: 0 }}>
-                      {n.published_at ? new Date(n.published_at).toLocaleDateString("pt-PT") : "—"}
-                      {n.home_team_name ? ` · ${n.home_team_name} vs ${n.away_team_name}` : ""}
-                    </p>
+
+                    {/* Status + data */}
+                    <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap", marginBottom: "4px" }}>
+                      {isPending && (
+                        <span style={{ fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "99px", background: "#FEF3C7", color: "#92400E", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                          ⟳ A gerar…
+                        </span>
+                      )}
+                      {isReady && (
+                        <span style={{ fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "99px", background: "#D1FAE5", color: "#065F46", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                          IA ✓
+                        </span>
+                      )}
+                      {isFailed && (
+                        <span style={{ fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "99px", background: "#FEE2E2", color: "#991B1B", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                          Falhou
+                        </span>
+                      )}
+                      <span style={{ fontSize: "10px", color: "#8C837A" }}>
+                        {n.published_at ? new Date(n.published_at).toLocaleDateString("pt-PT") : "—"}
+                        {n.home_team_name ? ` · ${n.home_team_name} vs ${n.away_team_name}` : ""}
+                      </span>
+                    </div>
+
+                    {/* Prompt preview */}
+                    {n.image_prompt && (
+                      <p style={{
+                        fontSize: "10px", color: "#9CA3AF", margin: 0,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        maxWidth: "360px", fontStyle: "italic",
+                      }} title={n.image_prompt}>
+                        "{n.image_prompt.slice(0, 80)}{n.image_prompt.length > 80 ? "…" : ""}"
+                      </p>
+                    )}
+
                     {msg && (
-                      <p style={{ fontSize: "11px", margin: "3px 0 0", color: msg.startsWith("✓") ? "#065F46" : "#DC2626" }}>{msg}</p>
+                      <p style={{ fontSize: "11px", margin: "4px 0 0", color: msg.startsWith("✓") || msg.startsWith("⏳") ? "#065F46" : "#DC2626" }}>{msg}</p>
                     )}
                   </div>
 
                   {/* Actions */}
-                  <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                  <div style={{ display: "flex", gap: "6px", flexShrink: 0, flexWrap: "wrap" }}>
+                    {/* Gerar / Regenerar com IA */}
+                    {!isPending && (
+                      <button
+                        onClick={() => {
+                          setRegenModal({ id: n.id, currentPrompt: n.image_prompt });
+                          setRegenModalPrompt(n.image_prompt ?? "");
+                        }}
+                        style={{
+                          padding: "5px 12px", fontSize: "11px", fontWeight: 700,
+                          border: "1.5px solid #6366F1", borderRadius: "6px",
+                          background: "transparent", color: "#6366F1", cursor: "pointer",
+                        }}
+                      >
+                        {isReady ? "↻ Regenerar IA" : "⚡ Gerar imagem IA"}
+                      </button>
+                    )}
+
+                    {/* Upload manual */}
                     <label style={{
                       padding: "5px 12px", fontSize: "11px", fontWeight: 700,
                       border: "1.5px solid #F97316", borderRadius: "6px",
                       background: "transparent", color: isUploading ? "#D1C9C0" : "#F97316",
                       cursor: isUploading ? "not-allowed" : "pointer",
                     }}>
-                      {isUploading ? "A enviar…" : n.cover_image_url ? "Substituir" : "Adicionar imagem"}
+                      {isUploading ? "A enviar…" : n.cover_image_url ? "Substituir" : "Carregar"}
                       <input
                         type="file" accept="image/jpeg,image/png,image/webp"
                         style={{ display: "none" }}
@@ -1041,6 +1178,8 @@ export default function LigaAdminPage() {
                         }}
                       />
                     </label>
+
+                    {/* Remover */}
                     {n.cover_image_url && (
                       <button
                         onClick={() => handleImageRemove(n.id)}
@@ -1059,6 +1198,65 @@ export default function LigaAdminPage() {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Regen modal ── */}
+      {regenModal && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,.45)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 1000, padding: "16px",
+        }}
+          onClick={() => !regenLoading && setRegenModal(null)}
+        >
+          <div style={{
+            background: "#FFFDFA", borderRadius: "12px", padding: "24px",
+            width: "100%", maxWidth: "520px", boxShadow: "0 20px 60px rgba(0,0,0,.2)",
+          }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 style={{
+              fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "11px",
+              fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase",
+              color: "#6366F1", margin: "0 0 4px",
+            }}>Gerar imagem com IA</h2>
+            <p style={{ fontSize: "12px", color: "#6B7280", margin: "0 0 16px" }}>
+              Deixa o prompt em branco para DeepSeek gerar automaticamente. Ou edita o prompt para controlar o resultado.
+            </p>
+
+            <div>
+              <label style={labelStyle}>Prompt (opcional)</label>
+              <textarea
+                value={regenModalPrompt}
+                onChange={e => setRegenModalPrompt(e.target.value)}
+                placeholder="Deixa em branco para gerar com IA…"
+                rows={5}
+                style={{
+                  ...inputStyle, width: "100%", boxSizing: "border-box",
+                  resize: "vertical", fontFamily: "var(--font-barlow, sans-serif)",
+                  lineHeight: 1.5,
+                }}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "20px" }}>
+              <button
+                onClick={() => setRegenModal(null)}
+                disabled={regenLoading}
+                style={{ ...btnSecondary }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleRegen(regenModal.id, regenModalPrompt.trim() || undefined)}
+                disabled={regenLoading}
+                style={{ ...btnPrimary, background: "#6366F1", opacity: regenLoading ? 0.6 : 1 }}
+              >
+                {regenLoading ? "A enfileirar…" : "Gerar imagem"}
+              </button>
+            </div>
           </div>
         </div>
       )}

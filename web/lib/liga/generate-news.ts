@@ -15,9 +15,18 @@ function slugify(text: string): string {
     .replace(/-+/g, "-");
 }
 
+export type NewsContext = {
+  title: string;
+  excerpt: string;
+  homeTeamName: string | null;
+  awayTeamName: string | null;
+  scoreStr: string;
+  jornadaInfo: string;
+};
+
 export async function generateLigaNews(
   gameId: string
-): Promise<{ ok: true; news_id: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; news_id: string; newsContext: NewsContext } | { ok: false; error: string }> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) return { ok: false, error: "DEEPSEEK_API_KEY não configurada" };
 
@@ -78,14 +87,6 @@ export async function generateLigaNews(
   const homeWon = result.home_score > result.away_score;
   const winner = homeWon ? result.home_team_name : result.away_team_name;
   const scoreStr = `${result.home_score}-${result.away_score}`;
-
-  // Imagem de destaque: logo do vencedor (ou da equipa de casa) se disponível
-  const { data: teamLogos } = await adminClient
-    .from("league_teams")
-    .select("name, logo_url")
-    .in("name", [result.home_team_name, result.away_team_name]);
-  const logoMap = new Map((teamLogos ?? []).map((t) => [t.name, t.logo_url ?? null]));
-  const coverImageUrl = logoMap.get(winner) ?? logoMap.get(result.home_team_name) ?? null;
 
   const prompt = `Escreve uma notícia de jornalismo desportivo local, em português de Portugal, sobre o seguinte resultado de basquetebol da Liga INATEL Masters.
 
@@ -166,7 +167,7 @@ Responde com JSON:
         home_team_name: result.home_team_name,
         away_team_name: result.away_team_name,
         source_submission_id: submission?.id ?? null,
-        ...(coverImageUrl ? { cover_image_url: coverImageUrl } : {}),
+        image_status: "pending",
       })
       .eq("id", existing.id);
     if (error) {
@@ -187,7 +188,7 @@ Responde com JSON:
         category: "Liga INATEL",
         home_team_name: result.home_team_name,
         away_team_name: result.away_team_name,
-        cover_image_url: coverImageUrl,
+        image_status: "pending",
         is_published: true,
         published_at: new Date().toISOString(),
       })
@@ -200,5 +201,16 @@ Responde com JSON:
     news_id = inserted!.id;
   }
 
-  return { ok: true, news_id };
+  return {
+    ok: true,
+    news_id,
+    newsContext: {
+      title: newsData.titulo!,
+      excerpt: newsData.entrada ?? "",
+      homeTeamName: result.home_team_name,
+      awayTeamName: result.away_team_name,
+      scoreStr,
+      jornadaInfo,
+    },
+  };
 }

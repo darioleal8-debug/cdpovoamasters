@@ -21,7 +21,7 @@ const securityHeaders = [
 
 // Build root: web/
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["pdf-parse", "xlsx", "@anthropic-ai/sdk"],
+  serverExternalPackages: ["pdf-parse", "xlsx", "@anthropic-ai/sdk", "sharp"],
   images: {
     remotePatterns: [
       {
