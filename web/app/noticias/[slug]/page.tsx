@@ -61,16 +61,31 @@ export default async function NoticiaDetailPage({ params }: Props) {
 
   const bodyHtml = markdownToHtml(article.body);
 
+  const isLiga = article.category === "Liga INATEL";
+  const backHref = isLiga ? "/liga-inatel" : "/noticias";
+  const backLabel = isLiga ? "← Liga INATEL" : "← Notícias";
+
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "48px 24px" }}>
       {/* Breadcrumb */}
       <nav style={{ marginBottom: 32, display: "flex", alignItems: "center", gap: 8 }}>
         <Link
-          href="/noticias"
+          href={backHref}
           style={{ fontSize: 14, color: DARK_ORANGE, textDecoration: "none", fontWeight: 500 }}
         >
-          ← Notícias
+          {backLabel}
         </Link>
+        {isLiga && (
+          <>
+            <span style={{ fontSize: 14, color: GRAY }}>·</span>
+            <Link
+              href="/noticias"
+              style={{ fontSize: 14, color: GRAY, textDecoration: "none", fontWeight: 500 }}
+            >
+              Notícias
+            </Link>
+          </>
+        )}
       </nav>
 
       {/* Header */}
@@ -162,7 +177,7 @@ export default async function NoticiaDetailPage({ params }: Props) {
         }}
       >
         <Link
-          href="/noticias"
+          href={backHref}
           style={{
             fontSize: 14,
             fontWeight: 600,
@@ -170,7 +185,7 @@ export default async function NoticiaDetailPage({ params }: Props) {
             textDecoration: "none",
           }}
         >
-          ← Ver todas as notícias
+          {isLiga ? "← Voltar à Liga INATEL" : "← Ver todas as notícias"}
         </Link>
         <Link
           href="/pedir-acesso"

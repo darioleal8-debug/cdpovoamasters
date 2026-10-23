@@ -261,6 +261,9 @@ export default async function LigaInatelHomePage() {
       {/* ── TICKER ── */}
       <ScoreTicker items={tickerItems} />
 
+      {/* ── NOTÍCIAS ── */}
+      <NoticiasSection noticias={noticias} />
+
       {/* ── ÚLTIMOS RESULTADOS ── */}
       {lastJornadaResults.length > 0 && (
         <section style={{ ...maxW, padding: "48px 20px 0" }}>
@@ -481,8 +484,6 @@ export default async function LigaInatelHomePage() {
         </div>
       </section>
 
-      {/* ── NOTÍCIAS ── */}
-      <NoticiasSection noticias={noticias} />
     </div>
   );
 }

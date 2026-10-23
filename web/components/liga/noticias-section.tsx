@@ -3,6 +3,17 @@ import type { NoticiaPublic } from "@/lib/competitions-data";
 
 const PT_MONTHS_LONG = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
 
+function plainText(md: string): string {
+  return md
+    .replace(/^#{1,6}\s+/gm, "")        // cabeçalhos #
+    .replace(/\*\*(.+?)\*\*/g, "$1")     // **negrito**
+    .replace(/\*(.+?)\*/g, "$1")         // *itálico*
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1") // [texto](url)
+    .replace(/^[-*]\s+/gm, "")          // marcadores de lista
+    .replace(/\n+/g, " ")               // quebras de linha
+    .trim();
+}
+
 function fmtDate(iso: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -17,7 +28,7 @@ export function NoticiasSection({ noticias }: { noticias: NoticiaPublic[] }) {
       style={{
         maxWidth: "1200px",
         margin: "0 auto",
-        padding: "0 20px 60px",
+        padding: "48px 20px 0",
       }}
     >
       {/* Título */}
@@ -169,7 +180,7 @@ export function NoticiasSection({ noticias }: { noticias: NoticiaPublic[] }) {
                   overflow: "hidden",
                 }}
               >
-                {n.body}
+                {plainText(n.body)}
               </p>
 
               <Link
