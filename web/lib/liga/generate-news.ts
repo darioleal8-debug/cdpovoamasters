@@ -79,6 +79,14 @@ export async function generateLigaNews(
   const winner = homeWon ? result.home_team_name : result.away_team_name;
   const scoreStr = `${result.home_score}-${result.away_score}`;
 
+  // Imagem de destaque: logo do vencedor (ou da equipa de casa) se disponível
+  const { data: teamLogos } = await adminClient
+    .from("league_teams")
+    .select("name, logo_url")
+    .in("name", [result.home_team_name, result.away_team_name]);
+  const logoMap = new Map((teamLogos ?? []).map((t) => [t.name, t.logo_url ?? null]));
+  const coverImageUrl = logoMap.get(winner) ?? logoMap.get(result.home_team_name) ?? null;
+
   const prompt = `Escreve uma notícia de jornalismo desportivo local, em português de Portugal, sobre o seguinte resultado de basquetebol da Liga INATEL Masters.
 
 JOGO: ${result.home_team_name} ${scoreStr} ${result.away_team_name}
@@ -158,6 +166,7 @@ Responde com JSON:
         home_team_name: result.home_team_name,
         away_team_name: result.away_team_name,
         source_submission_id: submission?.id ?? null,
+        ...(coverImageUrl ? { cover_image_url: coverImageUrl } : {}),
       })
       .eq("id", existing.id);
     if (error) {
@@ -178,6 +187,7 @@ Responde com JSON:
         category: "Liga INATEL",
         home_team_name: result.home_team_name,
         away_team_name: result.away_team_name,
+        cover_image_url: coverImageUrl,
         is_published: true,
         published_at: new Date().toISOString(),
       })

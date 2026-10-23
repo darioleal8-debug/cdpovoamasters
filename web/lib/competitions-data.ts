@@ -304,6 +304,9 @@ export type NoticiaPublic = {
   title: string;
   excerpt: string;
   body: string;
+  cover_image_url: string | null;
+  home_team_name: string | null;
+  away_team_name: string | null;
   published_at: string | null;
   created_at: string;
 };
@@ -312,7 +315,7 @@ export async function getLatestNoticias(limit = 4): Promise<NoticiaPublic[]> {
   const supabase = await createAdminClient();
   const { data } = await supabase
     .from("news")
-    .select("id, slug, game_id, title, excerpt, body, published_at, created_at")
+    .select("id, slug, game_id, title, excerpt, body, cover_image_url, home_team_name, away_team_name, published_at, created_at")
     .eq("category", "Liga INATEL")
     .eq("is_published", true)
     .order("published_at", { ascending: false })

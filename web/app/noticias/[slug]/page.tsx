@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { markdownToHtml } from "@/lib/markdown";
@@ -35,6 +36,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       url: `https://hoophub.pt/noticias/${slug}`,
       type: "article",
       publishedTime: article.published_at,
+      ...(article.cover_image_url
+        ? { images: [{ url: article.cover_image_url, width: 1200, height: 675, alt: article.title }] }
+        : {}),
     },
   };
 }
@@ -53,6 +57,39 @@ const BLACK       = "#111111";
 const GRAY        = "#4B5563";
 const BORDER      = "#E5E7EB";
 const LIGHT       = "#F2F4F7";
+
+function NewsImageFallback({ title }: { title: string }) {
+  return (
+    <div style={{
+      position: "absolute", inset: 0,
+      background: "linear-gradient(135deg, #F28C28 0%, #B26016 100%)",
+      display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center",
+      padding: "24px", gap: "10px",
+    }}>
+      <span style={{
+        fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))",
+        fontWeight: 900, fontSize: "clamp(28px, 6vw, 48px)",
+        letterSpacing: "0.06em", color: "#fff",
+        textTransform: "uppercase", lineHeight: 1,
+      }}>hoophub</span>
+      <span style={{
+        fontFamily: "var(--font-ibm-mono, monospace)",
+        fontSize: "11px", fontWeight: 600,
+        letterSpacing: "0.14em", color: "rgba(255,255,255,.75)",
+        textTransform: "uppercase",
+      }}>Liga INATEL</span>
+      <p style={{
+        fontFamily: "var(--font-barlow-condensed, sans-serif)",
+        fontSize: "clamp(14px, 2.5vw, 20px)", fontWeight: 700,
+        color: "rgba(255,255,255,.9)", textAlign: "center",
+        maxWidth: "80%", margin: 0, lineHeight: 1.3,
+        overflow: "hidden", display: "-webkit-box",
+        WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as const,
+      }}>{title}</p>
+    </div>
+  );
+}
 
 export default async function NoticiaDetailPage({ params }: Props) {
   const { slug } = await params;
@@ -152,6 +189,30 @@ export default async function NoticiaDetailPage({ params }: Props) {
           {formatDate(article.published_at)}
         </p>
       </header>
+
+      {/* Imagem de destaque */}
+      <div style={{
+        position: "relative",
+        width: "100%",
+        aspectRatio: "16/9",
+        borderRadius: "12px",
+        overflow: "hidden",
+        marginBottom: 32,
+        background: article.cover_image_url ? undefined : "#F28C28",
+      }}>
+        {article.cover_image_url ? (
+          <Image
+            src={article.cover_image_url}
+            alt={article.title}
+            fill
+            style={{ objectFit: "cover" }}
+            sizes="(max-width: 720px) 100vw, 720px"
+            priority
+          />
+        ) : (
+          <NewsImageFallback title={article.title} />
+        )}
+      </div>
 
       {/* Divider */}
       <div style={{ height: 1, background: BORDER, marginBottom: 32 }} />

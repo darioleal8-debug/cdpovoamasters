@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { NoticiaPublic } from "@/lib/competitions-data";
 
 const PT_MONTHS_LONG = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
@@ -108,10 +109,42 @@ export function NoticiasSection({ noticias }: { noticias: NoticiaPublic[] }) {
               flexDirection: "column",
             }}
           >
-            {/* Stripe de destaque no primeiro artigo */}
-            {i === 0 && (
-              <div style={{ height: "4px", background: "#F97316" }} />
-            )}
+            {/* Thumbnail 16:9 */}
+            <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", flexShrink: 0 }}>
+              {n.cover_image_url ? (
+                <Image
+                  src={n.cover_image_url}
+                  alt={n.title}
+                  fill
+                  style={{ objectFit: "cover" }}
+                  sizes="(max-width: 600px) 100vw, 360px"
+                  loading="lazy"
+                />
+              ) : (
+                <div style={{
+                  position: "absolute", inset: 0,
+                  background: "linear-gradient(135deg, #F97316 0%, #C2530A 100%)",
+                  display: "flex", flexDirection: "column",
+                  alignItems: "center", justifyContent: "center", gap: "4px",
+                }}>
+                  <span style={{
+                    fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))",
+                    fontWeight: 900, fontSize: "20px",
+                    letterSpacing: "0.06em", color: "#fff", textTransform: "uppercase",
+                  }}>hoophub</span>
+                  <span style={{
+                    fontFamily: "var(--font-ibm-mono, monospace)",
+                    fontSize: "8px", fontWeight: 600,
+                    letterSpacing: "0.12em", color: "rgba(255,255,255,.7)",
+                    textTransform: "uppercase",
+                  }}>Liga INATEL</span>
+                </div>
+              )}
+              {/* Stripe de destaque no primeiro artigo */}
+              {i === 0 && (
+                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "4px", background: "#F97316", zIndex: 1 }} />
+              )}
+            </div>
 
             <div style={{ padding: "18px 20px 20px", flex: 1, display: "flex", flexDirection: "column" }}>
               {/* Data */}

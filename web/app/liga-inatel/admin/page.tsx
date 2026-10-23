@@ -6,6 +6,14 @@ import { useRouter } from "next/navigation";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+type AdminNoticia = {
+  id: string; slug: string; title: string;
+  cover_image_url: string | null;
+  published_at: string | null; is_published: boolean;
+  home_team_name: string | null; away_team_name: string | null;
+  game_id: string | null;
+};
+
 type Submission = {
   id: string; event_id: string; status: string;
   home_team_name: string; away_team_name: string;
@@ -146,7 +154,14 @@ export default function LigaAdminPage() {
   const [restoring, setRestoring]             = useState<string | null>(null);
 
   // Team access tab
-  const [activeTab, setActiveTab]             = useState<"games" | "access">("games");
+  const [activeTab, setActiveTab]             = useState<"games" | "access" | "noticias">("games");
+
+  // Notícias tab
+  const [noticias, setNoticias]               = useState<AdminNoticia[]>([]);
+  const [loadingNoticias, setLoadingNoticias] = useState(false);
+  const [uploadingId, setUploadingId]         = useState<string | null>(null);
+  const [removingId, setRemovingId]           = useState<string | null>(null);
+  const [noticiaMsg, setNoticiaMsg]           = useState<Record<string, string>>({});
   const [teamAccess, setTeamAccess]           = useState<TeamAccess[]>([]);
   const [loadingAccess, setLoadingAccess]     = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -357,6 +372,48 @@ export default function LigaAdminPage() {
     if (next && deletedGames.length === 0) await loadDeletedGames();
   }
 
+  async function loadNoticias() {
+    setLoadingNoticias(true);
+    try {
+      const res = await fetch("/api/liga/admin/news");
+      if (!res.ok) return;
+      const json = await res.json();
+      setNoticias(json.news ?? []);
+    } finally { setLoadingNoticias(false); }
+  }
+
+  async function handleImageUpload(id: string, file: File) {
+    setUploadingId(id);
+    setNoticiaMsg(m => ({ ...m, [id]: "" }));
+    const form = new FormData();
+    form.append("image", file);
+    try {
+      const res = await fetch(`/api/liga/admin/news/${id}/image`, { method: "PATCH", body: form });
+      const json = await res.json();
+      if (res.ok) {
+        setNoticias(prev => prev.map(n => n.id === id ? { ...n, cover_image_url: json.cover_image_url } : n));
+        setNoticiaMsg(m => ({ ...m, [id]: "✓ Imagem guardada." }));
+      } else {
+        setNoticiaMsg(m => ({ ...m, [id]: `Erro: ${json.error ?? "falhou"}` }));
+      }
+    } finally { setUploadingId(null); }
+  }
+
+  async function handleImageRemove(id: string) {
+    setRemovingId(id);
+    setNoticiaMsg(m => ({ ...m, [id]: "" }));
+    try {
+      const res = await fetch(`/api/liga/admin/news/${id}/image`, { method: "DELETE" });
+      const json = await res.json();
+      if (res.ok) {
+        setNoticias(prev => prev.map(n => n.id === id ? { ...n, cover_image_url: null } : n));
+        setNoticiaMsg(m => ({ ...m, [id]: "✓ Imagem removida." }));
+      } else {
+        setNoticiaMsg(m => ({ ...m, [id]: `Erro: ${json.error ?? "falhou"}` }));
+      }
+    } finally { setRemovingId(null); }
+  }
+
   async function loadTeamAccess() {
     setLoadingAccess(true);
     try {
@@ -474,9 +531,13 @@ export default function LigaAdminPage() {
 
       {/* ── Tab switcher ── */}
       <div style={{ display: "flex", gap: "0", marginBottom: "24px", borderBottom: "2px solid #E8E0D6" }}>
-        {(["games", "access"] as const).map(tab => (
+        {(["games", "access", "noticias"] as const).map(tab => (
           <button key={tab}
-            onClick={() => { setActiveTab(tab); if (tab === "access" && teamAccess.length === 0) loadTeamAccess(); }}
+            onClick={() => {
+              setActiveTab(tab);
+              if (tab === "access" && teamAccess.length === 0) loadTeamAccess();
+              if (tab === "noticias" && noticias.length === 0) loadNoticias();
+            }}
             style={{
               padding: "8px 20px", fontWeight: 700, fontSize: "12px",
               letterSpacing: "0.06em", textTransform: "uppercase",
@@ -485,7 +546,7 @@ export default function LigaAdminPage() {
               borderBottom: `2px solid ${activeTab === tab ? "#F97316" : "transparent"}`,
               marginBottom: "-2px",
             }}>
-            {tab === "games" ? "Jogos" : "Acessos das Equipas"}
+            {tab === "games" ? "Jogos" : tab === "access" ? "Acessos das Equipas" : "Notícias"}
           </button>
         ))}
       </div>
@@ -893,6 +954,114 @@ export default function LigaAdminPage() {
         )}
       </div>
       </>}
+
+      {/* ── Notícias section ── */}
+      {activeTab === "noticias" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+            <p style={{ fontSize: "13px", color: "#8C837A", margin: 0 }}>
+              Imagens de destaque das notícias da Liga INATEL.
+            </p>
+            <button
+              onClick={loadNoticias}
+              style={{ fontSize: "12px", color: "#8C837A", background: "none", border: "none", cursor: "pointer" }}
+            >
+              ↺ Actualizar
+            </button>
+          </div>
+
+          {loadingNoticias && (
+            <p style={{ fontSize: "14px", color: "#8C837A", padding: "40px 0", textAlign: "center" }}>A carregar notícias…</p>
+          )}
+
+          {!loadingNoticias && noticias.length === 0 && (
+            <p style={{ fontSize: "14px", color: "#8C837A", padding: "40px 0", textAlign: "center" }}>Sem notícias da Liga INATEL.</p>
+          )}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {noticias.map(n => {
+              const isUploading = uploadingId === n.id;
+              const isRemoving  = removingId === n.id;
+              const msg = noticiaMsg[n.id];
+              return (
+                <div key={n.id} style={{
+                  display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap",
+                  padding: "12px 16px", borderRadius: "8px",
+                  border: "1px solid #E8E0D6", background: "#FFFDFA",
+                }}>
+                  {/* Thumbnail */}
+                  <div style={{
+                    width: "80px", height: "45px", borderRadius: "6px",
+                    overflow: "hidden", flexShrink: 0, position: "relative",
+                    background: n.cover_image_url ? undefined : "linear-gradient(135deg,#F97316,#C2530A)",
+                  }}>
+                    {n.cover_image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={n.cover_image_url} alt=""
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <span style={{ fontSize: "8px", color: "#fff", fontWeight: 800, letterSpacing: "0.06em" }}>SEM IMG</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div style={{ flex: 1, minWidth: "160px" }}>
+                    <p style={{
+                      fontSize: "13px", fontWeight: 600, color: "#1A1612", margin: "0 0 2px",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>{n.title}</p>
+                    <p style={{ fontSize: "10px", color: "#8C837A", margin: 0 }}>
+                      {n.published_at ? new Date(n.published_at).toLocaleDateString("pt-PT") : "—"}
+                      {n.home_team_name ? ` · ${n.home_team_name} vs ${n.away_team_name}` : ""}
+                    </p>
+                    {msg && (
+                      <p style={{ fontSize: "11px", margin: "3px 0 0", color: msg.startsWith("✓") ? "#065F46" : "#DC2626" }}>{msg}</p>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                    <label style={{
+                      padding: "5px 12px", fontSize: "11px", fontWeight: 700,
+                      border: "1.5px solid #F97316", borderRadius: "6px",
+                      background: "transparent", color: isUploading ? "#D1C9C0" : "#F97316",
+                      cursor: isUploading ? "not-allowed" : "pointer",
+                    }}>
+                      {isUploading ? "A enviar…" : n.cover_image_url ? "Substituir" : "Adicionar imagem"}
+                      <input
+                        type="file" accept="image/jpeg,image/png,image/webp"
+                        style={{ display: "none" }}
+                        disabled={isUploading}
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageUpload(n.id, file);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    {n.cover_image_url && (
+                      <button
+                        onClick={() => handleImageRemove(n.id)}
+                        disabled={isRemoving}
+                        style={{
+                          padding: "5px 10px", fontSize: "11px", fontWeight: 600,
+                          border: "1.5px solid #FCA5A5", borderRadius: "6px",
+                          background: "#FFF5F5", color: isRemoving ? "#D1C9C0" : "#DC2626",
+                          cursor: isRemoving ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        {isRemoving ? "…" : "Remover"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Team access section ── */}
       {activeTab === "access" && (
