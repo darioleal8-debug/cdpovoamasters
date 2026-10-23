@@ -11,6 +11,7 @@ type AdminNoticia = {
   cover_image_url: string | null;
   image_status: string | null;
   image_prompt: string | null;
+  image_error: string | null;
   published_at: string | null; is_published: boolean;
   home_team_name: string | null; away_team_name: string | null;
   game_id: string | null;
@@ -1114,7 +1115,8 @@ export default function LigaAdminPage() {
                         </span>
                       )}
                       {isFailed && (
-                        <span style={{ fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "99px", background: "#FEE2E2", color: "#991B1B", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                        <span style={{ fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "99px", background: "#FEE2E2", color: "#991B1B", letterSpacing: "0.06em", textTransform: "uppercase" }}
+                          title={n.image_error ?? undefined}>
                           Falhou
                         </span>
                       )}
@@ -1132,6 +1134,17 @@ export default function LigaAdminPage() {
                         maxWidth: "360px", fontStyle: "italic",
                       }} title={n.image_prompt}>
                         "{n.image_prompt.slice(0, 80)}{n.image_prompt.length > 80 ? "…" : ""}"
+                      </p>
+                    )}
+
+                    {/* Erro de geração */}
+                    {isFailed && n.image_error && (
+                      <p style={{
+                        fontSize: "10px", color: "#991B1B", margin: "3px 0 0",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        maxWidth: "360px",
+                      }} title={n.image_error}>
+                        {n.image_error.slice(0, 100)}
                       </p>
                     )}
 
@@ -1155,7 +1168,7 @@ export default function LigaAdminPage() {
                           background: "transparent", color: "#6366F1", cursor: "pointer",
                         }}
                       >
-                        {isReady ? "↻ Regenerar IA" : "⚡ Gerar imagem IA"}
+                        {isReady ? "↻ Regenerar IA" : isFailed ? "↻ Tentar novamente" : "⚡ Gerar imagem IA"}
                       </button>
                     )}
 
