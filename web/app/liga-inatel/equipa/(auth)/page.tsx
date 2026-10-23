@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCompetitionBySlug, getCompetitionGames } from "@/lib/competitions-data";
 import type { PublicGame } from "@/types/competitions";
 import { DelegateSignOut } from "@/components/liga/delegate-sign-out";
+import { TeamAvatar } from "@/components/liga/team-avatar";
 import { TeamLogoUpload } from "@/components/liga/team-logo-upload";
 import { SubmitResultFlow } from "@/components/liga/submit-result-flow";
 
@@ -117,7 +118,7 @@ export default async function DelegateDashboardPage() {
 
   const { data: membership } = await supabase
     .from("league_team_members")
-    .select("id, team_id, role, league_teams(id, name, slug, sigla, locality, home_pavilion, logo_url)")
+    .select("id, team_id, role, league_teams(id, name, slug, sigla, locality, home_pavilion, logo_url, updated_at)")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -125,7 +126,7 @@ export default async function DelegateDashboardPage() {
 
   const team = membership.league_teams as unknown as {
     id: string; name: string; slug: string | null; sigla: string | null;
-    locality: string | null; home_pavilion: string | null; logo_url: string | null;
+    locality: string | null; home_pavilion: string | null; logo_url: string | null; updated_at: string;
   };
 
   const competition = await getCompetitionBySlug("liga-inatel");
@@ -144,9 +145,6 @@ export default async function DelegateDashboardPage() {
   const pastAll = games.filter((g) => g.event_date < today).reverse();
   const past = pastAll.slice(0, 10);
 
-  const siglaOrInitials =
-    team.sigla ??
-    team.name.split(" ").map((w: string) => w[0]).join("").slice(0, 3).toUpperCase();
 
   return (
     <div
@@ -173,25 +171,16 @@ export default async function DelegateDashboardPage() {
             LIGA INATEL · DELEGADO
           </p>
           <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-            <div
-              style={{
-                width: "48px",
-                height: "48px",
-                borderRadius: "10px",
-                background: "#F97316",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-                fontWeight: 900,
-                fontSize: "14px",
-                color: "#fff",
-                fontFamily: "var(--font-bc-heavy, sans-serif)",
-                letterSpacing: "0.06em",
-              }}
-            >
-              {siglaOrInitials}
-            </div>
+            <TeamAvatar
+              name={team.name}
+              logoUrl={team.logo_url}
+              updatedAt={team.updated_at}
+              sigla={team.sigla}
+              size={48}
+              radius={10}
+              initBg="#F97316"
+              initColor="#fff"
+            />
             <div>
               <h1
                 style={{

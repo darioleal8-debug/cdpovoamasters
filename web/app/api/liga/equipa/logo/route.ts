@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
 const BUCKET = "club-logos";
@@ -74,6 +75,10 @@ export async function PATCH(req: Request) {
   if (updateErr) {
     return NextResponse.json({ error: updateErr.message }, { status: 500 });
   }
+
+  // Invalidar ISR nas páginas públicas para o logo aparecer imediatamente
+  revalidatePath("/liga-inatel/equipas", "layout");
+  revalidatePath("/liga-inatel", "layout");
 
   return NextResponse.json({ ok: true, logo_url: logoUrl });
 }

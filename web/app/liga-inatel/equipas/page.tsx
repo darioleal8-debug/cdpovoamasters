@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getLeagueTeamsWithDetails } from "@/lib/competitions-data";
 import { CourtBg } from "@/components/competitions/court-bg";
+import { TeamAvatar } from "@/components/liga/team-avatar";
 
 export const metadata: Metadata = {
   title: "Equipas",
   description: "Todas as equipas da Liga INATEL de basquetebol.",
 };
 
-export const revalidate = 300;
+export const revalidate = 60;
 
 export default async function EquipasPage() {
   const teams = await getLeagueTeamsWithDetails();
@@ -63,17 +64,16 @@ export default async function EquipasPage() {
                 className="team-card"
                 style={{ cursor: team.slug ? "pointer" : "default" }}
               >
-                {/* Initials badge */}
-                <div style={{
-                  width: "44px", height: "44px", borderRadius: "8px", flexShrink: 0,
-                  background: "#F0EAE1",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))",
-                  fontWeight: 800, fontSize: "14px", letterSpacing: "0.04em",
-                  color: "#6F675F",
-                }}>
-                  {(team.sigla ?? team.name.split(" ").map((w) => w[0]).join("").slice(0, 3).toUpperCase())}
-                </div>
+                <TeamAvatar
+                  name={team.name}
+                  logoUrl={team.logo_url}
+                  updatedAt={team.updated_at}
+                  sigla={team.sigla}
+                  size={44}
+                  radius={8}
+                  initBg="#F0EAE1"
+                  initColor="#6F675F"
+                />
 
                 <div style={{ minWidth: 0 }}>
                   <p style={{

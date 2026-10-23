@@ -8,6 +8,7 @@ import {
 } from "@/lib/competitions-data";
 import { CourtBg } from "@/components/competitions/court-bg";
 import { GamesCalendarClient } from "@/components/competitions/games-calendar-client";
+import { TeamAvatar } from "@/components/liga/team-avatar";
 
 export const revalidate = 60;
 
@@ -61,14 +62,6 @@ export default async function TeamPage({
 
   const maxW = { maxWidth: "1200px", margin: "0 auto", padding: "0 20px", width: "100%" };
 
-  const initials =
-    team.sigla ??
-    team.name
-      .split(" ")
-      .map((w) => w[0])
-      .join("")
-      .slice(0, 3)
-      .toUpperCase();
 
   return (
     <div>
@@ -84,16 +77,16 @@ export default async function TeamPage({
           </p>
 
           <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
-            <div style={{
-              width: "60px", height: "60px", borderRadius: "10px", flexShrink: 0,
-              background: "rgba(249,115,22,.15)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))",
-              fontWeight: 800, fontSize: "18px", letterSpacing: "0.04em",
-              color: "#F97316",
-            }}>
-              {initials}
-            </div>
+            <TeamAvatar
+              name={team.name}
+              logoUrl={team.logo_url}
+              updatedAt={team.updated_at}
+              sigla={team.sigla}
+              size={60}
+              radius={10}
+              initBg="rgba(249,115,22,.15)"
+              initColor="#F97316"
+            />
             <div>
               <h1 style={{
                 fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))",
