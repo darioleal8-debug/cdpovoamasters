@@ -4,7 +4,7 @@ import Link from "next/link";
 import { RoleSwitcherChip } from "@/components/auth/role-switcher";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { BarChart2, Calendar, CreditCard, Dumbbell, Home, LogOut, MessageSquare, Trophy, User, Users } from "lucide-react";
+import { BarChart2, Calendar, ClipboardList, CreditCard, Dumbbell, Home, LogOut, MessageSquare, Trophy, User, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useClubSettings } from "@/lib/club-context";
 import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
@@ -20,6 +20,7 @@ const PLAYER_NAV = [
   { href: "/player/meus-treinos",    label: "Os Meus Treinos",    icon: Dumbbell },
   { href: "/player/assiduidade",    label: "A Minha Assiduidade", icon: BarChart2 },
   { href: "/player/meus-pagamentos", label: "Os Meus Pagamentos", icon: CreditCard },
+  { href: "/player/laboratorio",     label: "Laboratório",        icon: ClipboardList },
   { href: "/player/palmares",        label: "Palmarés",           icon: Trophy },
   { href: "/player/chat",            label: "Chat",               icon: MessageSquare },
 ];

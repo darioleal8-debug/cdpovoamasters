@@ -21,6 +21,7 @@ import {
   Shield,
   Newspaper,
   FolderOpen,
+  ClipboardList,
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -46,6 +47,7 @@ const managementItems = [
   { label: "Histórico",        href: "/historico",     icon: History   },
   { label: "Palmarés",         href: "/palmares",      icon: Trophy    },
   { label: "Liga INATEL",      href: "/liga",          icon: Shield    },
+  { label: "Laboratório",      href: "/laboratorio",   icon: ClipboardList },
 ];
 
 const adminOnlyItems = [
