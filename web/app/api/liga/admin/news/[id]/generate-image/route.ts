@@ -8,7 +8,7 @@ export const maxDuration = 120;
 
 // POST /api/liga/admin/news/[id]/generate-image
 // Enfileira geração de imagem IA para uma notícia. A imagem é gerada via after().
-// Body (opcional): { custom_prompt: string } — se fornecido, salta o DeepSeek.
+// Body (opcional): { custom_prompt: string } — brief criativo; o DeepSeek interpreta-o e gera o prompt Flux.
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -37,7 +37,12 @@ export async function POST(
 
   if (customPrompt) {
     after(async () => {
-      await generateNewsImageFromPrompt(id, customPrompt);
+      await generateNewsImageFromPrompt(id, customPrompt, {
+        title: article.title,
+        excerpt: article.excerpt,
+        homeTeamName: article.home_team_name,
+        awayTeamName: article.away_team_name,
+      });
     });
   } else {
     after(async () => {

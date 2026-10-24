@@ -13,6 +13,7 @@ type AdminNoticia = {
   image_prompt: string | null;
   image_error: string | null;
   image_error_type: string | null;
+  image_seed: number | null;
   published_at: string | null; is_published: boolean;
   home_team_name: string | null; away_team_name: string | null;
   game_id: string | null;
@@ -1167,7 +1168,8 @@ export default function LigaAdminPage() {
                         </span>
                       )}
                       {isReady && (
-                        <span style={{ fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "99px", background: "#D1FAE5", color: "#065F46", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                        <span style={{ fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "99px", background: "#D1FAE5", color: "#065F46", letterSpacing: "0.06em", textTransform: "uppercase" }}
+                          title={n.image_seed != null ? `seed: ${n.image_seed}` : undefined}>
                           IA ✓
                         </span>
                       )}
