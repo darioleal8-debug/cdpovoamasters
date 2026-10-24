@@ -49,8 +49,10 @@ export default async function NoticiasPage() {
     .limit(30);
 
   const articles: Article[] = data ?? [];
-  const featured = articles.find((a) => a.is_featured) ?? articles[0] ?? null;
-  const rest = articles.filter((a) => a.id !== featured?.id);
+  const ligaArticles = articles.filter((a) => a.category === "Liga INATEL");
+  const nonLigaArticles = articles.filter((a) => a.category !== "Liga INATEL");
+  const featured = nonLigaArticles.find((a) => a.is_featured) ?? nonLigaArticles[0] ?? null;
+  const rest = nonLigaArticles.filter((a) => a.id !== featured?.id);
 
   return (
     <div style={{ maxWidth: 1024, margin: "0 auto", padding: "48px 24px" }}>
@@ -80,6 +82,101 @@ export default async function NoticiasPage() {
           Basquetebol e o que muda no jogo
         </h1>
       </div>
+
+      {/* Bloco Liga INATEL */}
+      {ligaArticles.length > 0 && (
+        <div
+          style={{
+            borderRadius: "14px",
+            background: "#15110E",
+            padding: "28px 28px",
+            marginBottom: "40px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "12px", marginBottom: "20px" }}>
+            <div>
+              <p
+                style={{
+                  fontFamily: "var(--font-ibm-mono, monospace)",
+                  fontSize: "10px",
+                  fontWeight: 600,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "#F97316",
+                  margin: "0 0 6px",
+                }}
+              >
+                Liga INATEL
+              </p>
+              <span
+                style={{
+                  fontSize: "17px",
+                  fontWeight: 800,
+                  color: "#F6F2EC",
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                Últimas notícias da liga
+              </span>
+            </div>
+            <Link
+              href="/liga-inatel/noticias"
+              style={{
+                fontSize: "13px",
+                fontWeight: 600,
+                color: "#F97316",
+                textDecoration: "none",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+              }}
+            >
+              Ver todas →
+            </Link>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            {ligaArticles.slice(0, 3).map((article) => (
+              <Link
+                key={article.id}
+                href={`/liga-inatel/noticias/${article.slug}`}
+                style={{ textDecoration: "none" }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                    padding: "12px 16px",
+                    borderRadius: "8px",
+                    background: "rgba(246,242,236,.06)",
+                    border: "1px solid rgba(249,115,22,.15)",
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <p
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: 700,
+                        color: "#F6F2EC",
+                        margin: "0 0 3px",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {article.title}
+                    </p>
+                    <p style={{ fontSize: "12px", color: "#8C837A", margin: 0 }}>
+                      {formatDate(article.published_at)}
+                    </p>
+                  </div>
+                  <span style={{ fontSize: "13px", color: "#F97316", flexShrink: 0 }}>→</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {articles.length === 0 && (
         <div
