@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const LINKS = [
   { href: "/liga-inatel",               label: "INÍCIO" },
+  { href: "/liga-inatel/noticias",      label: "NOTÍCIAS" },
   { href: "/liga-inatel/classificacao", label: "CLASSIFICAÇÃO" },
   { href: "/liga-inatel/calendario",    label: "CALENDÁRIO" },
   { href: "/liga-inatel/resultados",    label: "RESULTADOS" },

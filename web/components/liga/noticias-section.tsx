@@ -4,17 +4,6 @@ import type { NoticiaPublic } from "@/lib/competitions-data";
 
 const PT_MONTHS_LONG = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
 
-function plainText(md: string): string {
-  return md
-    .replace(/^#{1,6}\s+/gm, "")        // cabeçalhos #
-    .replace(/\*\*(.+?)\*\*/g, "$1")     // **negrito**
-    .replace(/\*(.+?)\*/g, "$1")         // *itálico*
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1") // [texto](url)
-    .replace(/^[-*]\s+/gm, "")          // marcadores de lista
-    .replace(/\n+/g, " ")               // quebras de linha
-    .trim();
-}
-
 function fmtDate(iso: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -58,7 +47,7 @@ export function NoticiasSection({ noticias }: { noticias: NoticiaPublic[] }) {
           Últimas notícias
         </span>
         <Link
-          href="/noticias"
+          href="/liga-inatel/noticias"
           style={{
             fontFamily: "var(--font-barlow-condensed, sans-serif)",
             fontWeight: 600,
@@ -98,8 +87,12 @@ export function NoticiasSection({ noticias }: { noticias: NoticiaPublic[] }) {
         }}
       >
         {noticias.map((n, i) => (
-          <article
+          <Link
             key={n.id}
+            href={`/liga-inatel/noticias/${n.slug}`}
+            style={{ textDecoration: "none" }}
+          >
+          <article
             style={{
               background: "#FFFDFA",
               borderRadius: "8px",
@@ -107,6 +100,7 @@ export function NoticiasSection({ noticias }: { noticias: NoticiaPublic[] }) {
               overflow: "hidden",
               display: "flex",
               flexDirection: "column",
+              height: "100%",
             }}
           >
             {/* Thumbnail 16:9 */}
@@ -193,31 +187,14 @@ export function NoticiasSection({ noticias }: { noticias: NoticiaPublic[] }) {
               </p>
             </div>
 
-            {/* Corpo expandido (primeiros 300 chars) + link de detalhe */}
+            {/* Link de detalhe */}
             <div
               style={{
                 padding: "14px 20px 18px",
                 borderTop: "1px solid rgba(26,22,18,.07)",
               }}
             >
-              <p
-                style={{
-                  fontFamily: "var(--font-barlow, sans-serif)",
-                  fontSize: "12px",
-                  color: "#6F675F",
-                  lineHeight: 1.6,
-                  margin: "0 0 10px",
-                  display: "-webkit-box",
-                  WebkitLineClamp: 4,
-                  WebkitBoxOrient: "vertical" as const,
-                  overflow: "hidden",
-                }}
-              >
-                {plainText(n.body)}
-              </p>
-
-              <Link
-                href={`/noticias/${n.slug}`}
+              <span
                 style={{
                   fontFamily: "var(--font-barlow-condensed, sans-serif)",
                   fontWeight: 700,
@@ -225,13 +202,13 @@ export function NoticiasSection({ noticias }: { noticias: NoticiaPublic[] }) {
                   letterSpacing: "0.06em",
                   textTransform: "uppercase",
                   color: "#C2530A",
-                  textDecoration: "none",
                 }}
               >
                 Ler mais →
-              </Link>
+              </span>
             </div>
           </article>
+          </Link>
         ))}
       </div>
       )}

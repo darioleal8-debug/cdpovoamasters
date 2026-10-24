@@ -8,6 +8,7 @@ import { ShieldCheck } from "lucide-react";
 
 const NAV_LINKS = [
   { href: "/liga-inatel",               label: "Início" },
+  { href: "/liga-inatel/noticias",      label: "Notícias" },
   { href: "/liga-inatel/classificacao", label: "Classificação" },
   { href: "/liga-inatel/calendario",    label: "Calendário" },
   { href: "/liga-inatel/resultados",    label: "Resultados" },
