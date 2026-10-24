@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { markdownToHtml } from "@/lib/markdown";
 import type { Metadata } from "next";
@@ -95,6 +95,10 @@ export default async function NoticiaDetailPage({ params }: Props) {
   const { slug } = await params;
   const article = await getArticle(slug);
   if (!article) notFound();
+
+  if (article.category === "Liga INATEL") {
+    permanentRedirect(`/liga-inatel/noticias/${slug}`);
+  }
 
   const bodyHtml = markdownToHtml(article.body);
 
