@@ -6,6 +6,7 @@ import type { PublicGame } from "@/types/competitions";
 import { DelegateSignOut } from "@/components/liga/delegate-sign-out";
 import { TeamAvatar } from "@/components/liga/team-avatar";
 import { TeamLogoUpload } from "@/components/liga/team-logo-upload";
+import { DelegateKitEditor } from "@/components/liga/delegate-kit-editor";
 import { SubmitResultFlow } from "@/components/liga/submit-result-flow";
 
 export const revalidate = 60;
@@ -118,7 +119,7 @@ export default async function DelegateDashboardPage() {
 
   const { data: membership } = await supabase
     .from("league_team_members")
-    .select("id, team_id, role, league_teams(id, name, slug, sigla, locality, home_pavilion, logo_url, updated_at)")
+    .select("id, team_id, role, league_teams(id, name, slug, sigla, locality, home_pavilion, logo_url, primary_color, secondary_color, updated_at)")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -126,7 +127,8 @@ export default async function DelegateDashboardPage() {
 
   const team = membership.league_teams as unknown as {
     id: string; name: string; slug: string | null; sigla: string | null;
-    locality: string | null; home_pavilion: string | null; logo_url: string | null; updated_at: string;
+    locality: string | null; home_pavilion: string | null; logo_url: string | null;
+    primary_color: string | null; secondary_color: string | null; updated_at: string;
   };
 
   const competition = await getCompetitionBySlug("liga-inatel");
@@ -234,16 +236,24 @@ export default async function DelegateDashboardPage() {
           </section>
         )}
 
-        {/* Logo da equipa */}
+        {/* Logo da equipa + Cores */}
         <section style={{ marginBottom: "32px" }}>
           <h2 style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted, #6F675F)", margin: "0 0 12px" }}>
             Identidade visual
           </h2>
-          <TeamLogoUpload
-            teamId={team.id}
-            teamName={team.name}
-            currentLogoUrl={team.logo_url ?? null}
-          />
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            <TeamLogoUpload
+              teamId={team.id}
+              teamName={team.name}
+              currentLogoUrl={team.logo_url ?? null}
+            />
+            <DelegateKitEditor
+              teamName={team.name}
+              logoUrl={team.logo_url ?? null}
+              initialPrimaryColor={team.primary_color ?? null}
+              initialSecondaryColor={team.secondary_color ?? null}
+            />
+          </div>
         </section>
 
         {/* Submissão de resultados */}
