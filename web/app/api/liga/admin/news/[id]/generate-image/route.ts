@@ -32,8 +32,8 @@ export async function POST(
     return NextResponse.json({ error: "Notícia não encontrada" }, { status: 404 });
   }
 
-  // Marca como pendente antes de devolver resposta
-  await admin.from("news").update({ image_status: "pending" }).eq("id", id);
+  // Limpa erro anterior e marca como pendente antes de devolver resposta
+  await admin.from("news").update({ image_status: "pending", image_error: null, image_error_type: null }).eq("id", id);
 
   if (customPrompt) {
     after(async () => {

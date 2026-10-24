@@ -28,10 +28,10 @@ export async function POST() {
     return NextResponse.json({ ok: true, count: 0 });
   }
 
-  // Marca todas como pendentes antes de devolver resposta
+  // Limpa erros anteriores e marca todas como pendentes antes de devolver resposta
   await admin
     .from("news")
-    .update({ image_status: "pending" })
+    .update({ image_status: "pending", image_error: null, image_error_type: null })
     .in("id", articles.map((a) => a.id));
 
   after(async () => {

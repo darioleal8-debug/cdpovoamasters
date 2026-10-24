@@ -1077,25 +1077,19 @@ export default function LigaAdminPage() {
           {/* Header com acções globais */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
             <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              {(() => {
-                const hasBlockingError = noticias.some(n => n.image_error_type === "BILLING" || n.image_error_type === "AUTH");
-                return (
-                  <button
-                    onClick={handleBatchGen}
-                    disabled={batchLoading || hasBlockingError}
-                    title={hasBlockingError ? "Resolve o erro de conta antes de gerar em lote" : undefined}
-                    style={{
-                      padding: "6px 14px", fontSize: "12px", fontWeight: 700,
-                      border: "1.5px solid #6366F1", borderRadius: "6px",
-                      background: "transparent",
-                      color: (batchLoading || hasBlockingError) ? "#D1C9C0" : "#6366F1",
-                      cursor: (batchLoading || hasBlockingError) ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    {batchLoading ? "A enfileirar…" : "⚡ Gerar imagens em falta"}
-                  </button>
-                );
-              })()}
+              <button
+                onClick={handleBatchGen}
+                disabled={batchLoading}
+                style={{
+                  padding: "6px 14px", fontSize: "12px", fontWeight: 700,
+                  border: "1.5px solid #6366F1", borderRadius: "6px",
+                  background: "transparent",
+                  color: batchLoading ? "#D1C9C0" : "#6366F1",
+                  cursor: batchLoading ? "not-allowed" : "pointer",
+                }}
+              >
+                {batchLoading ? "A enfileirar…" : "⚡ Gerar imagens em falta"}
+              </button>
               {noticiaMsg._batch && (
                 <span style={{ fontSize: "11px", color: noticiaMsg._batch.startsWith("⏳") ? "#065F46" : noticiaMsg._batch.startsWith("Erro") ? "#DC2626" : "#6B7280" }}>
                   {noticiaMsg._batch}
@@ -1125,7 +1119,6 @@ export default function LigaAdminPage() {
               const isPending   = n.image_status === "pending";
               const isReady     = n.image_status === "ready";
               const isFailed    = n.image_status === "failed";
-              const isBlockingError = n.image_error_type === "BILLING" || n.image_error_type === "AUTH";
               const errorLabel  = n.image_error_type ? (FAL_ERROR_LABELS[n.image_error_type] ?? FAL_ERROR_LABELS.UNKNOWN) : null;
               const msg = noticiaMsg[n.id];
               return (
@@ -1221,14 +1214,10 @@ export default function LigaAdminPage() {
                           setRegenModal({ id: n.id, currentPrompt: n.image_prompt });
                           setRegenModalPrompt(n.image_prompt ?? "");
                         }}
-                        disabled={isBlockingError}
-                        title={isBlockingError ? errorLabel ?? undefined : undefined}
                         style={{
                           padding: "5px 12px", fontSize: "11px", fontWeight: 700,
                           border: "1.5px solid #6366F1", borderRadius: "6px",
-                          background: "transparent",
-                          color: isBlockingError ? "#D1C9C0" : "#6366F1",
-                          cursor: isBlockingError ? "not-allowed" : "pointer",
+                          background: "transparent", color: "#6366F1", cursor: "pointer",
                         }}
                       >
                         {isReady ? "↻ Regenerar IA" : isFailed ? "↻ Tentar novamente" : "⚡ Gerar imagem IA"}
