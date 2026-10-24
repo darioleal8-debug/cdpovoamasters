@@ -22,7 +22,7 @@ LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
     WHERE id = (SELECT auth.uid())
     AND (
       role IN ('admin', 'treinador')
-      OR (roles_extra IS NOT NULL AND roles_extra && ARRAY['admin','treinador']::text[])
+      OR (roles_extra IS NOT NULL AND roles_extra ?| ARRAY['admin','treinador'])
     )
   )
 $$;
