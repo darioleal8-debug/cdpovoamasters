@@ -233,6 +233,19 @@ export async function getTeamNames(): Promise<string[]> {
   return (data ?? []).map((t) => t.name);
 }
 
+export async function getTeamLogos(): Promise<Record<string, string | null>> {
+  const supabase = await createAdminClient();
+  const { data } = await supabase
+    .from("league_teams")
+    .select("name, logo_url")
+    .eq("is_placeholder", false);
+  const map: Record<string, string | null> = {};
+  for (const t of data ?? []) {
+    map[t.name] = t.logo_url ?? null;
+  }
+  return map;
+}
+
 // ─── Admin: pending submissions ───────────────────────────────────────────────
 
 export type AdminSubmission = {

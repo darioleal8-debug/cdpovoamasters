@@ -17,9 +17,10 @@ interface Props {
   ourTeamName?: string;
   limit?: number;
   mini?: boolean; // versão compacta para o dashboard da homepage
+  teamLogos?: Record<string, string | null>;
 }
 
-export function StandingsTable({ standings, ourTeamName, limit, mini }: Props) {
+export function StandingsTable({ standings, ourTeamName, limit, mini, teamLogos }: Props) {
   const rows = limit ? standings.slice(0, limit) : standings;
   const hasForm = rows.some((r) => r.form && r.form.length > 0);
 
@@ -123,7 +124,7 @@ export function StandingsTable({ standings, ourTeamName, limit, mini }: Props) {
                 {/* Equipa */}
                 <td style={{ padding: mini ? "10px 8px" : "12px 10px", maxWidth: mini ? 140 : 200 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <TeamMono name={row.team_name} size={mini ? 28 : 32} />
+                    <TeamMono name={row.team_name} size={mini ? 28 : 32} logoUrl={teamLogos?.[row.team_name]} />
                     <span
                       style={{
                         overflow: "hidden",

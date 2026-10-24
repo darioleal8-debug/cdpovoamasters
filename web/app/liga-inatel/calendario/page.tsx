@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getCompetitionBySlug, getCompetitionGames, getTeamNames } from "@/lib/competitions-data";
+import { getCompetitionBySlug, getCompetitionGames, getTeamNames, getTeamLogos } from "@/lib/competitions-data";
 import { CourtBg } from "@/components/competitions/court-bg";
 import { GamesCalendarClient } from "@/components/competitions/games-calendar-client";
 
@@ -21,9 +21,10 @@ export default async function CalendarioPage() {
     );
   }
 
-  const [allGames, teamNames] = await Promise.all([
+  const [allGames, teamNames, teamLogos] = await Promise.all([
     getCompetitionGames(competition.competition_key ?? "Liga", competition.season_id),
     getTeamNames(),
+    getTeamLogos(),
   ]);
   const games = allGames.filter((g) => !g.is_test);
 
@@ -78,6 +79,7 @@ export default async function CalendarioPage() {
           competitionSlug="liga-inatel"
           mode="calendar"
           teams={teamNames}
+          teamLogos={teamLogos}
         />
       </div>
     </div>

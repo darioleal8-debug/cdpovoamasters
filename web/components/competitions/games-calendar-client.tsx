@@ -21,10 +21,11 @@ interface Props {
   mode?: "calendar" | "results";
   teams?: string[];
   initialTeam?: string;
+  teamLogos?: Record<string, string | null>;
 }
 
 // Inner component uses useSearchParams (requires Suspense)
-function GamesCalendarInner({ games, competitionSlug, mode = "calendar", teams, initialTeam }: Props) {
+function GamesCalendarInner({ games, competitionSlug, mode = "calendar", teams, initialTeam, teamLogos }: Props) {
   const searchParams = useSearchParams();
   const router       = useRouter();
   const pathname     = usePathname();
@@ -298,7 +299,7 @@ function GamesCalendarInner({ games, competitionSlug, mode = "calendar", teams, 
                 {/* Linhas de jogos */}
                 <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
                   {jornadaGames.map((g) => (
-                    <GameRow key={g.id} game={g} competitionSlug={competitionSlug} highlightOurs={!showOnlyCdPovoa} />
+                    <GameRow key={g.id} game={g} competitionSlug={competitionSlug} highlightOurs={!showOnlyCdPovoa} teamLogos={teamLogos} />
                   ))}
                 </div>
               </section>
@@ -318,7 +319,8 @@ export function GamesCalendarClient(props: Props) {
   );
 }
 
-function GameRow({ game, competitionSlug, highlightOurs = false }: { game: PublicGame; competitionSlug: string; highlightOurs?: boolean }) {
+
+function GameRow({ game, competitionSlug, highlightOurs = false, teamLogos }: { game: PublicGame; competitionSlug: string; highlightOurs?: boolean; teamLogos?: Record<string, string | null> }) {
   const isOurGame = highlightOurs && game.is_our_game;
   const { event_date, event_time, home_team, away_team, result, result_status, syntheticJornada, id } = game;
   const hasResult = result_status === "approved";
@@ -413,7 +415,7 @@ function GameRow({ game, competitionSlug, highlightOurs = false }: { game: Publi
         >
           {home_team}
         </span>
-        <TeamMono name={home_team} size={28} />
+        <TeamMono name={home_team} size={28} logoUrl={teamLogos?.[home_team]} />
       </div>
 
       {/* Col 3: marcação central */}
@@ -515,7 +517,7 @@ function GameRow({ game, competitionSlug, highlightOurs = false }: { game: Publi
           minWidth: 0,
         }}
       >
-        <TeamMono name={away_team} size={28} />
+        <TeamMono name={away_team} size={28} logoUrl={teamLogos?.[away_team]} />
         <span
           style={{
             fontFamily: "var(--font-barlow-condensed, sans-serif)",

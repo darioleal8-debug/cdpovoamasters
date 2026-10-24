@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+
 /** Monograma circular de equipa — usa oklch(0.5 0.13 hue) derivado do nome */
 
 function teamHue(name: string): number {
@@ -25,11 +29,12 @@ interface Props {
 }
 
 export function TeamMono({ name, size = 40, logoUrl }: Props) {
+  const [imgFailed, setImgFailed] = useState(false);
   const hue = teamHue(name);
   const initials = teamAbbr(name);
   const fs = Math.round(size * (initials.length > 2 ? 0.3 : 0.36));
 
-  if (logoUrl) {
+  if (logoUrl && !imgFailed) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
@@ -37,7 +42,9 @@ export function TeamMono({ name, size = 40, logoUrl }: Props) {
         alt={name}
         width={size}
         height={size}
-        style={{ borderRadius: "50%", objectFit: "contain", flexShrink: 0 }}
+        loading="lazy"
+        style={{ borderRadius: "50%", objectFit: "contain", flexShrink: 0, background: "#fff" }}
+        onError={() => setImgFailed(true)}
       />
     );
   }

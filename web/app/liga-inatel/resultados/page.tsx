@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getCompetitionBySlug, getCompetitionGames } from "@/lib/competitions-data";
+import { getCompetitionBySlug, getCompetitionGames, getTeamLogos } from "@/lib/competitions-data";
 import { CourtBg } from "@/components/competitions/court-bg";
 import { GamesCalendarClient } from "@/components/competitions/games-calendar-client";
 
@@ -21,10 +21,10 @@ export default async function ResultadosPage() {
     );
   }
 
-  const games = await getCompetitionGames(
-    competition.competition_key ?? "Liga",
-    competition.season_id
-  );
+  const [games, teamLogos] = await Promise.all([
+    getCompetitionGames(competition.competition_key ?? "Liga", competition.season_id),
+    getTeamLogos(),
+  ]);
 
   const approvedCount = games.filter((g) => g.result_status === "approved").length;
 
@@ -79,6 +79,7 @@ export default async function ResultadosPage() {
           games={games}
           competitionSlug="liga-inatel"
           mode="results"
+          teamLogos={teamLogos}
         />
       </div>
     </div>
