@@ -66,6 +66,8 @@ type TeamAccessMember = {
 type TeamAccess = {
   team_id: string; team_name: string; team_slug: string | null;
   team_sigla: string | null; logo_url: string | null;
+  primary_color: string | null; secondary_color: string | null;
+  kit_description: string | null;
   members: TeamAccessMember[];
 };
 
@@ -194,6 +196,11 @@ export default function LigaAdminPage() {
   const [removeUserId, setRemoveUserId]       = useState<string | null>(null);
   const [removeEmail, setRemoveEmail]         = useState("");
   const [removeTeamName, setRemoveTeamName]   = useState("");
+
+  // Kit editing state
+  const [kitEdits, setKitEdits]               = useState<Record<string, { primary_color: string; secondary_color: string; kit_description: string }>>({});
+  const [kitSaving, setKitSaving]             = useState<string | null>(null);
+  const [kitMsg, setKitMsg]                   = useState<Record<string, string>>({});
   const [removeLoading, setRemoveLoading]     = useState(false);
   const [removeError, setRemoveError]         = useState<string | null>(null);
 
@@ -560,6 +567,46 @@ export default function LigaAdminPage() {
 
   function openRemoveModal(userId: string, email: string, teamName: string) {
     setRemoveUserId(userId); setRemoveEmail(email); setRemoveTeamName(teamName); setRemoveError(null);
+  }
+
+  function getKitEdit(t: TeamAccess) {
+    return kitEdits[t.team_id] ?? {
+      primary_color: t.primary_color ?? "",
+      secondary_color: t.secondary_color ?? "",
+      kit_description: t.kit_description ?? "",
+    };
+  }
+
+  async function handleKitSave(teamId: string) {
+    const edit = kitEdits[teamId];
+    if (!edit) return;
+    setKitSaving(teamId);
+    setKitMsg(m => ({ ...m, [teamId]: "" }));
+    try {
+      const res = await fetch(`/api/liga/admin/teams/${teamId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          primary_color: edit.primary_color.trim() || null,
+          secondary_color: edit.secondary_color.trim() || null,
+          kit_description: edit.kit_description.trim() || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setKitMsg(m => ({ ...m, [teamId]: `Erro: ${json.error ?? "falhou"}` }));
+      } else {
+        setKitMsg(m => ({ ...m, [teamId]: "✓ Guardado." }));
+        // Update local teamAccess state
+        setTeamAccess(prev => prev.map(t =>
+          t.team_id === teamId
+            ? { ...t, primary_color: edit.primary_color || null, secondary_color: edit.secondary_color || null, kit_description: edit.kit_description || null }
+            : t
+        ));
+        // Clear edit state so it re-reads from updated teamAccess on next render
+        setKitEdits(e => { const n = { ...e }; delete n[teamId]; return n; });
+      }
+    } finally { setKitSaving(null); }
   }
 
   async function handleRemoveAccess() {
@@ -1416,6 +1463,93 @@ export default function LigaAdminPage() {
                   ))}
                 </div>
               )}
+
+              {/* Kit editing */}
+              {(() => {
+                const kit = getKitEdit(t);
+                const isSaving = kitSaving === t.team_id;
+                const msg = kitMsg[t.team_id];
+                return (
+                  <div style={{
+                    padding: "12px 16px",
+                    borderTop: t.members.length > 0 ? "1px solid #F0EAE1" : undefined,
+                    background: "#FDFAF6",
+                  }}>
+                    <p style={{ ...sectionTitle, margin: "0 0 10px" }}>Equipamento (para IA)</p>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+                      {/* Cor primária */}
+                      <div>
+                        <label style={labelStyle}>Cor primária</label>
+                        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                          <input
+                            type="color"
+                            value={kit.primary_color.startsWith("#") ? kit.primary_color : "#F97316"}
+                            onChange={e => setKitEdits(ed => ({ ...ed, [t.team_id]: { ...kit, primary_color: e.target.value } }))}
+                            style={{ width: "32px", height: "32px", padding: "2px", border: "1.5px solid #E8E0D6", borderRadius: "6px", cursor: "pointer", background: "#FFFDFA" }}
+                          />
+                          <input
+                            type="text"
+                            value={kit.primary_color}
+                            onChange={e => setKitEdits(ed => ({ ...ed, [t.team_id]: { ...kit, primary_color: e.target.value } }))}
+                            placeholder="#E63946"
+                            style={{ ...inputStyle, flex: 1, fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "12px" }}
+                          />
+                        </div>
+                      </div>
+                      {/* Cor secundária */}
+                      <div>
+                        <label style={labelStyle}>Cor secundária</label>
+                        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                          <input
+                            type="color"
+                            value={kit.secondary_color.startsWith("#") ? kit.secondary_color : "#FFFFFF"}
+                            onChange={e => setKitEdits(ed => ({ ...ed, [t.team_id]: { ...kit, secondary_color: e.target.value } }))}
+                            style={{ width: "32px", height: "32px", padding: "2px", border: "1.5px solid #E8E0D6", borderRadius: "6px", cursor: "pointer", background: "#FFFDFA" }}
+                          />
+                          <input
+                            type="text"
+                            value={kit.secondary_color}
+                            onChange={e => setKitEdits(ed => ({ ...ed, [t.team_id]: { ...kit, secondary_color: e.target.value } }))}
+                            placeholder="#FFFFFF"
+                            style={{ ...inputStyle, flex: 1, fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "12px" }}
+                          />
+                        </div>
+                      </div>
+                      {/* Descrição do kit */}
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <label style={labelStyle}>Descrição do equipamento</label>
+                        <input
+                          type="text"
+                          value={kit.kit_description}
+                          onChange={e => setKitEdits(ed => ({ ...ed, [t.team_id]: { ...kit, kit_description: e.target.value } }))}
+                          placeholder="Ex: Camisola vermelha com número e faixa branca"
+                          style={{ ...inputStyle, width: "100%", boxSizing: "border-box" }}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <button
+                        onClick={() => handleKitSave(t.team_id)}
+                        disabled={isSaving || !kitEdits[t.team_id]}
+                        style={{
+                          padding: "5px 14px", fontSize: "11px", fontWeight: 700,
+                          border: "1.5px solid #F97316", borderRadius: "6px",
+                          background: "transparent",
+                          color: (isSaving || !kitEdits[t.team_id]) ? "#D1C9C0" : "#F97316",
+                          cursor: (isSaving || !kitEdits[t.team_id]) ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        {isSaving ? "A guardar…" : "Guardar kit"}
+                      </button>
+                      {msg && (
+                        <span style={{ fontSize: "11px", color: msg.startsWith("✓") ? "#065F46" : "#DC2626" }}>
+                          {msg}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           ))}
         </div>

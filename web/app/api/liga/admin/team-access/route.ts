@@ -14,7 +14,7 @@ export async function GET() {
   const [teamsRes, membersRes] = await Promise.all([
     adminClient
       .from("league_teams")
-      .select("id, name, slug, sigla, logo_url")
+      .select("id, name, slug, sigla, logo_url, primary_color, secondary_color, kit_description")
       .eq("is_placeholder", false)
       .order("name"),
     adminClient
@@ -39,6 +39,9 @@ export async function GET() {
     team_slug: t.slug,
     team_sigla: t.sigla,
     logo_url: t.logo_url,
+    primary_color: t.primary_color ?? null,
+    secondary_color: t.secondary_color ?? null,
+    kit_description: t.kit_description ?? null,
     members: members
       .filter((m) => m.team_id === t.id)
       .map((m) => ({
