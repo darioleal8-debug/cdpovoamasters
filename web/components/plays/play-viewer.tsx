@@ -423,16 +423,17 @@ export function PlayViewer({ name, eyebrow, note, init, steps, options }: PlayVi
 
   // ── Button base styles ────────────────────────────────────────────────────
   const btnBase: React.CSSProperties = {
-    height: 42, borderRadius: 8, border: "1px solid var(--pv-line)",
+    height: 44, minWidth: 44, borderRadius: 8, border: "1px solid var(--pv-line)",
     cursor: "pointer", fontFamily: "'Barlow Condensed', sans-serif",
     fontWeight: 700, fontSize: 14, letterSpacing: "0.04em",
     textTransform: "uppercase", padding: "0 14px",
-    display: "flex", alignItems: "center", gap: 5,
+    display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
     whiteSpace: "nowrap", outline: "none",
     background: "transparent", color: "var(--pv-ink)",
+    touchAction: "manipulation",
   };
   const btnPrimary: React.CSSProperties = {
-    ...btnBase, flexGrow: 1, justifyContent: "center",
+    ...btnBase, flexGrow: 1,
     background: "var(--pv-accent)", color: "#fff", border: "none",
   };
   const focusRing = {
@@ -459,7 +460,7 @@ export function PlayViewer({ name, eyebrow, note, init, steps, options }: PlayVi
       } as React.CSSProperties}
     >
       {/* ── Header ── */}
-      <div style={{ padding: "24px 24px 18px", borderBottom: "3px solid var(--pv-ink)" }}>
+      <div style={{ padding: isNarrow ? "16px 12px 14px" : "24px 24px 18px", borderBottom: "3px solid var(--pv-ink)" }}>
         {eyebrow && (
           <p style={{
             fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, fontSize: 13,
@@ -479,8 +480,8 @@ export function PlayViewer({ name, eyebrow, note, init, steps, options }: PlayVi
             <span style={{ color: "var(--pv-accent)" }}>{titleLast}</span>
           </h1>
 
-          {/* Legend */}
-          <div style={{ display: "flex", gap: 14, alignItems: "flex-end", flexShrink: 0 }}>
+          {/* Legend — hidden on narrow screens */}
+          <div style={{ display: isNarrow ? "none" : "flex", gap: 14, alignItems: "flex-end", flexShrink: 0 }}>
             {([
               { label: "Corte", svg: (
                 <svg viewBox="0 0 34 12" width={34} height={12}>
@@ -540,7 +541,8 @@ export function PlayViewer({ name, eyebrow, note, init, steps, options }: PlayVi
       <div style={{
         display: "grid",
         gridTemplateColumns: isNarrow ? "1fr" : "minmax(0,1.25fr) minmax(0,1fr)",
-        gap: 20, padding: 20,
+        gap: isNarrow ? 12 : 20,
+        padding: isNarrow ? 12 : 20,
       }}>
         {/* LEFT: court + controls */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -572,24 +574,36 @@ export function PlayViewer({ name, eyebrow, note, init, steps, options }: PlayVi
           </div>
 
           {/* Controls */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <button style={btnBase} onClick={handleRestart} title="Recomeçar" {...focusRing}>↺</button>
-            <button style={{ ...btnBase, opacity: stepIdx === 0 ? 0.4 : 1 }} onClick={handlePrev} disabled={stepIdx === 0} {...focusRing}>‹ Anterior</button>
-            <button style={btnPrimary} onClick={handlePlay} {...focusRing}>
-              {playing ? "⏸ Pausa" : "▶ Reproduzir"}
-            </button>
-            <button style={{ ...btnBase, opacity: stepIdx === stepSeq.length - 1 ? 0.4 : 1 }} onClick={handleNext} disabled={stepIdx === stepSeq.length - 1} {...focusRing}>Seguinte ›</button>
-            <div style={{ display: "flex", marginLeft: "auto", border: "1px solid var(--pv-line)", borderRadius: 8, overflow: "hidden" }}>
-              {([0.5, 1] as const).map(s => (
-                <button key={s} aria-pressed={speed === s} onClick={() => setSpeed(s)} {...focusRing}
-                  style={{
-                    ...btnBase, height: 42, borderRadius: 0, padding: "0 13px",
-                    background: speed === s ? "var(--pv-accent)" : "transparent",
-                    color: speed === s ? "#fff" : "var(--pv-ink)",
-                    border: "none", fontSize: 13,
-                  }}
-                >{s}×</button>
-              ))}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {/* Row 1: restart + prev/next + play */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button style={btnBase} onClick={handleRestart} title="Recomeçar" aria-label="Recomeçar" {...focusRing}>↺</button>
+              <button style={{ ...btnBase, opacity: stepIdx === 0 ? 0.4 : 1 }} onClick={handlePrev} disabled={stepIdx === 0} aria-label="Passo anterior" {...focusRing}>‹</button>
+              <button style={btnPrimary} onClick={handlePlay} {...focusRing}>
+                {playing ? "⏸ Pausa" : "▶ Reproduzir"}
+              </button>
+              <button style={{ ...btnBase, opacity: stepIdx === stepSeq.length - 1 ? 0.4 : 1 }} onClick={handleNext} disabled={stepIdx === stepSeq.length - 1} aria-label="Passo seguinte" {...focusRing}>›</button>
+            </div>
+            {/* Row 2: step counter + speed toggle */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <span style={{
+                fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12,
+                color: "var(--pv-muted)", fontVariantNumeric: "tabular-nums",
+              }}>
+                Passo {stepIdx + 1} / {stepSeq.length}
+              </span>
+              <div style={{ display: "flex", border: "1px solid var(--pv-line)", borderRadius: 8, overflow: "hidden" }}>
+                {([0.5, 1] as const).map(s => (
+                  <button key={s} aria-pressed={speed === s} onClick={() => setSpeed(s)} {...focusRing}
+                    style={{
+                      ...btnBase, borderRadius: 0, padding: "0 16px",
+                      background: speed === s ? "var(--pv-accent)" : "transparent",
+                      color: speed === s ? "#fff" : "var(--pv-ink)",
+                      border: "none", fontSize: 13,
+                    }}
+                  >{s}×</button>
+                ))}
+              </div>
             </div>
           </div>
         </div>

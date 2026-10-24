@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   BarChart3,
   CalendarRange,
+  ClipboardList,
   Dumbbell,
   History,
   Landmark,
@@ -27,16 +28,17 @@ interface MenuItem {
 }
 
 const ITEMS: MenuItem[] = [
-  { label: "Plantel",          href: "/jogadores",     icon: Users,        desc: "Jogadores, fotos e perfis" },
+  { label: "Plantel",          href: "/jogadores",     icon: Users,         desc: "Jogadores, fotos e perfis" },
   { label: "Temporadas",       href: "/temporadas",    icon: CalendarRange, desc: "Gerir épocas desportivas" },
   { label: "Treinos",          href: "/treinos",       icon: Dumbbell,      desc: "Sessões e presenças" },
   { label: "Estatísticas",     href: "/estatisticas",  icon: BarChart3,     desc: "Análise da época" },
+  { label: "Laboratório",      href: "/laboratorio",   icon: ClipboardList, desc: "Jogadas animadas" },
   { label: "Documentos",       href: "/documentos",    icon: FolderOpen,    desc: "Regulamentos e documentos oficiais" },
   { label: "Histórico",        href: "/historico",     icon: History,       desc: "Épocas anteriores" },
   { label: "Financeiro",       href: "/financeiro",    icon: Landmark,      desc: "Caixa e entradas" },
-  { label: "Liga INATEL",      href: "/liga-inatel",    icon: Shield,        desc: "Classificação e resultados" },
-  { label: "Notícias",         href: "/noticias-admin", icon: Newspaper,    desc: "Gerir artigos e publicações" },
-  { label: "Gestão de Contas", href: "/gestao-contas",  icon: UserCog,      desc: "Contas de utilizador" },
+  { label: "Liga INATEL",      href: "/liga-inatel",   icon: Shield,        desc: "Classificação e resultados" },
+  { label: "Notícias",         href: "/noticias-admin", icon: Newspaper,   desc: "Gerir artigos e publicações" },
+  { label: "Gestão de Contas", href: "/gestao-contas", icon: UserCog,       desc: "Contas de utilizador" },
   { label: "Configurações",    href: "/configuracoes", icon: Settings,      desc: "Preferências do clube" },
 ];
 
