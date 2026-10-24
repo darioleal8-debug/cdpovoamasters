@@ -12,9 +12,19 @@ type AdminNoticia = {
   image_status: string | null;
   image_prompt: string | null;
   image_error: string | null;
+  image_error_type: string | null;
   published_at: string | null; is_published: boolean;
   home_team_name: string | null; away_team_name: string | null;
   game_id: string | null;
+};
+
+const FAL_ERROR_LABELS: Record<string, string> = {
+  BILLING: "Sem saldo fal.ai — carrega créditos em fal.ai/dashboard/billing",
+  AUTH: "Chave FAL_KEY inválida ou expirada — verifica as variáveis de ambiente no Vercel",
+  RATE_LIMIT: "Limite de pedidos atingido — tenta novamente em breve",
+  TRANSIENT: "Erro temporário na fal.ai",
+  CONTENT: "Conteúdo rejeitado pela política da fal.ai",
+  UNKNOWN: "Erro desconhecido",
 };
 
 type Submission = {
@@ -399,8 +409,23 @@ export default function LigaAdminPage() {
       try {
         const res = await fetch("/api/liga/admin/news");
         if (!res.ok || cancelled) return;
-        const json = await res.json();
-        if (!cancelled) setNoticias(json.news ?? []);
+        const incoming: AdminNoticia[] = (await res.json()).news ?? [];
+        if (cancelled) return;
+        setNoticias(prev => {
+          // Limpa "⏳ A gerar..." para artigos que saíram de pending
+          const idsNoLongerPending = prev
+            .filter(p => p.image_status === "pending")
+            .filter(p => incoming.find(n => n.id === p.id)?.image_status !== "pending")
+            .map(p => p.id);
+          if (idsNoLongerPending.length > 0) {
+            setNoticiaMsg(m => {
+              const next = { ...m };
+              idsNoLongerPending.forEach(id => delete next[id]);
+              return next;
+            });
+          }
+          return incoming;
+        });
       } catch { /* ignore */ }
     }, 4000);
     return () => { cancelled = true; clearInterval(timer); };
@@ -1025,21 +1050,51 @@ export default function LigaAdminPage() {
       {/* ── Notícias section ── */}
       {activeTab === "noticias" && (
         <div>
+          {/* Banners de erro de conta */}
+          {noticias.some(n => n.image_error_type === "BILLING") && (
+            <div style={{
+              marginBottom: "14px", padding: "12px 16px", borderRadius: "8px",
+              background: "#FEF3C7", border: "1.5px solid #F59E0B",
+              fontSize: "12px", color: "#78350F", lineHeight: 1.5,
+            }}>
+              <strong>⚠️ Conta fal.ai sem saldo</strong> — carrega créditos em{" "}
+              <a href="https://fal.ai/dashboard/billing" target="_blank" rel="noopener noreferrer"
+                style={{ color: "#B45309", textDecoration: "underline" }}>fal.ai/dashboard/billing</a>
+              {" "}para gerar imagens com IA. O upload manual continua disponível.
+            </div>
+          )}
+          {noticias.some(n => n.image_error_type === "AUTH") && (
+            <div style={{
+              marginBottom: "14px", padding: "12px 16px", borderRadius: "8px",
+              background: "#FEE2E2", border: "1.5px solid #F87171",
+              fontSize: "12px", color: "#7F1D1D", lineHeight: 1.5,
+            }}>
+              <strong>⚠️ Chave FAL_KEY inválida</strong> — verifica as variáveis de ambiente no Vercel.
+            </div>
+          )}
+
           {/* Header com acções globais */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
             <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <button
-                onClick={handleBatchGen}
-                disabled={batchLoading}
-                style={{
-                  padding: "6px 14px", fontSize: "12px", fontWeight: 700,
-                  border: "1.5px solid #6366F1", borderRadius: "6px",
-                  background: "transparent", color: batchLoading ? "#D1C9C0" : "#6366F1",
-                  cursor: batchLoading ? "not-allowed" : "pointer",
-                }}
-              >
-                {batchLoading ? "A enfileirar…" : "⚡ Gerar imagens em falta"}
-              </button>
+              {(() => {
+                const hasBlockingError = noticias.some(n => n.image_error_type === "BILLING" || n.image_error_type === "AUTH");
+                return (
+                  <button
+                    onClick={handleBatchGen}
+                    disabled={batchLoading || hasBlockingError}
+                    title={hasBlockingError ? "Resolve o erro de conta antes de gerar em lote" : undefined}
+                    style={{
+                      padding: "6px 14px", fontSize: "12px", fontWeight: 700,
+                      border: "1.5px solid #6366F1", borderRadius: "6px",
+                      background: "transparent",
+                      color: (batchLoading || hasBlockingError) ? "#D1C9C0" : "#6366F1",
+                      cursor: (batchLoading || hasBlockingError) ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {batchLoading ? "A enfileirar…" : "⚡ Gerar imagens em falta"}
+                  </button>
+                );
+              })()}
               {noticiaMsg._batch && (
                 <span style={{ fontSize: "11px", color: noticiaMsg._batch.startsWith("⏳") ? "#065F46" : noticiaMsg._batch.startsWith("Erro") ? "#DC2626" : "#6B7280" }}>
                   {noticiaMsg._batch}
@@ -1069,6 +1124,8 @@ export default function LigaAdminPage() {
               const isPending   = n.image_status === "pending";
               const isReady     = n.image_status === "ready";
               const isFailed    = n.image_status === "failed";
+              const isBlockingError = n.image_error_type === "BILLING" || n.image_error_type === "AUTH";
+              const errorLabel  = n.image_error_type ? (FAL_ERROR_LABELS[n.image_error_type] ?? FAL_ERROR_LABELS.UNKNOWN) : null;
               const msg = noticiaMsg[n.id];
               return (
                 <div key={n.id} style={{
@@ -1138,13 +1195,13 @@ export default function LigaAdminPage() {
                     )}
 
                     {/* Erro de geração */}
-                    {isFailed && n.image_error && (
+                    {isFailed && (
                       <p style={{
                         fontSize: "10px", color: "#991B1B", margin: "3px 0 0",
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                         maxWidth: "360px",
-                      }} title={n.image_error}>
-                        {n.image_error.slice(0, 100)}
+                      }} title={n.image_error ?? undefined}>
+                        {errorLabel ?? n.image_error?.slice(0, 100) ?? "Erro desconhecido"}
                       </p>
                     )}
 
@@ -1162,10 +1219,14 @@ export default function LigaAdminPage() {
                           setRegenModal({ id: n.id, currentPrompt: n.image_prompt });
                           setRegenModalPrompt(n.image_prompt ?? "");
                         }}
+                        disabled={isBlockingError}
+                        title={isBlockingError ? errorLabel ?? undefined : undefined}
                         style={{
                           padding: "5px 12px", fontSize: "11px", fontWeight: 700,
                           border: "1.5px solid #6366F1", borderRadius: "6px",
-                          background: "transparent", color: "#6366F1", cursor: "pointer",
+                          background: "transparent",
+                          color: isBlockingError ? "#D1C9C0" : "#6366F1",
+                          cursor: isBlockingError ? "not-allowed" : "pointer",
                         }}
                       >
                         {isReady ? "↻ Regenerar IA" : isFailed ? "↻ Tentar novamente" : "⚡ Gerar imagem IA"}

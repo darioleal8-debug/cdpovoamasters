@@ -8,7 +8,7 @@ export const maxDuration = 300;
 
 // POST /api/liga/admin/news/generate-images-batch
 // Gera imagens para todas as notícias publicadas sem imagem.
-// Processa uma de cada vez em segundo plano (after).
+// Para imediatamente em erro BILLING/AUTH; marca restantes como failed.
 export async function POST() {
   const auth = await authorizeAsLigaAdmin();
   if (!auth.ok) return auth.response;
@@ -35,16 +35,38 @@ export async function POST() {
     .in("id", articles.map((a) => a.id));
 
   after(async () => {
-    for (const article of articles) {
-      await generateNewsImage({
+    for (let i = 0; i < articles.length; i++) {
+      const article = articles[i];
+      const result = await generateNewsImage({
         newsId: article.id,
         title: article.title,
         excerpt: article.excerpt,
         homeTeamName: article.home_team_name,
         awayTeamName: article.away_team_name,
       });
-      // Pequena pausa entre pedidos para não sobrecarregar as APIs externas
-      await new Promise((r) => setTimeout(r, 1500));
+
+      // Erro de conta: para e marca restantes como failed para não ficarem presos em pending
+      if (!result.ok && (result.errorType === "BILLING" || result.errorType === "AUTH")) {
+        console.error(`[generateImages/batch] parando em ${result.errorType} após artigo ${article.id}`);
+        const remaining = articles.slice(i + 1);
+        if (remaining.length > 0) {
+          const batchAdmin = await createAdminClient();
+          await batchAdmin
+            .from("news")
+            .update({
+              image_status: "failed",
+              image_error_type: result.errorType,
+              image_error: "Interrompido: erro na conta fal.ai",
+            })
+            .in("id", remaining.map((a) => a.id));
+        }
+        break;
+      }
+
+      // Pausa entre pedidos para não sobrecarregar as APIs externas
+      if (i < articles.length - 1) {
+        await new Promise((r) => setTimeout(r, 1500));
+      }
     }
   });
 

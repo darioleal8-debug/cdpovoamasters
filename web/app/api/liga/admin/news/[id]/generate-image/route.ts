@@ -4,7 +4,7 @@ import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
 import { createAdminClient } from "@/lib/supabase/server";
 import { generateNewsImage, generateNewsImageFromPrompt } from "@/lib/liga/generate-image";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 // POST /api/liga/admin/news/[id]/generate-image
 // Enfileira geração de imagem IA para uma notícia. A imagem é gerada via after().

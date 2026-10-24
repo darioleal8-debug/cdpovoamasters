@@ -5,8 +5,6 @@ const DEEPSEEK_API = "https://api.deepseek.com/chat/completions";
 const FAL_API = "https://fal.run/fal-ai/flux/schnell";
 const BUCKET = "noticias";
 
-// deepseek-chat: modelo de chat sem raciocínio, suporta response_format json_object
-// Pode ser sobreposto com DEEPSEEK_TEXT_MODEL em produção se necessário
 function getDeepseekModel() {
   return process.env.DEEPSEEK_TEXT_MODEL ?? "deepseek-chat";
 }
@@ -21,23 +19,54 @@ export interface NewsImageContext {
   jornadaInfo?: string | null;
 }
 
+export type FalErrorType = "BILLING" | "AUTH" | "RATE_LIMIT" | "TRANSIENT" | "CONTENT" | "UNKNOWN";
+export type GenerateResult = { ok: true } | { ok: false; errorType: FalErrorType };
+
+interface FalError extends Error {
+  errorType: FalErrorType;
+}
+
+export function classifyFalError(status: number, body: string): FalErrorType {
+  const lower = body.toLowerCase();
+  if (status === 403) {
+    if (lower.includes("top_up") || lower.includes("locked") || lower.includes("billing")) return "BILLING";
+    return "AUTH";
+  }
+  if (status === 401) return "AUTH";
+  if (status === 429) return "RATE_LIMIT";
+  if (lower.includes("content") || lower.includes("safety") || lower.includes("nsfw") || lower.includes("policy")) return "CONTENT";
+  if (status >= 500) return "TRANSIENT";
+  return "UNKNOWN";
+}
+
 // ─── Exported entry points ────────────────────────────────────────────────────
 
 // Full pipeline: DeepSeek → fal.ai → webp → Supabase Storage
-export async function generateNewsImage(ctx: NewsImageContext): Promise<void> {
+export async function generateNewsImage(ctx: NewsImageContext): Promise<GenerateResult> {
+  try {
+    return await _generateNewsImage(ctx);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[generateNewsImage] uncaught: ${msg}`);
+    await setImageFailed(ctx.newsId, "TRANSIENT", msg);
+    return { ok: false, errorType: "TRANSIENT" };
+  }
+}
+
+async function _generateNewsImage(ctx: NewsImageContext): Promise<GenerateResult> {
   const deepseekKey = process.env.DEEPSEEK_API_KEY;
   const falKey = process.env.FAL_KEY;
 
   if (!falKey) {
     console.error("[generateNewsImage] FAL_KEY não configurada");
-    await setImageFailed(ctx.newsId, "FAL_KEY não configurada");
-    return;
+    await setImageFailed(ctx.newsId, "AUTH", "FAL_KEY não configurada");
+    return { ok: false, errorType: "AUTH" };
   }
 
   const admin = await createAdminClient();
   const tTotal = Date.now();
 
-  // ── Passo 1: gerar prompt (DeepSeek ou fallback determinístico) ───────────
+  // ── Passo 1: gerar prompt ─────────────────────────────────────────────────
   let prompt: string;
   let negativePrompt: string;
 
@@ -64,10 +93,10 @@ export async function generateNewsImage(ctx: NewsImageContext): Promise<void> {
     negativePrompt = fb.negativePrompt;
   }
 
-  // Grava prompt imediatamente (antes do fal.ai) para debugging
+  // Grava prompt antes do fal.ai para debugging
   await admin.from("news").update({ image_prompt: prompt }).eq("id", ctx.newsId);
 
-  // ── Passo 2: gerar imagem (2 tentativas) ─────────────────────────────────
+  // ── Passo 2: gerar imagem (2 tentativas; retry só para TRANSIENT/RATE_LIMIT) ─
   for (let attempt = 1; attempt <= 2; attempt++) {
     const t1 = Date.now();
     console.log(`[generateNewsImage] fal:start attempt=${attempt} ${ctx.newsId}`);
@@ -92,33 +121,58 @@ export async function generateNewsImage(ctx: NewsImageContext): Promise<void> {
 
       const { error: updateErr } = await admin
         .from("news")
-        .update({ cover_image_url: pub.publicUrl, image_status: "ready", image_error: null })
+        .update({ cover_image_url: pub.publicUrl, image_status: "ready", image_error: null, image_error_type: null })
         .eq("id", ctx.newsId);
 
       if (updateErr) throw new Error(`DB update: ${updateErr.message}`);
 
       console.log(`[generateNewsImage] upload:ok ${Date.now() - t2}ms total=${Date.now() - tTotal}ms ${ctx.newsId}`);
-      return;
+      return { ok: true };
     } catch (err) {
+      const errorType = (err as Partial<FalError>).errorType ?? "UNKNOWN";
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[generateNewsImage] fal:fail attempt=${attempt} ${Date.now() - t1}ms — ${msg}`);
-      if (attempt === 2) {
-        await setImageFailed(ctx.newsId, msg);
+      console.error(`[generateNewsImage] fal:fail attempt=${attempt} type=${errorType} ${Date.now() - t1}ms — ${msg}`);
+
+      // Erros não-recuperáveis: para imediatamente, sem retry
+      if (errorType === "BILLING" || errorType === "AUTH" || errorType === "CONTENT") {
+        await setImageFailed(ctx.newsId, errorType, msg);
+        return { ok: false, errorType };
       }
+
+      if (attempt === 2) {
+        await setImageFailed(ctx.newsId, errorType, msg);
+        return { ok: false, errorType };
+      }
+
+      // Backoff antes do retry: RATE_LIMIT→10s, TRANSIENT→5s
+      const delay = errorType === "RATE_LIMIT" ? 10_000 : 5_000;
+      console.log(`[generateNewsImage] aguarda ${delay}ms antes de retry`);
+      await new Promise((r) => setTimeout(r, delay));
     }
   }
+  return { ok: false, errorType: "UNKNOWN" };
 }
 
 // Skip DeepSeek — usa prompt fornecido pelo admin directamente
 export async function generateNewsImageFromPrompt(
   newsId: string,
   customPrompt: string
-): Promise<void> {
+): Promise<GenerateResult> {
+  try {
+    return await _generateNewsImageFromPrompt(newsId, customPrompt);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    await setImageFailed(newsId, "TRANSIENT", msg);
+    return { ok: false, errorType: "TRANSIENT" };
+  }
+}
+
+async function _generateNewsImageFromPrompt(newsId: string, customPrompt: string): Promise<GenerateResult> {
   const falKey = process.env.FAL_KEY;
   if (!falKey) {
     console.error("[generateNewsImage/custom] FAL_KEY não configurada");
-    await setImageFailed(newsId, "FAL_KEY não configurada");
-    return;
+    await setImageFailed(newsId, "AUTH", "FAL_KEY não configurada");
+    return { ok: false, errorType: "AUTH" };
   }
 
   const admin = await createAdminClient();
@@ -148,27 +202,45 @@ export async function generateNewsImageFromPrompt(
 
       await admin
         .from("news")
-        .update({ cover_image_url: pub.publicUrl, image_status: "ready", image_error: null })
+        .update({ cover_image_url: pub.publicUrl, image_status: "ready", image_error: null, image_error_type: null })
         .eq("id", newsId);
 
       console.log(`[generateNewsImage/custom] upload:ok total=${Date.now() - tTotal}ms ${newsId}`);
-      return;
+      return { ok: true };
     } catch (err) {
+      const errorType = (err as Partial<FalError>).errorType ?? "UNKNOWN";
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[generateNewsImage/custom] fal:fail attempt=${attempt} — ${msg}`);
-      if (attempt === 2) await setImageFailed(newsId, msg);
+      console.error(`[generateNewsImage/custom] fal:fail attempt=${attempt} type=${errorType} — ${msg}`);
+
+      if (errorType === "BILLING" || errorType === "AUTH" || errorType === "CONTENT") {
+        await setImageFailed(newsId, errorType, msg);
+        return { ok: false, errorType };
+      }
+
+      if (attempt === 2) {
+        await setImageFailed(newsId, errorType, msg);
+        return { ok: false, errorType };
+      }
+
+      const delay = errorType === "RATE_LIMIT" ? 10_000 : 5_000;
+      await new Promise((r) => setTimeout(r, delay));
     }
   }
+  return { ok: false, errorType: "UNKNOWN" };
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
-async function setImageFailed(newsId: string, errorMsg: string) {
+async function setImageFailed(newsId: string, errorType: FalErrorType, errorMsg: string) {
   try {
     const admin = await createAdminClient();
     await admin
       .from("news")
-      .update({ image_status: "failed", image_error: errorMsg.slice(0, 500) })
+      .update({
+        image_status: "failed",
+        image_error_type: errorType,
+        image_error: errorMsg.slice(0, 500),
+      })
       .eq("id", newsId);
   } catch { /* best effort */ }
 }
@@ -251,7 +323,6 @@ async function buildImagePrompt(
   const parsed = safeParseJson(raw);
 
   if (!parsed?.prompt || parsed.prompt.length < 30) {
-    // Texto não-JSON mas substancial → usa como prompt directamente
     if (raw.length > 50) {
       console.warn(`[generateNewsImage] deepseek devolveu texto não-JSON, a usar como prompt directo (${raw.length} chars)`);
       return {
@@ -274,13 +345,11 @@ async function buildImagePrompt(
 
 // Parsing robusto: remove fences markdown, extrai primeiro {...}, faz JSON.parse
 function safeParseJson(raw: string): { prompt?: string; negative_prompt?: string } | null {
-  // Remove ```json ... ``` ou ``` ... ```
   const cleaned = raw
     .replace(/^```(?:json)?\s*/im, "")
     .replace(/\s*```\s*$/m, "")
     .trim();
 
-  // Extrai primeiro bloco {...}
   const match = cleaned.match(/\{[\s\S]*\}/);
   if (!match) return null;
 
@@ -319,34 +388,53 @@ async function callFalApi(
   negativePrompt: string | undefined,
   falKey: string
 ): Promise<Buffer> {
-  // Flux não tem negative_prompt nativo — embute no prompt positivo
-  const finalPrompt = negativePrompt
-    ? `${prompt}\n\nDo not include: ${negativePrompt}`
-    : prompt;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 90_000);
 
-  const res = await fetch(FAL_API, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Key ${falKey}` },
-    body: JSON.stringify({
-      prompt: finalPrompt,
-      image_size: "landscape_16_9",
-      num_inference_steps: 4,
-      num_images: 1,
-      enable_safety_checker: false,
-    }),
-  });
+  try {
+    const finalPrompt = negativePrompt
+      ? `${prompt}\n\nDo not include: ${negativePrompt}`
+      : prompt;
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`fal.ai HTTP ${res.status}: ${errText.slice(0, 300)}`);
+    const res = await fetch(FAL_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Key ${falKey}` },
+      body: JSON.stringify({
+        prompt: finalPrompt,
+        image_size: "landscape_16_9",
+        num_inference_steps: 4,
+        num_images: 1,
+        enable_safety_checker: false,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      const errorType = classifyFalError(res.status, errText);
+      throw Object.assign(
+        new Error(`fal.ai HTTP ${res.status}: ${errText.slice(0, 300)}`),
+        { errorType }
+      ) as FalError;
+    }
+
+    const json = (await res.json()) as { images?: { url: string }[] };
+    const imageUrl = json.images?.[0]?.url;
+    if (!imageUrl) throw new Error("fal.ai: resposta sem URL de imagem");
+
+    const imgRes = await fetch(imageUrl, { signal: controller.signal });
+    if (!imgRes.ok) throw new Error(`fal.ai download falhou: HTTP ${imgRes.status}`);
+
+    return Buffer.from(await imgRes.arrayBuffer());
+  } catch (err) {
+    if ((err as { name?: string }).name === "AbortError") {
+      throw Object.assign(
+        new Error("fal.ai timeout (90s)"),
+        { errorType: "TRANSIENT" as FalErrorType }
+      ) as FalError;
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const json = (await res.json()) as { images?: { url: string }[] };
-  const imageUrl = json.images?.[0]?.url;
-  if (!imageUrl) throw new Error("fal.ai: resposta sem URL de imagem");
-
-  const imgRes = await fetch(imageUrl);
-  if (!imgRes.ok) throw new Error(`fal.ai download falhou: HTTP ${imgRes.status}`);
-
-  return Buffer.from(await imgRes.arrayBuffer());
 }
