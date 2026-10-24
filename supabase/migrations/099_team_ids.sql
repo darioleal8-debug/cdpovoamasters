@@ -1,30 +1,25 @@
 -- 099_team_ids.sql
 -- Adiciona home_team_id / away_team_id a league_game_results e result_submissions.
--- Cria team_aliases para resolução de nomes alternativos.
--- Faz backfill de todas as linhas existentes.
-
--- ─── team_aliases ─────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.team_aliases (
-  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  team_id    uuid NOT NULL REFERENCES public.league_teams(id) ON DELETE CASCADE,
-  alias      text NOT NULL,
-  normalized text NOT NULL,
-  UNIQUE (normalized)
-);
-
-CREATE INDEX IF NOT EXISTS team_aliases_team_id_idx  ON public.team_aliases (team_id);
-CREATE INDEX IF NOT EXISTS team_aliases_normalized_idx ON public.team_aliases (normalized);
+-- Cria resolve_team_id() para resolução de variantes de nome (team_aliases já existia).
+-- Nota: unaccent não disponível; usa translate() para diacríticos portugueses.
 
 -- ─── resolve_team_id ──────────────────────────────────────────────────────────
--- Normaliza o nome (unaccent + lowercase + só alfanumérico + espaços simples)
--- e procura primeiro em league_teams.normalized_name, depois em team_aliases.normalized.
+-- Normaliza via lower + translate (acentos → base) + regexp.
+-- Procura em league_teams.normalized_name; fallback em team_aliases.alias.
 CREATE OR REPLACE FUNCTION public.resolve_team_id(p_name text)
 RETURNS uuid
 LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path = extensions, public AS $$
+SET search_path = public AS $$
   WITH norm AS (
     SELECT trim(regexp_replace(
-             regexp_replace(lower(unaccent(p_name)), '[^a-z0-9 ]', '', 'g'),
+             regexp_replace(
+               translate(
+                 lower(p_name),
+                 'àáâãäåçèéêëìíîïðñòóôõöùúûüýÿ',
+                 'aaaaaaceeeeiiiidnoooooouuuuyy'
+               ),
+               '[^a-z0-9 ]', '', 'g'
+             ),
              ' +', ' ', 'g')) AS n
   )
   SELECT lt.id
@@ -34,7 +29,7 @@ SET search_path = extensions, public AS $$
   UNION ALL
   SELECT ta.team_id
   FROM   public.team_aliases ta, norm
-  WHERE  ta.normalized = norm.n
+  WHERE  ta.alias = norm.n
   LIMIT  1
 $$;
 
@@ -53,7 +48,7 @@ ALTER TABLE public.result_submissions
   ADD COLUMN IF NOT EXISTS home_team_id uuid REFERENCES public.league_teams(id),
   ADD COLUMN IF NOT EXISTS away_team_id uuid REFERENCES public.league_teams(id);
 
--- ─── Backfill league_game_results ─────────────────────────────────────────────
+-- ─── Backfill ─────────────────────────────────────────────────────────────────
 UPDATE public.league_game_results
 SET home_team_id = public.resolve_team_id(home_team_name)
 WHERE home_team_id IS NULL;
@@ -62,7 +57,6 @@ UPDATE public.league_game_results
 SET away_team_id = public.resolve_team_id(away_team_name)
 WHERE away_team_id IS NULL;
 
--- ─── Backfill result_submissions ──────────────────────────────────────────────
 UPDATE public.result_submissions
 SET home_team_id = public.resolve_team_id(home_team_name)
 WHERE home_team_id IS NULL;
