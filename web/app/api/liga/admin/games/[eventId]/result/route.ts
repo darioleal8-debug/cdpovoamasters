@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
 import { createAdminClient } from "@/lib/supabase/server";
 import { parseGameMeta } from "@/types/competitions";
@@ -111,5 +112,6 @@ export async function POST(
     }
   }
 
+  revalidatePath("/liga-inatel", "layout");
   return NextResponse.json({ result: newResult });
 }

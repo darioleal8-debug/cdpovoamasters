@@ -72,6 +72,7 @@ export interface ResultSubmission {
 
 // Resultado calculado para a classificação (computado em TypeScript)
 export interface StandingRow {
+  team_id?: string | null; // uuid da league_teams, presente quando seedTeams fornecido
   team_name: string;
   gp: number;    // jogos disputados
   wins: number;
@@ -105,18 +106,47 @@ export interface PublicGame {
 
 // ─── Utilitários ─────────────────────────────────────────────────────────────
 
+/** Remove acentos, lowercase, só alfanumérico + espaços simples */
+export function normalizeName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9 ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /** Calcula classificação a partir de resultados aprovados.
- *  Regras INATEL basketball: 2 pts vitória, 1 pt derrota */
+ *  Regras INATEL basketball: 2 pts vitória, 1 pt derrota.
+ *  seedTeams: todas as equipas não-placeholder — garante que equipas sem jogos aparecem a zero. */
 export function computeStandings(
-  results: Pick<LeagueGameResult, "home_team_name" | "away_team_name" | "home_score" | "away_score">[]
+  results: Pick<LeagueGameResult, "home_team_name" | "away_team_name" | "home_score" | "away_score">[],
+  seedTeams?: Pick<LeagueTeam, "id" | "name" | "normalized_name">[]
 ): StandingRow[] {
+  // key = team_id (se seed) ou normalizeName(name) (fallback)
   const map = new Map<string, StandingRow>();
+  // normalized_name → team_id para resolução de variantes de nome
+  const normToId = new Map<string, string>();
+
+  if (seedTeams) {
+    for (const t of seedTeams) {
+      map.set(t.id, { team_id: t.id, team_name: t.name, gp: 0, wins: 0, losses: 0, pf: 0, pc: 0, diff: 0, pts: 0 });
+      normToId.set(t.normalized_name, t.id);
+      normToId.set(normalizeName(t.name), t.id);
+    }
+  }
 
   function get(name: string): StandingRow {
-    if (!map.has(name)) {
-      map.set(name, { team_name: name, gp: 0, wins: 0, losses: 0, pf: 0, pc: 0, diff: 0, pts: 0 });
+    if (seedTeams) {
+      const teamId = normToId.get(normalizeName(name));
+      if (teamId && map.has(teamId)) return map.get(teamId)!;
     }
-    return map.get(name)!;
+    const fallbackKey = normalizeName(name);
+    if (!map.has(fallbackKey)) {
+      map.set(fallbackKey, { team_name: name, gp: 0, wins: 0, losses: 0, pf: 0, pc: 0, diff: 0, pts: 0 });
+    }
+    return map.get(fallbackKey)!;
   }
 
   for (const r of results) {

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getCompetitionBySlug, getStandingsWithForm, getTeamNames, getTeamLogos } from "@/lib/competitions-data";
+import { getCompetitionBySlug, getStandingsWithForm, getTeamLogos } from "@/lib/competitions-data";
 import { CourtBg } from "@/components/competitions/court-bg";
 import { StandingsTable } from "@/components/competitions/standings-table";
 
@@ -17,21 +17,12 @@ export default async function ClassificacaoPage() {
     return <p style={{ textAlign: "center", padding: "60px 20px", color: "#6F675F" }}>Competição não disponível.</p>;
   }
 
-  const [standings, allTeams, teamLogos] = await Promise.all([
+  const [standings, teamLogos] = await Promise.all([
     getStandingsWithForm(competition.id),
-    getTeamNames(),
     getTeamLogos(),
   ]);
 
-  // Se não houver resultados, mostrar todas as equipas a zero
-  const rows =
-    standings.length > 0
-      ? standings
-      : allTeams.map((name) => ({
-          team_name: name,
-          gp: 0, wins: 0, losses: 0, pf: 0, pc: 0, diff: 0, pts: 0,
-          form: [] as ("V" | "D")[],
-        }));
+  const rows = standings;
 
   const maxW = { maxWidth: "1200px", margin: "0 auto", padding: "0 20px", width: "100%" };
 

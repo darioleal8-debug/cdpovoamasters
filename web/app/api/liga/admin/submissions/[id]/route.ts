@@ -1,5 +1,6 @@
 import { after } from "next/server";
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
 import { createAdminClient } from "@/lib/supabase/server";
 import { generateLigaNews } from "@/lib/liga/generate-news";
@@ -118,5 +119,6 @@ export async function PATCH(
     });
   }
 
+  revalidatePath("/liga-inatel", "layout");
   return NextResponse.json({ ok: true });
 }

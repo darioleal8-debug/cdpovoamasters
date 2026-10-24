@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import { computeStandings, parseGameMeta, type Competition, type LeagueGameResult, type LeagueTeam, type PublicGame, type StandingRow } from "@/types/competitions";
+import { computeStandings, normalizeName, parseGameMeta, type Competition, type LeagueGameResult, type LeagueTeam, type PublicGame, type StandingRow } from "@/types/competitions";
 
 // ─── Competition ─────────────────────────────────────────────────────────────
 
@@ -184,37 +184,55 @@ export async function getCompetitionGames(
 
 export async function getStandings(competitionId: string): Promise<StandingRow[]> {
   const supabase = await createAdminClient();
-  const { data } = await supabase
-    .from("league_game_results")
-    .select("home_team_name, away_team_name, home_score, away_score")
-    .eq("competition_id", competitionId);
-  return computeStandings(data ?? []);
+  const [resultsRes, teamsRes] = await Promise.all([
+    supabase
+      .from("league_game_results")
+      .select("home_team_name, away_team_name, home_score, away_score")
+      .eq("competition_id", competitionId),
+    supabase
+      .from("league_teams")
+      .select("id, name, normalized_name")
+      .eq("is_placeholder", false),
+  ]);
+  const seedTeams = (teamsRes.data ?? []) as Pick<LeagueTeam, "id" | "name" | "normalized_name">[];
+  return computeStandings(resultsRes.data ?? [], seedTeams);
 }
 
 export type StandingRowWithForm = StandingRow & { form: ("V" | "D")[] };
 
 export async function getStandingsWithForm(competitionId: string): Promise<StandingRowWithForm[]> {
   const supabase = await createAdminClient();
-  const { data } = await supabase
-    .from("league_game_results")
-    .select("home_team_name, away_team_name, home_score, away_score, approved_at")
-    .eq("competition_id", competitionId)
-    .order("approved_at", { ascending: false });
+  const [resultsRes, teamsRes] = await Promise.all([
+    supabase
+      .from("league_game_results")
+      .select("home_team_name, away_team_name, home_score, away_score, approved_at")
+      .eq("competition_id", competitionId)
+      .order("approved_at", { ascending: false }),
+    supabase
+      .from("league_teams")
+      .select("id, name, normalized_name")
+      .eq("is_placeholder", false),
+  ]);
 
-  const results = (data ?? []) as (StandingRow extends never ? never : {
+  const results = (resultsRes.data ?? []) as {
     home_team_name: string; away_team_name: string;
     home_score: number; away_score: number; approved_at: string;
-  })[];
+  }[];
+  const seedTeams = (teamsRes.data ?? []) as Pick<LeagueTeam, "id" | "name" | "normalized_name">[];
 
-  const standings = computeStandings(results);
+  const standings = computeStandings(results, seedTeams);
 
   return standings.map((s) => ({
     ...s,
-    form: (results as { home_team_name: string; away_team_name: string; home_score: number; away_score: number }[])
-      .filter((r) => r.home_team_name === s.team_name || r.away_team_name === s.team_name)
+    form: results
+      .filter((r) => {
+        const norm = normalizeName(s.team_name);
+        return normalizeName(r.home_team_name) === norm || normalizeName(r.away_team_name) === norm;
+      })
       .slice(0, 5)
       .map((r) => {
-        const isHome = r.home_team_name === s.team_name;
+        const norm = normalizeName(s.team_name);
+        const isHome = normalizeName(r.home_team_name) === norm;
         const homeWon = r.home_score > r.away_score;
         return ((isHome ? homeWon : !homeWon) ? "V" : "D") as "V" | "D";
       }),
