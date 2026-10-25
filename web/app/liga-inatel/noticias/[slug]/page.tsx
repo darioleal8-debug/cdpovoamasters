@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { markdownToHtml } from "@/lib/markdown";
 import type { Metadata } from "next";
 import { ShareButtons } from "./_share-buttons";
+import { GamePhotoGallery } from "@/components/liga/game-photo-gallery";
+import type { GalleryPhoto } from "@/components/liga/game-photo-gallery";
 
 export const revalidate = 300;
 
@@ -16,12 +18,40 @@ async function getArticle(slug: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("news")
-    .select("id, slug, title, excerpt, body, category, published_at, cover_image_url")
+    .select("id, slug, title, excerpt, body, category, published_at, cover_image_url, game_id, cover_photo_id")
     .eq("slug", slug)
     .eq("is_published", true)
     .eq("category", "Liga INATEL")
     .single();
   return data;
+}
+
+async function getGalleryPhotos(gameId: string, coverPhotoId: string | null): Promise<GalleryPhoto[]> {
+  const supabase = await createClient();
+  // RLS enforces hidden=false; we skip the cover photo (it is shown above the article)
+  const { data: photos } = await supabase
+    .from("game_photos")
+    .select("id, storage_path, caption, team_id")
+    .eq("game_id", gameId)
+    .neq("id", coverPhotoId ?? "00000000-0000-0000-0000-000000000000")
+    .order("created_at", { ascending: true });
+
+  if (!photos || photos.length === 0) return [];
+
+  const teamIds = [...new Set(photos.map((p) => p.team_id))];
+  const { data: teams } = await supabase.from("league_teams").select("id, name").in("id", teamIds);
+  const teamMap: Record<string, string> = {};
+  for (const t of teams ?? []) teamMap[t.id] = t.name;
+
+  return photos.map((p) => {
+    const { data: pub } = supabase.storage.from("game-photos").getPublicUrl(p.storage_path);
+    return {
+      id: p.id,
+      public_url: pub.publicUrl,
+      caption: p.caption ?? null,
+      team_name: teamMap[p.team_id] ?? "Equipa",
+    };
+  });
 }
 
 async function getRelated(currentId: string, limit = 3) {
@@ -83,9 +113,12 @@ export default async function LigaNoticiaDetailPage({ params }: Props) {
   const article = await getArticle(slug);
   if (!article) notFound();
 
-  const [bodyHtml, related] = await Promise.all([
+  const [bodyHtml, related, galleryPhotos] = await Promise.all([
     Promise.resolve(markdownToHtml(article.body)),
     getRelated(article.id),
+    article.game_id
+      ? getGalleryPhotos(article.game_id, (article as { cover_photo_id?: string | null }).cover_photo_id ?? null)
+      : Promise.resolve([] as GalleryPhoto[]),
   ]);
 
   const canonicalUrl = `https://www.hoophub.pt/liga-inatel/noticias/${slug}`;
@@ -212,6 +245,26 @@ export default async function LigaNoticiaDetailPage({ params }: Props) {
           dangerouslySetInnerHTML={{ __html: bodyHtml }}
           className="liga-article-body"
         />
+
+        {/* Galeria de fotografias do jogo */}
+        {galleryPhotos.length > 0 && (
+          <div style={{ marginTop: "40px" }}>
+            <p
+              style={{
+                fontFamily: "var(--font-ibm-mono, monospace)",
+                fontSize: "10px",
+                fontWeight: 600,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: "#8C837A",
+                margin: "0 0 12px",
+              }}
+            >
+              Fotos do jogo
+            </p>
+            <GamePhotoGallery photos={galleryPhotos} />
+          </div>
+        )}
 
         {/* Partilhar */}
         <div

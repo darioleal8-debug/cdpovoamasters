@@ -8,7 +8,9 @@ interface Props {
   teamName: string;
 }
 
-type Step = "select" | "photo" | "confirm" | "done";
+type Step = "select" | "photo" | "game_photos" | "confirm" | "done";
+type UploadedPhoto = { id: string; public_url: string; caption: string };
+type StagedPhoto   = { file: File; preview: string; caption: string };
 
 function fmt(dateStr: string) {
   return new Date(dateStr + "T00:00:00").toLocaleDateString("pt-PT", {
@@ -27,6 +29,27 @@ const s = {
   label: { fontSize: "11px", fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.08em", color: "var(--muted,#6F675F)", display: "block", marginBottom: "6px" },
   numInput: { width: "100%", padding: "12px", fontSize: "28px", fontWeight: 800, textAlign: "center" as const, borderRadius: "10px", border: "1.5px solid var(--border,#E8E0D4)", background: "var(--card,#fff)", fontFamily: "var(--font-ibm-mono,monospace)", boxSizing: "border-box" as const },
 };
+
+// Comprime fotos de jogo: lado maior ≤ 1920 px, JPEG 0.8, remove EXIF via canvas
+async function compressGamePhoto(file: File): Promise<File> {
+  const MAX_PX = 1920;
+  return new Promise<File>((resolve, reject) => {
+    createImageBitmap(file, { imageOrientation: "from-image" }).then((bitmap) => {
+      let { width, height } = bitmap;
+      const scale = Math.min(1, MAX_PX / Math.max(width, height));
+      width  = Math.round(width  * scale);
+      height = Math.round(height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = width; canvas.height = height;
+      canvas.getContext("2d")!.drawImage(bitmap, 0, 0, width, height);
+      bitmap.close();
+      canvas.toBlob((blob) => {
+        if (!blob) { resolve(file); return; }
+        resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }));
+      }, "image/jpeg", 0.8);
+    }).catch(reject);
+  });
+}
 
 /**
  * Normaliza SEMPRE a imagem: corrige orientação EXIF, redimensiona lado maior a 2000px,
@@ -95,6 +118,13 @@ export function SubmitResultFlow({ games, teamName }: Props) {
   const [notes, setNotes] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Fotos de jogo (passo game_photos)
+  const [stagedPhoto, setStagedPhoto] = useState<StagedPhoto | null>(null);
+  const [gamePhotos, setGamePhotos]   = useState<UploadedPhoto[]>([]);
+  const [photoConsent, setPhotoConsent] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const gamePhotoInputRef = useRef<HTMLInputElement>(null);
+
   const eligibleGames = games.filter(
     (g) =>
       !g.result &&
@@ -102,13 +132,28 @@ export function SubmitResultFlow({ games, teamName }: Props) {
       new Date(g.event_date) < new Date()
   );
 
+  async function cleanupPhotos() {
+    if (gamePhotos.length === 0) return;
+    await Promise.allSettled(
+      gamePhotos.map((p) => fetch(`/api/liga/equipa/game-photos/${p.id}`, { method: "DELETE" }))
+    );
+    setGamePhotos([]);
+  }
+
   function reset() {
     setStep("select"); setSelectedGame(null); setScanResult(null);
     setPhotoPreview(null); setHomeScore(""); setAwayScore(""); setNotes(""); setError(null);
+    setStagedPhoto(null); setGamePhotos([]); setPhotoConsent(false);
   }
-  function close() { setOpen(false); reset(); }
+
+  function close() {
+    void cleanupPhotos();
+    setOpen(false);
+    reset();
+  }
 
   function selectGame(g: PublicGame) {
+    if (gamePhotos.length > 0) void cleanupPhotos();
     setSelectedGame(g); setStep("photo"); setError(null);
   }
 
@@ -141,17 +186,17 @@ export function SubmitResultFlow({ games, teamName }: Props) {
         const reason = json.reason ? ` (${json.reason})` : "";
         setError((json.error ?? "Não foi possível ler automaticamente — preenche manualmente.") + reason);
         setScanResult({ photo_path: json.photo_path });
-        setStep("confirm");
+        setStep("game_photos");
         return;
       }
 
       setScanResult(json);
       if (json.pontos_casa != null) setHomeScore(String(json.pontos_casa));
       if (json.pontos_fora != null) setAwayScore(String(json.pontos_fora));
-      setStep("confirm");
+      setStep("game_photos");
     } catch (e) {
       setError(`Erro ao processar ficheiro: ${String(e)}`);
-      setStep("confirm");
+      setStep("game_photos");
     } finally {
       setProcessing(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -161,6 +206,50 @@ export function SubmitResultFlow({ games, teamName }: Props) {
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (file) await processFile(file);
+  }
+
+  async function handleGamePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.files?.[0];
+    if (!raw) return;
+    if (gamePhotoInputRef.current) gamePhotoInputRef.current.value = "";
+    let file = raw;
+    try {
+      if (HEIC_TYPES.includes(raw.type) || raw.name.toLowerCase().endsWith(".heic") || raw.name.toLowerCase().endsWith(".heif")) {
+        file = await heicToJpeg(raw);
+      }
+      if (IMAGE_TYPES.includes(file.type)) {
+        file = await compressGamePhoto(file);
+      }
+      const preview = URL.createObjectURL(file);
+      setStagedPhoto({ file, preview, caption: "" });
+    } catch (e) {
+      setError(`Erro ao processar foto: ${String(e)}`);
+    }
+  }
+
+  async function confirmStagedPhoto() {
+    if (!stagedPhoto || !selectedGame) return;
+    setUploadingPhoto(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append("photo", stagedPhoto.file);
+      fd.append("game_id", selectedGame.id);
+      fd.append("team_name", teamName);
+      if (stagedPhoto.caption) fd.append("caption", stagedPhoto.caption);
+      const res = await fetch("/api/liga/equipa/game-photos", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok) { setError(json.error ?? "Erro ao carregar foto."); return; }
+      setGamePhotos((prev) => [...prev, { id: json.id, public_url: json.public_url, caption: stagedPhoto.caption }]);
+      setStagedPhoto(null);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
+  async function removeGamePhoto(id: string) {
+    await fetch(`/api/liga/equipa/game-photos/${id}`, { method: "DELETE" });
+    setGamePhotos((prev) => prev.filter((p) => p.id !== id));
   }
 
   async function handleSubmit() {
@@ -300,7 +389,116 @@ export function SubmitResultFlow({ games, teamName }: Props) {
 
             <div style={{ display: "flex", gap: "10px", marginTop: "14px" }}>
               <button onClick={() => { setStep("select"); setError(null); }} style={s.btn()}>← Voltar</button>
-              <button onClick={() => { setStep("confirm"); setError(null); }} style={s.btn()}>Preencher manualmente</button>
+              <button onClick={() => { setStep("game_photos"); setError(null); }} style={s.btn()}>Preencher manualmente</button>
+            </div>
+          </>
+        )}
+
+        {/* ── STEP: FOTOS DE JOGO (opcional) ── */}
+        {step === "game_photos" && selectedGame && (
+          <>
+            <h2 style={{ fontSize: "17px", fontWeight: 700, margin: "0 0 4px", color: "var(--fg,#15110E)" }}>
+              Fotos do jogo <span style={{ fontSize: "12px", fontWeight: 400, color: "var(--muted,#6F675F)" }}>(opcional)</span>
+            </h2>
+            <p style={{ fontSize: "12px", color: "var(--muted,#6F675F)", margin: "0 0 14px" }}>
+              Adiciona até 3 fotos. As fotos podem aparecer na notícia automática.
+            </p>
+
+            {error && <p style={{ fontSize: "13px", color: "#DC2626", margin: "0 0 10px", background: "#FEF2F2", padding: "10px 12px", borderRadius: "8px" }}>{error}</p>}
+
+            {/* Fotos já carregadas */}
+            {gamePhotos.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "12px" }}>
+                {gamePhotos.map((p, i) => (
+                  <div key={p.id} style={{ display: "flex", gap: "10px", alignItems: "flex-start", padding: "10px", background: "var(--card,#fff)", borderRadius: "8px", border: "1px solid var(--border,#E8E0D4)" }}>
+                    <img src={p.public_url} alt={`Foto ${i + 1}`} style={{ width: "60px", height: "45px", objectFit: "cover", borderRadius: "4px", flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: "12px", color: "var(--muted,#6F675F)", margin: "0 0 2px" }}>
+                        {p.caption || <em>Sem legenda</em>}
+                      </p>
+                    </div>
+                    <button onClick={() => removeGamePhoto(p.id)} style={{ ...s.btn(), padding: "4px 8px", fontSize: "11px", flexShrink: 0 }}>Remover</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Foto em staging (aguarda legenda + confirmação) */}
+            {stagedPhoto && (
+              <div style={{ padding: "12px", background: "var(--card,#fff)", borderRadius: "8px", border: "1.5px solid #F97316", marginBottom: "10px" }}>
+                <img src={stagedPhoto.preview} alt="Pré-visualização" style={{ width: "100%", maxHeight: "160px", objectFit: "cover", borderRadius: "6px", marginBottom: "8px" }} />
+                <input
+                  type="text"
+                  placeholder="Legenda opcional (máx. 120 caracteres)"
+                  maxLength={120}
+                  value={stagedPhoto.caption}
+                  onChange={(e) => setStagedPhoto((p) => p ? { ...p, caption: e.target.value } : null)}
+                  style={{ width: "100%", padding: "8px 10px", fontSize: "13px", borderRadius: "8px", border: "1.5px solid var(--border,#E8E0D4)", background: "var(--bg,#F6F2EC)", boxSizing: "border-box" as const, marginBottom: "8px" }}
+                />
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button onClick={() => setStagedPhoto(null)} style={s.btn()}>Cancelar</button>
+                  <button onClick={confirmStagedPhoto} disabled={uploadingPhoto} style={{ ...s.btn(true, uploadingPhoto), flex: 1 }}>
+                    {uploadingPhoto ? "A carregar…" : "Adicionar foto"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Botão adicionar (só se < 3 fotos e nenhuma em staging) */}
+            {!stagedPhoto && gamePhotos.length < 3 && (
+              <>
+                <input
+                  ref={gamePhotoInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                  style={{ display: "none" }}
+                  onChange={handleGamePhotoSelect}
+                />
+                <button
+                  onClick={() => { gamePhotoInputRef.current?.setAttribute("capture", "environment"); gamePhotoInputRef.current?.click(); }}
+                  style={{ ...s.btn(), width: "100%", padding: "12px", marginBottom: "6px" }}
+                >
+                  📷 Câmara — {gamePhotos.length}/3 fotos
+                </button>
+                <button
+                  onClick={() => { gamePhotoInputRef.current?.removeAttribute("capture"); gamePhotoInputRef.current?.click(); }}
+                  style={{ ...s.btn(), width: "100%", padding: "12px", marginBottom: "12px" }}
+                >
+                  🗂 Galeria ou ficheiro — {gamePhotos.length}/3 fotos
+                </button>
+              </>
+            )}
+
+            {gamePhotos.length >= 3 && (
+              <p style={{ fontSize: "12px", color: "var(--muted,#6F675F)", margin: "0 0 12px", textAlign: "center" }}>
+                Limite de 3 fotos atingido.
+              </p>
+            )}
+
+            {/* Consentimento (obrigatório se há fotos) */}
+            {gamePhotos.length > 0 && (
+              <label style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "14px", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={photoConsent}
+                  onChange={(e) => setPhotoConsent(e.target.checked)}
+                  style={{ marginTop: "2px", flexShrink: 0 }}
+                />
+                <span style={{ fontSize: "12px", color: "var(--fg,#15110E)", lineHeight: 1.5 }}>
+                  Confirmo que tenho autorização para publicar estas fotos e que os jogadores fotografados concordaram.
+                </span>
+              </label>
+            )}
+
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button onClick={() => { setStep("photo"); setError(null); setStagedPhoto(null); }} style={s.btn()}>← Voltar</button>
+              <button
+                onClick={() => { setStep("confirm"); setError(null); }}
+                disabled={gamePhotos.length > 0 && !photoConsent}
+                style={{ ...s.btn(true, gamePhotos.length > 0 && !photoConsent), flex: 1 }}
+              >
+                Continuar
+              </button>
             </div>
           </>
         )}
@@ -406,7 +604,7 @@ export function SubmitResultFlow({ games, teamName }: Props) {
             />
 
             <div style={{ display: "flex", gap: "10px" }}>
-              <button onClick={() => { setStep("photo"); setError(null); setScanResult(null); setPhotoPreview(null); }} style={s.btn()}>
+              <button onClick={() => { setStep("game_photos"); setError(null); }} style={s.btn()}>
                 ← Voltar
               </button>
               <button onClick={handleSubmit} disabled={submitting || homeScore === "" || awayScore === ""}

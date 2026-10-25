@@ -76,6 +76,12 @@ type SeasonTeamEntry = {
   active: boolean; game_count: number; in_season: boolean;
 };
 
+type AdminGamePhoto = {
+  id: string; storage_path: string; public_url: string;
+  caption: string | null; hidden: boolean; team_name: string;
+  created_at: string; is_cover: boolean;
+};
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmtDate(d: string, t: string | null) {
@@ -210,6 +216,11 @@ export default function LigaAdminPage() {
   const [removeLoading, setRemoveLoading]     = useState(false);
   const [removeError, setRemoveError]         = useState<string | null>(null);
 
+  // Game photos tab (within expanded game panel)
+  const [gamePhotosMap, setGamePhotosMap]     = useState<Record<string, AdminGamePhoto[]>>({});
+  const [photosLoading, setPhotosLoading]     = useState<string | null>(null);
+  const [photoActing, setPhotoActing]         = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -237,6 +248,30 @@ export default function LigaAdminPage() {
     } finally { setAuditLoading(false); }
   }
 
+  async function loadGamePhotos(eventId: string) {
+    setPhotosLoading(eventId);
+    try {
+      const res = await fetch(`/api/liga/admin/games/${eventId}/photos`);
+      const json = await res.json();
+      setGamePhotosMap((m) => ({ ...m, [eventId]: json.photos ?? [] }));
+    } finally { setPhotosLoading(null); }
+  }
+
+  async function handlePhotoAction(eventId: string, photoId: string, action: "hide" | "unhide" | "set_cover") {
+    setPhotoActing(photoId);
+    try {
+      const res = await fetch(`/api/liga/admin/games/${eventId}/photos`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photo_id: photoId, action }),
+      });
+      const json = await res.json();
+      if (!res.ok) { alert(json.error ?? "Erro"); return; }
+      await loadGamePhotos(eventId);
+      if (action === "set_cover") await load();
+    } finally { setPhotoActing(null); }
+  }
+
   async function loadDeletedGames() {
     setLoadingDeleted(true);
     try {
@@ -256,6 +291,7 @@ export default function LigaAdminPage() {
       setEditAway(game.result ? String(game.result.away_score) : "");
       setEditMotivo("");
       loadAudit(game.id);
+      loadGamePhotos(game.id);
     }
   }
 
@@ -973,6 +1009,58 @@ export default function LigaAdminPage() {
                         </div>
                       )}
                     </div>
+                  </div>
+
+                  {/* Fotografias */}
+                  <div style={{ marginTop: "16px" }}>
+                    <h3 style={sectionTitle}>Fotografias do jogo</h3>
+                    {photosLoading === game.id ? (
+                      <p style={{ fontSize: "12px", color: "#8C837A" }}>A carregar…</p>
+                    ) : !gamePhotosMap[game.id] || gamePhotosMap[game.id].length === 0 ? (
+                      <p style={{ fontSize: "12px", color: "#8C837A" }}>Sem fotografias.</p>
+                    ) : (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+                        {gamePhotosMap[game.id].map((photo) => (
+                          <div key={photo.id} style={{
+                            width: "140px", background: "#F6F2EC", borderRadius: "8px",
+                            overflow: "hidden", border: photo.hidden ? "2px solid #FCA5A5" : photo.is_cover ? "2px solid #F97316" : "1px solid #E8E0D6",
+                          }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={photo.public_url} alt={photo.caption ?? "foto"} style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }} />
+                            <div style={{ padding: "6px 8px" }}>
+                              {photo.is_cover && (
+                                <p style={{ fontSize: "10px", color: "#C2530A", fontWeight: 700, margin: "0 0 3px", textTransform: "uppercase" }}>Capa</p>
+                              )}
+                              {photo.hidden && (
+                                <p style={{ fontSize: "10px", color: "#DC2626", fontWeight: 700, margin: "0 0 3px", textTransform: "uppercase" }}>Oculta</p>
+                              )}
+                              {photo.caption && (
+                                <p style={{ fontSize: "10px", color: "#6B7280", margin: "0 0 4px", lineHeight: 1.3, overflow: "hidden", maxHeight: "32px" }}>{photo.caption}</p>
+                              )}
+                              <p style={{ fontSize: "10px", color: "#9CA3AF", margin: "0 0 6px" }}>{photo.team_name}</p>
+                              <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                                {!photo.is_cover && (
+                                  <button
+                                    onClick={() => handlePhotoAction(game.id, photo.id, "set_cover")}
+                                    disabled={photoActing === photo.id}
+                                    style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", border: "1px solid #E8E0D6", background: "#fff", cursor: "pointer", color: "#F97316" }}
+                                  >
+                                    Capa
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handlePhotoAction(game.id, photo.id, photo.hidden ? "unhide" : "hide")}
+                                  disabled={photoActing === photo.id}
+                                  style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", border: "1px solid #E8E0D6", background: "#fff", cursor: "pointer", color: photo.hidden ? "#16A34A" : "#DC2626" }}
+                                >
+                                  {photo.hidden ? "Mostrar" : "Ocultar"}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Audit */}

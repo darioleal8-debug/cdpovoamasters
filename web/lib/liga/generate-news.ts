@@ -84,6 +84,20 @@ export async function generateLigaNews(
     jornadaInfo = `Jornada ${meta.jornada ?? "?"}, Volta ${meta.volta ?? "?"}, Série ${meta.serie ?? "A"}`;
   } catch { /* ignore */ }
 
+  // Legendas das fotos reais (contexto texto para DeepSeek — sem enviar imagens)
+  let photoCaptions = "";
+  try {
+    const { data: gamePics } = await adminClient
+      .from("game_photos")
+      .select("caption")
+      .eq("game_id", gameId)
+      .eq("hidden", false)
+      .not("caption", "is", null)
+      .order("created_at", { ascending: true });
+    const caps = (gamePics ?? []).map((p: { caption: string | null }) => p.caption).filter(Boolean) as string[];
+    if (caps.length > 0) photoCaptions = caps.join(" / ");
+  } catch { /* ignorar se tabela não existe ainda */ }
+
   const homeWon = result.home_score > result.away_score;
   const winner = homeWon ? result.home_team_name : result.away_team_name;
   const scoreStr = `${result.home_score}-${result.away_score}`;
@@ -97,6 +111,7 @@ Local: ${event.location ?? "não especificado"}
 ${jornadaInfo}
 ${topScorers ? `Destaques: ${topScorers}` : ""}
 ${submission?.notes ? `Notas: ${submission.notes}` : ""}
+${photoCaptions ? `Descrição das fotografias do jogo: ${photoCaptions}` : ""}
 
 CLASSIFICAÇÃO ACTUALIZADA (top 5):
 ${top5}

@@ -114,6 +114,43 @@ async function _generateNewsImage(ctx: NewsImageContext): Promise<GenerateResult
   ]);
   const oldImageUrl = newsRow.data?.cover_image_url ?? null;
 
+  // ── Passo 0: se existem fotos reais do jogo, usar a primeira como capa ────
+  const gameId = newsRow.data?.game_id;
+  if (gameId) {
+    try {
+      const { data: gamePics } = await admin
+        .from("game_photos")
+        .select("id, storage_path")
+        .eq("game_id", gameId)
+        .eq("hidden", false)
+        .order("created_at", { ascending: true })
+        .limit(1);
+
+      if (gamePics && gamePics.length > 0) {
+        console.log(`[generateNewsImage] real photo exists for game ${gameId} — skipping fal.ai`);
+        const { data: pub } = admin.storage.from("game-photos").getPublicUrl(gamePics[0].storage_path);
+        const imgFetch = await fetch(pub.publicUrl, { signal: AbortSignal.timeout(30_000) });
+        if (imgFetch.ok) {
+          const rawBuffer = Buffer.from(await imgFetch.arrayBuffer());
+          const webpBuffer = await buildFinalImage(rawBuffer, ctx, gameData);
+          const { publicUrl } = await saveImageToStorage(admin, ctx.newsId, webpBuffer);
+          await admin.from("news").update({
+            cover_image_url: publicUrl,
+            cover_photo_id: gamePics[0].id,
+            image_status: "ready",
+            image_error: null,
+            image_error_type: null,
+          }).eq("id", ctx.newsId);
+          await deletePreviousImage(admin, oldImageUrl);
+          console.log(`[generateNewsImage] real photo cover done total=${Date.now() - tTotal}ms`);
+          return { ok: true };
+        }
+      }
+    } catch (photoErr) {
+      console.warn(`[generateNewsImage] real photo check failed: ${(photoErr as Error).message} — continuing to fal.ai`);
+    }
+  }
+
   // ── Passo 1: gerar prompt com dados reais ─────────────────────────────────
   let prompt: string;
   let negativePrompt: string;
