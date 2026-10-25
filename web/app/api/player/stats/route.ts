@@ -40,25 +40,50 @@ export async function GET(req: NextRequest) {
 
   if (!player) return NextResponse.json({ season: null, last5: null });
 
+  // Resolver session IDs: apenas jogos live terminados (excluir is_test e result_only)
+  const { data: evData } = await supabase
+    .from("events")
+    .select("id, event_date")
+    .eq("season_id", seasonId)
+    .eq("type", "jogo")
+    .eq("is_test", false);
+
+  const eventIds = (evData ?? []).map((e) => e.id as string);
+  if (eventIds.length === 0) return NextResponse.json({ season: null, last5: null });
+
+  const { data: sessData } = await supabase
+    .from("game_sessions")
+    .select("id, event_id")
+    .in("event_id", eventIds)
+    .eq("status", "finished")
+    .neq("stats_source", "result_only");
+
+  const allowedSessionIds = (sessData ?? []).map((s) => s.id as string);
+  if (allowedSessionIds.length === 0) return NextResponse.json({ season: null, last5: null });
+
+  // Mapa session_id → event_date para ordenação
+  const sessionEventDate = new Map<string, string>();
+  for (const sess of sessData ?? []) {
+    const ev = (evData ?? []).find((e) => e.id === (sess as { id: string; event_id: string }).event_id);
+    if (ev) sessionEventDate.set(sess.id as string, (ev as { id: string; event_date?: string }).event_date ?? "");
+  }
+
   // player_stats existe em produção mas está vazia e nada a escreve (STA-04):
-  // a fonte real são os totais por jogo em player_game_stats, só de jogos terminados.
+  // a fonte real são os totais por jogo em player_game_stats, só de jogos terminados com live stats.
   const { data: gameRows } = await supabase
     .from("player_game_stats")
-    .select("pts, reb_off, reb_def, ast, game_session:game_sessions!inner(status, event:events(event_date))")
+    .select("pts, reb_off, reb_def, ast, game_session_id")
     .eq("player_id", player.id)
     .eq("season_id", seasonId)
-    .eq("game_session.status", "finished");
+    .in("game_session_id", allowedSessionIds);
 
-  type GameRow = {
-    pts: number; reb_off: number; reb_def: number; ast: number;
-    game_session: { event: { event_date: string } | null } | null;
-  };
+  type GameRow = { pts: number; reb_off: number; reb_def: number; ast: number; game_session_id: string };
   const rows = ((gameRows ?? []) as unknown as GameRow[])
     .map((r) => ({
       pontos: r.pts ?? 0,
       ressaltos: (r.reb_off ?? 0) + (r.reb_def ?? 0),
       assistencias: r.ast ?? 0,
-      date: r.game_session?.event?.event_date ?? "",
+      date: sessionEventDate.get(r.game_session_id) ?? "",
     }))
     .sort((a, b) => b.date.localeCompare(a.date));
 

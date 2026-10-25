@@ -50,85 +50,64 @@ export function useSeasonStats(
       // query player_game_stats directly. Otherwise, first resolve the matching
       // game_session_ids, then filter stats by those ids.
 
-      const needsJoin = filter.gameType !== "all" || !!filter.competition;
+      // Sempre resolver os session_ids: filtra is_test=false e stats_source != result_only
+      let eventsQ = supabase
+        .from("events")
+        .select("id")
+        .eq("season_id", seasonId)
+        .eq("type", "jogo")
+        .eq("is_test", false);
 
-      let allowedSessionIds: string[] | null = null;
+      if (filter.gameType === "official")  eventsQ = eventsQ.eq("game_type", "official");
+      if (filter.gameType === "friendly")  eventsQ = eventsQ.eq("game_type", "friendly");
+      if (filter.competition)              eventsQ = eventsQ.eq("competition", filter.competition);
 
-      if (needsJoin) {
-        // Build the events query for the matching game_type / competition
-        let eventsQ = supabase
-          .from("events")
-          .select("id")
-          .eq("season_id", seasonId)
-          .eq("type", "jogo");
+      const { data: evData } = await eventsQ;
+      const eventIds = (evData ?? []).map((e) => e.id as string);
 
-        if (filter.gameType === "official")  eventsQ = eventsQ.eq("game_type", "official");
-        if (filter.gameType === "friendly")  eventsQ = eventsQ.eq("game_type", "friendly");
-        if (filter.competition)              eventsQ = eventsQ.eq("competition", filter.competition);
+      if (eventIds.length === 0) {
+        setStats({
+          total_pts: 0, total_reb: 0, total_ast: 0, total_stl: 0,
+          total_blk: 0, total_tov: 0, total_fouls_committed: 0,
+          total_fouls_drawn: 0, games_finished: 0, total_players: 0,
+        });
+        setLoading(false);
+        return;
+      }
 
-        const { data: evData } = await eventsQ;
-        const eventIds = (evData ?? []).map((e) => e.id);
+      const { data: sessData } = await supabase
+        .from("game_sessions")
+        .select("id")
+        .in("event_id", eventIds)
+        .eq("status", "finished")
+        .neq("stats_source", "result_only");
 
-        if (eventIds.length === 0) {
-          // No matching games — return empty stats
-          setStats({
-            total_pts: 0, total_reb: 0, total_ast: 0, total_stl: 0,
-            total_blk: 0, total_tov: 0, total_fouls_committed: 0,
-            total_fouls_drawn: 0, games_finished: 0, total_players: 0,
-          });
-          setLoading(false);
-          return;
-        }
+      const allowedSessionIds: string[] = (sessData ?? []).map((s) => s.id as string);
 
-        // Resolve game_session_ids for those events
-        const { data: sessData } = await supabase
-          .from("game_sessions")
-          .select("id")
-          .in("event_id", eventIds)
-          .eq("status", "finished");
-
-        allowedSessionIds = (sessData ?? []).map((s) => s.id);
-
-        if (allowedSessionIds.length === 0) {
-          setStats({
-            total_pts: 0, total_reb: 0, total_ast: 0, total_stl: 0,
-            total_blk: 0, total_tov: 0, total_fouls_committed: 0,
-            total_fouls_drawn: 0, games_finished: 0, total_players: 0,
-          });
-          setLoading(false);
-          return;
-        }
+      if (allowedSessionIds.length === 0) {
+        setStats({
+          total_pts: 0, total_reb: 0, total_ast: 0, total_stl: 0,
+          total_blk: 0, total_tov: 0, total_fouls_committed: 0,
+          total_fouls_drawn: 0, games_finished: 0, total_players: 0,
+        });
+        setLoading(false);
+        return;
       }
 
       // ── 2. Fetch stats ────────────────────────────────────────────────────────
 
       const [statsRes, gamesRes, playersRes] = await Promise.all([
-        // Player stats — filtered by session ids when filter is active
-        (() => {
-          let q = supabase
-            .from("player_game_stats")
-            .select("pts, reb_off, reb_def, ast, stl, blk, tov, fouls_committed, fouls_drawn")
-            .eq("season_id", seasonId);
-          if (allowedSessionIds) q = q.in("game_session_id", allowedSessionIds);
-          return q;
-        })(),
+        supabase
+          .from("player_game_stats")
+          .select("pts, reb_off, reb_def, ast, stl, blk, tov, fouls_committed, fouls_drawn")
+          .eq("season_id", seasonId)
+          .in("game_session_id", allowedSessionIds),
 
-        // Finished game count
-        (() => {
-          if (allowedSessionIds) {
-            return supabase
-              .from("game_sessions")
-              .select("id", { count: "exact", head: true })
-              .in("id", allowedSessionIds);
-          }
-          return supabase
-            .from("game_sessions")
-            .select("id", { count: "exact", head: true })
-            .eq("season_id", seasonId)
-            .eq("status", "finished");
-        })(),
+        supabase
+          .from("game_sessions")
+          .select("id", { count: "exact", head: true })
+          .in("id", allowedSessionIds),
 
-        // Total players in season (not affected by game filter)
         supabase
           .from("players")
           .select("id", { count: "exact", head: true })

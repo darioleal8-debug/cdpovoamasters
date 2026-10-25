@@ -156,6 +156,7 @@ export async function POST(
         home_score:           homeScore,
         away_score:           awayScore,
         status:               "finished",
+        stats_source:         "result_only",
         current_period:       4,
         started_at:           now,
         finished_at:          now,

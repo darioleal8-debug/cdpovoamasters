@@ -478,6 +478,13 @@ export interface GameSession {
   period_duration_secs: number;
   home_timeouts_left: number;
   away_timeouts_left: number;
+  // FIBA half-based timeout counters (migration 103)
+  home_timeouts_first_half:  number;
+  home_timeouts_second_half: number;
+  away_timeouts_first_half:  number;
+  away_timeouts_second_half: number;
+  // Stats provenance (migration 104)
+  stats_source: 'live' | 'result_only' | 'import';
   // Opponent team stats (migration 023)
   away_reb_off: number;
   away_reb_def: number;
@@ -502,10 +509,11 @@ export interface PlayByPlay {
   shot_zone: string | null;
   description: string | null;
   created_at: string;
-  // Migration 034: idempotência + soft-delete + autor
-  client_id?:  string | null;
-  deleted_at?: string | null;
-  author_id?:  string | null;
+  // Migration 103: idempotência + soft-delete
+  client_id?:   string | null;
+  deleted_at?:  string | null;
+  deleted_by?:  string | null;
+  author_id?:   string | null;
 }
 
 export interface PlayerGameStats {

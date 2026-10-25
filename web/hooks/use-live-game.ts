@@ -29,41 +29,6 @@ const POINTS_MAP: Partial<Record<PlayEventType, number>> = {
   "2pt_made": 2, "3pt_made": 3, "ft_made": 1,
 };
 
-function statDeltaForEvent(type: PlayEventType): Partial<Record<string, number>> {
-  switch (type) {
-    case "2pt_made":       return { pts: 2, fg2_made: 1, fg2_att: 1 };
-    case "2pt_miss":       return { fg2_att: 1 };
-    case "3pt_made":       return { pts: 3, fg3_made: 1, fg3_att: 1 };
-    case "3pt_miss":       return { fg3_att: 1 };
-    case "ft_made":        return { pts: 1, ft_made: 1, ft_att: 1 };
-    case "ft_miss":        return { ft_att: 1 };
-    case "rebound_off":    return { reb_off: 1 };
-    case "rebound_def":    return { reb_def: 1 };
-    case "assist":         return { ast: 1 };
-    case "steal":          return { stl: 1 };
-    case "block":          return { blk: 1 };
-    case "turnover":       return { tov: 1 };
-    case "foul_committed":
-    case "foul_def":
-    case "foul_of":
-    case "foul_tec":
-    case "foul_anti":
-      return { fouls_committed: 1 };
-    case "foul_drawn":     return { fouls_drawn: 1 };
-    default: return {};
-  }
-}
-
-function calcEfficiency(s: Partial<PlayerGameStats>): number {
-  return (
-    (s.pts ?? 0) + (s.reb_off ?? 0) + (s.reb_def ?? 0) +
-    (s.ast ?? 0) + (s.stl ?? 0) + (s.blk ?? 0) - (s.tov ?? 0) -
-    ((s.fg2_att ?? 0) - (s.fg2_made ?? 0)) -
-    ((s.fg3_att ?? 0) - (s.fg3_made ?? 0)) -
-    ((s.ft_att ?? 0) - (s.ft_made ?? 0))
-  );
-}
-
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
 export interface UseLiveGameOptions {
@@ -88,11 +53,11 @@ export function useLiveGame(
   const sessionRef = useRef<GameSession | null>(null);
   sessionRef.current = session;
 
-  // ── Season ──────────────────────────────────────────────
+  // ── Season — derivada do evento, não da temporada activa ─
   useEffect(() => {
-    supabase.from("seasons").select("id").eq("status", "ativa").single()
-      .then(({ data }) => { if (data) setSeasonId(data.id); });
-  }, []);
+    supabase.from("events").select("season_id").eq("id", eventId).single()
+      .then(({ data }) => { if (data?.season_id) setSeasonId(data.season_id as string); });
+  }, [eventId]);
 
   // ── Load functions ──────────────────────────────────────
   const loadRoster = useCallback(async (sid: string) => {
@@ -298,10 +263,16 @@ export function useLiveGame(
         { event: "*", schema: "public", table: "game_sessions", filter: `id=eq.${session.id}` },
         (payload) => { setSession(payload.new as GameSession); })
       .on("postgres_changes",
-        { event: "INSERT", schema: "public", table: "play_by_play", filter: `game_session_id=eq.${session.id}` },
+        { event: "*", schema: "public", table: "play_by_play", filter: `game_session_id=eq.${session.id}` },
         () => { loadPlays(session.id); })
       .on("postgres_changes",
         { event: "*", schema: "public", table: "player_game_stats", filter: `game_session_id=eq.${session.id}` },
+        () => { loadPlayerStats(session.id); })
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "game_period_scores", filter: `game_session_id=eq.${session.id}` },
+        () => { loadPeriodScores(session.id); })
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "player_court_stints", filter: `game_session_id=eq.${session.id}` },
         () => { loadPlayerStats(session.id); })
       .on("postgres_changes",
         { event: "*", schema: "public", table: "game_current_lineup", filter: `game_session_id=eq.${session.id}` },
@@ -441,83 +412,22 @@ export function useLiveGame(
     if (!session || recording) return false;
     setRecording(true);
     try {
-      const pts = POINTS_MAP[input.event_type] ?? 0;
-      const newHome = session.home_score + pts;
-      const clockStr = input.game_clock ?? formatClock(clockSecs);
-
-      const { error } = await supabase.from("play_by_play").insert({
-        game_session_id: session.id,
-        season_id: session.season_id,
-        period: session.current_period,
-        game_clock: clockStr,
-        clock_time_secs: Math.round(clockSecs),
-        event_type: input.event_type,
-        player_id: input.player_id ?? null,
-        secondary_player_id: input.secondary_player_id ?? null,
-        is_home_team: true,
-        points_delta: pts,
-        home_score_after: newHome,
-        away_score_after: session.away_score,
-        description: input.description ?? null,
+      const { error } = await supabase.rpc("record_play", {
+        p_game_session_id:     session.id,
+        p_event_type:          input.event_type,
+        p_period:              session.current_period,
+        p_clock_time_secs:     Math.round(clockSecs),
+        p_is_home_team:        true,
+        p_points_delta:        POINTS_MAP[input.event_type] ?? 0,
+        p_player_id:           input.player_id ?? null,
+        p_secondary_player_id: input.secondary_player_id ?? null,
+        p_game_clock:          input.game_clock ?? formatClock(clockSecs),
+        p_description:         input.description ?? null,
       });
 
       if (error) {
         toast({ title: "Erro", description: error.message, variant: "destructive" });
         return false;
-      }
-
-      if (pts > 0) {
-        await supabase.from("game_sessions")
-          .update({ home_score: newHome, updated_at: new Date().toISOString() })
-          .eq("id", session.id);
-        setSession((s) => s ? { ...s, home_score: newHome } : s);
-      }
-
-      if (input.player_id) {
-        const delta = statDeltaForEvent(input.event_type);
-        if (Object.keys(delta).length > 0) {
-          const existing = playerStats.find((s) => s.player_id === input.player_id);
-          // Strip join fields (e.g. `user`) — not DB columns, cause PostgREST to reject the upsert
-          let base: Partial<PlayerGameStats>;
-          if (existing) {
-            const { user: _u, ...cols } = existing as unknown as Record<string, unknown>;
-            base = cols as Partial<PlayerGameStats>;
-          } else {
-            base = { game_session_id: session.id, season_id: session.season_id, player_id: input.player_id };
-          }
-          const updated = { ...base };
-          for (const [k, v] of Object.entries(delta)) {
-            if (v !== undefined) {
-              (updated as Record<string, number>)[k] =
-                ((updated as Record<string, number>)[k] ?? 0) + v;
-            }
-          }
-          updated.efficiency = calcEfficiency(updated);
-          const { error: upsertErr } = await supabase.from("player_game_stats").upsert(
-            { ...updated, updated_at: new Date().toISOString() },
-            { onConflict: "game_session_id,player_id" }
-          );
-          if (upsertErr) console.error("[stats/upsert]", upsertErr.message);
-        }
-      }
-
-      // Assist for secondary player (when shot is made)
-      if (input.secondary_player_id && input.event_type.endsWith("_made")) {
-        const existing = playerStats.find((s) => s.player_id === input.secondary_player_id);
-        let base: Partial<PlayerGameStats>;
-        if (existing) {
-          const { user: _u, ...cols } = existing as unknown as Record<string, unknown>;
-          base = cols as Partial<PlayerGameStats>;
-        } else {
-          base = { game_session_id: session.id, season_id: session.season_id, player_id: input.secondary_player_id };
-        }
-        const updated = { ...base, ast: ((base.ast ?? 0) + 1) };
-        updated.efficiency = calcEfficiency(updated);
-        const { error: assistErr } = await supabase.from("player_game_stats").upsert(
-          { ...updated, updated_at: new Date().toISOString() },
-          { onConflict: "game_session_id,player_id" }
-        );
-        if (assistErr) console.error("[stats/upsert/assist]", assistErr.message);
       }
 
       await Promise.all([loadPlays(session.id), loadPlayerStats(session.id)]);
@@ -530,41 +440,23 @@ export function useLiveGame(
   // ── Opponent points ─────────────────────────────────────
 
   async function recordOpponentPoints(pts: number): Promise<void> {
-    if (!session) return;
-    const newAway = session.away_score + pts;
-    await supabase.from("game_sessions")
-      .update({ away_score: newAway, updated_at: new Date().toISOString() })
-      .eq("id", session.id);
-    await supabase.from("play_by_play").insert({
-      game_session_id: session.id,
-      season_id: session.season_id,
-      period: session.current_period,
-      game_clock: formatClock(clockSecs),
-      clock_time_secs: Math.round(clockSecs),
-      event_type: pts === 1 ? "ft_made" : pts === 3 ? "3pt_made" : "2pt_made",
-      is_home_team: false,
-      points_delta: pts,
-      home_score_after: session.home_score,
-      away_score_after: newAway,
-      description: `Adversário +${pts}`,
-    });
-    setSession((s) => s ? { ...s, away_score: newAway } : s);
-    await loadPlays(session.id);
-  }
-
-  // ── Opponent stat counters ──────────────────────────────
-
-  async function recordOpponentStat(
-    type: "reb_off" | "reb_def" | "foul",
-    delta: 1 | -1
-  ): Promise<void> {
-    if (!session) return;
-    const field = type === "reb_off" ? "away_reb_off" : type === "reb_def" ? "away_reb_def" : "away_fouls";
-    const next = Math.max(0, (session[field] ?? 0) + delta);
-    await supabase.from("game_sessions")
-      .update({ [field]: next, updated_at: new Date().toISOString() })
-      .eq("id", session.id);
-    setSession((s) => s ? { ...s, [field]: next } : s);
+    if (!session || recording) return;
+    setRecording(true);
+    try {
+      await supabase.rpc("record_play", {
+        p_game_session_id: session.id,
+        p_event_type:      pts === 1 ? "ft_made" : pts === 3 ? "3pt_made" : "2pt_made",
+        p_period:          session.current_period,
+        p_clock_time_secs: Math.round(clockSecs),
+        p_is_home_team:    false,
+        p_points_delta:    pts,
+        p_game_clock:      formatClock(clockSecs),
+        p_description:     `Adversário +${pts}`,
+      });
+      await loadPlays(session.id);
+    } finally {
+      setRecording(false);
+    }
   }
 
   // ── Opponent typed foul ─────────────────────────────────
@@ -572,63 +464,46 @@ export function useLiveGame(
   async function recordOpponentFoul(
     type: "foul_def" | "foul_of" | "foul_tec" | "foul_anti"
   ): Promise<void> {
-    if (!session) return;
-    // foul_tec does not count for team fouls; others do
-    const countsForTeam = type !== "foul_tec";
-    const newAwayFouls = countsForTeam ? session.away_fouls + 1 : session.away_fouls;
-
-    const foulDesc = type === "foul_def" ? "Falta defensiva" : type === "foul_of" ? "Falta ofensiva" : type === "foul_tec" ? "Falta técnica" : "Falta antidesportiva";
-    await supabase.from("play_by_play").insert({
-      game_session_id: session.id,
-      season_id: session.season_id,
-      period: session.current_period,
-      game_clock: formatClock(clockSecs),
-      clock_time_secs: Math.round(clockSecs),
-      event_type: type,
-      player_id: null,
-      is_home_team: false,
-      points_delta: 0,
-      home_score_after: session.home_score,
-      away_score_after: session.away_score,
-      description: `Adversário · ${foulDesc}`,
-    });
-
-    if (countsForTeam) {
-      await supabase.from("game_sessions")
-        .update({ away_fouls: newAwayFouls, updated_at: new Date().toISOString() })
-        .eq("id", session.id);
+    if (!session || recording) return;
+    setRecording(true);
+    try {
+      const foulDesc = type === "foul_def" ? "Falta defensiva" : type === "foul_of" ? "Falta ofensiva" : type === "foul_tec" ? "Falta técnica" : "Falta antidesportiva";
+      await supabase.rpc("record_play", {
+        p_game_session_id: session.id,
+        p_event_type:      type,
+        p_period:          session.current_period,
+        p_clock_time_secs: Math.round(clockSecs),
+        p_is_home_team:    false,
+        p_points_delta:    0,
+        p_game_clock:      formatClock(clockSecs),
+        p_description:     `Adversário · ${foulDesc}`,
+      });
+      await loadPlays(session.id);
+    } finally {
+      setRecording(false);
     }
-    if (countsForTeam) setSession((s) => s ? { ...s, away_fouls: newAwayFouls } : s);
-    await loadPlays(session.id);
   }
 
   // ── Opponent rebounds (typed) ───────────────────────────
 
   async function recordOpponentReb(type: "reb_off" | "reb_def"): Promise<void> {
-    if (!session) return;
-    const field = type === "reb_off" ? "away_reb_off" : "away_reb_def";
-    const next = (session[field] ?? 0) + 1;
-    await Promise.all([
-      supabase.from("game_sessions")
-        .update({ [field]: next, updated_at: new Date().toISOString() })
-        .eq("id", session.id),
-      supabase.from("play_by_play").insert({
-        game_session_id: session.id,
-        season_id: session.season_id,
-        period: session.current_period,
-        game_clock: formatClock(clockSecs),
-        clock_time_secs: Math.round(clockSecs),
-        event_type: type === "reb_off" ? "rebound_off" : "rebound_def",
-        player_id: null,
-        is_home_team: false,
-        points_delta: 0,
-        home_score_after: session.home_score,
-        away_score_after: session.away_score,
-        description: `Adversário · ${type === "reb_off" ? "Ressalto ofensivo" : "Ressalto defensivo"}`,
-      }),
-    ]);
-    setSession((s) => s ? { ...s, [field]: next } : s);
-    await loadPlays(session.id);
+    if (!session || recording) return;
+    setRecording(true);
+    try {
+      await supabase.rpc("record_play", {
+        p_game_session_id: session.id,
+        p_event_type:      type === "reb_off" ? "rebound_off" : "rebound_def",
+        p_period:          session.current_period,
+        p_clock_time_secs: Math.round(clockSecs),
+        p_is_home_team:    false,
+        p_points_delta:    0,
+        p_game_clock:      formatClock(clockSecs),
+        p_description:     `Adversário · ${type === "reb_off" ? "Ressalto ofensivo" : "Ressalto defensivo"}`,
+      });
+      await loadPlays(session.id);
+    } finally {
+      setRecording(false);
+    }
   }
 
   // ── Substitution ────────────────────────────────────────
@@ -738,57 +613,23 @@ export function useLiveGame(
   // ── Timeout ─────────────────────────────────────────────
 
   async function callTimeout(team: "home" | "away"): Promise<void> {
-    if (!session) return;
-    const field = team === "home" ? "home_timeouts_left" : "away_timeouts_left";
-    const current = team === "home" ? session.home_timeouts_left : session.away_timeouts_left;
-    if (current <= 0) { toast({ title: "Sem timeouts disponíveis" }); return; }
-
-    await supabase.from("game_sessions")
-      .update({ [field]: current - 1, updated_at: new Date().toISOString() })
-      .eq("id", session.id);
-
-    await supabase.from("play_by_play").insert({
-      game_session_id: session.id,
-      season_id: session.season_id,
-      period: session.current_period,
-      game_clock: formatClock(clockSecs),
-      event_type: "timeout",
-      is_home_team: team === "home",
-      points_delta: 0,
-      home_score_after: session.home_score,
-      away_score_after: session.away_score,
-      description: `Timeout ${team === "home" ? "CD Póvoa" : "Adversário"}`,
-    });
-
-    setSession((s) => s ? { ...s, [field]: current - 1 } : s);
-    await loadPlays(session.id);
-    toast({ title: `Timeout ${team === "home" ? "CD Póvoa" : "Adversário"}` });
-  }
-
-  // ── Undo ────────────────────────────────────────────────
-
-  async function undoLastPlay(): Promise<boolean> {
-    if (!session) return false;
+    if (!session || recording) return;
     setRecording(true);
     try {
-      const { data, error } = await supabase.rpc("undo_last_play", {
+      const { error } = await supabase.rpc("record_play", {
         p_game_session_id: session.id,
+        p_event_type:      "timeout",
+        p_period:          session.current_period,
+        p_clock_time_secs: Math.round(clockSecs),
+        p_is_home_team:    team === "home",
+        p_points_delta:    0,
+        p_game_clock:      formatClock(clockSecs),
+        p_description:     `Timeout ${team === "home" ? "CD Póvoa" : "Adversário"}`,
       });
-      if (error) {
-        toast({ title: "Erro ao desfazer", description: error.message, variant: "destructive" });
-        return false;
+      if (!error) {
+        await loadPlays(session.id);
+        toast({ title: `Timeout ${team === "home" ? "CD Póvoa" : "Adversário"}` });
       }
-      if (!data?.length) {
-        toast({ title: "Nada a desfazer" });
-        return false;
-      }
-      await Promise.all([
-        loadPlays(session.id),
-        loadPlayerStats(session.id),
-        loadSession(),
-      ]);
-      toast({ title: "Evento desfeito" });
-      return true;
     } finally {
       setRecording(false);
     }
@@ -809,79 +650,11 @@ export function useLiveGame(
 
     setRecording(true);
     try {
-      // Reverse score delta
-      if ((play.points_delta ?? 0) > 0) {
-        const field = play.is_home_team ? "home_score" : "away_score";
-        const current = play.is_home_team
-          ? (sessionRef.current?.home_score ?? 0)
-          : (sessionRef.current?.away_score ?? 0);
-        const newScore = Math.max(0, current - (play.points_delta ?? 0));
-        await supabase.from("game_sessions")
-          .update({ [field]: newScore, updated_at: new Date().toISOString() })
-          .eq("id", session.id);
-        setSession((s) => s ? { ...s, [field]: newScore } : s);
-      }
-
-      // Restore timeout count
-      if (play.event_type === "timeout") {
-        const field = play.is_home_team ? "home_timeouts_left" : "away_timeouts_left";
-        const current = play.is_home_team
-          ? (sessionRef.current?.home_timeouts_left ?? 0)
-          : (sessionRef.current?.away_timeouts_left ?? 0);
-        await supabase.from("game_sessions")
-          .update({ [field]: current + 1, updated_at: new Date().toISOString() })
-          .eq("id", session.id);
-        setSession((s) => s ? { ...s, [field]: current + 1 } : s);
-      }
-
-      // Reverse player stat delta (home plays with player)
-      if (play.player_id && play.is_home_team) {
-        const delta = statDeltaForEvent(play.event_type as PlayEventType);
-        if (Object.keys(delta).length > 0) {
-          const existing = playerStats.find((s) => s.player_id === play.player_id);
-          if (existing) {
-            const { user: _u, ...cols } = existing as unknown as Record<string, unknown>;
-            const base = cols as Partial<PlayerGameStats>;
-            const updated = { ...base };
-            for (const [k, v] of Object.entries(delta)) {
-              if (v !== undefined) {
-                (updated as Record<string, number>)[k] = Math.max(
-                  0,
-                  ((updated as Record<string, number>)[k] ?? 0) - v
-                );
-              }
-            }
-            updated.efficiency = calcEfficiency(updated);
-            await supabase.from("player_game_stats").upsert(
-              { ...updated, updated_at: new Date().toISOString() },
-              { onConflict: "game_session_id,player_id" }
-            );
-          }
-        }
-
-        // Reverse assist on secondary player if a scored basket was undone
-        if (play.secondary_player_id && (play.event_type as string).endsWith("_made")) {
-          const assistPlayer = playerStats.find((s) => s.player_id === play.secondary_player_id);
-          if (assistPlayer) {
-            const { user: _u, ...cols } = assistPlayer as unknown as Record<string, unknown>;
-            const base = cols as Partial<PlayerGameStats>;
-            const updated = { ...base, ast: Math.max(0, (base.ast ?? 0) - 1) };
-            updated.efficiency = calcEfficiency(updated);
-            await supabase.from("player_game_stats").upsert(
-              { ...updated, updated_at: new Date().toISOString() },
-              { onConflict: "game_session_id,player_id" }
-            );
-          }
-        }
-      }
-
-      // Delete play record
-      const { error } = await supabase.from("play_by_play").delete().eq("id", playId);
+      const { error } = await supabase.rpc("undo_play", { p_play_id: playId });
       if (error) {
         toast({ title: "Erro ao anular jogada", description: error.message, variant: "destructive" });
         return false;
       }
-
       await Promise.all([loadPlays(session.id), loadPlayerStats(session.id), loadSession()]);
       toast({ title: "Jogada anulada" });
       return true;
@@ -920,9 +693,9 @@ export function useLiveGame(
       description: `Fim do ${session.current_period}º período`,
     });
 
-    // Close all open stints
+    // Close all open stints (usar o relógio real, não 0)
     await supabase.from("player_court_stints")
-      .update({ exit_clock_secs: 0, exit_home_score: session.home_score, exit_away_score: session.away_score })
+      .update({ exit_clock_secs: Math.round(clockSecs), exit_home_score: session.home_score, exit_away_score: session.away_score })
       .eq("game_session_id", session.id)
       .is("exit_clock_secs", null);
 
@@ -968,7 +741,7 @@ export function useLiveGame(
     );
 
     await supabase.from("player_court_stints")
-      .update({ exit_clock_secs: 0, exit_home_score: session.home_score, exit_away_score: session.away_score })
+      .update({ exit_clock_secs: Math.round(clockSecs), exit_home_score: session.home_score, exit_away_score: session.away_score })
       .eq("game_session_id", session.id)
       .is("exit_clock_secs", null);
 
@@ -1036,9 +809,9 @@ export function useLiveGame(
     plays, playerStats, periodScores, clockSecs,
     loading, recording,
     startGame, startClock, stopClock, resetClock,
-    recordPlay, recordOpponentPoints, recordOpponentStat,
+    recordPlay, recordOpponentPoints,
     recordOpponentFoul, recordOpponentReb,
-    substitutePlayer, setLineup, callTimeout, undoLastPlay, undoPlay,
+    substitutePlayer, setLineup, callTimeout, undoPlay,
     nextPeriod, finishGame,
   };
 }
