@@ -61,6 +61,9 @@ export interface Event {
   game_type: string;            // 'official' | 'friendly'
   training_kind: string | null;
   description: string | null;
+  is_club_game: boolean;
+  is_test: boolean;
+  deleted_at: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

@@ -278,6 +278,7 @@ export default function JogosPage() {
               rawGames={rawGames}
               events={events}
               loading={ligaLoading || eventsLoading}
+              isPlayer={isPlayer}
             />
           ) : (
             <>
