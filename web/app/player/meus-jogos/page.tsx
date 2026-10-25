@@ -14,6 +14,7 @@ function parseMeta(description: string | null) {
       jornada?: unknown; volta?: unknown;
       home_team?: unknown; away_team?: unknown;
       pavilion?: unknown; locality?: unknown;
+      is_home?: unknown;
     };
     if (!m.jornada || !m.home_team || !m.away_team) return null;
     return {
@@ -23,6 +24,7 @@ function parseMeta(description: string | null) {
       away_team: String(m.away_team),
       pavilion:  m.pavilion  ? String(m.pavilion)  : null,
       locality:  m.locality  ? String(m.locality)  : null,
+      is_home:   typeof m.is_home === "boolean" ? m.is_home : null,
     };
   } catch { return null; }
 }
@@ -96,6 +98,7 @@ export default async function MeusJogosPage({
       away_team:     meta?.away_team ?? null,
       pavilion:      meta?.pavilion  ?? null,
       locality:      meta?.locality  ?? null,
+      is_home:       meta?.is_home   ?? null,
     };
   });
 

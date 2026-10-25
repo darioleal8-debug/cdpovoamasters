@@ -24,6 +24,7 @@ export type ProcessedGame = {
   syntheticJornada: number | null;
   home_team: string | null;
   away_team: string | null;
+  is_home: boolean | null;
   pavilion: string | null;
   locality: string | null;
   result: { home: number; away: number } | null;
@@ -140,7 +141,7 @@ function GameCard({
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className={cn(
               "text-sm font-semibold truncate",
-              game.is_club_game && !game.isPast ? "text-cdpovoa-primary" : ""
+              game.is_club_game && !game.isPast && game.is_home !== false ? "text-cdpovoa-primary" : ""
             )}>
               {game.home_team ?? game.title}
             </span>
@@ -149,7 +150,7 @@ function GameCard({
                 <span className="text-xs text-muted-foreground shrink-0">vs</span>
                 <span className={cn(
                   "text-sm font-semibold truncate",
-                  game.is_club_game && !game.isPast ? "text-cdpovoa-primary" : ""
+                  game.is_club_game && !game.isPast && game.is_home === false ? "text-cdpovoa-primary" : ""
                 )}>
                   {game.away_team}
                 </span>
@@ -190,12 +191,16 @@ function GameCard({
           )}
           {game.is_club_game && (
             <Badge
-              variant={game.home_team && game.is_club_game ? "default" : "outline"}
-              className={cn("text-[10px]", "bg-cdpovoa-primary hover:bg-cdpovoa-primary/90")}
+              variant={game.is_home !== false ? "default" : "outline"}
+              className={cn(
+                "text-[10px]",
+                game.is_home !== false
+                  ? "bg-cdpovoa-primary hover:bg-cdpovoa-primary/90"
+                  : "border-cdpovoa-primary/50 text-cdpovoa-primary"
+              )}
             >
               <Shield className="h-2.5 w-2.5 mr-1" />
-              {/* Determinar Casa/Fora via is_home stored in title or via team name — use title heuristic */}
-              {game.title.includes("(Fora)") ? "Fora" : "Casa"}
+              {(game.is_home !== null ? game.is_home : !game.title.includes("(Fora)")) ? "Casa" : "Fora"}
             </Badge>
           )}
         </div>

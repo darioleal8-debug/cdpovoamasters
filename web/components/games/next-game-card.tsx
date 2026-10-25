@@ -46,7 +46,7 @@ export async function NextGameCard({
 
   const { data: game } = await supabase
     .from("events")
-    .select("id, title, event_date, event_time, location")
+    .select("id, title, event_date, event_time, location, description, opponent")
     .eq("type", "jogo")
     .eq("is_club_game", true)
     .is("deleted_at", null)
@@ -106,6 +106,20 @@ export async function NextGameCard({
     if (availabilityRow?.status === "unavailable") myAvailability = "no";
   }
 
+  // Parse meta from description JSON (home_team, away_team, is_home)
+  let gameMeta: { home_team: string; away_team: string; is_home: boolean } | null = null;
+  try {
+    const d = game.description as string | null;
+    if (d) {
+      const m = JSON.parse(d) as { home_team?: unknown; away_team?: unknown; is_home?: unknown };
+      if (m.home_team && m.away_team && typeof m.is_home === "boolean") {
+        gameMeta = { home_team: String(m.home_team), away_team: String(m.away_team), is_home: m.is_home };
+      }
+    }
+  } catch { /* silently ignore */ }
+
+  const isHome = gameMeta?.is_home ?? !((game.title as string).includes("(Fora)"));
+
   const label   = dateLabel(game.event_date);
   const isToday = label === "Hoje";
 
@@ -132,7 +146,27 @@ export async function NextGameCard({
           </Badge>
         </div>
 
-        <h2 className="mb-3 text-lg font-bold leading-tight">{game.title}</h2>
+        {gameMeta ? (
+          <div className="mb-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Badge
+                variant={isHome ? "default" : "outline"}
+                className="text-[10px] shrink-0"
+                style={isHome
+                  ? { backgroundColor: "rgba(255,255,255,0.2)", border: "none", color: "#fff" }
+                  : { backgroundColor: "transparent", border: "1px solid rgba(255,255,255,0.4)", color: "rgba(255,255,255,0.8)" }
+                }
+              >
+                {isHome ? "Casa" : "Fora"}
+              </Badge>
+            </div>
+            <h2 className="text-lg font-bold leading-tight">
+              {gameMeta.home_team} <span className="opacity-60 font-normal text-base">vs</span> {gameMeta.away_team}
+            </h2>
+          </div>
+        ) : (
+          <h2 className="mb-3 text-lg font-bold leading-tight">{game.title as string}</h2>
+        )}
 
         <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm opacity-80">
           <span className="flex items-center gap-1.5">

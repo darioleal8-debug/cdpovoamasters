@@ -4,7 +4,7 @@ import { todayInClubTz } from "@/lib/time/club-time";
 import { useState, useMemo } from "react";
 import { format, parseISO, startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
 import { pt } from "date-fns/locale";
-import { Plus, Users, FileText, Pencil, Trash2, Clock, MapPin, BarChart, Camera, MessageSquare } from "lucide-react";
+import { Plus, Users, FileText, Pencil, Trash2, Clock, MapPin, BarChart, Camera, MessageSquare, ChevronDown, ChevronRight } from "lucide-react";
 import { ShareButton } from "@/components/ui/share-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -58,6 +58,12 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
   const [filterPeriod, setFilterPeriod] = useState<string>("all");
   const [filterMonth, setFilterMonth]   = useState<string>("all");
 
+  // Paginação da vista dividida (activa quando nenhum filtro está definido)
+  const [showAllUpcoming, setShowAllUpcoming] = useState(false);
+  const [showPastSection, setShowPastSection] = useState(false);
+  const [pastPage, setPastPage]             = useState(0);
+  const PAST_PAGE_SIZE = 20;
+
   // Meses disponíveis
   const months = useMemo(() => {
     const set = new Set(trainings.map((t) => t.date.slice(0, 7)));
@@ -83,6 +89,18 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
     });
   }, [trainings, filterType, filterMonth, filterPeriod]);
 
+  // Vista dividida: activa só quando nenhum filtro específico está seleccionado
+  const isSplitView = filterType === "all" && filterPeriod === "all" && filterMonth === "all";
+
+  const { upcomingTrainings, pastTrainings } = useMemo(() => {
+    if (!isSplitView) return { upcomingTrainings: [] as Training[], pastTrainings: [] as Training[] };
+    const todayStr = todayInClubTz();
+    return {
+      upcomingTrainings: trainings.filter((t) => t.date >= todayStr).sort((a, b) => a.date.localeCompare(b.date)),
+      pastTrainings:     trainings.filter((t) => t.date <  todayStr).sort((a, b) => b.date.localeCompare(a.date)),
+    };
+  }, [trainings, isSplitView]);
+
   // Estatísticas globais da equipa
   const teamStats = useMemo(() => {
     const total = trainings.length;
@@ -100,6 +118,78 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
     deleteTraining(deleteConfirm.id);
     setDeleteConfirm(null);
   }
+
+  const renderTrainingRow = (t: Training) => {
+    const isPast = t.date < todayInClubTz();
+    return (
+      <tr key={t.id} className={cn("hover:bg-muted/30 transition-colors", isPast && "opacity-70")}>
+        <td className="px-4 py-3 font-medium whitespace-nowrap">
+          {format(parseISO(t.date), "EEE, d MMM yyyy", { locale: pt })}
+        </td>
+        <td className="px-4 py-3 whitespace-nowrap">
+          <span className="flex items-center gap-1 text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" />
+            {t.start_time.slice(0, 5)}
+            {t.end_time ? `–${t.end_time.slice(0, 5)}` : ""}h
+          </span>
+        </td>
+        <td className="px-4 py-3">
+          <span className="flex items-center gap-1 text-muted-foreground truncate max-w-[200px]">
+            <MapPin className="h-3.5 w-3.5 shrink-0" />
+            {t.location || "—"}
+          </span>
+        </td>
+        <td className="px-4 py-3">
+          <Badge variant="outline" className={cn("text-xs", TYPE_COLORS[t.type])}>
+            {TRAINING_TYPE_LABELS[t.type]}
+          </Badge>
+        </td>
+        <td className="px-4 py-3">
+          <button onClick={() => setRsvps(t)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors" title="Ver RSVPs">
+            <MessageSquare className="h-3.5 w-3.5" /><span>Ver</span>
+          </button>
+        </td>
+        <td className="px-4 py-3">
+          <button onClick={() => setAttendance(t)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors" title="Ver/editar presenças">
+            <Users className="h-3.5 w-3.5" /><span>Presenças</span>
+          </button>
+        </td>
+        <td className="px-4 py-3">
+          <div className="flex items-center justify-end gap-0.5">
+            <Button variant="ghost" size="sm" className="h-7 px-2 gap-1" onClick={() => setRsvps(t)}>
+              <MessageSquare className="h-3.5 w-3.5" /><span className="hidden sm:inline text-xs">RSVPs</span>
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 px-2 gap-1" onClick={() => setAttendance(t)}>
+              <Users className="h-3.5 w-3.5" /><span className="hidden sm:inline text-xs">Presenças</span>
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 px-2 gap-1" onClick={() => setNotes(t)}>
+              <FileText className="h-3.5 w-3.5" /><span className="hidden sm:inline text-xs">Notas</span>
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 px-2 gap-1" onClick={() => setPhotos(t)}>
+              <Camera className="h-3.5 w-3.5" /><span className="hidden sm:inline text-xs">Fotos</span>
+            </Button>
+            <ShareButton eventId={t.id} title={`Treino — ${t.date}`} />
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEdit(t)}>
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(t)}>
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </td>
+      </tr>
+    );
+  };
+
+  const tableHead = (
+    <thead className="bg-muted/40 text-muted-foreground">
+      <tr>
+        {["Data", "Hora", "Local", "Tipo", "RSVPs", "Assiduidade", ""].map((h) => (
+          <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>
+        ))}
+      </tr>
+    </thead>
+  );
 
   return (
     <div className="space-y-5">
@@ -160,123 +250,96 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
       </div>
 
       {/* Tabela */}
-      <div className="rounded-lg border overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/40 text-muted-foreground">
-            <tr>
-              {["Data", "Hora", "Local", "Tipo", "RSVPs", "Assiduidade", ""].map((h) => (
-                <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {loading || playersLoading
-              ? Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i}>
-                    {Array.from({ length: 6 }).map((_, j) => (
-                      <td key={j} className="px-4 py-3"><Skeleton className="h-4 w-full" /></td>
-                    ))}
-                  </tr>
-                ))
-              : filtered.length === 0
-              ? <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
-                    Nenhum treino encontrado.
-                  </td>
-                </tr>
-              : filtered.map((t) => {
-                  const isPast = t.date < todayInClubTz();
+      {isSplitView ? (
+        <div className="space-y-4">
+          {/* ── Próximos treinos ── */}
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <span className="text-sm font-semibold">Próximos treinos</span>
+              {!loading && <span className="text-xs text-muted-foreground">({upcomingTrainings.length})</span>}
+            </div>
+            <div className="rounded-lg border overflow-x-auto">
+              <table className="w-full text-sm">
+                {tableHead}
+                <tbody className="divide-y">
+                  {loading || playersLoading
+                    ? Array.from({ length: 4 }).map((_, i) => (
+                        <tr key={i}>{Array.from({ length: 7 }).map((_, j) => (<td key={j} className="px-4 py-3"><Skeleton className="h-4 w-full" /></td>))}</tr>
+                      ))
+                    : upcomingTrainings.length === 0
+                    ? <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">Sem treinos agendados.</td></tr>
+                    : (showAllUpcoming ? upcomingTrainings : upcomingTrainings.slice(0, 4)).map(renderTrainingRow)}
+                </tbody>
+              </table>
+            </div>
+            {!loading && upcomingTrainings.length > 4 && (
+              <button
+                onClick={() => setShowAllUpcoming((v) => !v)}
+                className="mt-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                {showAllUpcoming
+                  ? <><ChevronRight className="h-3.5 w-3.5 rotate-90" /> Mostrar menos</>
+                  : <><ChevronDown className="h-3.5 w-3.5" /> Ver todos ({upcomingTrainings.length} próximos)</>}
+              </button>
+            )}
+          </div>
 
-                  return (
-                    <tr key={t.id} className={cn("hover:bg-muted/30 transition-colors", isPast && "opacity-70")}>
-                      {/* Data */}
-                      <td className="px-4 py-3 font-medium whitespace-nowrap">
-                        {format(parseISO(t.date), "EEE, d MMM yyyy", { locale: pt })}
-                      </td>
-                      {/* Hora */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="flex items-center gap-1 text-muted-foreground">
-                          <Clock className="h-3.5 w-3.5" />
-                          {t.start_time.slice(0, 5)}
-                          {t.end_time ? `–${t.end_time.slice(0, 5)}` : ""}h
-                        </span>
-                      </td>
-                      {/* Local */}
-                      <td className="px-4 py-3">
-                        <span className="flex items-center gap-1 text-muted-foreground truncate max-w-[200px]">
-                          <MapPin className="h-3.5 w-3.5 shrink-0" />
-                          {t.location || "—"}
-                        </span>
-                      </td>
-                      {/* Tipo */}
-                      <td className="px-4 py-3">
-                        <Badge variant="outline" className={cn("text-xs", TYPE_COLORS[t.type])}>
-                          {TRAINING_TYPE_LABELS[t.type]}
-                        </Badge>
-                      </td>
-                      {/* RSVPs */}
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => setRsvps(t)}
-                          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                          title="Ver RSVPs"
-                        >
-                          <MessageSquare className="h-3.5 w-3.5" />
-                          <span>Ver</span>
-                        </button>
-                      </td>
-                      {/* Assiduidade */}
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => setAttendance(t)}
-                          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                          title="Ver/editar presenças"
-                        >
-                          <Users className="h-3.5 w-3.5" />
-                          <span>Presenças</span>
-                        </button>
-                      </td>
-                      {/* Ações */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-0.5">
-                          <Button variant="ghost" size="sm" className="h-7 px-2 gap-1"
-                            onClick={() => setRsvps(t)}>
-                            <MessageSquare className="h-3.5 w-3.5" />
-                            <span className="hidden sm:inline text-xs">RSVPs</span>
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-7 px-2 gap-1"
-                            onClick={() => setAttendance(t)}>
-                            <Users className="h-3.5 w-3.5" />
-                            <span className="hidden sm:inline text-xs">Presenças</span>
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-7 px-2 gap-1"
-                            onClick={() => setNotes(t)}>
-                            <FileText className="h-3.5 w-3.5" />
-                            <span className="hidden sm:inline text-xs">Notas</span>
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-7 px-2 gap-1"
-                            onClick={() => setPhotos(t)}>
-                            <Camera className="h-3.5 w-3.5" />
-                            <span className="hidden sm:inline text-xs">Fotos</span>
-                          </Button>
-                          <ShareButton eventId={t.id} title={`Treino — ${t.date}`} />
-                          <Button variant="ghost" size="icon" className="h-7 w-7"
-                            onClick={() => setEdit(t)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon"
-                            className="h-7 w-7 text-destructive hover:text-destructive"
-                            onClick={() => handleDelete(t)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </td>
+          {/* ── Treinos passados ── */}
+          {!loading && pastTrainings.length > 0 && (
+            <div>
+              <button
+                onClick={() => { setShowPastSection((v) => !v); setPastPage(0); }}
+                className="flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground"
+              >
+                {showPastSection ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                Treinos passados ({pastTrainings.length})
+              </button>
+              {showPastSection && (
+                <div className="mt-2 rounded-lg border overflow-x-auto">
+                  <table className="w-full text-sm">
+                    {tableHead}
+                    <tbody className="divide-y">
+                      {pastTrainings
+                        .slice(pastPage * PAST_PAGE_SIZE, (pastPage + 1) * PAST_PAGE_SIZE)
+                        .map(renderTrainingRow)}
+                    </tbody>
+                  </table>
+                  {pastTrainings.length > PAST_PAGE_SIZE && (
+                    <div className="flex items-center justify-between border-t px-4 py-3 text-xs text-muted-foreground">
+                      <span>
+                        {pastPage * PAST_PAGE_SIZE + 1}–{Math.min((pastPage + 1) * PAST_PAGE_SIZE, pastTrainings.length)} de {pastTrainings.length}
+                      </span>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs" disabled={pastPage === 0} onClick={() => setPastPage((p) => p - 1)}>Anterior</Button>
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs" disabled={(pastPage + 1) * PAST_PAGE_SIZE >= pastTrainings.length} onClick={() => setPastPage((p) => p + 1)}>Seguinte</Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-lg border overflow-x-auto">
+          <table className="w-full text-sm">
+            {tableHead}
+            <tbody className="divide-y">
+              {loading || playersLoading
+                ? Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i}>
+                      {Array.from({ length: 7 }).map((_, j) => (
+                        <td key={j} className="px-4 py-3"><Skeleton className="h-4 w-full" /></td>
+                      ))}
                     </tr>
-                  );
-                })}
-          </tbody>
-        </table>
-      </div>
+                  ))
+                : filtered.length === 0
+                ? <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">Nenhum treino encontrado.</td></tr>
+                : filtered.map(renderTrainingRow)}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Secção de assiduidade dos jogadores */}
       {Object.keys(attendanceStats).length > 0 && (

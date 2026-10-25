@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
-import { ArrowLeft, Calendar, Check, Clock, HelpCircle, MapPin, Users, X, Trophy } from "lucide-react";
+import { ArrowLeft, Calendar, Check, Clock, HelpCircle, MapPin, Shield, Users, X, Trophy } from "lucide-react";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 import type { AvailabilityRosterRow } from "@/types/availability";
 import { AvailabilityPrompt } from "@/components/player/availability-prompt";
 import { lisbonDateTime } from "@/lib/event-time";
@@ -74,7 +75,7 @@ export default async function GameDetailPage({ params }: Props) {
   // Fetch game event
   const { data: event } = await supabase
     .from("events")
-    .select("id, title, event_date, event_time, location, opponent")
+    .select("id, title, event_date, event_time, location, opponent, description")
     .eq("id", id)
     .eq("type", "jogo")
     .maybeSingle();
@@ -146,6 +147,20 @@ export default async function GameDetailPage({ params }: Props) {
 
   const myIsConvocado = linkedPlayer?.id && callupIds.includes(linkedPlayer.id);
 
+  // Parse meta from description JSON
+  let gameMeta: { home_team: string; away_team: string; is_home: boolean } | null = null;
+  try {
+    const d = event.description as string | null;
+    if (d) {
+      const m = JSON.parse(d) as { home_team?: unknown; away_team?: unknown; is_home?: unknown };
+      if (m.home_team && m.away_team && typeof m.is_home === "boolean") {
+        gameMeta = { home_team: String(m.home_team), away_team: String(m.away_team), is_home: m.is_home };
+      }
+    }
+  } catch { /* silently ignore */ }
+
+  const isHome = gameMeta?.is_home ?? !((event.title as string).includes("(Fora)"));
+
   return (
     <div className="space-y-6 max-w-2xl">
 
@@ -165,10 +180,26 @@ export default async function GameDetailPage({ params }: Props) {
         className="rounded-xl px-5 py-5 text-white"
         style={{ backgroundColor: "var(--club-primary, #111111)" }}
       >
-        <p className="text-[0.65rem] font-bold uppercase tracking-widest opacity-60 mb-1">
-          Jogo
-        </p>
-        <h1 className="text-xl font-bold leading-tight mb-3">{event.title}</h1>
+        <div className="flex items-center gap-2 mb-1">
+          <p className="text-[0.65rem] font-bold uppercase tracking-widest opacity-60">Jogo</p>
+          <Badge
+            variant={isHome ? "default" : "outline"}
+            className="text-[10px]"
+            style={isHome
+              ? { backgroundColor: "rgba(255,255,255,0.2)", border: "none", color: "#fff" }
+              : { backgroundColor: "transparent", border: "1px solid rgba(255,255,255,0.4)", color: "rgba(255,255,255,0.8)" }
+            }
+          >
+            <Shield className="h-2.5 w-2.5 mr-1" />
+            {isHome ? "Casa" : "Fora"}
+          </Badge>
+        </div>
+        <h1 className="text-xl font-bold leading-tight mb-3">
+          {gameMeta
+            ? <>{gameMeta.home_team} <span className="opacity-60 font-normal text-lg">vs</span> {gameMeta.away_team}</>
+            : (event.title as string)
+          }
+        </h1>
         <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm opacity-85">
           <span className="flex items-center gap-1.5">
             <Calendar className="h-3.5 w-3.5 shrink-0" />
