@@ -182,19 +182,48 @@ export async function getCompetitionGames(
 
 // ─── Standings ────────────────────────────────────────────────────────────────
 
+// Equipas ativas na temporada (via season_teams). Fallback: todas as não-placeholder.
+async function fetchActiveSeasonTeams(
+  competitionId: string,
+  supabase: Awaited<ReturnType<typeof createAdminClient>>
+): Promise<Pick<LeagueTeam, "id" | "name" | "normalized_name">[]> {
+  const fallback = async () => {
+    const { data } = await supabase
+      .from("league_teams")
+      .select("id, name, normalized_name")
+      .eq("is_placeholder", false);
+    return (data ?? []) as Pick<LeagueTeam, "id" | "name" | "normalized_name">[];
+  };
+
+  const { data: stRows, error } = await supabase
+    .from("season_teams")
+    .select("team_id")
+    .eq("competition_id", competitionId)
+    .eq("active", true);
+
+  // Graceful fallback if season_teams table not yet migrated
+  if (error) return fallback();
+
+  const ids = (stRows ?? []).map((r: { team_id: string }) => r.team_id);
+  if (ids.length === 0) return fallback();
+
+  const { data } = await supabase
+    .from("league_teams")
+    .select("id, name, normalized_name")
+    .in("id", ids)
+    .order("name");
+  return (data ?? []) as Pick<LeagueTeam, "id" | "name" | "normalized_name">[];
+}
+
 export async function getStandings(competitionId: string): Promise<StandingRow[]> {
   const supabase = await createAdminClient();
-  const [resultsRes, teamsRes] = await Promise.all([
+  const [resultsRes, seedTeams] = await Promise.all([
     supabase
       .from("league_game_results")
       .select("home_team_name, away_team_name, home_score, away_score")
       .eq("competition_id", competitionId),
-    supabase
-      .from("league_teams")
-      .select("id, name, normalized_name")
-      .eq("is_placeholder", false),
+    fetchActiveSeasonTeams(competitionId, supabase),
   ]);
-  const seedTeams = (teamsRes.data ?? []) as Pick<LeagueTeam, "id" | "name" | "normalized_name">[];
   return computeStandings(resultsRes.data ?? [], seedTeams);
 }
 
@@ -202,23 +231,19 @@ export type StandingRowWithForm = StandingRow & { form: ("V" | "D")[] };
 
 export async function getStandingsWithForm(competitionId: string): Promise<StandingRowWithForm[]> {
   const supabase = await createAdminClient();
-  const [resultsRes, teamsRes] = await Promise.all([
+  const [resultsRes, seedTeams] = await Promise.all([
     supabase
       .from("league_game_results")
       .select("home_team_name, away_team_name, home_score, away_score, approved_at")
       .eq("competition_id", competitionId)
       .order("approved_at", { ascending: false }),
-    supabase
-      .from("league_teams")
-      .select("id, name, normalized_name")
-      .eq("is_placeholder", false),
+    fetchActiveSeasonTeams(competitionId, supabase),
   ]);
 
   const results = (resultsRes.data ?? []) as {
     home_team_name: string; away_team_name: string;
     home_score: number; away_score: number; approved_at: string;
   }[];
-  const seedTeams = (teamsRes.data ?? []) as Pick<LeagueTeam, "id" | "name" | "normalized_name">[];
 
   const standings = computeStandings(results, seedTeams);
 
@@ -239,14 +264,10 @@ export async function getStandingsWithForm(competitionId: string): Promise<Stand
   }));
 }
 
-export async function getTeamNames(): Promise<string[]> {
+export async function getTeamNames(competitionId: string): Promise<string[]> {
   const supabase = await createAdminClient();
-  const { data } = await supabase
-    .from("league_teams")
-    .select("name")
-    .eq("is_placeholder", false)
-    .order("name");
-  return (data ?? []).map((t) => t.name);
+  const teams = await fetchActiveSeasonTeams(competitionId, supabase);
+  return teams.map((t) => t.name).sort((a, b) => a.localeCompare(b, "pt"));
 }
 
 export async function getTeamLogos(): Promise<Record<string, string | null>> {

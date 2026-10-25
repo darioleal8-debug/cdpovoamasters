@@ -71,6 +71,10 @@ type TeamAccess = {
   kit_description: string | null;
   members: TeamAccessMember[];
 };
+type SeasonTeamEntry = {
+  team_id: string; name: string; logo_url: string | null;
+  active: boolean; game_count: number; in_season: boolean;
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -171,7 +175,12 @@ export default function LigaAdminPage() {
   const [restoring, setRestoring]             = useState<string | null>(null);
 
   // Team access tab
-  const [activeTab, setActiveTab]             = useState<"games" | "access" | "noticias">("games");
+  const [activeTab, setActiveTab]             = useState<"games" | "access" | "noticias" | "equipas">("games");
+
+  // Season teams tab
+  const [seasonTeams, setSeasonTeams]         = useState<SeasonTeamEntry[]>([]);
+  const [loadingSeasonTeams, setLoadingSeasonTeams] = useState(false);
+  const [toggleLoading, setToggleLoading]     = useState<string | null>(null);
 
   // Notícias tab
   const [noticias, setNoticias]               = useState<AdminNoticia[]>([]);
@@ -511,6 +520,29 @@ export default function LigaAdminPage() {
     } finally { setRemovingId(null); }
   }
 
+  const loadSeasonTeams = useCallback(async () => {
+    setLoadingSeasonTeams(true);
+    try {
+      const res = await fetch("/api/liga/admin/season-teams");
+      if (!res.ok) return;
+      const json = await res.json();
+      setSeasonTeams(json.teams ?? []);
+    } finally { setLoadingSeasonTeams(false); }
+  }, []);
+
+  async function toggleTeamActive(teamId: string, active: boolean) {
+    setToggleLoading(teamId);
+    try {
+      const res = await fetch(`/api/liga/admin/season-teams/${teamId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active }),
+      });
+      if (!res.ok) return;
+      setSeasonTeams(prev => prev.map(t => t.team_id === teamId ? { ...t, active } : t));
+    } finally { setToggleLoading(null); }
+  }
+
   async function loadTeamAccess() {
     setLoadingAccess(true);
     try {
@@ -628,12 +660,13 @@ export default function LigaAdminPage() {
 
       {/* ── Tab switcher ── */}
       <div style={{ display: "flex", gap: "0", marginBottom: "24px", borderBottom: "2px solid #E8E0D6" }}>
-        {(["games", "access", "noticias"] as const).map(tab => (
+        {(["games", "access", "noticias", "equipas"] as const).map(tab => (
           <button key={tab}
             onClick={() => {
               setActiveTab(tab);
               if (tab === "access" && teamAccess.length === 0) loadTeamAccess();
               if (tab === "noticias" && noticias.length === 0) loadNoticias();
+              if (tab === "equipas" && seasonTeams.length === 0) loadSeasonTeams();
             }}
             style={{
               padding: "8px 20px", fontWeight: 700, fontSize: "12px",
@@ -643,7 +676,7 @@ export default function LigaAdminPage() {
               borderBottom: `2px solid ${activeTab === tab ? "#F97316" : "transparent"}`,
               marginBottom: "-2px",
             }}>
-            {tab === "games" ? "Jogos" : tab === "access" ? "Acessos das Equipas" : "Notícias"}
+            {tab === "games" ? "Jogos" : tab === "access" ? "Acessos das Equipas" : tab === "noticias" ? "Notícias" : "Equipas"}
           </button>
         ))}
       </div>
@@ -1751,6 +1784,68 @@ export default function LigaAdminPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Equipas tab ── */}
+      {activeTab === "equipas" && (
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+            <h2 style={{ fontFamily: "var(--font-bc-heavy, sans-serif)", fontSize: "18px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em", color: "#1A1612", margin: 0 }}>
+              Equipas da Temporada
+            </h2>
+            <button onClick={loadSeasonTeams} disabled={loadingSeasonTeams}
+              style={{ fontSize: "12px", padding: "6px 14px", borderRadius: "6px", border: "1px solid #E8E0D6", background: "#FFFDFA", cursor: "pointer", color: "#8C837A" }}>
+              {loadingSeasonTeams ? "A carregar…" : "Atualizar"}
+            </button>
+          </div>
+
+          {loadingSeasonTeams && seasonTeams.length === 0 ? (
+            <p style={{ color: "#8C837A", fontSize: "14px" }}>A carregar equipas…</p>
+          ) : seasonTeams.length === 0 ? (
+            <p style={{ color: "#8C837A", fontSize: "14px" }}>Nenhuma equipa encontrada.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {seasonTeams.map(team => {
+                const warn = team.active && team.game_count === 0;
+                return (
+                  <div key={team.team_id} style={{
+                    display: "flex", alignItems: "center", gap: "12px",
+                    padding: "12px 16px", borderRadius: "8px",
+                    background: warn ? "#FFF7ED" : "#FFFDFA",
+                    border: `1px solid ${warn ? "#FED7AA" : "#E8E0D6"}`,
+                  }}>
+                    {team.logo_url && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={team.logo_url} alt="" width={28} height={28} style={{ objectFit: "contain", flexShrink: 0 }} />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: 0, fontWeight: 700, fontSize: "14px", color: "#1A1612" }}>{team.name}</p>
+                      <p style={{ margin: 0, fontSize: "12px", color: warn ? "#C2410C" : "#8C837A" }}>
+                        {team.game_count} jogo{team.game_count !== 1 ? "s" : ""} agendado{team.game_count !== 1 ? "s" : ""}
+                        {warn ? " — ativa sem jogos" : ""}
+                      </p>
+                    </div>
+                    <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none" }}>
+                      <span style={{ fontSize: "12px", color: team.active ? "#16A34A" : "#8C837A", fontWeight: 600 }}>
+                        {team.active ? "Ativa" : "Inativa"}
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={team.active}
+                        disabled={toggleLoading === team.team_id}
+                        onChange={e => toggleTeamActive(team.team_id, e.target.checked)}
+                        style={{ width: "16px", height: "16px", cursor: "pointer", accentColor: "#F97316" }}
+                      />
+                    </label>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <p style={{ marginTop: "16px", fontSize: "12px", color: "#B9AFA4" }}>
+            Equipas inativas não aparecem na classificação nem no filtro do calendário.
+          </p>
         </div>
       )}
 

@@ -23,7 +23,7 @@ export default async function CalendarioPage() {
 
   const [allGames, teamNames, teamLogos] = await Promise.all([
     getCompetitionGames(competition.competition_key ?? "Liga", competition.season_id),
-    getTeamNames(),
+    getTeamNames(competition.id),
     getTeamLogos(),
   ]);
   const games = allGames.filter((g) => !g.is_test);
