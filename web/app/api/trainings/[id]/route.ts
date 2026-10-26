@@ -50,14 +50,37 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return fail("JSON inválido"); }
 
-  const { date, start_time, end_time, location, type, notes } = body as Record<string, string>;
+  const { date, start_time, end_time, location, type, notes, foco } = body as Record<string, string>;
 
   const { data, error } = await supabase
     .from("trainings")
     .update({
       date, start_time, end_time: end_time || null,
       location: location || "", type, notes: notes || null,
+      foco: foco || null,
     })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) return fail(error.message, 500);
+  return ok({ training: data });
+}
+
+// ─── PATCH /api/trainings/[id] — cancelar / reativar ────
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const auth = await authorize(MANAGERS);
+  if (!auth.ok) return auth.response;
+  const { supabase } = auth;
+
+  let body: Record<string, unknown>;
+  try { body = await req.json(); } catch { return fail("JSON inválido"); }
+
+  const cancel = body.cancel === true;
+  const { data, error } = await supabase
+    .from("trainings")
+    .update({ deleted_at: cancel ? new Date().toISOString() : null })
     .eq("id", id)
     .select()
     .single();
@@ -71,7 +94,7 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params;
   const auth = await authorize(MANAGERS);
   if (!auth.ok) return auth.response;
-  const { supabase, user } = auth;
+  const { supabase } = auth;
 
   const { error } = await supabase.from("trainings").delete().eq("id", id);
   if (error) return fail(error.message, 500);

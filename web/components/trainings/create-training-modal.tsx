@@ -29,6 +29,7 @@ export function CreateTrainingModal({ open, onClose, seasonId, onSubmit }: Props
     end_time:        "",
     location:        "",
     type:            "geral" as TrainingType,
+    foco:            "",
     notes:           "",
     recurrence_type: "unique" as RecurrenceType,
     day_of_week:     "1",
@@ -51,6 +52,7 @@ export function CreateTrainingModal({ open, onClose, seasonId, onSubmit }: Props
       location:        form.location,
       type:            form.type,
       notes:           form.notes || undefined,
+      foco:            form.foco  || undefined,
       recurrence_type: form.recurrence_type,
       day_of_week:     form.recurrence_type === "weekly"  ? Number(form.day_of_week)  : undefined,
       day_of_month:    form.recurrence_type === "monthly" ? Number(form.day_of_month) : undefined,
@@ -272,6 +274,17 @@ export function CreateTrainingModal({ open, onClose, seasonId, onSubmit }: Props
               </p>
             </div>
           )}
+
+          {/* Foco do treino */}
+          <div className="space-y-1.5">
+            <Label htmlFor="foco">Foco do treino</Label>
+            <Input
+              id="foco"
+              placeholder="Ex: Ataque posicional, defesa de zona…"
+              value={form.foco}
+              onChange={(e) => set("foco", e.target.value)}
+            />
+          </div>
 
           {/* Notas */}
           <div className="space-y-1.5">

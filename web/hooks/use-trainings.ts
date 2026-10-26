@@ -56,6 +56,38 @@ export function useTrainings(seasonId: string | null) {
     return true;
   }
 
+  async function cancelTraining(id: string): Promise<boolean> {
+    const res = await fetch(`/api/trainings/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cancel: true }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      toast({ title: "Erro ao cancelar treino", description: json.error, variant: "destructive" });
+      return false;
+    }
+    toast({ title: "Treino cancelado" });
+    setTrainings((prev) => prev.map((t) => t.id === id ? { ...t, deleted_at: new Date().toISOString() } : t));
+    return true;
+  }
+
+  async function uncancelTraining(id: string): Promise<boolean> {
+    const res = await fetch(`/api/trainings/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cancel: false }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      toast({ title: "Erro ao reativar treino", description: json.error, variant: "destructive" });
+      return false;
+    }
+    toast({ title: "Treino reativado" });
+    setTrainings((prev) => prev.map((t) => t.id === id ? { ...t, deleted_at: null } : t));
+    return true;
+  }
+
   async function deleteTraining(id: string): Promise<boolean> {
     const res = await fetch(`/api/trainings/${id}`, { method: "DELETE" });
     if (!res.ok) {
@@ -67,7 +99,7 @@ export function useTrainings(seasonId: string | null) {
     return true;
   }
 
-  return { trainings, loading, createTraining, updateTraining, deleteTraining, refresh: load };
+  return { trainings, loading, createTraining, updateTraining, cancelTraining, uncancelTraining, deleteTraining, refresh: load };
 }
 
 // ─── Hook: presenças de um treino ────────────────────────

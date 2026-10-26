@@ -4,7 +4,7 @@ import { todayInClubTz } from "@/lib/time/club-time";
 import { useState, useMemo } from "react";
 import { format, parseISO, startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
 import { pt } from "date-fns/locale";
-import { Plus, Users, FileText, Pencil, Trash2, Clock, MapPin, BarChart, Camera, MessageSquare, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Users, FileText, Pencil, Trash2, Clock, MapPin, BarChart, Camera, MessageSquare, ChevronDown, ChevronRight, XCircle, RotateCcw, Target } from "lucide-react";
 import { ShareButton } from "@/components/ui/share-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,7 +41,7 @@ interface Props {
 }
 
 export function TrainingsList({ seasonId, players, playersLoading }: Props) {
-  const { trainings, loading, createTraining, updateTraining, deleteTraining } = useTrainings(seasonId);
+  const { trainings, loading, createTraining, updateTraining, cancelTraining, uncancelTraining, deleteTraining } = useTrainings(seasonId);
   const { stats: attendanceStats } = usePlayerAttendanceStats(seasonId);
 
   // Modals
@@ -95,15 +95,17 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
   const { upcomingTrainings, pastTrainings } = useMemo(() => {
     if (!isSplitView) return { upcomingTrainings: [] as Training[], pastTrainings: [] as Training[] };
     const todayStr = todayInClubTz();
+    // cancelled trainings still appear but are visually distinct
     return {
       upcomingTrainings: trainings.filter((t) => t.date >= todayStr).sort((a, b) => a.date.localeCompare(b.date)),
       pastTrainings:     trainings.filter((t) => t.date <  todayStr).sort((a, b) => b.date.localeCompare(a.date)),
     };
   }, [trainings, isSplitView]);
 
-  // Estatísticas globais da equipa
+  // Estatísticas globais da equipa — exclui cancelados
   const teamStats = useMemo(() => {
-    const total = trainings.length;
+    const active = trainings.filter((t) => !t.deleted_at);
+    const total = active.length;
     const allPct = Object.values(attendanceStats).map((s) => s.pct);
     const avgPct = allPct.length ? allPct.reduce((a, b) => a + b, 0) / allPct.length : 0;
     return { total, avgPct: Math.round(avgPct * 10) / 10 };
@@ -120,11 +122,24 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
   }
 
   const renderTrainingRow = (t: Training) => {
-    const isPast = t.date < todayInClubTz();
+    const isPast      = t.date < todayInClubTz();
+    const isCancelled = !!t.deleted_at;
     return (
-      <tr key={t.id} className={cn("hover:bg-muted/30 transition-colors", isPast && "opacity-70")}>
+      <tr key={t.id} className={cn("hover:bg-muted/30 transition-colors", isPast && "opacity-70", isCancelled && "bg-muted/20")}>
         <td className="px-4 py-3 font-medium whitespace-nowrap">
-          {format(parseISO(t.date), "EEE, d MMM yyyy", { locale: pt })}
+          <div className="flex items-center gap-1.5">
+            {format(parseISO(t.date), "EEE, d MMM yyyy", { locale: pt })}
+            {isCancelled && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-red-50 text-red-700 border-red-200">
+                Cancelado
+              </Badge>
+            )}
+          </div>
+          {t.foco && (
+            <span className="flex items-center gap-1 text-[11px] text-muted-foreground mt-0.5">
+              <Target className="h-3 w-3 shrink-0" />{t.foco}
+            </span>
+          )}
         </td>
         <td className="px-4 py-3 whitespace-nowrap">
           <span className="flex items-center gap-1 text-muted-foreground">
@@ -140,7 +155,7 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
           </span>
         </td>
         <td className="px-4 py-3">
-          <Badge variant="outline" className={cn("text-xs", TYPE_COLORS[t.type])}>
+          <Badge variant="outline" className={cn("text-xs", isCancelled ? "opacity-40" : TYPE_COLORS[t.type])}>
             {TRAINING_TYPE_LABELS[t.type]}
           </Badge>
         </td>
@@ -156,22 +171,35 @@ export function TrainingsList({ seasonId, players, playersLoading }: Props) {
         </td>
         <td className="px-4 py-3">
           <div className="flex items-center justify-end gap-0.5">
-            <Button variant="ghost" size="sm" className="h-7 px-2 gap-1" onClick={() => setRsvps(t)}>
-              <MessageSquare className="h-3.5 w-3.5" /><span className="hidden sm:inline text-xs">RSVPs</span>
-            </Button>
-            <Button variant="ghost" size="sm" className="h-7 px-2 gap-1" onClick={() => setAttendance(t)}>
-              <Users className="h-3.5 w-3.5" /><span className="hidden sm:inline text-xs">Presenças</span>
-            </Button>
-            <Button variant="ghost" size="sm" className="h-7 px-2 gap-1" onClick={() => setNotes(t)}>
-              <FileText className="h-3.5 w-3.5" /><span className="hidden sm:inline text-xs">Notas</span>
-            </Button>
-            <Button variant="ghost" size="sm" className="h-7 px-2 gap-1" onClick={() => setPhotos(t)}>
-              <Camera className="h-3.5 w-3.5" /><span className="hidden sm:inline text-xs">Fotos</span>
-            </Button>
-            <ShareButton eventId={t.id} title={`Treino — ${t.date}`} />
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEdit(t)}>
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
+            {!isCancelled && (
+              <>
+                <Button variant="ghost" size="sm" className="h-7 px-2 gap-1" onClick={() => setRsvps(t)}>
+                  <MessageSquare className="h-3.5 w-3.5" /><span className="hidden sm:inline text-xs">RSVPs</span>
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 px-2 gap-1" onClick={() => setAttendance(t)}>
+                  <Users className="h-3.5 w-3.5" /><span className="hidden sm:inline text-xs">Presenças</span>
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 px-2 gap-1" onClick={() => setNotes(t)}>
+                  <FileText className="h-3.5 w-3.5" /><span className="hidden sm:inline text-xs">Notas</span>
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 px-2 gap-1" onClick={() => setPhotos(t)}>
+                  <Camera className="h-3.5 w-3.5" /><span className="hidden sm:inline text-xs">Fotos</span>
+                </Button>
+                <ShareButton eventId={t.id} title={`Treino — ${t.date}`} />
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEdit(t)}>
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              </>
+            )}
+            {isCancelled ? (
+              <Button variant="ghost" size="sm" className="h-7 px-2 gap-1 text-green-700 hover:text-green-800" onClick={() => uncancelTraining(t.id)} title="Reativar treino">
+                <RotateCcw className="h-3.5 w-3.5" /><span className="hidden sm:inline text-xs">Reativar</span>
+              </Button>
+            ) : (
+              <Button variant="ghost" size="sm" className="h-7 px-2 gap-1 text-orange-600 hover:text-orange-700" onClick={() => cancelTraining(t.id)} title="Cancelar treino">
+                <XCircle className="h-3.5 w-3.5" /><span className="hidden sm:inline text-xs">Cancelar</span>
+              </Button>
+            )}
             <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(t)}>
               <Trash2 className="h-3.5 w-3.5" />
             </Button>

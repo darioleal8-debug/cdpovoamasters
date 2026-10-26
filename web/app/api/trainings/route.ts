@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
 
   const {
     season_id, date, start_time, end_time, location, type = "geral",
-    notes, recurrence_type = "unique", day_of_week, day_of_month, end_date,
+    notes, foco, recurrence_type = "unique", day_of_week, day_of_month, end_date,
     location_lat, location_lng,
   } = body as Record<string, string>;
 
@@ -109,6 +109,7 @@ export async function POST(req: NextRequest) {
   const rows = dates.map((d) => ({
     season_id, date: d, start_time, end_time: end_time || null,
     location: location || "", type, notes: notes || null,
+    foco: foco || null,
     recurrence_id: recurrenceId, created_by: user.id,
     location_lat: gpsLat && !isNaN(gpsLat) ? gpsLat : null,
     location_lng: gpsLng && !isNaN(gpsLng) ? gpsLng : null,

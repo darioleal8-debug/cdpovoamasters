@@ -597,6 +597,7 @@ export interface Training {
   end_time: string | null;
   location: string;
   type: TrainingType;
+  foco: string | null;
   notes: string | null;
   created_by: string | null;
   created_at: string;
@@ -604,6 +605,7 @@ export interface Training {
   location_lng: number | null;
   rsvp_deadline_hours: number;
   min_players: number;
+  deleted_at: string | null;
 }
 
 export interface TrainingAttendance {
