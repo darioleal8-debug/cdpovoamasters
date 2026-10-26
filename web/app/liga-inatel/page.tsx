@@ -4,7 +4,8 @@ import { getCompetitionBySlug, getCompetitionGames, getStandings, getLatestNotic
 import { createAdminClient } from "@/lib/supabase/server";
 import { todayInClubTz } from "@/lib/time/club-time";
 import { CourtBg } from "@/components/competitions/court-bg";
-import { TeamMono, teamAbbr } from "@/components/competitions/team-mono";
+import { TeamMono } from "@/components/competitions/team-mono";
+import { teamAbbr } from "@/lib/liga/format";
 import { ScoreTicker } from "@/components/competitions/score-ticker";
 import { ScoreCard } from "@/components/competitions/score-card";
 import { StandingsTable } from "@/components/competitions/standings-table";

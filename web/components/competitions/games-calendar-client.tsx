@@ -3,7 +3,8 @@
 import { useState, useMemo, Suspense } from "react";
 import Link from "next/link";
 import type { PublicGame } from "@/types/competitions";
-import { TeamMono, teamAbbr } from "./team-mono";
+import { TeamMono } from "./team-mono";
+import { teamAbbr } from "@/lib/liga/format";
 
 const PT_MONTHS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 const PT_DAYS   = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
