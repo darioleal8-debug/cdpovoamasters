@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import type { PublicGame } from "@/types/competitions";
 
 interface Props {
   games: PublicGame[];
   teamName: string;
+  /** Jogo escolhido a partir da lista ou da página do jogo (?jogo=…): abre o fluxo já nesse jogo */
+  preselectedGameId?: string | null;
 }
 
 type Step = "select" | "photo" | "game_photos" | "confirm" | "done";
@@ -104,7 +107,8 @@ interface ScanResult {
   reason?: string;
 }
 
-export function SubmitResultFlow({ games, teamName }: Props) {
+export function SubmitResultFlow({ games, teamName, preselectedGameId = null }: Props) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<Step>("select");
   const [selectedGame, setSelectedGame] = useState<PublicGame | null>(null);
@@ -125,12 +129,22 @@ export function SubmitResultFlow({ games, teamName }: Props) {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const gamePhotoInputRef = useRef<HTMLInputElement>(null);
 
+  // A lista já vem filtrada pelo servidor (jogos de hoje e passados, no fuso de Lisboa)
   const eligibleGames = games.filter(
-    (g) =>
-      !g.result &&
-      g.result_status !== "pending" &&
-      new Date(g.event_date) < new Date()
+    (g) => !g.result && g.result_status !== "pending"
   );
+
+  // Abre directamente no jogo indicado no URL (botão "Submeter resultado" de cada jogo)
+  useEffect(() => {
+    if (!preselectedGameId) return;
+    const g = eligibleGames.find((x) => x.id === preselectedGameId);
+    if (!g) return;
+    setSelectedGame(g);
+    setStep("photo");
+    setError(null);
+    setOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preselectedGameId]);
 
   async function cleanupPhotos() {
     if (gamePhotos.length === 0) return;
@@ -147,9 +161,15 @@ export function SubmitResultFlow({ games, teamName }: Props) {
   }
 
   function close() {
-    void cleanupPhotos();
+    const wasDone = step === "done";
+    // Depois de submeter, as fotos já pertencem à submissão — não as apagar
+    if (!wasDone) void cleanupPhotos();
     setOpen(false);
     reset();
+    // Limpa ?jogo=… para o mesmo botão voltar a abrir o fluxo
+    if (preselectedGameId) router.replace("/liga-inatel/equipa#resultados", { scroll: false });
+    // Actualiza a lista de jogos (o jogo passa a "Em validação")
+    if (wasDone) router.refresh();
   }
 
   function selectGame(g: PublicGame) {

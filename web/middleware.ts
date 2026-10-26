@@ -119,12 +119,15 @@ export async function middleware(request: NextRequest) {
 
   // Rota de delegado: requer sessão + cookie league_delegate
   if (isDelegateRoute(path)) {
+    // Guarda o destino (ex.: /liga-inatel/equipa?jogo=…) para voltar lá depois do login
+    const loginUrl = new URL(DELEGATE_LOGIN, request.url);
+    loginUrl.searchParams.set("redirect", path + request.nextUrl.search);
     if (!user) {
-      return buildRedirect(new URL(DELEGATE_LOGIN, request.url));
+      return buildRedirect(loginUrl);
     }
     const userTypeCookie = request.cookies.get("hh_user_type")?.value;
     if (userTypeCookie !== "league_delegate") {
-      return buildRedirect(new URL(DELEGATE_LOGIN, request.url));
+      return buildRedirect(loginUrl);
     }
   }
 

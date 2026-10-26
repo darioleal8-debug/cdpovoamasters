@@ -96,10 +96,6 @@ export function LigaHeaderButtons() {
     window.location.href = "/liga-inatel";
   }
 
-  const resultadosHref = team
-    ? "/liga-inatel/equipa"
-    : "/liga-inatel/equipa/login?redirect=/liga-inatel/resultados/submeter";
-
   const teamLabel = team
     ? (team.sigla ?? team.short_name ?? team.name.split(" ")[0])
     : null;
@@ -149,7 +145,7 @@ export function LigaHeaderButtons() {
                 boxShadow: "0 8px 24px rgba(0,0,0,.4)",
               }}>
                 <Link
-                  href="/liga-inatel/equipa"
+                  href="/liga-inatel/equipa#resultados"
                   onClick={() => setDropdownOpen(false)}
                   style={{ display: "block", padding: "11px 16px", fontSize: "13px", color: "#F6F2EC", textDecoration: "none" }}
                 >
@@ -176,17 +172,10 @@ export function LigaHeaderButtons() {
           </Link>
         )}
 
-        <Link href={resultadosHref} className="liga-cta-btn">
-          + Resultado
-        </Link>
       </div>
 
       {/* ── Mobile bar: compact CTA + hamburger (≤768px) ─────── */}
       <div className="liga-mobile-bar">
-        <Link href={resultadosHref} className="liga-cta-btn liga-cta-compact">
-          + Resultado
-        </Link>
-
         <button
           className="liga-hamburger"
           onClick={() => setMenuOpen((v) => !v)}
@@ -292,19 +281,6 @@ export function LigaHeaderButtons() {
               );
             })}
 
-            {/* + Resultado CTA */}
-            <Link
-              href={resultadosHref}
-              style={{
-                marginTop: "20px", padding: "14px",
-                textAlign: "center", borderRadius: "6px",
-                background: "#F97316", color: "#15110E",
-                ...CTA_FONT, fontSize: "15px",
-                textDecoration: "none",
-              }}
-            >
-              + Resultado
-            </Link>
           </nav>
         </div>
       )}

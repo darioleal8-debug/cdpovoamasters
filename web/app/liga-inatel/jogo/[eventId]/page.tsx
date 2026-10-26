@@ -154,7 +154,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ eve
         <div className="rounded-xl border border-dashed border-border p-6 text-center space-y-2">
           <p className="text-muted-foreground text-sm">Resultado ainda não registado</p>
           <Link
-            href={`/liga-inatel/resultados/submeter?jogo=${event.id}`}
+            href={`/liga-inatel/equipa?jogo=${event.id}#resultados`}
             className="inline-block px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors"
           >
             Submeter resultado

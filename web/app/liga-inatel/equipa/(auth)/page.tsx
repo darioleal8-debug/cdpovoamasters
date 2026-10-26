@@ -8,20 +8,24 @@ import { TeamAvatar } from "@/components/liga/team-avatar";
 import { TeamLogoUpload } from "@/components/liga/team-logo-upload";
 import { DelegateKitEditor } from "@/components/liga/delegate-kit-editor";
 import { SubmitResultFlow } from "@/components/liga/submit-result-flow";
+import { todayInClubTz } from "@/lib/time/club-time";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 function fmt(dateStr: string, timeStr: string | null) {
   const d = new Date(dateStr + (timeStr ? `T${timeStr}` : ""));
   return d.toLocaleDateString("pt-PT", { weekday: "short", day: "2-digit", month: "short" });
 }
 
-function GameRow({ game, teamName }: { game: PublicGame; teamName: string }) {
+function GameRow({ game, teamName, today }: { game: PublicGame; teamName: string; today: string }) {
   const isHome = game.home_team === teamName;
   const opponent = isHome ? game.away_team : game.home_team;
-  const today = new Date().toISOString().slice(0, 10);
   const isPast = game.event_date < today;
+  const isToday = game.event_date === today;
   const hasResult = game.result !== null;
+  const isPending = !hasResult && game.result_status === "pending";
+  // Jogos de hoje e passados sem resultado: o delegado pode submeter a partir daqui
+  const canSubmit = !hasResult && !isPending && (isPast || isToday);
 
   return (
     <div
@@ -77,6 +81,39 @@ function GameRow({ game, teamName }: { game: PublicGame; teamName: string }) {
               : (game.result!.away_score > game.result!.home_score ? "Vitória" : "Derrota")}
           </p>
         </div>
+      ) : isPending ? (
+        <span
+          style={{
+            fontSize: "11px",
+            padding: "3px 8px",
+            borderRadius: "6px",
+            background: "#FEFCE8",
+            color: "#A16207",
+            border: "1px solid #FDE047",
+            fontWeight: 600,
+            flexShrink: 0,
+          }}
+        >
+          Em validação
+        </span>
+      ) : canSubmit ? (
+        <Link
+          href={`/liga-inatel/equipa?jogo=${game.id}#resultados`}
+          scroll={false}
+          style={{
+            fontSize: "12px",
+            padding: "8px 12px",
+            borderRadius: "8px",
+            background: "#F97316",
+            color: "#fff",
+            fontWeight: 700,
+            textDecoration: "none",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
+          }}
+        >
+          Submeter resultado
+        </Link>
       ) : isPast ? (
         <span
           style={{
@@ -111,7 +148,12 @@ function GameRow({ game, teamName }: { game: PublicGame; teamName: string }) {
   );
 }
 
-export default async function DelegateDashboardPage() {
+export default async function DelegateDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ jogo?: string }>;
+}) {
+  const { jogo } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -142,9 +184,11 @@ export default async function DelegateDashboardPage() {
     );
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInClubTz();
   const upcoming = games.filter((g) => g.event_date >= today).slice(0, 5);
   const pastAll = games.filter((g) => g.event_date < today).reverse();
+  // Jogos que já podem ter resultado: os de hoje (fuso de Lisboa) e os passados
+  const submittable = games.filter((g) => g.event_date <= today).reverse();
   const past = pastAll.slice(0, 10);
 
 
@@ -219,7 +263,7 @@ export default async function DelegateDashboardPage() {
             <p style={{ fontSize: "14px", color: "var(--muted, #6F675F)", padding: "20px 0" }}>Sem jogos agendados.</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {upcoming.map((g) => <GameRow key={g.id} game={g} teamName={team.name} />)}
+              {upcoming.map((g) => <GameRow key={g.id} game={g} teamName={team.name} today={today} />)}
             </div>
           )}
         </section>
@@ -231,7 +275,7 @@ export default async function DelegateDashboardPage() {
               Jogos recentes
             </h2>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {past.map((g) => <GameRow key={g.id} game={g} teamName={team.name} />)}
+              {past.map((g) => <GameRow key={g.id} game={g} teamName={team.name} today={today} />)}
             </div>
           </section>
         )}
@@ -257,11 +301,11 @@ export default async function DelegateDashboardPage() {
         </section>
 
         {/* Submissão de resultados */}
-        <section style={{ marginBottom: "32px" }}>
+        <section id="resultados" style={{ marginBottom: "32px", scrollMarginTop: "16px" }}>
           <h2 style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted, #6F675F)", margin: "0 0 12px" }}>
             Resultados
           </h2>
-          <SubmitResultFlow games={pastAll} teamName={team.name} />
+          <SubmitResultFlow games={submittable} teamName={team.name} preselectedGameId={jogo ?? null} />
         </section>
 
         <p style={{ marginTop: "24px", textAlign: "center" }}>
