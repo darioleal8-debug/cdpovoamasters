@@ -11,10 +11,11 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Button }    from "@/components/ui/button";
-import { Input }     from "@/components/ui/input";
-import { Label }     from "@/components/ui/label";
-import { toast }     from "@/components/ui/toaster";
+import { Button }   from "@/components/ui/button";
+import { Input }    from "@/components/ui/input";
+import { Label }    from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast }    from "@/components/ui/toaster";
 import { Camera, RefreshCw, UserPlus } from "lucide-react";
 import type { RosterEntry, PlayerPosition } from "@/types/database";
 import { CreatePlayerAccountModal } from "@/components/admin/create-player-account-modal";
@@ -128,7 +129,10 @@ export default function JogadoresPage() {
             Plantel
           </h1>
           <p className="text-[12px]" style={{ color: "var(--muted-text,#5A6478)" }}>
-            {players.length} jogador{players.length !== 1 ? "es" : ""}
+            {loading
+              ? <Skeleton className="h-3.5 w-20 inline-block" />
+              : <>{players.length} jogador{players.length !== 1 ? "es" : ""}</>
+            }
           </p>
         </div>
 
