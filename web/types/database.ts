@@ -608,6 +608,25 @@ export interface Training {
   deleted_at: string | null;
 }
 
+export type PlayerDocumentCategory = "licenca" | "atestado_medico" | "autorizacao" | "seguro" | "outro";
+export type PlayerDocumentStatus   = "pendente" | "entregue" | "rejeitado" | "expirado";
+
+export interface PlayerDocument {
+  id:          string;
+  player_id:   string;
+  season_id:   string;
+  title:       string;
+  category:    PlayerDocumentCategory;
+  status:      PlayerDocumentStatus;
+  file_url:    string | null;
+  storage_key: string | null;
+  expires_at:  string | null;
+  notes:       string | null;
+  created_by:  string | null;
+  created_at:  string;
+  updated_at:  string;
+}
+
 export interface TrainingAttendance {
   id: string;
   training_id: string;

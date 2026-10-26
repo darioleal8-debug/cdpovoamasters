@@ -16,9 +16,10 @@ import { Input }    from "@/components/ui/input";
 import { Label }    from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast }    from "@/components/ui/toaster";
-import { Camera, RefreshCw, UserPlus } from "lucide-react";
+import { Camera, FileText, RefreshCw, UserPlus } from "lucide-react";
 import type { RosterEntry, PlayerPosition } from "@/types/database";
 import { CreatePlayerAccountModal } from "@/components/admin/create-player-account-modal";
+import { PlayerDocumentsModal } from "@/components/players/player-documents-modal";
 import {
   PhotoUploadWithTemplate,
   type PhotoUploadResult,
@@ -51,6 +52,7 @@ export default function JogadoresPage() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [submitting,   setSubmitting]   = useState(false);
   const [accountModal, setAccountModal] = useState(false);
+  const [docsPlayer,   setDocsPlayer]   = useState<RosterEntry | null>(null);
 
   // Carregar template do clube uma vez
   useEffect(() => {
@@ -292,7 +294,16 @@ export default function JogadoresPage() {
             </div>
 
 
-            <DialogFooter>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-1.5 sm:mr-auto"
+                onClick={() => { setDialogOpen(false); setDocsPlayer(editing); }}
+                disabled={submitting || !editing?.player_id}
+              >
+                <FileText className="h-4 w-4" /> Documentos
+              </Button>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>
                 Cancelar
               </Button>
@@ -310,12 +321,22 @@ export default function JogadoresPage() {
         open={accountModal}
         onClose={(created) => {
           setAccountModal(false);
-          // Se criou um jogador, recarregar o plantel
           if (created) {
             // useRoster recarrega automaticamente via useEffect
           }
         }}
       />
+
+      {/* Modal Documentos do Jogador */}
+      {docsPlayer?.player_id && seasonId && (
+        <PlayerDocumentsModal
+          open={!!docsPlayer}
+          onClose={() => setDocsPlayer(null)}
+          playerId={docsPlayer.player_id}
+          playerName={docsPlayer.name}
+          seasonId={seasonId}
+        />
+      )}
     </div>
   );
 }
