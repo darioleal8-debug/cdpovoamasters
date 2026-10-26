@@ -1,3 +1,4 @@
+import { getOfficialGameSessionIds } from "@/lib/stats/official-games";
 import { createAdminClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import { authorize } from "@/lib/auth/guards";
@@ -88,11 +89,14 @@ export default async function PlayerProfilePage({
   }
 
   // ── 6. Estatísticas de jogo ─────────────────────────────────
+  // Só jogos oficiais contam (exclui treinos/amigáveis, testes e eliminados)
+  const officialSessionIds = await getOfficialGameSessionIds(admin, player.season_id);
   const { data: gameStatsRaw } = await admin
     .from("player_game_stats")
     .select("id, game_session_id, pts, reb_off, reb_def, ast, stl, blk, tov, fg2_made, fg2_att, fg3_made, fg3_att, ft_made, ft_att, seconds_played, efficiency") // minutes_played nunca é escrito (STA-10)
     .eq("player_id", playerId)
-    .eq("season_id", player.season_id);
+    .eq("season_id", player.season_id)
+    .in("game_session_id", officialSessionIds.length ? officialSessionIds : ["00000000-0000-0000-0000-000000000000"]);
 
   let gameStats: {
     id: string; game_session_id: string; pts: number; reb_off: number; reb_def: number;

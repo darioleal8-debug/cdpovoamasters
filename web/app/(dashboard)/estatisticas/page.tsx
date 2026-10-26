@@ -222,30 +222,14 @@ export default function EstatisticasPage() {
           <p className="hidden md:block text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             Estatísticas Desportivas
           </p>
-          {/* Filtro: Todos / Oficial / Treino / competição específica */}
+          {/* Só jogos oficiais; filtro opcional por competição */}
           <div className="flex flex-wrap gap-2">
-            {/* gameType filter */}
-            <Select
-              value={statsFilter.gameType}
-              onValueChange={(v) =>
-                setStatsFilter((f) => ({ ...f, gameType: v as StatsFilter["gameType"], competition: undefined }))
-              }
-            >
-              <SelectTrigger className="h-8 w-44 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os jogos</SelectItem>
-                <SelectItem value="official">Jogos Oficiais</SelectItem>
-                <SelectItem value="friendly">Jogos de Treino</SelectItem>
-              </SelectContent>
-            </Select>
             {/* Competition filter — only when showing official games */}
-            {statsFilter.gameType !== "friendly" && (
+            {(
               <Select
                 value={statsFilter.competition ?? "__all__"}
                 onValueChange={(v) =>
-                  setStatsFilter((f) => ({ ...f, competition: v === "__all__" ? undefined : v, gameType: v !== "__all__" ? "official" : f.gameType }))
+                  setStatsFilter({ competition: v === "__all__" ? undefined : v })
                 }
               >
                 <SelectTrigger className="h-8 w-36 text-xs">

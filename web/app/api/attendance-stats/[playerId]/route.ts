@@ -3,6 +3,7 @@ import { authorize } from "@/lib/auth/guards";
 import { hasAnyRole, MANAGERS } from "@/lib/auth/roles";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { getOfficialGameSessionIds } from "@/lib/stats/official-games";
 
 export const runtime = "nodejs";
 
@@ -84,8 +85,12 @@ export async function GET(
     .eq("player_id", playerId)
     .eq("season_id", seasonId);
 
+  // Só jogos oficiais contam (exclui treinos/amigáveis, testes e eliminados)
+  const officialSessionIds = new Set(await getOfficialGameSessionIds(db, seasonId));
+
   const gameSessions = (gameStatsRows ?? [])
     .filter((r) => r.game_session != null)
+    .filter((r) => officialSessionIds.has(((r.game_session as unknown) as GameSessionRow).id))
     .map((r) => {
       const gs = (r.game_session as unknown) as GameSessionRow;
       const ev = gs.event;

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getOfficialGameSessionIds } from "@/lib/stats/official-games";
 
 export interface SeasonGameStats {
   total_pts: number;
@@ -16,17 +17,13 @@ export interface SeasonGameStats {
   total_players: number;
 }
 
-// Filter for stat queries — corresponds to game_type column on events
-// 'all'       → todos os jogos (official + friendly)
-// 'official'  → apenas jogos oficiais
-// 'friendly'  → apenas jogos de treino/amigáveis
-// competition → apenas jogos dessa competição (implica official)
+// As estatísticas só contabilizam jogos oficiais (ver lib/stats/official-games).
+// O filtro opcional restringe a uma competição específica (ex.: 'Liga', 'Taça').
 export interface StatsFilter {
-  gameType: "all" | "official" | "friendly";
-  competition?: string; // e.g. 'Liga', 'Taça'
+  competition?: string;
 }
 
-export const DEFAULT_STATS_FILTER: StatsFilter = { gameType: "all" };
+export const DEFAULT_STATS_FILTER: StatsFilter = {};
 
 export function useSeasonStats(
   seasonId: string | null,
@@ -40,49 +37,11 @@ export function useSeasonStats(
     if (!seasonId) { setStats(null); setLoading(false); return; }
     setLoading(true);
     try {
-      // ── 1. Determine which game_session_ids match the filter ──────────────────
-      //
-      // player_game_stats.season_id is enough to scope to the season.
-      // For game_type / competition filters we need to join:
-      //   player_game_stats → game_sessions → events
-      //
-      // Strategy: if filter is 'all' and no competition, skip the join and
-      // query player_game_stats directly. Otherwise, first resolve the matching
-      // game_session_ids, then filter stats by those ids.
-
-      // Sempre resolver os session_ids: filtra is_test=false e stats_source != result_only
-      let eventsQ = supabase
-        .from("events")
-        .select("id")
-        .eq("season_id", seasonId)
-        .eq("type", "jogo")
-        .eq("is_test", false);
-
-      if (filter.gameType === "official")  eventsQ = eventsQ.eq("game_type", "official");
-      if (filter.gameType === "friendly")  eventsQ = eventsQ.eq("game_type", "friendly");
-      if (filter.competition)              eventsQ = eventsQ.eq("competition", filter.competition);
-
-      const { data: evData } = await eventsQ;
-      const eventIds = (evData ?? []).map((e) => e.id as string);
-
-      if (eventIds.length === 0) {
-        setStats({
-          total_pts: 0, total_reb: 0, total_ast: 0, total_stl: 0,
-          total_blk: 0, total_tov: 0, total_fouls_committed: 0,
-          total_fouls_drawn: 0, games_finished: 0, total_players: 0,
-        });
-        setLoading(false);
-        return;
-      }
-
-      const { data: sessData } = await supabase
-        .from("game_sessions")
-        .select("id")
-        .in("event_id", eventIds)
-        .eq("status", "finished")
-        .neq("stats_source", "result_only");
-
-      const allowedSessionIds: string[] = (sessData ?? []).map((s) => s.id as string);
+      // ── 1. Sessões de jogos oficiais terminados (exclui treinos/amigáveis, testes e eliminados)
+      const allowedSessionIds = await getOfficialGameSessionIds(supabase, seasonId, {
+        competition:  filter.competition,
+        finishedOnly: true,
+      });
 
       if (allowedSessionIds.length === 0) {
         setStats({
@@ -132,7 +91,7 @@ export function useSeasonStats(
     } finally {
       setLoading(false);
     }
-  }, [seasonId, filter.gameType, filter.competition]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [seasonId, filter.competition]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load(); }, [load]);
   return { stats, loading };

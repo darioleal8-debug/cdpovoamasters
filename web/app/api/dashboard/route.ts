@@ -2,6 +2,7 @@ import { todayInClubTz } from "@/lib/time/club-time";
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/auth/guards";
 import { createAdminClient } from "@/lib/supabase/server";
+import { getOfficialGameSessionIds } from "@/lib/stats/official-games";
 
 export const runtime = "nodejs";
 
@@ -275,8 +276,12 @@ export async function GET(req: NextRequest) {
       const pid = playerRow.id;
       playerId = pid;
 
+      // Só jogos oficiais contam (exclui treinos/amigáveis, testes e eliminados)
+      const officialSessionIds = sid ? await getOfficialGameSessionIds(supabase, sid) : [];
       const [statsRes, attRes, payRes, avRes] = await Promise.all([
-        supabase.from("player_game_stats").select("pts").eq("player_id", pid),
+        officialSessionIds.length
+          ? supabase.from("player_game_stats").select("pts").eq("player_id", pid).in("game_session_id", officialSessionIds)
+          : Promise.resolve({ data: [] as Array<{ pts: number }> }),
         supabase.from("training_attendance").select("status").eq("player_id", pid),
         supabase.from("player_payments").select("status").eq("player_id", pid).eq("season_id", sid),
         nextGame?.id

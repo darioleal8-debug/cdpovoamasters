@@ -3,6 +3,7 @@ import { authorize } from "@/lib/auth/guards";
 import { hasAnyRole, MANAGERS } from "@/lib/auth/roles";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { getOfficialGameEventIds, getOfficialGameSessionIds } from "@/lib/stats/official-games";
 
 export const runtime = "nodejs";
 
@@ -59,18 +60,19 @@ export async function GET(req: NextRequest) {
     (trainingStats ?? []).map((s) => [s.player_id as string, s])
   );
 
-  // Total games in season
-  const { count: totalGames } = await db
-    .from("events")
-    .select("*", { count: "exact", head: true })
-    .eq("season_id", seasonId)
-    .eq("type", "jogo");
+  // Só jogos oficiais contam (exclui treinos/amigáveis, testes e eliminados)
+  const officialEventIds = await getOfficialGameEventIds(db, seasonId);
+  const totalGames = officialEventIds.length;
+  const officialSessionIds = await getOfficialGameSessionIds(db, seasonId);
 
-  // Game stats: player_id + game_session_id pairs
-  const { data: gameStatsRaw } = await db
-    .from("player_game_stats")
-    .select("player_id, game_session_id")
-    .eq("season_id", seasonId);
+  // Game stats: player_id + game_session_id pairs (apenas jogos oficiais)
+  const { data: gameStatsRaw } = officialSessionIds.length
+    ? await db
+        .from("player_game_stats")
+        .select("player_id, game_session_id")
+        .eq("season_id", seasonId)
+        .in("game_session_id", officialSessionIds)
+    : { data: [] as { player_id: string; game_session_id: string }[] };
 
   // Distinct game sessions with any stats
   const allSessions = new Set(
@@ -161,7 +163,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     players,
     season: {
-      total_games:      totalGames ?? 0,
+      total_games:      totalGames,
       games_with_stats: gamesWithStats,
     },
     team_avg: {

@@ -40,13 +40,15 @@ export async function GET(req: NextRequest) {
 
   if (!player) return NextResponse.json({ season: null, last5: null });
 
-  // Resolver session IDs: apenas jogos live terminados (excluir is_test e result_only)
+  // Resolver session IDs: apenas jogos oficiais terminados (excluir treinos/amigáveis, is_test, eliminados e result_only)
   const { data: evData } = await supabase
     .from("events")
     .select("id, event_date")
     .eq("season_id", seasonId)
     .eq("type", "jogo")
-    .eq("is_test", false);
+    .eq("game_type", "official")
+    .eq("is_test", false)
+    .is("deleted_at", null);
 
   const eventIds = (evData ?? []).map((e) => e.id as string);
   if (eventIds.length === 0) return NextResponse.json({ season: null, last5: null });
