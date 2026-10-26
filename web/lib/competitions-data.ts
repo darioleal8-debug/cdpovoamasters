@@ -121,18 +121,43 @@ export async function getCompetitionGames(
     return acc;
   }, new Map<string, number>());
 
-  // syntheticJornada: accumulate offset across voltas so jornada is globally unique
-  const voltaOffsets = new Map<number, number>();
-  let maxJornada = 0;
+  // syntheticJornada: só adicionar offset entre voltas se a numeração reiniciar
+  // (quando já é contínua, e.g. volta 2 começa em J6, não aplicar offset)
+  const jornadaByVolta = new Map<number, Set<number>>();
   for (const e of events) {
     const m = parseGameMeta(e.description);
-    if (!m?.jornada || !m?.volta) continue;
-    const v = m.volta;
-    if (!voltaOffsets.has(v)) {
-      voltaOffsets.set(v, maxJornada);
+    if (m?.jornada != null && m?.volta != null) {
+      if (!jornadaByVolta.has(m.volta)) jornadaByVolta.set(m.volta, new Set());
+      jornadaByVolta.get(m.volta)!.add(m.jornada);
     }
-    const synthetic = voltaOffsets.get(v)! + m.jornada;
-    if (synthetic > maxJornada) maxJornada = synthetic;
+  }
+  const voltaList = Array.from(jornadaByVolta.keys()).sort((a, b) => a - b);
+  let jornadasRestart = false;
+  outer: for (let i = 1; i < voltaList.length; i++) {
+    const prev = jornadaByVolta.get(voltaList[i - 1])!;
+    for (const j of jornadaByVolta.get(voltaList[i])!) {
+      if (prev.has(j)) { jornadasRestart = true; break outer; }
+    }
+  }
+
+  const voltaOffsets = new Map<number, number>();
+  let maxJornada = 0;
+  if (jornadasRestart) {
+    for (const e of events) {
+      const m = parseGameMeta(e.description);
+      if (!m?.jornada || !m?.volta) continue;
+      const v = m.volta;
+      if (!voltaOffsets.has(v)) voltaOffsets.set(v, maxJornada);
+      const synthetic = voltaOffsets.get(v)! + m.jornada;
+      if (synthetic > maxJornada) maxJornada = synthetic;
+    }
+  } else {
+    // Numeração já contínua — offset zero para todas as voltas
+    for (const e of events) {
+      const m = parseGameMeta(e.description);
+      if (m?.volta != null) voltaOffsets.set(m.volta, 0);
+      if (m?.jornada != null && m.jornada > maxJornada) maxJornada = m.jornada;
+    }
   }
 
   return events.map((e): PublicGame => {
