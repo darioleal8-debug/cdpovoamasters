@@ -5,6 +5,56 @@ import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
 import { createAdminClient } from "@/lib/supabase/server";
 import { generateLigaNews } from "@/lib/liga/generate-news";
 
+type ExtractionRaw = {
+  ok?: boolean;
+  arbitros?: string[];
+  parciais?: { periodo: number; casa: number; fora: number }[];
+  jogadores?: { nome: string; equipa: "casa" | "fora"; numero?: number; pontos?: number; triplos?: number; lances_livres?: number; faltas?: number }[];
+  prolongamento?: boolean;
+};
+
+async function copyStatsFromSubmission(
+  adminClient: Awaited<ReturnType<typeof createAdminClient>>,
+  eventId: string,
+  submissionId: string,
+  raw: ExtractionRaw,
+  homeTeamId: string | null,
+  awayTeamId: string | null,
+) {
+  const periods = (raw.parciais ?? []).map((p) => ({
+    event_id: eventId,
+    periodo: p.periodo,
+    home_points: p.casa,
+    away_points: p.fora,
+  }));
+  if (periods.length > 0) {
+    await adminClient
+      .from("league_game_periods")
+      .upsert(periods, { onConflict: "event_id,periodo" });
+  }
+
+  const players = (raw.jogadores ?? []).map((j) => ({
+    event_id: eventId,
+    team_id: j.equipa === "casa" ? homeTeamId : awayTeamId,
+    side: j.equipa === "casa" ? "home" : "away",
+    numero: j.numero ?? null,
+    nome: j.nome,
+    pontos: j.pontos ?? 0,
+    triplos: j.triplos ?? 0,
+    lances_livres: j.lances_livres ?? 0,
+    faltas: j.faltas ?? 0,
+  }));
+  if (players.length > 0) {
+    await adminClient
+      .from("league_game_player_stats")
+      .delete()
+      .eq("event_id", eventId);
+    await adminClient
+      .from("league_game_player_stats")
+      .insert(players);
+  }
+}
+
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -63,7 +113,9 @@ export async function PATCH(
       .eq("event_id", sub.event_id)
       .maybeSingle();
 
-    // UPSERT resultado oficial com approved_by
+    const raw: ExtractionRaw = (sub.extraction_raw as ExtractionRaw) ?? {};
+
+    // UPSERT resultado oficial (inclui novos campos de stats)
     await adminClient
       .from("league_game_results")
       .upsert({
@@ -75,7 +127,20 @@ export async function PATCH(
         away_score: sub.away_score,
         approved_at: now,
         approved_by: auth.user.id,
+        referees: raw.arbitros?.length ? raw.arbitros : null,
+        overtime: raw.prolongamento === true,
+        source_submission_id: id,
       }, { onConflict: "event_id" });
+
+    // Copiar estatísticas de parciais e jogadores
+    await copyStatsFromSubmission(
+      adminClient,
+      sub.event_id,
+      id,
+      raw,
+      sub.home_team_id ?? null,
+      sub.away_team_id ?? null,
+    );
 
     // Auditoria
     await adminClient.from("liga_resultado_audit").insert({

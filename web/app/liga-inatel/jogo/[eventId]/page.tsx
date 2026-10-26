@@ -3,164 +3,467 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { parseGameMeta } from "@/types/competitions";
+import { CourtBg } from "@/components/competitions/court-bg";
+import { TeamMono } from "@/components/competitions/team-mono";
+import { PlayerStatsTabs } from "@/components/competitions/player-stats-tabs";
 
 export const revalidate = 60;
 
-async function getGameData(eventId: string) {
-  const supabase = await createAdminClient();
+const MONTH_PT = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+const WEEKDAY_PT = ["domingo","segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado"];
+const MONTH_SHORT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
-  const [eventRes, resultRes, sessionRes] = await Promise.all([
-    supabase
-      .from("events")
-      .select("id, event_date, event_time, location, description, opponent")
-      .eq("id", eventId)
-      .eq("type", "jogo")
-      .single(),
-    supabase
-      .from("league_game_results")
-      .select("*")
-      .eq("event_id", eventId)
-      .single(),
-    supabase
-      .from("game_sessions")
-      .select("id, status, home_score, away_score, is_home_game")
-      .eq("event_id", eventId)
-      .single(),
-  ]);
-
-  return {
-    event:   eventRes.data,
-    result:  resultRes.data,
-    session: sessionRes.data,
-  };
+function fmtDateLong(s: string) {
+  const d = new Date(s + "T12:00:00");
+  return `${WEEKDAY_PT[d.getDay()]}, ${d.getDate()} de ${MONTH_PT[d.getMonth()]} de ${d.getFullYear()}`;
 }
 
-const MONTH = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
-const WEEKDAY = ["domingo","segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado"];
+function fmtDateShort(s: string) {
+  const d = new Date(s + "T12:00:00");
+  return `${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`;
+}
+
+type GamePeriod = { periodo: number; home_points: number; away_points: number };
+type PlayerStat = { nome: string; side: "home" | "away"; numero: number | null; pontos: number; triplos: number; lances_livres: number; faltas: number };
+
+async function getGamePageData(eventId: string) {
+  const supabase = await createAdminClient();
+
+  const [eventRes, resultRes, periodsRes, playerStatsRes] = await Promise.all([
+    supabase.from("events")
+      .select("id, event_date, event_time, location, description, season_id, competition")
+      .eq("id", eventId).eq("type", "jogo").is("deleted_at", null).single(),
+    supabase.from("league_game_results")
+      .select("id, home_team_name, away_team_name, home_score, away_score, home_team_id, away_team_id, referees, overtime, approved_at")
+      .eq("event_id", eventId).maybeSingle(),
+    supabase.from("league_game_periods")
+      .select("periodo, home_points, away_points").eq("event_id", eventId).order("periodo"),
+    supabase.from("league_game_player_stats")
+      .select("nome, side, numero, pontos, triplos, lances_livres, faltas")
+      .eq("event_id", eventId).order("pontos", { ascending: false }),
+  ]);
+
+  const event = eventRes.data;
+  if (!event) return null;
+
+  const meta = parseGameMeta(event.description ?? null);
+  if (meta?.is_test === true) return null;
+
+  const result = resultRes.data ?? null;
+
+  // Logos das equipas
+  let homeLogoUrl: string | null = null;
+  let awayLogoUrl: string | null = null;
+  if (result?.home_team_id || result?.away_team_id) {
+    const ids = [result?.home_team_id, result?.away_team_id].filter(Boolean) as string[];
+    const { data: teams } = await supabase.from("league_teams").select("id, logo_url").in("id", ids);
+    homeLogoUrl = teams?.find((t) => t.id === result?.home_team_id)?.logo_url ?? null;
+    awayLogoUrl = teams?.find((t) => t.id === result?.away_team_id)?.logo_url ?? null;
+  }
+
+  // Notícias associadas (máx. 2)
+  const { data: news } = await supabase.from("news")
+    .select("id, slug, title, excerpt, cover_image_url, published_at")
+    .eq("game_id", eventId).eq("is_published", true)
+    .order("published_at", { ascending: false }).limit(2);
+
+  // Fotos (hidden=false via RLS, máx. 6)
+  const { data: photosRaw } = await supabase.from("game_photos")
+    .select("id, storage_path, caption, sort_order")
+    .eq("game_id", eventId).order("sort_order").limit(6);
+
+  const photos = (photosRaw ?? []).map((p) => ({
+    id: p.id,
+    caption: p.caption as string | null,
+    public_url: supabase.storage.from("game-photos").getPublicUrl(p.storage_path).data.publicUrl,
+  }));
+
+  // Navegação prev/next
+  let prevGame: { id: string; event_date: string; home_team?: string; away_team?: string } | null = null;
+  let nextGame: { id: string; event_date: string; home_team?: string; away_team?: string } | null = null;
+  if (event.competition && event.season_id) {
+    const [prevRes, nextRes] = await Promise.all([
+      supabase.from("events").select("id, event_date, description")
+        .eq("type", "jogo").eq("competition", event.competition).eq("season_id", event.season_id)
+        .is("deleted_at", null).lt("event_date", event.event_date)
+        .order("event_date", { ascending: false }).limit(1),
+      supabase.from("events").select("id, event_date, description")
+        .eq("type", "jogo").eq("competition", event.competition).eq("season_id", event.season_id)
+        .is("deleted_at", null).gt("event_date", event.event_date)
+        .order("event_date", { ascending: true }).limit(1),
+    ]);
+    const prev = prevRes.data?.[0];
+    if (prev) {
+      const m = parseGameMeta(prev.description);
+      prevGame = { id: prev.id, event_date: prev.event_date, home_team: m?.home_team, away_team: m?.away_team };
+    }
+    const next = nextRes.data?.[0];
+    if (next) {
+      const m = parseGameMeta(next.description);
+      nextGame = { id: next.id, event_date: next.event_date, home_team: m?.home_team, away_team: m?.away_team };
+    }
+  }
+
+  return {
+    event,
+    meta,
+    result,
+    periods: (periodsRes.data ?? []) as GamePeriod[],
+    playerStats: (playerStatsRes.data ?? []) as PlayerStat[],
+    homeLogoUrl,
+    awayLogoUrl,
+    news: news ?? [],
+    photos,
+    prevGame,
+    nextGame,
+  };
+}
 
 export async function generateMetadata({ params }: { params: Promise<{ eventId: string }> }): Promise<Metadata> {
   const { eventId } = await params;
-  const { event } = await getGameData(eventId);
-  const meta = parseGameMeta(event?.description ?? null);
-  const home = meta?.home_team ?? "Equipa A";
-  const away = meta?.away_team ?? "Adversário";
+  const data = await getGamePageData(eventId);
+  if (!data) return { title: "Jogo — Liga INATEL" };
+  const home = data.meta?.home_team ?? data.result?.home_team_name ?? "Equipa A";
+  const away = data.meta?.away_team ?? data.result?.away_team_name ?? "Adversário";
+  const score = data.result ? ` ${data.result.home_score}–${data.result.away_score}` : "";
   return {
-    title: `${home} vs ${away}`,
-    description: `Detalhe do jogo ${home} vs ${away} — Liga INATEL.`,
+    title: `${home} vs ${away}${score}`,
+    description: `Relatório do jogo ${home} vs ${away} — Liga INATEL.`,
   };
 }
 
+const SECTION: React.CSSProperties = {
+  borderRadius: "12px",
+  border: "1px solid var(--border, #E9E2D8)",
+  background: "var(--card, #FFFDFA)",
+  padding: "20px",
+};
+
 export default async function GameDetailPage({ params }: { params: Promise<{ eventId: string }> }) {
   const { eventId } = await params;
-  const { event, result, session } = await getGameData(eventId);
+  const data = await getGamePageData(eventId);
+  if (!data) notFound();
 
-  if (!event) notFound();
+  const { event, meta, result, periods, playerStats, homeLogoUrl, awayLogoUrl, news, photos, prevGame, nextGame } = data;
 
-  const meta = parseGameMeta(event.description ?? null);
-  const homeTeam = meta?.home_team ?? "—";
-  const awayTeam = meta?.away_team ?? (event.opponent ?? "Adversário");
-  const d = new Date(event.event_date + "T12:00:00");
-  const dateLabel = `${WEEKDAY[d.getDay()]}, ${d.getDate()} de ${MONTH[d.getMonth()]} de ${d.getFullYear()}`;
-
-  const isLive = session?.status === "live";
+  const homeTeam = meta?.home_team ?? result?.home_team_name ?? "—";
+  const awayTeam = meta?.away_team ?? result?.away_team_name ?? "—";
   const hasResult = !!result;
-
   const homeWon = hasResult && result!.home_score > result!.away_score;
   const awayWon = hasResult && result!.away_score > result!.home_score;
+  const overtime = result?.overtime === true;
+
+  const jornada = meta?.jornada;
+  const serie = meta?.serie;
+  const dateLabel = fmtDateLong(event.event_date);
+  const pavilion = meta?.pavilion;
+  const locality = meta?.locality;
+  const locationText = event.location ?? pavilion ?? locality ?? null;
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+
+      {/* Breadcrumb */}
       <div>
-        <Link href="/liga-inatel/resultados" className="text-xs text-muted-foreground hover:text-foreground">
-          ← Resultados
+        <Link href="/liga-inatel/calendario" style={{ fontSize: "12px", color: "var(--muted-foreground, #8C837A)", textDecoration: "none" }}>
+          ← Calendário
         </Link>
       </div>
 
-      {/* Game header */}
-      <div className="rounded-2xl border border-border bg-card p-6">
-        {meta?.jornada && (
-          <p className="text-xs text-muted-foreground text-center mb-1 uppercase tracking-wider">
-            Jornada {meta.jornada}{meta.volta ? ` · Volta ${meta.volta}` : ""}
-          </p>
-        )}
+      {/* ── HERO ── */}
+      <CourtBg style={{ borderRadius: "16px" }} minHeight="200px">
+        <div style={{ position: "relative", zIndex: 1, padding: "24px 20px 20px" }}>
 
-        <div className="flex items-center justify-center gap-4 flex-wrap">
-          <h2 className="text-lg font-bold text-right flex-1">
-            {homeTeam}
-          </h2>
+          {/* Jornada/série badge */}
+          {(jornada || serie) && (
+            <p style={{
+              textAlign: "center",
+              fontFamily: "var(--font-ibm-mono, monospace)",
+              fontSize: "11px",
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: "#F97316",
+              fontWeight: 500,
+              marginBottom: "16px",
+            }}>
+              Liga INATEL{serie ? ` · Série ${serie}` : ""}{jornada ? ` · J${jornada}` : ""}
+            </p>
+          )}
 
-          <div className="text-center shrink-0">
-            {isLive ? (
-              <div className="space-y-1">
-                <div className="text-4xl font-bold tabular-nums">
-                  {session!.home_score ?? 0}
-                  <span className="text-muted-foreground mx-2">–</span>
-                  {session!.away_score ?? 0}
+          {/* Equipas + marcador */}
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
+
+            {/* Casa */}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", flex: "1 1 120px", minWidth: 0 }}>
+              <TeamMono name={homeTeam} size={52} logoUrl={homeLogoUrl} showLabel />
+              <span style={{
+                fontFamily: "var(--font-barlow-condensed, sans-serif)",
+                fontWeight: 700,
+                fontSize: "13px",
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+                color: hasResult ? (homeWon ? "#FFFDFA" : "#B9AFA4") : "#FFFDFA",
+                textAlign: "center",
+                lineHeight: 1.2,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                maxWidth: "140px",
+              }}>
+                {homeTeam}
+              </span>
+            </div>
+
+            {/* Marcador */}
+            <div style={{ textAlign: "center", flexShrink: 0, minWidth: "100px" }}>
+              {hasResult ? (
+                <div>
+                  <div style={{
+                    fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))",
+                    fontWeight: 800,
+                    fontSize: "clamp(44px, 8vw, 72px)",
+                    lineHeight: 1,
+                    letterSpacing: "-0.02em",
+                    fontVariantNumeric: "tabular-nums",
+                    color: "#FFFDFA",
+                  }}>
+                    <span style={{ color: homeWon ? "#FFFDFA" : "#B9AFA4" }}>{result!.home_score}</span>
+                    <span style={{ color: "#8C6040", margin: "0 6px" }}>–</span>
+                    <span style={{ color: awayWon ? "#FFFDFA" : "#B9AFA4" }}>{result!.away_score}</span>
+                  </div>
+                  <div style={{ marginTop: "6px", display: "flex", justifyContent: "center", gap: "6px", flexWrap: "wrap" }}>
+                    <span style={{ fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "10px", letterSpacing: "0.1em", color: "#F97316", fontWeight: 600 }}>
+                      FINAL
+                    </span>
+                    {overtime && (
+                      <span style={{ fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "10px", letterSpacing: "0.1em", color: "#F97316", fontWeight: 600 }}>
+                        · PROL.
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <span className="inline-flex items-center gap-1 text-orange-500 text-sm font-semibold">
-                  <span className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
-                  AO VIVO
-                </span>
-              </div>
-            ) : hasResult ? (
-              <div className="space-y-1">
-                <div className="text-5xl font-bold tabular-nums">
-                  <span className={homeWon ? "" : "text-muted-foreground"}>{result!.home_score}</span>
-                  <span className="text-muted-foreground mx-2 text-3xl">–</span>
-                  <span className={awayWon ? "" : "text-muted-foreground"}>{result!.away_score}</span>
-                </div>
-                {homeWon !== undefined && (
-                  <p className="text-sm font-semibold text-muted-foreground">
-                    {homeWon ? `${homeTeam} venceu` : awayWon ? `${awayTeam} venceu` : "Empate"}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div className="text-muted-foreground text-2xl font-light">vs</div>
+              ) : (
+                <span style={{ fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "20px", color: "#8C6040", letterSpacing: "0.1em" }}>vs</span>
+              )}
+            </div>
+
+            {/* Visitante */}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", flex: "1 1 120px", minWidth: 0 }}>
+              <TeamMono name={awayTeam} size={52} logoUrl={awayLogoUrl} showLabel />
+              <span style={{
+                fontFamily: "var(--font-barlow-condensed, sans-serif)",
+                fontWeight: 700,
+                fontSize: "13px",
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+                color: hasResult ? (awayWon ? "#FFFDFA" : "#B9AFA4") : "#FFFDFA",
+                textAlign: "center",
+                lineHeight: 1.2,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                maxWidth: "140px",
+              }}>
+                {awayTeam}
+              </span>
+            </div>
+          </div>
+
+          {/* Data + local */}
+          <div style={{
+            marginTop: "20px",
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            gap: "4px 16px",
+          }}>
+            <span style={{ fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "11px", color: "#B9AFA4", letterSpacing: "0.06em", textTransform: "capitalize" }}>
+              {dateLabel}{event.event_time ? ` · ${event.event_time.slice(0, 5)}` : ""}
+            </span>
+            {locationText && (
+              <span style={{ fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "11px", color: "#8C6040", letterSpacing: "0.04em" }}>
+                {locationText}
+              </span>
             )}
           </div>
+        </div>
+      </CourtBg>
 
-          <h2 className="text-lg font-bold text-left flex-1">
-            {awayTeam}
+      {/* ── PARCIAIS ── */}
+      {periods.length > 0 && (
+        <section style={SECTION}>
+          <h2 style={{ fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-foreground, #8C837A)", marginBottom: "14px", fontWeight: 600 }}>
+            Parciais
           </h2>
-        </div>
-      </div>
-
-      {/* Details */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-        <div className="rounded-xl border border-border bg-card p-4 space-y-2">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Data & Local</h3>
-          <p className="capitalize">{dateLabel}{event.event_time ? ` · ${event.event_time.slice(0, 5)}` : ""}</p>
-          {event.location && <p className="text-muted-foreground">{event.location}</p>}
-          {meta?.pavilion && <p className="text-muted-foreground">{meta.pavilion}</p>}
-          {meta?.locality && <p className="text-muted-foreground">{meta.locality}</p>}
-        </div>
-
-        {isLive && session?.id && (
-          <div className="rounded-xl border border-orange-400 bg-orange-500/5 p-4 flex flex-col justify-between">
-            <h3 className="text-xs font-semibold text-orange-500 uppercase tracking-wider mb-2">Ao Vivo</h3>
-            <Link
-              href={`/live/${session.id}`}
-              className="block w-full text-center py-2.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold transition-colors"
-            >
-              Ver jogo ao vivo →
-            </Link>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontVariantNumeric: "tabular-nums" }}>
+              <thead>
+                <tr>
+                  <th style={{ padding: "6px 8px 6px 0", textAlign: "left", fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-foreground, #8C837A)", fontWeight: 600, borderBottom: "1px solid var(--border, #E9E2D8)" }}>
+                    Equipa
+                  </th>
+                  {periods.map((p) => (
+                    <th key={p.periodo} style={{ padding: "6px 10px", textAlign: "center", fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "10px", letterSpacing: "0.08em", color: "var(--muted-foreground, #8C837A)", fontWeight: 600, borderBottom: "1px solid var(--border, #E9E2D8)" }}>
+                      Q{p.periodo}
+                    </th>
+                  ))}
+                  {overtime && (
+                    <th style={{ padding: "6px 10px", textAlign: "center", fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "10px", letterSpacing: "0.08em", color: "#F97316", fontWeight: 600, borderBottom: "1px solid var(--border, #E9E2D8)" }}>
+                      PR
+                    </th>
+                  )}
+                  <th style={{ padding: "6px 8px", textAlign: "center", fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "10px", letterSpacing: "0.08em", color: "var(--muted-foreground, #8C837A)", fontWeight: 600, borderBottom: "1px solid var(--border, #E9E2D8)" }}>
+                    Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {(["home", "away"] as const).map((side) => {
+                  const name = side === "home" ? homeTeam : awayTeam;
+                  const total = side === "home" ? result?.home_score : result?.away_score;
+                  const won = side === "home" ? homeWon : awayWon;
+                  return (
+                    <tr key={side}>
+                      <td style={{ padding: "8px 8px 8px 0", fontFamily: "var(--font-barlow-condensed, sans-serif)", fontSize: "13px", fontWeight: 700, letterSpacing: "0.03em", textTransform: "uppercase", color: won ? "var(--foreground, #1A1612)" : "var(--muted-foreground, #8C837A)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "160px" }}>
+                        {name}
+                      </td>
+                      {periods.map((p) => {
+                        const pts = side === "home" ? p.home_points : p.away_points;
+                        return (
+                          <td key={p.periodo} style={{ padding: "8px 10px", textAlign: "center", fontSize: "14px", fontWeight: pts > 0 ? 600 : 400, color: pts > 0 ? "var(--foreground, #1A1612)" : "var(--muted-foreground, #8C837A)" }}>
+                            {pts}
+                          </td>
+                        );
+                      })}
+                      {overtime && (
+                        <td style={{ padding: "8px 10px", textAlign: "center", fontSize: "14px", color: "var(--muted-foreground, #8C837A)" }}>—</td>
+                      )}
+                      <td style={{ padding: "8px", textAlign: "center", fontSize: "16px", fontWeight: 800, color: won ? "var(--foreground, #1A1612)" : "var(--muted-foreground, #8C837A)" }}>
+                        {total ?? "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        )}
-      </div>
 
-      {/* Submit result CTA if no result */}
-      {!hasResult && !isLive && (
-        <div className="rounded-xl border border-dashed border-border p-6 text-center space-y-2">
-          <p className="text-muted-foreground text-sm">Resultado ainda não registado</p>
-          <Link
-            href={`/liga-inatel/equipa?jogo=${event.id}#resultados`}
-            className="inline-block px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors"
-          >
-            Submeter resultado
-          </Link>
-        </div>
+          {/* Árbitros */}
+          {(result?.referees as string[] | null)?.length ? (
+            <p style={{ marginTop: "14px", fontSize: "12px", color: "var(--muted-foreground, #8C837A)", fontFamily: "var(--font-ibm-mono, monospace)" }}>
+              <span style={{ fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginRight: "6px" }}>Árbitros</span>
+              {(result?.referees as string[]).join(", ")}
+            </p>
+          ) : null}
+        </section>
       )}
+
+      {/* ── ESTATÍSTICAS DE JOGADORES ── */}
+      {playerStats.length > 0 && (
+        <section style={SECTION}>
+          <h2 style={{ fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-foreground, #8C837A)", marginBottom: "14px", fontWeight: 600 }}>
+            Estatísticas
+          </h2>
+          <PlayerStatsTabs
+            homeName={homeTeam}
+            awayName={awayTeam}
+            stats={playerStats}
+          />
+        </section>
+      )}
+
+      {/* ── NOTÍCIAS RELACIONADAS ── */}
+      {news.length > 0 && (
+        <section style={SECTION}>
+          <h2 style={{ fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-foreground, #8C837A)", marginBottom: "14px", fontWeight: 600 }}>
+            Destaques
+          </h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            {news.map((n) => (
+              <Link key={n.id} href={`/liga-inatel/noticias/${n.slug}`} style={{ textDecoration: "none" }}>
+                <div style={{ display: "flex", gap: "12px", alignItems: "center", padding: "10px", borderRadius: "8px", border: "1px solid var(--border, #E9E2D8)", transition: "background 0.15s" }}>
+                  {n.cover_image_url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={n.cover_image_url}
+                      alt={n.title}
+                      width={72}
+                      height={48}
+                      style={{ borderRadius: "6px", objectFit: "cover", flexShrink: 0 }}
+                    />
+                  )}
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ fontFamily: "var(--font-barlow-condensed, sans-serif)", fontWeight: 700, fontSize: "14px", letterSpacing: "0.02em", color: "var(--foreground, #1A1612)", lineHeight: 1.3, marginBottom: "4px", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                      {n.title}
+                    </p>
+                    {n.excerpt && (
+                      <p style={{ fontSize: "12px", color: "var(--muted-foreground, #8C837A)", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical" }}>
+                        {n.excerpt}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── FOTOS ── */}
+      {photos.length > 0 && (
+        <section style={SECTION}>
+          <h2 style={{ fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-foreground, #8C837A)", marginBottom: "14px", fontWeight: 600 }}>
+            Fotos
+          </h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "8px" }}>
+            {photos.map((p) => (
+              <div key={p.id} style={{ aspectRatio: "4/3", borderRadius: "8px", overflow: "hidden" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={p.public_url}
+                  alt={p.caption ?? "Foto do jogo"}
+                  loading="lazy"
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── NAVEGAÇÃO PREV/NEXT ── */}
+      {(prevGame || nextGame) && (
+        <nav style={{ display: "flex", justifyContent: "space-between", gap: "8px", paddingTop: "4px" }}>
+          {prevGame ? (
+            <Link href={`/liga-inatel/jogo/${prevGame.id}`} style={{ textDecoration: "none", flex: 1 }}>
+              <div style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid var(--border, #E9E2D8)", background: "var(--card, #FFFDFA)" }}>
+                <p style={{ fontSize: "10px", fontFamily: "var(--font-ibm-mono, monospace)", color: "var(--muted-foreground, #8C837A)", letterSpacing: "0.08em", marginBottom: "3px" }}>
+                  ← ANTERIOR
+                </p>
+                <p style={{ fontSize: "12px", fontWeight: 600, color: "var(--foreground, #1A1612)", lineHeight: 1.3 }}>
+                  {prevGame.home_team && prevGame.away_team
+                    ? `${prevGame.home_team} vs ${prevGame.away_team}`
+                    : fmtDateShort(prevGame.event_date)}
+                </p>
+              </div>
+            </Link>
+          ) : <div style={{ flex: 1 }} />}
+
+          {nextGame ? (
+            <Link href={`/liga-inatel/jogo/${nextGame.id}`} style={{ textDecoration: "none", flex: 1 }}>
+              <div style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid var(--border, #E9E2D8)", background: "var(--card, #FFFDFA)", textAlign: "right" }}>
+                <p style={{ fontSize: "10px", fontFamily: "var(--font-ibm-mono, monospace)", color: "var(--muted-foreground, #8C837A)", letterSpacing: "0.08em", marginBottom: "3px" }}>
+                  SEGUINTE →
+                </p>
+                <p style={{ fontSize: "12px", fontWeight: 600, color: "var(--foreground, #1A1612)", lineHeight: 1.3 }}>
+                  {nextGame.home_team && nextGame.away_team
+                    ? `${nextGame.home_team} vs ${nextGame.away_team}`
+                    : fmtDateShort(nextGame.event_date)}
+                </p>
+              </div>
+            </Link>
+          ) : <div style={{ flex: 1 }} />}
+        </nav>
+      )}
+
     </div>
   );
 }
