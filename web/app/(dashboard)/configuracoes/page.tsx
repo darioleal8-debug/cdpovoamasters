@@ -330,6 +330,31 @@ export default function ConfiguracoesPage() {
         </CardContent>
       </Card>
 
+      <Separator />
+
+      {/* ── Calendário ICS ────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarRange className="h-4 w-4" /> Calendário
+          </CardTitle>
+          <CardDescription>
+            Descarrega os jogos e treinos da época ativa em formato iCalendar (.ics)
+            para importar no teu calendário (Google, Apple, Outlook…).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <a
+            href="/api/calendar/ics"
+            download="hoophub.ics"
+            className="inline-flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-semibold transition-opacity hover:opacity-80"
+            style={{ background: "var(--ink,#0A1220)", color: "#fff" }}
+          >
+            <CalendarRange className="h-4 w-4" /> Descarregar calendário (.ics)
+          </a>
+        </CardContent>
+      </Card>
+
       {/* ── Dialog criar/editar temporada ──────────────────── */}
       <Dialog open={seasonDialog} onOpenChange={setSeasonDialog}>
         <DialogContent>
