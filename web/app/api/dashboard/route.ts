@@ -1,6 +1,7 @@
 import { todayInClubTz } from "@/lib/time/club-time";
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/auth/guards";
+import { createAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -259,6 +260,9 @@ export async function GET(req: NextRequest) {
     payment_status: string;
   } | null = null;
 
+  let playerId:            string | null = null;
+  let myGameAvailability:  "yes" | "no" | null = null;
+
   const isPlayer = userProfile?.role === "jogador" ||
     (Array.isArray(userProfile?.roles_extra) && userProfile?.roles_extra.includes("jogador"));
 
@@ -269,11 +273,20 @@ export async function GET(req: NextRequest) {
 
     if (playerRow) {
       const pid = playerRow.id;
-      const [statsRes, attRes, payRes] = await Promise.all([
+      playerId = pid;
+
+      const [statsRes, attRes, payRes, avRes] = await Promise.all([
         supabase.from("player_game_stats").select("pts").eq("player_id", pid),
         supabase.from("training_attendance").select("status").eq("player_id", pid),
         supabase.from("player_payments").select("status").eq("player_id", pid).eq("season_id", sid),
+        nextGame?.id
+          ? supabase.from("game_availability").select("status")
+              .eq("game_id", nextGame.id).eq("player_id", pid).maybeSingle()
+          : Promise.resolve({ data: null }),
       ]);
+
+      if ((avRes as { data: { status: string } | null }).data?.status === "available")   myGameAvailability = "yes";
+      if ((avRes as { data: { status: string } | null }).data?.status === "unavailable") myGameAvailability = "no";
 
       const stats = (statsRes.data ?? []) as Array<{ pts: number }>;
       const att   = (attRes.data  ?? []) as Array<{ status: string }>;
@@ -295,6 +308,31 @@ export async function GET(req: NextRequest) {
       };
     }
   }
+
+  // 5. Jogadores sem primeiro acesso (conta criada mas nunca usada)
+  try {
+    const admin = await createAdminClient();
+    const { data: { users: authUsers } } = await admin.auth.admin.listUsers({ perPage: 200 });
+    const neverLoggedInSet = new Set(
+      authUsers
+        .filter((u) => !u.last_sign_in_at && u.email_confirmed_at)
+        .map((u) => u.id)
+    );
+    const { data: seasonPlayers } = await supabase
+      .from("players").select("user_id").eq("season_id", sid);
+    const neverLoggedInCount = (seasonPlayers ?? []).filter(
+      (p) => p.user_id && neverLoggedInSet.has(p.user_id as string)
+    ).length;
+    if (neverLoggedInCount > 0) {
+      tasks.push({
+        id: "never-logged-in", severity: "info",
+        title: `${neverLoggedInCount} jogador${neverLoggedInCount !== 1 ? "es" : ""} sem primeiro acesso`,
+        subtitle: "Conta criada mas nunca utilizada",
+        href: "/jogadores", action_label: "Ver plantel",
+        deadline: null, count: neverLoggedInCount,
+      });
+    }
+  } catch { /* não crítico — ignora se admin query falhar */ }
 
   // ── Resposta ─────────────────────────────────────────────
   return NextResponse.json({
@@ -331,10 +369,12 @@ export async function GET(req: NextRequest) {
       losses,
       draws:   0,
     },
-    tasks:       tasks.slice(0, 5),
-    tasks_total: tasks.length,
-    notices:     [],
+    tasks:               tasks.slice(0, 5),
+    tasks_total:         tasks.length,
+    notices:             [],
     playerData,
     isPlayer,
+    playerId,
+    myGameAvailability,
   });
 }

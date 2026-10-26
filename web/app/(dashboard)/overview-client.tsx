@@ -39,7 +39,9 @@ interface DashboardData {
     games_played: number; avg_points: number | null;
     attendance_pct: number | null; payment_status: string;
   } | null;
-  isPlayer:     boolean;
+  isPlayer:            boolean;
+  playerId?:           string | null;
+  myGameAvailability?: "yes" | "no" | null;
 }
 
 type View = "treinador" | "jogador";
@@ -290,7 +292,11 @@ function TrainerView({ data }: TrainerViewProps) {
     <div className="grid gap-5 md:grid-cols-[1fr_340px]">
       <div className="flex flex-col gap-5 order-2 md:order-1">
         <TrainingConflictWarning seasonId={data.season?.id} />
-        <NextGameDashboard game={data.nextGame} />
+        <NextGameDashboard
+          game={data.nextGame}
+          playerId={data.playerId}
+          myGameAvailability={data.myGameAvailability}
+        />
         <TasksCard tasks={data.tasks} tasks_total={data.tasks_total} />
       </div>
       <div className="flex flex-col gap-4 order-1 md:order-2">
@@ -310,7 +316,11 @@ function PlayerView({ data }: PlayerViewProps) {
   return (
     <div className="grid gap-5 md:grid-cols-[1fr_340px]">
       <div className="flex flex-col gap-5">
-        <NextGameDashboard game={data.nextGame} />
+        <NextGameDashboard
+          game={data.nextGame}
+          playerId={data.playerId}
+          myGameAvailability={data.myGameAvailability}
+        />
         <NextTrainingCard training={data.nextTraining} />
       </div>
       <div className="flex flex-col gap-4">

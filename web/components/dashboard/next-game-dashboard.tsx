@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { AvailabilityPrompt } from "@/components/player/availability-prompt";
+import { lisbonDateTime } from "@/lib/event-time";
 
 interface NextGameData {
   id:           string;
@@ -18,6 +20,8 @@ interface NextGameData {
 interface Props {
   game: NextGameData | null;
   loading?: boolean;
+  playerId?: string | null;
+  myGameAvailability?: "yes" | "no" | null;
 }
 
 function fmtDate(d: string, t?: string | null): string {
@@ -28,7 +32,7 @@ function fmtDate(d: string, t?: string | null): string {
   return t ? `${cap} · ${t.slice(0, 5).replace(":", "h")}` : cap;
 }
 
-export function NextGameDashboard({ game, loading }: Props) {
+export function NextGameDashboard({ game, loading, playerId, myGameAvailability }: Props) {
   if (loading) {
     return (
       <section
@@ -171,6 +175,18 @@ export function NextGameDashboard({ game, loading }: Props) {
               }}
             />
           </div>
+        </div>
+      )}
+
+      {/* Disponibilidade — só para jogadores */}
+      {playerId && (
+        <div className="relative z-10 pt-4 border-t" style={{ borderColor: "rgba(255,255,255,.1)" }}>
+          <AvailabilityPrompt
+            kind="game"
+            eventId={game.id}
+            deadlineIso={lisbonDateTime(game.event_date, game.event_time).toISOString()}
+            initialAnswer={myGameAvailability ?? null}
+          />
         </div>
       )}
 
