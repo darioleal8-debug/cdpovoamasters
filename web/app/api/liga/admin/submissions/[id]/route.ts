@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
 import { createAdminClient } from "@/lib/supabase/server";
 import { generateLigaNews } from "@/lib/liga/generate-news";
+import { generateNewsImage } from "@/lib/liga/generate-image";
 
 type ExtractionRaw = {
   ok?: boolean;
@@ -54,6 +55,9 @@ async function copyStatsFromSubmission(
       .insert(players);
   }
 }
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function PATCH(
   req: Request,
@@ -164,12 +168,15 @@ export async function PATCH(
 
     if (!isTestGame) {
       const gameId = sub.event_id;
-      // after() garante execução após o response, sem bloquear o admin.
-      // Usa generateLigaNews diretamente (service role) — sem depender do cookie/sessão.
       after(async () => {
         const result = await generateLigaNews(gameId);
         if (!result.ok) {
           console.error(`[submissions/approve] generateLigaNews falhou para game_id=${gameId}: ${result.error}`);
+          return;
+        }
+        const imageResult = await generateNewsImage({ newsId: result.news_id, ...result.newsContext });
+        if (!imageResult.ok) {
+          console.error(`[submissions/approve] generateNewsImage falhou para news_id=${result.news_id}: ${imageResult.errorType}`);
         }
       });
     }
