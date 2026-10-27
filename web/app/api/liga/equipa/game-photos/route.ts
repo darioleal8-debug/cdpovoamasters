@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
+import { authorizeLeagueDelegate } from "@/lib/auth/liga-delegate-guard";
 
 const BUCKET = "game-photos";
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -8,20 +9,19 @@ const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 // POST /api/liga/equipa/game-photos
 // Upload uma fotografia de jogo. Autenticação + membro da equipa obrigatório.
 export async function POST(req: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  const auth = await authorizeLeagueDelegate();
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
 
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "FormData inválido" }, { status: 400 });
 
   const photo    = form.get("photo")     as File   | null;
   const gameId   = form.get("game_id")   as string | null;
-  const teamName = form.get("team_name") as string | null;
   const caption  = ((form.get("caption") as string | null) ?? "").slice(0, 120).trim() || null;
 
-  if (!photo || !gameId || !teamName) {
-    return NextResponse.json({ error: "photo, game_id e team_name são obrigatórios" }, { status: 400 });
+  if (!photo || !gameId) {
+    return NextResponse.json({ error: "photo e game_id são obrigatórios" }, { status: 400 });
   }
 
   if (!ALLOWED_TYPES.includes(photo.type)) {
@@ -34,22 +34,8 @@ export async function POST(req: Request) {
 
   const admin = await createAdminClient();
 
-  // Look up team
-  const { data: team } = await admin
-    .from("league_teams")
-    .select("id")
-    .ilike("name", teamName)
-    .maybeSingle();
-  if (!team) return NextResponse.json({ error: "Equipa não encontrada" }, { status: 400 });
-
-  // Check user is member
-  const { data: member } = await admin
-    .from("league_team_members")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("team_id", team.id)
-    .maybeSingle();
-  if (!member) return NextResponse.json({ error: "Sem permissão para esta equipa" }, { status: 403 });
+  // Equipa do delegado (da associação, não do formulário)
+  const team = { id: auth.teamId };
 
   // Check result not yet approved
   const { data: result } = await admin

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
+import { authorize } from "@/lib/auth/guards";
 import { isBirthdayTodayLisbon, calculateAgeLisbon, getTodayLisbon } from "@/lib/birthday-utils";
 
 export const runtime = "nodejs";
@@ -20,9 +21,9 @@ export interface BirthdayPlayer {
 }
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  // Dados do plantel do clube (datas de nascimento, fotos): só contas ativas do clube
+  const auth = await authorize();
+  if (!auth.ok) return auth.response;
 
   const sp = req.nextUrl.searchParams;
 
