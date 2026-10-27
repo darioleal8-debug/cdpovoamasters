@@ -1,15 +1,11 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
+import { deepseekJSON } from "@/lib/deepseek";
 
-const DEEPSEEK_API = "https://api.deepseek.com/chat/completions";
 // flux/dev: modelo fotorrealista (28 steps), muito mais qualidade que schnell (4 steps)
 const FAL_API = "https://fal.run/fal-ai/flux/dev";
 const BUCKET = "noticias";
-
-function getDeepseekModel() {
-  return process.env.DEEPSEEK_TEXT_MODEL ?? "deepseek-chat";
-}
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -157,9 +153,9 @@ async function _generateNewsImage(ctx: NewsImageContext): Promise<GenerateResult
 
   if (deepseekKey) {
     const t0 = Date.now();
-    console.log(`[generateNewsImage] deepseek:start ${ctx.newsId} model=${getDeepseekModel()}`);
+    console.log(`[generateNewsImage] deepseek:start ${ctx.newsId} model=${process.env.DEEPSEEK_TEXT_MODEL ?? "deepseek-chat"}`);
     try {
-      const result = await buildImagePrompt(ctx, gameData, deepseekKey);
+      const result = await buildImagePrompt(ctx, gameData);
       if (!validatePrompt(result.prompt)) {
         console.warn(`[generateNewsImage] deepseek:banned_terms — usando fallback`);
         const fb = buildFallbackPrompt(ctx, gameData);
@@ -275,7 +271,7 @@ async function _generateNewsImageFromPrompt(
         scoreStr: ctxPartial.scoreStr,
         jornadaInfo: ctxPartial.jornadaInfo,
       };
-      const result = await buildImagePromptFromBrief(brief, ctx, gameData, deepseekKey);
+      const result = await buildImagePromptFromBrief(brief, ctx, gameData);
       if (!validatePrompt(result.prompt)) {
         console.warn(`[generateNewsImage/brief] banned_terms — usando brief directamente`);
         prompt = `Portuguese amateur basketball. ${brief.slice(0, 400)}`;
@@ -638,7 +634,6 @@ negative_prompt: 20–50 words (always include: text, letters, numbers, NBA, ame
 async function buildImagePrompt(
   ctx: NewsImageContext,
   gameData: GameImageData | null,
-  apiKey: string
 ): Promise<{ prompt: string; negativePrompt: string }> {
   const homeTeamName = ctx.homeTeamName ?? "";
   const awayTeamName = ctx.awayTeamName ?? "";
@@ -662,7 +657,7 @@ async function buildImagePrompt(
     ctx.excerpt && `Lead: ${ctx.excerpt.slice(0, 120)}`,
   ].filter(Boolean).join("\n");
 
-  return callDeepSeekForPrompt(systemPrompt, userContent, apiKey);
+  return callDeepSeekForPrompt(systemPrompt, userContent);
 }
 
 // ─── DeepSeek: brief criativo do admin ───────────────────────────────────────
@@ -690,7 +685,6 @@ async function buildImagePromptFromBrief(
   brief: string,
   ctx: NewsImageContext,
   gameData: GameImageData | null,
-  apiKey: string
 ): Promise<{ prompt: string; negativePrompt: string }> {
   const userContent = [
     `Creative brief: ${brief}`,
@@ -702,72 +696,34 @@ async function buildImagePromptFromBrief(
     gameData?.awayKit?.kit_description && `Away kit: ${gameData.awayKit.kit_description}`,
   ].filter(Boolean).join("\n");
 
-  return callDeepSeekForPrompt(BRIEF_SYSTEM_PROMPT, userContent, apiKey);
+  return callDeepSeekForPrompt(BRIEF_SYSTEM_PROMPT, userContent);
 }
 
 async function callDeepSeekForPrompt(
   systemPrompt: string,
   userContent: string,
-  apiKey: string
 ): Promise<{ prompt: string; negativePrompt: string }> {
-  const res = await fetch(DEEPSEEK_API, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: getDeepseekModel(),
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userContent },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.7,
-      max_tokens: 1000,
-    }),
+  const result = await deepseekJSON<{ prompt?: string; negative_prompt?: string }>({
+    system: systemPrompt,
+    user: userContent,
+    maxTokens: 1000,
+    temperature: 0.7,
+    model: process.env.DEEPSEEK_TEXT_MODEL ?? "deepseek-chat",
   });
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`DeepSeek HTTP ${res.status}: ${text.slice(0, 300)}`);
+  if (!result.ok) {
+    throw new Error(result.error);
   }
 
-  const json = (await res.json()) as {
-    choices?: { finish_reason?: string; message?: { content?: string; reasoning_content?: string } }[];
-  };
-
-  const choice = json.choices?.[0];
-  const finishReason = choice?.finish_reason ?? "unknown";
-  const raw = choice?.message?.content ?? "";
-
-  if (!raw.trim()) {
-    const hint = choice?.message?.reasoning_content?.slice(0, 200) ?? "";
-    throw new Error(`DeepSeek devolveu conteúdo vazio (finish_reason=${finishReason}${hint ? `, reasoning="${hint}"` : ""})`);
-  }
-
-  const parsed = safeParseJson(raw);
-
+  const parsed = result.data;
   if (!parsed?.prompt || parsed.prompt.length < 30) {
-    if (raw.length > 50) {
-      console.warn(`[generateNewsImage] deepseek não-JSON, usando como prompt directo (${raw.length} chars)`);
-      return { prompt: raw.slice(0, 500), negativePrompt: STANDARD_NEGATIVE };
-    }
-    throw new Error(`DeepSeek prompt inválido (finish_reason=${finishReason}): ${raw.slice(0, 300)}`);
+    throw new Error(`DeepSeek prompt inválido: ${JSON.stringify(parsed).slice(0, 300)}`);
   }
 
   return {
     prompt: parsed.prompt.slice(0, 500),
     negativePrompt: (parsed.negative_prompt ?? STANDARD_NEGATIVE).slice(0, 300),
   };
-}
-
-function safeParseJson(raw: string): { prompt?: string; negative_prompt?: string } | null {
-  const cleaned = raw
-    .replace(/^```(?:json)?\s*/im, "")
-    .replace(/\s*```\s*$/m, "")
-    .trim();
-  const match = cleaned.match(/\{[\s\S]*\}/);
-  if (!match) return null;
-  try { return JSON.parse(match[0]) as { prompt?: string; negative_prompt?: string }; }
-  catch (err) { console.error(`[safeParseJson] falhou:`, (err as Error).message); return null; }
 }
 
 // Fallback determinístico com dados reais quando DeepSeek falha

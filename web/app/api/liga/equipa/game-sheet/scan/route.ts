@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { parseJsonSafe, validateQuarters, penalizeConfidence } from "@/lib/liga/game-sheet-scan";
+import { validateQuarters, penalizeConfidence } from "@/lib/liga/game-sheet-scan";
 import type { ScanExtraction, QuarterScore, PlayerScan } from "@/lib/liga/game-sheet-scan";
+import { deepseekJSON } from "@/lib/deepseek";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -11,109 +12,27 @@ const MAX_SIZE = 15 * 1024 * 1024;
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const ALLOWED_TYPES = [...IMAGE_TYPES, "application/pdf"];
 
-const DEEPSEEK_API = "https://api.deepseek.com/chat/completions";
-const DEEPSEEK_MODEL = process.env.DEEPSEEK_VISION_MODEL ?? "deepseek-flash";
-
-// DeepSeek: thinking mode is ON by default in deepseek-flash.
-// Disable it explicitly — otherwise reasoning tokens consume max_tokens before the JSON is emitted.
-const THINKING_OFF = { thinking: { type: "disabled" } };
-
-// ── Logging ──────────────────────────────────────────────────────────────────
-
-function logCall(
-  label: string,
-  status: number,
-  finishReason: string | undefined,
-  usage: { prompt_tokens?: number; completion_tokens?: number } | undefined,
-  durationMs: number,
-  contentSnippet: string,
-) {
-  console.log(
-    `[game-sheet/scan] ${label} | HTTP ${status} | finish=${finishReason ?? "?"} | ` +
-    `tokens=${usage?.prompt_tokens ?? "?"}p/${usage?.completion_tokens ?? "?"}c | ${durationMs}ms | ` +
-    `content_preview=${contentSnippet.slice(0, 500)}`,
-  );
-}
-
 // ── DeepSeek helper ──────────────────────────────────────────────────────────
 
-async function callDeepSeek(
-  apiKey: string,
-  messages: object[],
-  maxTokens = 4096,
-): Promise<{ content: string; finishReason: string; usage?: object; durationMs: number; httpStatus: number }> {
-  const t0 = Date.now();
-  const res = await fetch(DEEPSEEK_API, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: DEEPSEEK_MODEL,
-      messages,
-      response_format: { type: "json_object" },
-      temperature: 0,
-      max_tokens: maxTokens,
-      ...THINKING_OFF,
-    }),
-  });
-  const durationMs = Date.now() - t0;
-  const httpStatus = res.status;
-
-  if (!res.ok) {
-    const body = await res.text();
-    return { content: body, finishReason: "error", durationMs, httpStatus };
-  }
-
-  const json = await res.json() as {
-    choices?: { message?: { content?: string }; finish_reason?: string }[];
-    usage?: { prompt_tokens?: number; completion_tokens?: number };
-  };
-
-  const choice = json.choices?.[0];
-  const content = choice?.message?.content ?? "";
-  const finishReason = choice?.finish_reason ?? "unknown";
-
-  logCall("ok", httpStatus, finishReason, json.usage, durationMs, content);
-  return { content, finishReason, usage: json.usage, durationMs, httpStatus };
-}
-
-// ── Parse com retry ──────────────────────────────────────────────────────────
+type ScanContent = string | { type: string; [key: string]: unknown }[];
 
 async function callAndParse(
-  apiKey: string,
-  messages: object[],
+  userContent: ScanContent,
   label: string,
 ): Promise<{ data: Record<string, unknown>; reason?: string }> {
-  const first = await callDeepSeek(apiKey, messages);
+  const result = await deepseekJSON<Record<string, unknown>>({
+    user: userContent,
+    maxTokens: 4096,
+    temperature: 0,
+    model: process.env.DEEPSEEK_VISION_MODEL ?? "deepseek-flash",
+  });
 
-  if (first.httpStatus >= 400) {
-    const reason = `erro DeepSeek ${first.httpStatus}: ${first.content.slice(0, 200)}`;
-    console.error(`[game-sheet/scan] ${label} HTTP error:`, reason);
-    return { data: {}, reason };
+  if (!result.ok) {
+    console.error(`[game-sheet/scan] ${label} failed: ${result.error}`);
+    return { data: {}, reason: result.error };
   }
 
-  if (first.finishReason === "length") {
-    console.error(`[game-sheet/scan] ${label} truncated (finish_reason=length)`);
-    return { data: {}, reason: "resposta truncada — o modelo atingiu o limite de tokens" };
-  }
-
-  try {
-    return { data: parseJsonSafe(first.content) };
-  } catch (e) {
-    console.error(`[game-sheet/scan] ${label} JSON parse failed, retrying:`, String(e));
-    // Retry com instrução mais explícita
-    const retry = await callDeepSeek(apiKey, [
-      ...messages,
-      { role: "assistant", content: first.content },
-      { role: "user", content: "Responde APENAS com o JSON pedido, sem texto adicional, sem markdown." },
-    ]);
-    if (retry.finishReason === "length")
-      return { data: {}, reason: "resposta truncada após retry" };
-    try {
-      return { data: parseJsonSafe(retry.content) };
-    } catch {
-      return { data: {}, reason: "JSON inválido após retry — preenche manualmente" };
-    }
-  }
+  return { data: result.data };
 }
 
 // ── Buscar nomes das equipas a partir do game_id ─────────────────────────────
@@ -270,8 +189,7 @@ export async function POST(req: Request) {
       }
 
       const { data, reason } = await callAndParse(
-        apiKey,
-        [{ role: "user", content: makeTextPrompt(pdfText, homeTeam, awayTeam) }],
+        makeTextPrompt(pdfText, homeTeam, awayTeam),
         "pdf",
       );
       if (reason) globalReason = reason;
@@ -285,14 +203,10 @@ export async function POST(req: Request) {
 
       // Chamada A: resultado + parciais (obrigatória)
       const { data: scoresData, reason: scoresReason } = await callAndParse(
-        apiKey,
-        [{
-          role: "user",
-          content: [
-            { type: "image_url", image_url: { url: dataUrl } },
-            { type: "text", text: makeScoresPrompt(homeTeam, awayTeam) },
-          ],
-        }],
+        [
+          { type: "image_url", image_url: { url: dataUrl } },
+          { type: "text", text: makeScoresPrompt(homeTeam, awayTeam) },
+        ],
         "scores",
       );
 
@@ -305,14 +219,10 @@ export async function POST(req: Request) {
         // Chamada B: jogadores (opcional — falha silenciosa)
         try {
           const { data: playersData, reason: playersReason } = await callAndParse(
-            apiKey,
-            [{
-              role: "user",
-              content: [
-                { type: "image_url", image_url: { url: dataUrl } },
-                { type: "text", text: PLAYERS_PROMPT },
-              ],
-            }],
+            [
+              { type: "image_url", image_url: { url: dataUrl } },
+              { type: "text", text: PLAYERS_PROMPT },
+            ],
             "players",
           );
           if (!playersReason && Array.isArray(playersData.jogadores)) {

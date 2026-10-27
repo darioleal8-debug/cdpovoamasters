@@ -1,8 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { computeStandings } from "@/types/competitions";
-
-const DEEPSEEK_API = "https://api.deepseek.com/chat/completions";
-const DEEPSEEK_MODEL = "deepseek-flash";
+import { deepseekJSON } from "@/lib/deepseek";
 
 function slugify(text: string): string {
   return text
@@ -24,12 +22,20 @@ export type NewsContext = {
   jornadaInfo: string;
 };
 
+const NEWS_SYSTEM = `Escreves notícias de jornalismo desportivo local em português de Portugal sobre basquetebol da Liga INATEL Masters.
+Usa APENAS os factos fornecidos — nunca inventes dados.
+Tom entusiasta mas sóbrio. Português europeu (não do Brasil).
+
+Responde APENAS com JSON válido (sem markdown) com este esquema:
+{
+  "titulo": "título da notícia (máx. 80 caracteres)",
+  "entrada": "1-2 frases de entrada/lide",
+  "corpo": "corpo da notícia, 150-250 palavras"
+}`;
+
 export async function generateLigaNews(
   gameId: string
 ): Promise<{ ok: true; news_id: string; newsContext: NewsContext } | { ok: false; error: string }> {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) return { ok: false, error: "DEEPSEEK_API_KEY não configurada" };
-
   const adminClient = await createAdminClient();
 
   const [eventRes, resultRes, compRes] = await Promise.all([
@@ -84,7 +90,6 @@ export async function generateLigaNews(
     jornadaInfo = `Jornada ${meta.jornada ?? "?"}, Volta ${meta.volta ?? "?"}, Série ${meta.serie ?? "A"}`;
   } catch { /* ignore */ }
 
-  // Legendas das fotos reais (contexto texto para DeepSeek — sem enviar imagens)
   let photoCaptions = "";
   try {
     const { data: gamePics } = await adminClient
@@ -102,9 +107,7 @@ export async function generateLigaNews(
   const winner = homeWon ? result.home_team_name : result.away_team_name;
   const scoreStr = `${result.home_score}-${result.away_score}`;
 
-  const prompt = `Escreve uma notícia de jornalismo desportivo local, em português de Portugal, sobre o seguinte resultado de basquetebol da Liga INATEL Masters.
-
-JOGO: ${result.home_team_name} ${scoreStr} ${result.away_team_name}
+  const userPrompt = `JOGO: ${result.home_team_name} ${scoreStr} ${result.away_team_name}
 Vencedor: ${winner}
 Data: ${event.event_date}
 Local: ${event.location ?? "não especificado"}
@@ -117,53 +120,36 @@ CLASSIFICAÇÃO ACTUALIZADA (top 5):
 ${top5}
 
 Regras:
-- Usa APENAS os factos fornecidos (nada inventado)
-- Português de Portugal (não do Brasil)
-- Tom de jornalismo desportivo local, entusiasta mas sóbrio
-- Menciona o contexto da jornada e o impacto na classificação se relevante
+- Menciona o contexto da jornada e o impacto na classificação se relevante`;
 
-Responde com JSON:
-{
-  "titulo": "título da notícia (máx. 80 caracteres)",
-  "entrada": "1-2 frases de entrada/lide",
-  "corpo": "corpo da notícia, 150-250 palavras"
-}`;
-
-  const res = await fetch(DEEPSEEK_API, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: DEEPSEEK_MODEL,
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-      temperature: 0.4,
-      max_tokens: 1024,
-    }),
+  const aiResult = await deepseekJSON<{ titulo?: string; entrada?: string; corpo?: string }>({
+    system: NEWS_SYSTEM,
+    user: userPrompt,
+    maxTokens: 4096,
+    temperature: 0.4,
   });
 
-  if (!res.ok) {
-    const t = await res.text();
-    const msg = `DeepSeek error ${res.status}: ${t.slice(0, 200)}`;
+  if (!aiResult.ok) {
+    console.error(`[generateLigaNews] deepseekJSON failed: ${aiResult.error}`);
+    return { ok: false, error: aiResult.error };
+  }
+
+  const newsData = aiResult.data;
+
+  let titulo = (newsData.titulo ?? "").trim();
+  const corpo = (newsData.corpo ?? "").trim();
+
+  if (!titulo || !corpo) {
+    const msg = `DeepSeek não devolveu notícia válida (titulo=${!!titulo}, corpo=${!!corpo})`;
     console.error(`[generateLigaNews] ${msg}`);
     return { ok: false, error: msg };
   }
 
-  const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  const rawContent = json.choices?.[0]?.message?.content ?? "{}";
-  let newsData: { titulo?: string; entrada?: string; corpo?: string } = {};
-  try { newsData = JSON.parse(rawContent); } catch { /* ignore */ }
+  if (titulo.length > 80) titulo = titulo.slice(0, 80);
 
-  if (!newsData.titulo || !newsData.corpo) {
-    const msg = `DeepSeek não devolveu notícia válida: ${rawContent.slice(0, 200)}`;
-    console.error(`[generateLigaNews] ${msg}`);
-    return { ok: false, error: msg };
-  }
-
-  // Slug determinístico: liga-inatel-{equipa_casa}-{equipa_fora}-{data}
   const datePart = event.event_date.slice(0, 10);
   const slug = `liga-inatel-${slugify(result.home_team_name)}-${slugify(result.away_team_name)}-${datePart}`;
 
-  // Check-then-write idempotente por game_id
   const { data: existing } = await adminClient
     .from("news")
     .select("id")
@@ -176,9 +162,9 @@ Responde com JSON:
     const { error } = await adminClient
       .from("news")
       .update({
-        title: newsData.titulo,
+        title: titulo,
         excerpt: newsData.entrada ?? "",
-        body: newsData.corpo,
+        body: corpo,
         home_team_name: result.home_team_name,
         away_team_name: result.away_team_name,
         source_submission_id: submission?.id ?? null,
@@ -197,9 +183,9 @@ Responde com JSON:
         slug,
         game_id: gameId,
         source_submission_id: submission?.id ?? null,
-        title: newsData.titulo,
+        title: titulo,
         excerpt: newsData.entrada ?? "",
-        body: newsData.corpo,
+        body: corpo,
         category: "Liga INATEL",
         home_team_name: result.home_team_name,
         away_team_name: result.away_team_name,
@@ -220,7 +206,7 @@ Responde com JSON:
     ok: true,
     news_id,
     newsContext: {
-      title: newsData.titulo!,
+      title: titulo,
       excerpt: newsData.entrada ?? "",
       homeTeamName: result.home_team_name,
       awayTeamName: result.away_team_name,

@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/auth/guards";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { deepseekJSON } from "@/lib/deepseek";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
-
-const DEEPSEEK_ENDPOINT = "https://api.deepseek.com/v1/chat/completions";
-const DEEPSEEK_MODEL = "deepseek-chat";
 const MAX_ITERATIONS = 3;
 
 function ok(data: Record<string, unknown>) {
@@ -101,10 +99,9 @@ function determineAction(group: EventRow[]): Action {
 
 // ─── DeepSeek call (non-fatal: fallback to deterministic on failure) ─
 
-async function callDeepSeek(
-  rounds: object[],
-  apiKey: string
-): Promise<DSResponse | null> {
+const CLEANUP_SYSTEM = "És um assistente de auditoria de dados desportivos. Respondes sempre em JSON puro, sem markdown.";
+
+async function callDeepSeek(rounds: object[]): Promise<DSResponse | null> {
   const userMsg = `Analisa estes grupos de jogos duplicados e confirma quais eliminar.
 
 CRITÉRIOS DE DUPLICAÇÃO (todos os campos após normalização de acentos/capitalização/espaços):
@@ -137,45 +134,20 @@ Se não houver duplicados: { "duplicates_found": false, "actions": [], "summary"
 Dados (já ordenados por created_at — o primeiro de cada grupo deve ser mantido):
 ${JSON.stringify({ operation: "detect_and_remove_duplicates", rounds }, null, 2)}`;
 
-  try {
-    const resp = await fetch(DEEPSEEK_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: DEEPSEEK_MODEL,
-        temperature: 0,
-        max_tokens: 2000,
-        messages: [
-          {
-            role: "system",
-            content: "És um assistente de auditoria de dados desportivos. Respondes sempre em JSON puro, sem markdown.",
-          },
-          { role: "user", content: userMsg },
-        ],
-      }),
-    });
+  const result = await deepseekJSON<DSResponse>({
+    system: CLEANUP_SYSTEM,
+    user: userMsg,
+    maxTokens: 2000,
+    temperature: 0,
+    model: "deepseek-chat",
+  });
 
-    if (!resp.ok) {
-      console.error(`[deepseek/calendar-cleanup] API error ${resp.status}`);
-      return null;
-    }
-
-    const json = await resp.json();
-    const tokens = json.usage;
-    console.log(
-      `[deepseek/calendar-cleanup] tokens: ${tokens?.prompt_tokens} prompt + ${tokens?.completion_tokens} completion`
-    );
-
-    const raw = (json.choices?.[0]?.message?.content ?? "") as string;
-    const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    return JSON.parse(cleaned) as DSResponse;
-  } catch (e) {
-    console.error("[deepseek/calendar-cleanup] fallback to deterministic:", (e as Error).message);
+  if (!result.ok) {
+    console.error("[deepseek/calendar-cleanup] fallback to deterministic:", result.error);
     return null;
   }
+
+  return result.data;
 }
 
 // ─── Merge: deterministic is ground truth, DeepSeek enriches reasons ─
@@ -293,7 +265,7 @@ export async function POST(req: NextRequest) {
     }));
 
     // ── Call DeepSeek (non-fatal) ─────────────────────────────
-    const dsResponse = await callDeepSeek(rounds, apiKey);
+    const dsResponse = await callDeepSeek(rounds);
 
     // ── Merge: deterministic wins, DeepSeek enriches reasons ──
     const validatedActions = mergeActions(deterministicActions, dsResponse, validIds);

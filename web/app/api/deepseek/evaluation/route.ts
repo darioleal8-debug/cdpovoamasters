@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/auth/guards";
 import { MANAGERS } from "@/lib/auth/roles";
 import { createAdminClient } from "@/lib/supabase/server";
+import { deepseekJSON } from "@/lib/deepseek";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-
-const DEEPSEEK_ENDPOINT = "https://api.deepseek.com/v1/chat/completions";
-const DEEPSEEK_MODEL = "deepseek-chat";
 
 interface StatAgg {
   games: number;
@@ -31,8 +29,7 @@ export async function POST(req: NextRequest) {
   if (!auth.ok) return auth.response;
   const supabase = auth.supabase;
 
-  const key = process.env.DEEPSEEK_API_KEY;
-  if (!key)
+  if (!process.env.DEEPSEEK_API_KEY)
     return NextResponse.json({ error: "DEEPSEEK_API_KEY não configurada" }, { status: 500 });
 
   let event_id: string;
@@ -249,90 +246,31 @@ Devolve exatamente este JSON:
   "tactical_notes": "observações táticas e estratégia sugerida para este jogo"
 }`;
 
-  let deepseekRes: Response;
-  try {
-    deepseekRes = await fetch(DEEPSEEK_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model: DEEPSEEK_MODEL,
-        max_tokens: 4096,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-      }),
-    });
-  } catch (err) {
-    console.error("[deepseek/evaluation] fetch error:", err);
-    return NextResponse.json(
-      { error: "Erro de rede ao contactar DeepSeek" },
-      { status: 502 }
-    );
-  }
+  const aiResult = await deepseekJSON<{
+    recommended_players?: Array<{ player_id: string; name: string; score: number; reason: string }>;
+    excluded_players?: Array<{ player_id: string; name: string; reason: string }>;
+    tactical_notes?: string;
+  }>({
+    system: systemPrompt,
+    user: userPrompt,
+    maxTokens: 4096,
+    model: "deepseek-chat",
+  });
 
-  if (!deepseekRes.ok) {
-    const errText = await deepseekRes.text().catch(() => "");
-    console.error("[deepseek/evaluation] API error:", deepseekRes.status, errText);
-    return NextResponse.json(
-      { error: `DeepSeek API error ${deepseekRes.status}` },
-      { status: 502 }
-    );
-  }
-
-  const raw = (await deepseekRes.json()) as {
-    choices: Array<{ message: { content: string }; finish_reason: string }>;
-    usage?: { prompt_tokens: number; completion_tokens: number };
-  };
-
-  const content = raw.choices?.[0]?.message?.content;
-  if (!content)
-    return NextResponse.json(
-      { error: "DeepSeek: resposta sem conteúdo" },
-      { status: 502 }
-    );
-
-  if (raw.usage) {
-    console.log(
-      `[deepseek/evaluation] tokens: ${raw.usage.prompt_tokens} prompt + ${raw.usage.completion_tokens} completion`
-    );
+  if (!aiResult.ok) {
+    console.error("[deepseek/evaluation] deepseekJSON failed:", aiResult.error);
+    return NextResponse.json({ error: aiResult.error }, { status: 502 });
   }
 
   let evaluation: {
-    recommended_players: Array<{
-      player_id: string;
-      name: string;
-      score: number;
-      reason: string;
-    }>;
-    excluded_players: Array<{
-      player_id: string;
-      name: string;
-      reason: string;
-    }>;
+    recommended_players: Array<{ player_id: string; name: string; score: number; reason: string }>;
+    excluded_players: Array<{ player_id: string; name: string; reason: string }>;
     tactical_notes?: string;
+  } = {
+    recommended_players: aiResult.data.recommended_players ?? [],
+    excluded_players: aiResult.data.excluded_players ?? [],
+    tactical_notes: aiResult.data.tactical_notes,
   };
-
-  try {
-    const jsonMatch =
-      content.match(/```(?:json)?\s*([\s\S]+?)\s*```/) ??
-      content.match(/(\{[\s\S]+\})/);
-    const jsonStr = jsonMatch ? jsonMatch[1] : content.trim();
-    evaluation = JSON.parse(jsonStr);
-  } catch (e) {
-    console.error(
-      "[deepseek/evaluation] JSON parse error:",
-      e,
-      content.slice(0, 300)
-    );
-    return NextResponse.json(
-      { error: "Resposta da IA inválida — não foi possível interpretar" },
-      { status: 502 }
-    );
-  }
 
   // Safety: move any late player from recommended to excluded
   const lateInRec = (evaluation.recommended_players ?? []).filter((p) =>
