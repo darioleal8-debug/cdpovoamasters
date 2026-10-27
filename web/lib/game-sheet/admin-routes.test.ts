@@ -273,18 +273,18 @@ describe("DELETE apagar folha", () => {
     expect((await sheetsRoute.DELETE(delReq({ kind: "import", id: "not-a-uuid" }), p({ eventId: GAME }))).status).toBe(400);
   });
 
-  it("apaga importação e remove objeto do Storage quando can_remove=true", async () => {
+  it("apaga importação e remove objeto do Storage quando other_refs=0", async () => {
     const removedPaths: string[] = [];
     userClient = fakeSupabase({
       user: { id: ADMIN },
       handler: (q) => (q.table === "events" ? { data: EVENT() } : { data: null }),
       rpc: (name) => name === "liga_delete_game_sheet"
-        ? { data: { storage_path: `admin/${GAME}/abc.jpg`, can_remove: true } }
+        ? { data: { storage_path: `admin/${GAME}/abc.jpg`, other_refs: 0 } }
         : { data: null },
     });
     serviceClient = fakeSupabase({
       user: null,
-      handler: () => ({ data: [] }),
+      handler: (q) => (q.table === "game_sheet_imports" && q.op === "delete" ? { data: null } : { data: [] }),
       storage: { remove: (paths) => { removedPaths.push(...paths); return {}; } },
     });
     adminClient = fakeSupabase({ user: null, handler: () => ({ data: null }) });
@@ -294,16 +294,16 @@ describe("DELETE apagar folha", () => {
     expect(removedPaths).toContain(`admin/${GAME}/abc.jpg`);
   });
 
-  it("apaga importação com can_remove=false — não remove Storage", async () => {
+  it("apaga importação com other_refs>0 — não remove Storage", async () => {
     let storageCalled = false;
     userClient = fakeSupabase({
       user: { id: ADMIN },
       handler: (q) => (q.table === "events" ? { data: EVENT() } : { data: null }),
-      rpc: () => ({ data: { storage_path: `admin/${GAME}/abc.jpg`, can_remove: false } }),
+      rpc: () => ({ data: { storage_path: `admin/${GAME}/abc.jpg`, other_refs: 1 } }),
     });
     serviceClient = fakeSupabase({
       user: null,
-      handler: () => ({ data: [] }),
+      handler: (q) => (q.table === "game_sheet_imports" && q.op === "delete" ? { data: null } : { data: [] }),
       storage: { remove: () => { storageCalled = true; return {}; } },
     });
     adminClient = fakeSupabase({ user: null, handler: () => ({ data: null }) });

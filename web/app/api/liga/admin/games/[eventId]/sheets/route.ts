@@ -100,20 +100,24 @@ export async function DELETE(req: Request, { params }: Params) {
     return jsonError(rpcErr.message, status);
   }
 
-  const result = rpcData as { storage_path: string | null; can_remove: boolean } | null;
+  // A função RPC faz validação, anula FKs e regista auditoria.
+  // O DELETE da linha e a remoção do Storage são feitos aqui com service role.
+  const result = rpcData as { storage_path: string | null; other_refs: number } | null;
   const svc = createServiceClient();
 
-  if (kind === "import" && result?.can_remove && result.storage_path) {
-    const { error: rmErr } = await svc.storage.from("folhas-jogo").remove([result.storage_path]);
-    if (rmErr) console.error(`[delete-sheet] remove ${result.storage_path}: ${rmErr.message}`);
+  if (kind === "import") {
+    const { error: delErr } = await svc.from("game_sheet_imports").delete().eq("id", id);
+    if (delErr) console.error(`[delete-sheet] delete import ${id}: ${delErr.message}`);
+
+    if (result?.storage_path && (result.other_refs ?? 1) === 0) {
+      const { error: rmErr } = await svc.storage.from("folhas-jogo").remove([result.storage_path]);
+      if (rmErr) console.error(`[delete-sheet] remove ${result.storage_path}: ${rmErr.message}`);
+    }
   } else if (kind === "submission" && subPhotoUrl) {
     const loc = resolveSheetLocation(subPhotoUrl);
     if (loc) {
-      // Verificar se mais alguma importação ainda referencia este path
       const { data: refs } = await svc.from("game_sheet_imports")
-        .select("id")
-        .eq("image_path", loc.path)
-        .limit(1);
+        .select("id").eq("image_path", loc.path).limit(1);
       if (!refs?.length) {
         const { error: rmErr } = await svc.storage.from(loc.bucket).remove([loc.path]);
         if (rmErr) console.error(`[delete-sheet] remove sub ${loc.bucket}/${loc.path}: ${rmErr.message}`);
