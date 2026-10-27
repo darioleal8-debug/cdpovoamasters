@@ -36,6 +36,7 @@ type Submission = {
   submitted_by_name: string; submitted_by_team: string | null;
   submitted_at: string; notes: string | null;
   import_id?: string | null;
+  sheet_kind?: "image" | "pdf" | null;
 };
 
 type AdminGame = {
@@ -993,6 +994,9 @@ export default function LigaAdminPage() {
                                 <p style={{ fontSize: "11px", color: "#6B7280", margin: "0 0 6px" }}>
                                   Nota: {sub.notes}
                                 </p>
+                              )}
+                              {sub.sheet_kind && (
+                                <SubmissionSheet subId={sub.id} kind={sub.sheet_kind} />
                               )}
                               {sub.import_id && (
                                 <a
@@ -2031,6 +2035,49 @@ export default function LigaAdminPage() {
 }
 
 // ─── Micro-components ─────────────────────────────────────────────────────────
+
+/** Folha de jogo submetida pelo delegado (bucket privado, URL assinado de curta duração). */
+function SubmissionSheet({ subId, kind }: { subId: string; kind: "image" | "pdf" }) {
+  const [open, setOpen] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const href = `/api/liga/admin/submissions/${subId}/sheet`;
+  const link = { fontSize: "11px", fontWeight: 700, color: "#C2530A" } as const;
+  return (
+    <div style={{ margin: "0 0 6px" }}>
+      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+        {kind === "image" && (
+          <button
+            type="button"
+            onClick={() => { setOpen((o) => !o); setFailed(false); }}
+            style={{ ...link, background: "none", border: "none", padding: 0, cursor: "pointer", textDecoration: "underline" }}
+          >
+            {open ? "Ocultar folha de jogo" : "📄 Ver folha de jogo"}
+          </button>
+        )}
+        <a href={href} target="_blank" rel="noopener noreferrer" style={link}>
+          {kind === "pdf" ? "📄 Abrir folha de jogo (PDF) ↗" : "Abrir em novo separador ↗"}
+        </a>
+      </div>
+      {open && kind === "image" && (
+        failed ? (
+          <p style={{ fontSize: "11px", color: "#DC2626", margin: "6px 0 0" }}>
+            Não foi possível carregar a folha de jogo (ficheiro em falta no armazenamento).
+          </p>
+        ) : (
+          <a href={href} target="_blank" rel="noopener noreferrer" title="Abrir em tamanho real">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={href}
+              alt="Folha de jogo submetida"
+              onError={() => setFailed(true)}
+              style={{ display: "block", width: "100%", maxHeight: "480px", objectFit: "contain", marginTop: "6px", borderRadius: "6px", border: "1px solid #E8E0D6", background: "#fff" }}
+            />
+          </a>
+        )
+      )}
+    </div>
+  );
+}
 
 function SignOutBtn() {
   const router = useRouter();
