@@ -38,10 +38,12 @@ export async function generateLigaNews(
 ): Promise<{ ok: true; news_id: string; newsContext: NewsContext } | { ok: false; error: string }> {
   const adminClient = await createAdminClient();
 
-  const [eventRes, resultRes, compRes] = await Promise.all([
+  const [eventRes, resultRes, compRes, periodsRes, playerStatsRes] = await Promise.all([
     adminClient.from("events").select("id, title, event_date, location, description").eq("id", gameId).single(),
     adminClient.from("league_game_results").select("*").eq("event_id", gameId).maybeSingle(),
     adminClient.from("competitions").select("id, name").eq("slug", "liga-inatel").single(),
+    adminClient.from("league_game_periods").select("periodo, home_points, away_points").eq("event_id", gameId).order("periodo"),
+    adminClient.from("league_game_player_stats").select("nome, side, pontos").eq("event_id", gameId).order("pontos", { ascending: false }),
   ]);
 
   const event = eventRes.data;
@@ -84,6 +86,47 @@ export async function generateLigaNews(
     } catch { /* ignore */ }
   }
 
+  // Parciais vindos da DB (fonte de verdade após aprovação)
+  const periods = (periodsRes.data ?? []) as { periodo: number; home_points: number; away_points: number }[];
+  let periodsBlock = "";
+  let decisivePeriodLine = "";
+  if (periods.length > 0) {
+    let cumHome = 0;
+    let cumAway = 0;
+    const lines: string[] = ["PARCIAIS (casa | fora | acumulado):"];
+    let maxSwing = 0;
+    let decisivePeriod = 0;
+    let decisiveDesc = "";
+    for (const p of periods) {
+      cumHome += p.home_points;
+      cumAway += p.away_points;
+      lines.push(`P${p.periodo}: ${p.home_points} | ${p.away_points} | ${cumHome}-${cumAway}`);
+      const swing = p.home_points - p.away_points;
+      if (Math.abs(swing) > Math.abs(maxSwing)) {
+        maxSwing = swing;
+        decisivePeriod = p.periodo;
+        const side = swing > 0 ? "casa" : "fora";
+        decisiveDesc = `P${p.periodo} (${side} +${Math.abs(swing)}, ${cumHome}-${cumAway} acumulado)`;
+      }
+    }
+    periodsBlock = lines.join("\n");
+    if (decisivePeriod > 0) decisivePeriodLine = `Período decisivo: ${decisiveDesc}`;
+  }
+
+  // Top marcadores por equipa (DB tem prioridade; fallback para extraction_raw)
+  const dbPlayers = (playerStatsRes.data ?? []) as { nome: string; side: string; pontos: number }[];
+  let topScorersByTeamBlock = "";
+  if (dbPlayers.length > 0) {
+    const homeTop = dbPlayers.filter((j) => j.side === "home" && j.pontos > 0).slice(0, 3);
+    const awayTop = dbPlayers.filter((j) => j.side === "away" && j.pontos > 0).slice(0, 3);
+    const parts: string[] = [];
+    if (homeTop.length > 0) parts.push(`Casa: ${homeTop.map((j) => `${j.nome} (${j.pontos} pts)`).join(", ")}`);
+    if (awayTop.length > 0) parts.push(`Fora: ${awayTop.map((j) => `${j.nome} (${j.pontos} pts)`).join(", ")}`);
+    if (parts.length > 0) topScorersByTeamBlock = `Marcadores por equipa:\n${parts.join("\n")}`;
+  } else if (topScorers) {
+    topScorersByTeamBlock = `Destaques: ${topScorers}`;
+  }
+
   let jornadaInfo = "";
   try {
     const meta = JSON.parse(event.description ?? "{}") as { jornada?: number; volta?: number; serie?: string };
@@ -112,7 +155,9 @@ Vencedor: ${winner}
 Data: ${event.event_date}
 Local: ${event.location ?? "não especificado"}
 ${jornadaInfo}
-${topScorers ? `Destaques: ${topScorers}` : ""}
+${periodsBlock ? `\n${periodsBlock}` : ""}
+${decisivePeriodLine ? decisivePeriodLine : ""}
+${topScorersByTeamBlock ? `\n${topScorersByTeamBlock}` : ""}
 ${submission?.notes ? `Notas: ${submission.notes}` : ""}
 ${photoCaptions ? `Descrição das fotografias do jogo: ${photoCaptions}` : ""}
 
@@ -120,7 +165,8 @@ CLASSIFICAÇÃO ACTUALIZADA (top 5):
 ${top5}
 
 Regras:
-- Menciona o contexto da jornada e o impacto na classificação se relevante`;
+- Menciona o contexto da jornada e o impacto na classificação se relevante
+- Usa APENAS os dados fornecidos acima — nunca inventes pontuações, nomes ou factos`;
 
   const aiResult = await deepseekJSON<{ titulo?: string; entrada?: string; corpo?: string }>({
     system: NEWS_SYSTEM,

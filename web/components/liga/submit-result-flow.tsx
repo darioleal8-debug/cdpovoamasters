@@ -100,12 +100,15 @@ interface ScanResult {
   pontos_casa?: number | null;
   pontos_fora?: number | null;
   parciais?: { periodo: number; casa: number; fora: number }[];
+  jogadores?: { nome: string; equipa: "casa" | "fora"; numero?: number | null; pontos?: number | null; faltas?: number | null }[];
   confianca?: number;
   avisos?: string[];
   fallback_manual?: boolean;
-  /** Razão legível para o delegado quando o OCR falha */
   reason?: string;
 }
+
+type EditParcial = { periodo: number; casa: number; fora: number };
+type EditJogador = { nome: string; equipa: "casa" | "fora"; numero: number | null; pontos: number; faltas: number | null };
 
 export function SubmitResultFlow({ games, teamName, preselectedGameId = null }: Props) {
   const router = useRouter();
@@ -120,6 +123,8 @@ export function SubmitResultFlow({ games, teamName, preselectedGameId = null }: 
   const [homeScore, setHomeScore] = useState("");
   const [awayScore, setAwayScore] = useState("");
   const [notes, setNotes] = useState("");
+  const [editedParciais, setEditedParciais] = useState<EditParcial[]>([]);
+  const [editedJogadores, setEditedJogadores] = useState<EditJogador[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fotos de jogo (passo game_photos)
@@ -158,6 +163,7 @@ export function SubmitResultFlow({ games, teamName, preselectedGameId = null }: 
     setStep("select"); setSelectedGame(null); setScanResult(null);
     setPhotoPreview(null); setHomeScore(""); setAwayScore(""); setNotes(""); setError(null);
     setStagedPhoto(null); setGamePhotos([]); setPhotoConsent(false);
+    setEditedParciais([]); setEditedJogadores([]);
   }
 
   function close() {
@@ -290,7 +296,11 @@ export function SubmitResultFlow({ games, teamName, preselectedGameId = null }: 
           away_score: as_,
           photo_path: scanResult?.photo_path ?? null,
           notes: notes || undefined,
-          extraction_raw: scanResult?.pontos_casa != null ? scanResult : undefined,
+          extraction_raw: scanResult?.pontos_casa != null ? {
+            ...scanResult,
+            parciais: editedParciais.length > 0 ? editedParciais : (scanResult.parciais ?? []),
+            jogadores: editedJogadores.length > 0 ? editedJogadores : (scanResult.jogadores ?? []),
+          } : undefined,
         }),
       });
       const json = await res.json();
@@ -513,7 +523,19 @@ export function SubmitResultFlow({ games, teamName, preselectedGameId = null }: 
             <div style={{ display: "flex", gap: "10px" }}>
               <button onClick={() => { setStep("photo"); setError(null); setStagedPhoto(null); }} style={s.btn()}>← Voltar</button>
               <button
-                onClick={() => { setStep("confirm"); setError(null); }}
+                onClick={() => {
+                  setEditedParciais(scanResult?.parciais ?? []);
+                  setEditedJogadores(
+                    (scanResult?.jogadores ?? []).map((j) => ({
+                      nome: j.nome,
+                      equipa: j.equipa,
+                      numero: j.numero ?? null,
+                      pontos: j.pontos ?? 0,
+                      faltas: j.faltas ?? null,
+                    }))
+                  );
+                  setStep("confirm"); setError(null);
+                }}
                 disabled={gamePhotos.length > 0 && !photoConsent}
                 style={{ ...s.btn(true, gamePhotos.length > 0 && !photoConsent), flex: 1 }}
               >
@@ -600,20 +622,135 @@ export function SubmitResultFlow({ games, teamName, preselectedGameId = null }: 
               </div>
             </div>
 
-            {/* Parciais (se disponíveis) */}
-            {(scanResult?.parciais ?? []).length > 0 && (
-              <div style={{ marginBottom: "12px" }}>
-                <p style={{ ...s.label, marginBottom: "6px" }}>Parciais por período</p>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px" }}>
-                  {scanResult!.parciais!.map((p) => (
-                    <div key={p.periodo} style={{ textAlign: "center", padding: "6px 8px", background: "var(--card,#fff)", borderRadius: "6px", border: "1px solid var(--border,#E8E0D4)" }}>
-                      <p style={{ fontSize: "10px", color: "var(--muted,#6F675F)", margin: "0 0 2px" }}>P{p.periodo}</p>
-                      <p style={{ fontSize: "13px", fontWeight: 700, margin: 0, fontVariantNumeric: "tabular-nums" }}>{p.casa}–{p.fora}</p>
+            {/* Parciais editáveis */}
+            {editedParciais.length > 0 && (() => {
+              const hs = parseInt(homeScore, 10) || 0;
+              const as_ = parseInt(awayScore, 10) || 0;
+              const sumCasa = editedParciais.reduce((a, p) => a + p.casa, 0);
+              const sumFora = editedParciais.reduce((a, p) => a + p.fora, 0);
+              const casaMismatch = hs > 0 && sumCasa !== hs;
+              const foraMismatch = as_ > 0 && sumFora !== as_;
+              return (
+                <div style={{ marginBottom: "12px" }}>
+                  <p style={{ ...s.label, marginBottom: "6px" }}>Parciais por período</p>
+                  {(casaMismatch || foraMismatch) && (
+                    <div style={{ marginBottom: "8px", padding: "6px 10px", background: "#FFFBEB", borderRadius: "6px", border: "1px solid #FDE68A" }}>
+                      {casaMismatch && <p style={{ fontSize: "11px", color: "#92400E", margin: 0 }}>⚠ Soma casa ({sumCasa}) ≠ resultado ({hs})</p>}
+                      {foraMismatch && <p style={{ fontSize: "11px", color: "#92400E", margin: casaMismatch ? "2px 0 0" : 0 }}>⚠ Soma fora ({sumFora}) ≠ resultado ({as_})</p>}
                     </div>
-                  ))}
+                  )}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px" }}>
+                    {editedParciais.map((p, i) => (
+                      <div key={p.periodo} style={{ background: "var(--card,#fff)", borderRadius: "6px", border: "1px solid var(--border,#E8E0D4)", padding: "6px 4px", textAlign: "center" }}>
+                        <p style={{ fontSize: "10px", color: "var(--muted,#6F675F)", margin: "0 0 4px" }}>P{p.periodo}</p>
+                        <input
+                          type="number" min="0" value={p.casa}
+                          onChange={(e) => {
+                            const v = parseInt(e.target.value, 10);
+                            setEditedParciais((prev) => prev.map((x, j) => j === i ? { ...x, casa: isNaN(v) ? 0 : v } : x));
+                          }}
+                          style={{ width: "100%", padding: "2px", fontSize: "13px", fontWeight: 700, textAlign: "center", border: "1px solid #E8E0D4", borderRadius: "4px", background: "var(--bg,#F6F2EC)", fontVariantNumeric: "tabular-nums", boxSizing: "border-box" as const }}
+                        />
+                        <p style={{ fontSize: "10px", color: "var(--muted,#6F675F)", margin: "2px 0" }}>–</p>
+                        <input
+                          type="number" min="0" value={p.fora}
+                          onChange={(e) => {
+                            const v = parseInt(e.target.value, 10);
+                            setEditedParciais((prev) => prev.map((x, j) => j === i ? { ...x, fora: isNaN(v) ? 0 : v } : x));
+                          }}
+                          style={{ width: "100%", padding: "2px", fontSize: "13px", fontWeight: 700, textAlign: "center", border: "1px solid #E8E0D4", borderRadius: "4px", background: "var(--bg,#F6F2EC)", fontVariantNumeric: "tabular-nums", boxSizing: "border-box" as const }}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
+
+            {/* Jogadores editáveis */}
+            {editedJogadores.length > 0 && selectedGame && (() => {
+              const hs = parseInt(homeScore, 10) || 0;
+              const as_ = parseInt(awayScore, 10) || 0;
+              const casaJogs = editedJogadores.filter((j) => j.equipa === "casa");
+              const foraJogs = editedJogadores.filter((j) => j.equipa === "fora");
+              const sumCasaPts = casaJogs.reduce((a, j) => a + j.pontos, 0);
+              const sumForaPts = foraJogs.reduce((a, j) => a + j.pontos, 0);
+              const casaMismatch = hs > 0 && casaJogs.length > 0 && sumCasaPts !== hs;
+              const foraMismatch = as_ > 0 && foraJogs.length > 0 && sumForaPts !== as_;
+
+              const renderTeamTable = (equipa: "casa" | "fora", teamName: string, mismatch: boolean, sumPts: number, total: number) => {
+                const jogs = editedJogadores
+                  .map((j, globalIdx) => ({ ...j, globalIdx }))
+                  .filter((j) => j.equipa === equipa);
+                return (
+                  <div style={{ flex: "1 1 140px", minWidth: 0 }}>
+                    <p style={{ ...s.label, marginBottom: "4px" }}>{teamName}</p>
+                    {mismatch && (
+                      <p style={{ fontSize: "11px", color: "#92400E", margin: "0 0 4px" }}>⚠ Soma ({sumPts}) ≠ {total}</p>
+                    )}
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: "left", padding: "2px 4px", color: "var(--muted,#6F675F)", fontWeight: 600, fontSize: "10px" }}>#</th>
+                          <th style={{ textAlign: "left", padding: "2px 4px", color: "var(--muted,#6F675F)", fontWeight: 600, fontSize: "10px" }}>Nome</th>
+                          <th style={{ textAlign: "center", padding: "2px 4px", color: "var(--muted,#6F675F)", fontWeight: 600, fontSize: "10px" }}>Pts</th>
+                          <th style={{ textAlign: "center", padding: "2px 4px", color: "var(--muted,#6F675F)", fontWeight: 600, fontSize: "10px" }}>F</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {jogs.map(({ globalIdx, numero, nome, pontos, faltas }) => (
+                          <tr key={globalIdx}>
+                            <td style={{ padding: "2px 4px" }}>
+                              <input type="number" min="0" value={numero ?? ""} placeholder="—"
+                                onChange={(e) => {
+                                  const v = parseInt(e.target.value, 10);
+                                  setEditedJogadores((prev) => prev.map((x, k) => k === globalIdx ? { ...x, numero: isNaN(v) ? null : v } : x));
+                                }}
+                                style={{ width: "32px", padding: "2px", fontSize: "12px", textAlign: "center", border: "1px solid #E8E0D4", borderRadius: "4px", background: "var(--bg,#F6F2EC)" }}
+                              />
+                            </td>
+                            <td style={{ padding: "2px 4px" }}>
+                              <input type="text" value={nome}
+                                onChange={(e) => setEditedJogadores((prev) => prev.map((x, k) => k === globalIdx ? { ...x, nome: e.target.value } : x))}
+                                style={{ width: "100%", padding: "2px 4px", fontSize: "12px", border: "1px solid #E8E0D4", borderRadius: "4px", background: "var(--bg,#F6F2EC)", minWidth: "60px" }}
+                              />
+                            </td>
+                            <td style={{ padding: "2px 4px" }}>
+                              <input type="number" min="0" value={pontos}
+                                onChange={(e) => {
+                                  const v = parseInt(e.target.value, 10);
+                                  setEditedJogadores((prev) => prev.map((x, k) => k === globalIdx ? { ...x, pontos: isNaN(v) ? 0 : v } : x));
+                                }}
+                                style={{ width: "36px", padding: "2px", fontSize: "12px", textAlign: "center", border: "1px solid #E8E0D4", borderRadius: "4px", background: "var(--bg,#F6F2EC)", fontVariantNumeric: "tabular-nums" }}
+                              />
+                            </td>
+                            <td style={{ padding: "2px 4px" }}>
+                              <input type="number" min="0" value={faltas ?? ""}  placeholder="—"
+                                onChange={(e) => {
+                                  const v = parseInt(e.target.value, 10);
+                                  setEditedJogadores((prev) => prev.map((x, k) => k === globalIdx ? { ...x, faltas: isNaN(v) ? null : v } : x));
+                                }}
+                                style={{ width: "32px", padding: "2px", fontSize: "12px", textAlign: "center", border: "1px solid #E8E0D4", borderRadius: "4px", background: "var(--bg,#F6F2EC)" }}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              };
+
+              return (
+                <div style={{ marginBottom: "12px" }}>
+                  <p style={{ ...s.label, marginBottom: "6px" }}>Estatísticas de jogadores</p>
+                  <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                    {casaJogs.length > 0 && renderTeamTable("casa", selectedGame.home_team, casaMismatch, sumCasaPts, hs)}
+                    {foraJogs.length > 0 && renderTeamTable("fora", selectedGame.away_team, foraMismatch, sumForaPts, as_)}
+                  </div>
+                </div>
+              );
+            })()}
 
             <textarea
               placeholder="Notas opcionais (W/O, adiado, etc.)"

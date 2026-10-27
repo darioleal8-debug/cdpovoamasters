@@ -18,7 +18,7 @@ async function getArticle(slug: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("news")
-    .select("id, slug, title, excerpt, body, category, published_at, cover_image_url, game_id, cover_photo_id")
+    .select("id, slug, title, excerpt, body, category, published_at, cover_image_url, game_id, cover_photo_id, home_team_name, away_team_name")
     .eq("slug", slug)
     .eq("is_published", true)
     .eq("category", "Liga INATEL")
@@ -52,6 +52,29 @@ async function getGalleryPhotos(gameId: string, coverPhotoId: string | null): Pr
       team_name: teamMap[p.team_id] ?? "Equipa",
     };
   });
+}
+
+type GamePeriod = { periodo: number; home_points: number; away_points: number };
+type PlayerStat = { nome: string; side: string; numero: number | null; pontos: number; faltas: number | null };
+
+async function getGamePeriods(gameId: string): Promise<GamePeriod[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("league_game_periods")
+    .select("periodo, home_points, away_points")
+    .eq("event_id", gameId)
+    .order("periodo");
+  return (data ?? []) as GamePeriod[];
+}
+
+async function getGamePlayerStats(gameId: string): Promise<PlayerStat[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("league_game_player_stats")
+    .select("nome, side, numero, pontos, faltas")
+    .eq("event_id", gameId)
+    .order("pontos", { ascending: false });
+  return (data ?? []) as PlayerStat[];
 }
 
 async function getRelated(currentId: string, limit = 3) {
@@ -113,12 +136,14 @@ export default async function LigaNoticiaDetailPage({ params }: Props) {
   const article = await getArticle(slug);
   if (!article) notFound();
 
-  const [bodyHtml, related, galleryPhotos] = await Promise.all([
+  const [bodyHtml, related, galleryPhotos, periods, playerStats] = await Promise.all([
     Promise.resolve(markdownToHtml(article.body)),
     getRelated(article.id),
     article.game_id
       ? getGalleryPhotos(article.game_id, (article as { cover_photo_id?: string | null }).cover_photo_id ?? null)
       : Promise.resolve([] as GalleryPhoto[]),
+    article.game_id ? getGamePeriods(article.game_id) : Promise.resolve([] as GamePeriod[]),
+    article.game_id ? getGamePlayerStats(article.game_id) : Promise.resolve([] as PlayerStat[]),
   ]);
 
   const canonicalUrl = `https://www.hoophub.pt/liga-inatel/noticias/${slug}`;
@@ -245,6 +270,127 @@ export default async function LigaNoticiaDetailPage({ params }: Props) {
           dangerouslySetInnerHTML={{ __html: bodyHtml }}
           className="liga-article-body"
         />
+
+        {/* Estatísticas do jogo */}
+        {(periods.length > 0 || playerStats.length > 0) && (() => {
+          const homeTeam = (article as { home_team_name?: string | null }).home_team_name ?? "Casa";
+          const awayTeam = (article as { away_team_name?: string | null }).away_team_name ?? "Fora";
+          const homeTotal = periods.reduce((s, p) => s + p.home_points, 0);
+          const awayTotal = periods.reduce((s, p) => s + p.away_points, 0);
+          const homePlayers = playerStats.filter((p) => p.side === "home").slice(0, 10);
+          const awayPlayers = playerStats.filter((p) => p.side === "away").slice(0, 10);
+          const homeTopPts = homePlayers[0]?.pontos ?? -1;
+          const awayTopPts = awayPlayers[0]?.pontos ?? -1;
+
+          return (
+            <div style={{ marginTop: "36px" }}>
+              <p style={{
+                fontFamily: "var(--font-ibm-mono, monospace)",
+                fontSize: "10px", fontWeight: 600, letterSpacing: "0.12em",
+                textTransform: "uppercase", color: "#8C837A", margin: "0 0 14px",
+              }}>
+                Estatísticas do jogo
+              </p>
+
+              {periods.length > 0 && (
+                <div style={{ marginBottom: "20px" }}>
+                  <p style={{
+                    fontFamily: "var(--font-ibm-mono, monospace)",
+                    fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em",
+                    textTransform: "uppercase", color: "#F97316", margin: "0 0 8px",
+                  }}>
+                    Parciais
+                  </p>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{
+                      width: "100%", borderCollapse: "collapse",
+                      fontFamily: "var(--font-barlow, sans-serif)",
+                      fontSize: "13px", fontVariantNumeric: "tabular-nums",
+                    }}>
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, fontSize: "11px", color: "#8C837A", borderBottom: "1px solid rgba(26,22,18,.1)", minWidth: "80px" }} />
+                          {periods.map((p) => (
+                            <th key={p.periodo} style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600, fontSize: "11px", color: "#8C837A", borderBottom: "1px solid rgba(26,22,18,.1)" }}>
+                              P{p.periodo}
+                            </th>
+                          ))}
+                          <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 700, fontSize: "11px", color: "#1A1612", borderBottom: "1px solid rgba(26,22,18,.1)" }}>
+                            Total
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          { label: homeTeam, pts: periods.map((p) => p.home_points), total: homeTotal },
+                          { label: awayTeam, pts: periods.map((p) => p.away_points), total: awayTotal },
+                        ].map((row, ri) => (
+                          <tr key={ri} style={{ background: ri % 2 === 0 ? "rgba(26,22,18,.03)" : "transparent" }}>
+                            <td style={{ padding: "8px 8px", fontWeight: 600, fontSize: "13px", color: "#1A1612", borderBottom: "1px solid rgba(26,22,18,.06)", whiteSpace: "nowrap" }}>
+                              {row.label}
+                            </td>
+                            {row.pts.map((v, i) => (
+                              <td key={i} style={{ textAlign: "center", padding: "8px 8px", color: "#3D3630", borderBottom: "1px solid rgba(26,22,18,.06)" }}>
+                                {v}
+                              </td>
+                            ))}
+                            <td style={{ textAlign: "center", padding: "8px 8px", fontWeight: 800, color: "#1A1612", borderBottom: "1px solid rgba(26,22,18,.06)" }}>
+                              {row.total}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {(homePlayers.length > 0 || awayPlayers.length > 0) && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
+                  {[
+                    { label: homeTeam, players: homePlayers, topPts: homeTopPts },
+                    { label: awayTeam, players: awayPlayers, topPts: awayTopPts },
+                  ].map((team) =>
+                    team.players.length > 0 ? (
+                      <div key={team.label} style={{ background: "rgba(26,22,18,.03)", borderRadius: "8px", padding: "12px 14px", border: "1px solid rgba(26,22,18,.08)" }}>
+                        <p style={{
+                          fontFamily: "var(--font-ibm-mono, monospace)",
+                          fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em",
+                          textTransform: "uppercase", color: "#F97316", margin: "0 0 10px",
+                        }}>
+                          {team.label}
+                        </p>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "var(--font-barlow, sans-serif)", fontSize: "12px", fontVariantNumeric: "tabular-nums" }}>
+                          <thead>
+                            <tr>
+                              <th style={{ textAlign: "left", padding: "3px 4px", fontWeight: 600, fontSize: "10px", color: "#8C837A", width: "28px" }}>#</th>
+                              <th style={{ textAlign: "left", padding: "3px 4px", fontWeight: 600, fontSize: "10px", color: "#8C837A" }}>Nome</th>
+                              <th style={{ textAlign: "center", padding: "3px 4px", fontWeight: 600, fontSize: "10px", color: "#8C837A", width: "32px" }}>Pts</th>
+                              <th style={{ textAlign: "center", padding: "3px 4px", fontWeight: 600, fontSize: "10px", color: "#8C837A", width: "28px" }}>F</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {team.players.map((p, i) => {
+                              const isTop = p.pontos === team.topPts && team.topPts > 0;
+                              return (
+                                <tr key={i}>
+                                  <td style={{ padding: "4px 4px", color: "#8C837A", fontSize: "11px" }}>{p.numero ?? "—"}</td>
+                                  <td style={{ padding: "4px 4px", color: isTop ? "#F97316" : "#3D3630", fontWeight: isTop ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "120px" }}>{p.nome}</td>
+                                  <td style={{ textAlign: "center", padding: "4px 4px", color: isTop ? "#F97316" : "#1A1612", fontWeight: isTop ? 800 : 600 }}>{p.pontos}</td>
+                                  <td style={{ textAlign: "center", padding: "4px 4px", color: "#8C837A" }}>{p.faltas ?? "—"}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : null
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Galeria de fotografias do jogo */}
         {galleryPhotos.length > 0 && (
