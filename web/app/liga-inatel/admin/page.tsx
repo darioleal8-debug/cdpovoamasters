@@ -35,6 +35,7 @@ type Submission = {
   home_score: number; away_score: number;
   submitted_by_name: string; submitted_by_team: string | null;
   submitted_at: string; notes: string | null;
+  import_id?: string | null;
 };
 
 type AdminGame = {
@@ -992,6 +993,16 @@ export default function LigaAdminPage() {
                                 <p style={{ fontSize: "11px", color: "#6B7280", margin: "0 0 6px" }}>
                                   Nota: {sub.notes}
                                 </p>
+                              )}
+                              {sub.import_id && (
+                                <a
+                                  href={`/liga-inatel/boletim/${sub.import_id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ display: "inline-block", fontSize: "11px", fontWeight: 700, color: "#C2530A", margin: "0 0 6px" }}
+                                >
+                                  Ver boletim importado (imagem, marcha e validação) ↗
+                                </a>
                               )}
                               {sub.status === "pending" && (
                                 <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "6px" }}>

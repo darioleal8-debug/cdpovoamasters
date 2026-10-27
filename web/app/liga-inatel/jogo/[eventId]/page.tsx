@@ -34,7 +34,7 @@ async function getGamePageData(eventId: string) {
       .select("id, event_date, event_time, location, description, season_id, competition")
       .eq("id", eventId).eq("type", "jogo").is("deleted_at", null).single(),
     supabase.from("league_game_results")
-      .select("id, home_team_name, away_team_name, home_score, away_score, home_team_id, away_team_id, referees, overtime, approved_at")
+      .select("*") // inclui pontos por atribuir (migração 111), quando existirem
       .eq("event_id", eventId).maybeSingle(),
     supabase.from("league_game_periods")
       .select("periodo, home_points, away_points").eq("event_id", eventId).order("periodo"),
@@ -151,7 +151,8 @@ export default async function GameDetailPage({ params }: { params: Promise<{ eve
   const hasResult = !!result;
   const homeWon = hasResult && result!.home_score > result!.away_score;
   const awayWon = hasResult && result!.away_score > result!.home_score;
-  const overtime = result?.overtime === true;
+  // Boletins importados guardam o prolongamento como período 5+; os antigos só têm a flag
+  const overtime = result?.overtime === true && !periods.some((p) => p.periodo > 4);
 
   const jornada = meta?.jornada;
   const serie = meta?.serie;
@@ -302,7 +303,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ eve
                   </th>
                   {periods.map((p) => (
                     <th key={p.periodo} style={{ padding: "6px 10px", textAlign: "center", fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "10px", letterSpacing: "0.08em", color: "var(--muted-foreground, #8C837A)", fontWeight: 600, borderBottom: "1px solid var(--border, #E9E2D8)" }}>
-                      Q{p.periodo}
+                      {p.periodo > 4 ? `PR${p.periodo > 5 ? p.periodo - 4 : ""}` : `Q${p.periodo}`}
                     </th>
                   ))}
                   {overtime && (
@@ -367,6 +368,18 @@ export default async function GameDetailPage({ params }: { params: Promise<{ eve
             awayName={awayTeam}
             stats={playerStats}
           />
+          {(() => {
+            const r = result as { home_unattributed_points?: number | null; away_unattributed_points?: number | null } | null;
+            const parts = [
+              r?.home_unattributed_points ? `${homeTeam}: ${r.home_unattributed_points}` : null,
+              r?.away_unattributed_points ? `${awayTeam}: ${r.away_unattributed_points}` : null,
+            ].filter(Boolean);
+            return parts.length ? (
+              <p style={{ fontSize: "11px", color: "var(--muted-foreground, #8C837A)", margin: "10px 0 0" }}>
+                Pontos sem marcador identificado no boletim — {parts.join(" · ")}.
+              </p>
+            ) : null;
+          })()}
         </section>
       )}
 

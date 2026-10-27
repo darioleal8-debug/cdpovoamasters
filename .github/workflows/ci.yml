@@ -40,3 +40,5 @@ jobs:
           echo "/usr/lib/postgresql/$(ls /usr/lib/postgresql | sort -n | tail -1)/bin" >> "$GITHUB_PATH"
       - name: Testes RLS (baseline de produção + migrações)
         run: bash supabase/tests/run-local.sh
+      - name: Testes da migração 111 (boletim de jogo)
+        run: bash supabase/tests/run-game-sheet.sh

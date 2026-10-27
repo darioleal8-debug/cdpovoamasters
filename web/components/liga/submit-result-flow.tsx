@@ -55,11 +55,11 @@ async function compressGamePhoto(file: File): Promise<File> {
 }
 
 /**
- * Normaliza SEMPRE a imagem: corrige orientação EXIF, redimensiona lado maior a 2000px,
- * exporta como JPEG qualidade 0.9. Melhora a precisão do OCR e o tamanho do upload.
+ * Normaliza SEMPRE a imagem: corrige orientação EXIF, limita o lado maior a 3200px
+ * (preserva o texto manuscrito pequeno) e exporta como JPEG qualidade 0.92.
  */
 async function normalizeImage(file: File): Promise<File> {
-  const MAX_PX = 2000;
+  const MAX_PX = 3200;
 
   return new Promise<File>((resolve, reject) => {
     createImageBitmap(file, { imageOrientation: "from-image" }).then((bitmap) => {
@@ -76,7 +76,7 @@ async function normalizeImage(file: File): Promise<File> {
       canvas.toBlob((blob) => {
         if (!blob) { resolve(file); return; }
         resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }));
-      }, "image/jpeg", 0.9);
+      }, "image/jpeg", 0.92);
     }).catch(reject);
   });
 }
@@ -126,6 +126,9 @@ export function SubmitResultFlow({ games, teamName, preselectedGameId = null }: 
   const [editedParciais, setEditedParciais] = useState<EditParcial[]>([]);
   const [editedJogadores, setEditedJogadores] = useState<EditJogador[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Importação inteligente do boletim (imagens): rascunho revisto numa página própria
+  const [importId, setImportId] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Fotos de jogo (passo game_photos)
   const [stagedPhoto, setStagedPhoto] = useState<StagedPhoto | null>(null);
@@ -163,7 +166,7 @@ export function SubmitResultFlow({ games, teamName, preselectedGameId = null }: 
     setStep("select"); setSelectedGame(null); setScanResult(null);
     setPhotoPreview(null); setHomeScore(""); setAwayScore(""); setNotes(""); setError(null);
     setStagedPhoto(null); setGamePhotos([]); setPhotoConsent(false);
-    setEditedParciais([]); setEditedJogadores([]);
+    setEditedParciais([]); setEditedJogadores([]); setImportId(null);
   }
 
   function close() {
@@ -194,9 +197,31 @@ export function SubmitResultFlow({ games, teamName, preselectedGameId = null }: 
       }
 
       if (IMAGE_TYPES.includes(file.type)) {
-        // Normaliza sempre: corrige orientação EXIF + redimensiona + JPEG 0.9
+        // Normaliza sempre: corrige orientação EXIF + limita resolução + JPEG 0.92
         file = await normalizeImage(file);
         setPhotoPreview(URL.createObjectURL(file));
+
+        // Importação inteligente: interpreta, valida e cria rascunho para revisão
+        if (selectedGame) {
+          const fdi = new FormData();
+          fdi.append("photo", file);
+          fdi.append("game_id", selectedGame.id);
+          const ctrl = new AbortController();
+          abortRef.current = ctrl;
+          const res = await fetch("/api/liga/equipa/game-sheet/imports", { method: "POST", body: fdi, signal: ctrl.signal });
+          const json = await res.json().catch(() => ({}));
+          if (res.ok && json.id) {
+            setImportId(json.id);
+            if (json.analysis_error) setError(`Leitura automática falhou: ${json.analysis_error}. Poderá preencher os dados na revisão.`);
+            setStep("game_photos");
+            return;
+          }
+          // Sem importação possível (ex.: serviço indisponível): segue para preenchimento manual
+          setError((json.error ?? "Não foi possível ler automaticamente — preenche manualmente."));
+          setScanResult(null);
+          setStep("game_photos");
+          return;
+        }
       } else if (file.type === PDF_TYPE || raw.type === PDF_TYPE) {
         file = raw;
       }
@@ -221,9 +246,14 @@ export function SubmitResultFlow({ games, teamName, preselectedGameId = null }: 
       if (json.pontos_fora != null) setAwayScore(String(json.pontos_fora));
       setStep("game_photos");
     } catch (e) {
+      if ((e as { name?: string }).name === "AbortError") {
+        setError("Importação cancelada.");
+        return;
+      }
       setError(`Erro ao processar ficheiro: ${String(e)}`);
       setStep("game_photos");
     } finally {
+      abortRef.current = null;
       setProcessing(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
@@ -315,12 +345,12 @@ export function SubmitResultFlow({ games, teamName, preselectedGameId = null }: 
     return (
       <div style={{ borderRadius: "12px", border: "1.5px solid var(--border,#E8E0D4)", padding: "20px 16px" }}>
         <p style={{ fontSize: "13px", fontWeight: 600, color: "var(--fg,#15110E)", margin: "0 0 4px" }}>
-          Submissão de resultados via foto
+          Importar boletim de jogo com IA
         </p>
         <p style={{ fontSize: "12px", color: "var(--muted,#6F675F)", margin: "0 0 12px" }}>
           {eligibleGames.length === 0
             ? "Não há jogos com resultado por registar."
-            : `${eligibleGames.length} jogo${eligibleGames.length > 1 ? "s" : ""} por registar · Fotografia, PDF ou HEIC (iPhone)`}
+            : `${eligibleGames.length} jogo${eligibleGames.length > 1 ? "s" : ""} por registar · Fotografia da folha oficial: resultado, parciais, marcadores e notícia, com revisão antes de submeter`}
         </p>
         {eligibleGames.length > 0 && (
           <button onClick={() => setOpen(true)} style={s.btn(true)}>Submeter resultado</button>
@@ -417,9 +447,17 @@ export function SubmitResultFlow({ games, teamName, preselectedGameId = null }: 
               <p style={{ fontSize: "10px", color: "var(--muted,#6F675F)", margin: "6px 0 0" }}>JPEG · PNG · WebP · HEIC (iPhone) · PDF até 15 MB</p>
             </div>
 
+            {processing && (
+              <div role="status" style={{ margin: "14px 0 0", padding: "10px 12px", background: "#FFF7ED", borderRadius: "8px", border: "1px solid #FDBA74" }}>
+                <p style={{ fontSize: "12px", color: "#9A3412", margin: 0, fontWeight: 600 }}>A ler o boletim… pode demorar até 1 minuto.</p>
+                <p style={{ fontSize: "11px", color: "#9A3412", margin: "2px 0 0" }}>Equipas, plantéis, marcha do resultado e parciais são verificados automaticamente.</p>
+                <button onClick={() => abortRef.current?.abort()} style={{ ...s.btn(), marginTop: 8, padding: "6px 12px", fontSize: "12px" }}>Cancelar</button>
+              </div>
+            )}
+
             <div style={{ display: "flex", gap: "10px", marginTop: "14px" }}>
-              <button onClick={() => { setStep("select"); setError(null); }} style={s.btn()}>← Voltar</button>
-              <button onClick={() => { setStep("game_photos"); setError(null); }} style={s.btn()}>Preencher manualmente</button>
+              <button onClick={() => { setStep("select"); setError(null); }} disabled={processing} style={s.btn(false, processing)}>← Voltar</button>
+              <button onClick={() => { setStep("game_photos"); setError(null); }} disabled={processing} style={s.btn(false, processing)}>Preencher manualmente</button>
             </div>
           </>
         )}
@@ -524,6 +562,10 @@ export function SubmitResultFlow({ games, teamName, preselectedGameId = null }: 
               <button onClick={() => { setStep("photo"); setError(null); setStagedPhoto(null); }} style={s.btn()}>← Voltar</button>
               <button
                 onClick={() => {
+                  if (importId) {
+                    router.push(`/liga-inatel/boletim/${importId}`);
+                    return;
+                  }
                   setEditedParciais(scanResult?.parciais ?? []);
                   setEditedJogadores(
                     (scanResult?.jogadores ?? []).map((j) => ({
@@ -539,7 +581,7 @@ export function SubmitResultFlow({ games, teamName, preselectedGameId = null }: 
                 disabled={gamePhotos.length > 0 && !photoConsent}
                 style={{ ...s.btn(true, gamePhotos.length > 0 && !photoConsent), flex: 1 }}
               >
-                Continuar
+                {importId ? "Continuar para a revisão do boletim" : "Continuar"}
               </button>
             </div>
           </>
