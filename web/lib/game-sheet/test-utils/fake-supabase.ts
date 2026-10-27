@@ -17,7 +17,7 @@ export function fakeSupabase(opts: {
   user: { id: string } | null;
   handler: Handler;
   rpc?: (name: string, args: unknown) => FakeResult;
-  storage?: { upload?: () => FakeResult; download?: () => FakeResult };
+  storage?: { upload?: () => FakeResult; download?: () => FakeResult; remove?: (paths: string[]) => FakeResult };
 }) {
   const calls: FakeQuery[] = [];
   function builder(table: string) {
@@ -56,6 +56,7 @@ export function fakeSupabase(opts: {
       from: () => ({
         upload: async () => ({ data: null, error: null, ...(opts.storage?.upload?.() ?? {}) }),
         download: async () => ({ data: null, error: null, ...(opts.storage?.download?.() ?? {}) }),
+        remove: async (paths: string[]) => ({ data: null, error: null, ...(opts.storage?.remove?.(paths) ?? {}) }),
         createSignedUrl: async () => ({ data: { signedUrl: "https://signed.example/img" }, error: null }),
       }),
     },

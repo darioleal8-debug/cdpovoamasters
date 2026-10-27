@@ -53,6 +53,7 @@ export function AdminGameSheets({ eventId }: { eventId: string }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<{ candidate: Candidate; reason: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -109,6 +110,27 @@ export function AdminGameSheets({ eventId }: { eventId: string }) {
     await load();
   }
 
+  async function confirmDelete() {
+    if (!deleting) return;
+    const { candidate: c, reason } = deleting;
+    setDeleting(null);
+    setBusy(`del:${c.key}`); setError(null);
+    try {
+      const res = await fetch(`/api/liga/admin/games/${eventId}/sheets`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: c.kind, id: c.id, reason: reason.trim() || "Apagado pelo admin" }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error ?? "Erro ao apagar");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function upload(file: File) {
     setBusy("upload"); setError(null); setProgress("A carregar e analisar a folha… (até 1 min)");
     try {
@@ -132,11 +154,41 @@ export function AdminGameSheets({ eventId }: { eventId: string }) {
   if (loading && !data) return <p style={{ fontSize: "12px", color: "#8C837A" }}>A carregar folhas de jogo…</p>;
   if (!data) return error ? <p style={{ fontSize: "12px", color: "#DC2626" }}>{error}</p> : null;
 
+  const isConfirmedOrPublished = (c: Candidate) => c.status === "confirmed" || c.status === "published";
+
   const pending = data.candidates.filter((c) => c.status === "por_analisar").length;
   const best = data.candidates.find((c) => c.is_best);
 
   return (
     <div>
+      {/* Diálogo de confirmação de eliminação */}
+      {deleting && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+          <div style={{ background: "#fff", borderRadius: "12px", padding: "20px", maxWidth: "360px", width: "100%", boxShadow: "0 4px 24px rgba(0,0,0,.2)" }}>
+            <p style={{ fontWeight: 700, fontSize: "14px", margin: "0 0 6px" }}>Apagar folha de jogo?</p>
+            {isConfirmedOrPublished(deleting.candidate) && (
+              <p style={{ fontSize: "12px", color: "#DC2626", fontWeight: 600, margin: "0 0 8px" }}>
+                ⚠️ Esta folha está {deleting.candidate.status === "published" ? "aplicada ao jogo" : "confirmada"} — apagá-la não reverte o resultado já registado.
+              </p>
+            )}
+            <p style={{ fontSize: "12px", color: "#6B7280", margin: "0 0 12px" }}>{deleting.candidate.label}</p>
+            <label style={{ fontSize: "12px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Motivo (opcional)</label>
+            <input
+              type="text"
+              placeholder="ex: imagem errada"
+              value={deleting.reason}
+              onChange={(e) => setDeleting((d) => d ? { ...d, reason: e.target.value } : null)}
+              style={{ width: "100%", boxSizing: "border-box", padding: "6px 8px", fontSize: "12px", borderRadius: "6px", border: "1px solid #E8E0D6", marginBottom: "12px" }}
+              autoFocus
+            />
+            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+              <button style={btn(false, false)} onClick={() => setDeleting(null)}>Cancelar</button>
+              <button style={{ ...btn(false, false), background: "#DC2626", color: "#fff", border: "none" }} onClick={() => void confirmDelete()}>Apagar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center", marginBottom: "8px" }}>
         {data.finished && (
           <>
@@ -214,6 +266,15 @@ export function AdminGameSheets({ eventId }: { eventId: string }) {
                       <a href={`/liga-inatel/boletim/${c.import_id}`} target="_blank" rel="noopener noreferrer" style={{ ...btn(c.is_best), textDecoration: "none" }}>
                         Rever ↗
                       </a>
+                    )}
+                    {c.status !== "processing" && (
+                      <button
+                        style={{ ...btn(false, busy !== null), color: "#DC2626", borderColor: "#FECACA" }}
+                        disabled={busy !== null}
+                        onClick={() => setDeleting({ candidate: c, reason: "" })}
+                      >
+                        🗑
+                      </button>
                     )}
                   </div>
                 </div>

@@ -36,31 +36,15 @@ export const createClient = cache(async () => {
   );
 });
 
-/** Cliente com service role — apenas para uso em Route Handlers com acesso admin */
-function stripBom(v: string | undefined): string {
-  const s = (v ?? "").trim();
-  return s.charCodeAt(0) === 0xFEFF ? s.slice(1) : s;
-}
-
+/**
+ * Cliente com service role — bypassa RLS (base de dados e Storage).
+ *
+ * Usa createClient de @supabase/supabase-js sem cookies para que o service role
+ * key seja sempre enviado como Authorization header (nunca substituído pelo JWT
+ * da sessão do utilizador). Caso contrário, o Storage avalia RLS como utilizador
+ * e rejeita uploads que requerem bypass de RLS.
+ */
 export async function createAdminClient() {
-  const cookieStore = await cookies();
-
-  return createServerClient(
-    stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL),
-    stripBom(process.env.SUPABASE_SERVICE_ROLE_KEY),
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet: SupabaseCookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {}
-        },
-      },
-    }
-  );
+  const { createServiceClient } = await import("./service");
+  return createServiceClient();
 }

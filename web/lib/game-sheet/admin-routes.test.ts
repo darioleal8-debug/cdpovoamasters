@@ -7,6 +7,7 @@ import { emptySheetData } from "./schema";
 let isAdmin = true;
 let userClient: ReturnType<typeof fakeSupabase>;
 let adminClient: ReturnType<typeof fakeSupabase>;
+let serviceClient: ReturnType<typeof fakeSupabase>;
 const ADMIN = "00000000-0000-4000-8000-00000000000a";
 const GAME = "00000000-0000-4000-8000-0000000000e1";
 const IMP = "00000000-0000-4000-8000-0000000000a1";
@@ -21,6 +22,9 @@ vi.mock("@/lib/auth/liga-admin-guard", () => ({
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => userClient.client,
   createAdminClient: async () => adminClient.client,
+}));
+vi.mock("@/lib/supabase/service", () => ({
+  createServiceClient: () => serviceClient.client,
 }));
 const runAndStore = vi.fn(async () => ({ ok: true }));
 vi.mock("@/lib/game-sheet/run", () => ({
@@ -56,7 +60,10 @@ const importRow = (over: Record<string, unknown> = {}) => ({
   created_at: "2026-10-27T10:00:00Z", updated_at: "2026-10-27T10:00:00Z", ...over,
 });
 
-function setup(handler: (q: FakeQuery) => FakeResult | undefined, opts: { eventDate?: string; adminHandler?: (q: FakeQuery) => FakeResult | undefined; download?: Buffer } = {}) {
+function setup(
+  handler: (q: FakeQuery) => FakeResult | undefined,
+  opts: { eventDate?: string; adminHandler?: (q: FakeQuery) => FakeResult | undefined; download?: Buffer } = {},
+) {
   userClient = fakeSupabase({
     user: { id: ADMIN },
     handler: (q) => handler(q) ?? (q.table === "events" ? { data: EVENT(opts.eventDate) } : { data: null }),
@@ -67,6 +74,7 @@ function setup(handler: (q: FakeQuery) => FakeResult | undefined, opts: { eventD
     handler: (q) => opts.adminHandler?.(q) ?? { data: null },
     storage: { download: () => ({ data: opts.download ? new Blob([new Uint8Array(opts.download)]) : null }) },
   });
+  serviceClient = fakeSupabase({ user: null, handler: () => ({ data: null }) });
 }
 
 const p = <T extends Record<string, string>>(o: T) => ({ params: Promise.resolve(o) });
@@ -216,5 +224,150 @@ describe("POST aplicar ao jogo", () => {
     expect(rpcArgs).toMatchObject({ name: "liga_apply_game_sheet", args: { p_submission_id: "sub-admin", p_motivo: "folha mais legível" } });
     expect((rpcArgs as { args: { p_payload: { periods: unknown[] } } }).args.p_payload.periods).toHaveLength(4);
     expect(generateLigaNews).toHaveBeenCalledOnce();
+  });
+});
+
+describe("POST carregar folha (regressão Parte 1 — upload antes do insert)", () => {
+  it("reutiliza linha 'failed' com mesmo hash: update em vez de insert", async () => {
+    setup((q) => {
+      if (q.table === "game_sheet_imports" && q.op === "select") return { data: { id: IMP, status: "failed" } };
+      if (q.table === "game_sheet_imports" && q.op === "update") return { data: null };
+      return undefined;
+    });
+    const res = await sheetsRoute.POST(upload(await jpeg()), p({ eventId: GAME }));
+    expect(res.status).toBe(201);
+    const inserts = userClient.calls.filter((c) => c.table === "game_sheet_imports" && c.op === "insert");
+    expect(inserts).toHaveLength(0);
+    const updates = userClient.calls.filter((c) => c.table === "game_sheet_imports" && c.op === "update");
+    expect(updates.some((u) => (u.payload as Record<string, unknown>)?.status === "processing")).toBe(true);
+    expect(runAndStore).toHaveBeenCalledOnce();
+  });
+
+  it("ignora linha existente com status != failed e devolve skipped=true", async () => {
+    setup((q) => {
+      if (q.table === "game_sheet_imports" && q.op === "select") return { data: { id: IMP, status: "ready_to_confirm" } };
+      return undefined;
+    });
+    const res = await sheetsRoute.POST(upload(await jpeg()), p({ eventId: GAME }));
+    expect(res.status).toBe(200); // skipped → 200
+    expect(runAndStore).not.toHaveBeenCalled();
+  });
+});
+
+describe("DELETE apagar folha", () => {
+  const delReq = (body: unknown) => new Request("http://x", { method: "DELETE", body: JSON.stringify(body) });
+
+  it("non-admin → 403", async () => {
+    isAdmin = false;
+    setup(() => undefined);
+    expect((await sheetsRoute.DELETE(delReq({ kind: "import", id: IMP }), p({ eventId: GAME }))).status).toBe(403);
+  });
+
+  it("kind inválido → 400", async () => {
+    setup(() => undefined);
+    expect((await sheetsRoute.DELETE(delReq({ kind: "other", id: IMP }), p({ eventId: GAME }))).status).toBe(400);
+  });
+
+  it("id inválido → 400", async () => {
+    setup(() => undefined);
+    expect((await sheetsRoute.DELETE(delReq({ kind: "import", id: "not-a-uuid" }), p({ eventId: GAME }))).status).toBe(400);
+  });
+
+  it("apaga importação e remove objeto do Storage quando can_remove=true", async () => {
+    const removedPaths: string[] = [];
+    userClient = fakeSupabase({
+      user: { id: ADMIN },
+      handler: (q) => (q.table === "events" ? { data: EVENT() } : { data: null }),
+      rpc: (name) => name === "liga_delete_game_sheet"
+        ? { data: { storage_path: `admin/${GAME}/abc.jpg`, can_remove: true } }
+        : { data: null },
+    });
+    serviceClient = fakeSupabase({
+      user: null,
+      handler: () => ({ data: [] }),
+      storage: { remove: (paths) => { removedPaths.push(...paths); return {}; } },
+    });
+    adminClient = fakeSupabase({ user: null, handler: () => ({ data: null }) });
+
+    const res = await sheetsRoute.DELETE(delReq({ kind: "import", id: IMP, reason: "imagem errada" }), p({ eventId: GAME }));
+    expect(res.status).toBe(200);
+    expect(removedPaths).toContain(`admin/${GAME}/abc.jpg`);
+  });
+
+  it("apaga importação com can_remove=false — não remove Storage", async () => {
+    let storageCalled = false;
+    userClient = fakeSupabase({
+      user: { id: ADMIN },
+      handler: (q) => (q.table === "events" ? { data: EVENT() } : { data: null }),
+      rpc: () => ({ data: { storage_path: `admin/${GAME}/abc.jpg`, can_remove: false } }),
+    });
+    serviceClient = fakeSupabase({
+      user: null,
+      handler: () => ({ data: [] }),
+      storage: { remove: () => { storageCalled = true; return {}; } },
+    });
+    adminClient = fakeSupabase({ user: null, handler: () => ({ data: null }) });
+
+    const res = await sheetsRoute.DELETE(delReq({ kind: "import", id: IMP }), p({ eventId: GAME }));
+    expect(res.status).toBe(200);
+    expect(storageCalled).toBe(false);
+  });
+
+  it("importação em processamento → 409 via código RPC 55000", async () => {
+    userClient = fakeSupabase({
+      user: { id: ADMIN },
+      handler: (q) => (q.table === "events" ? { data: EVENT() } : { data: null }),
+      rpc: () => ({ error: { message: "Importação em processamento", code: "55000" } }),
+    });
+    serviceClient = fakeSupabase({ user: null, handler: () => ({ data: null }) });
+    adminClient = fakeSupabase({ user: null, handler: () => ({ data: null }) });
+
+    expect((await sheetsRoute.DELETE(delReq({ kind: "import", id: IMP }), p({ eventId: GAME }))).status).toBe(409);
+  });
+
+  it("apaga kind=submission: anula photo_url via RPC e remove Storage se sem refs", async () => {
+    const removedPaths: string[] = [];
+    userClient = fakeSupabase({
+      user: { id: ADMIN },
+      handler: (q) => (q.table === "events" ? { data: EVENT() } : { data: null }),
+      rpc: () => ({ data: { storage_path: null, can_remove: false } }),
+    });
+    serviceClient = fakeSupabase({
+      user: null,
+      handler: (q) => {
+        if (q.table === "result_submissions") return { data: { id: SUB, event_id: GAME, photo_url: "u/2026/g/del.jpg" } };
+        if (q.table === "game_sheet_imports") return { data: [] }; // sem refs
+        return { data: null };
+      },
+      storage: { remove: (paths) => { removedPaths.push(...paths); return {}; } },
+    });
+    adminClient = fakeSupabase({ user: null, handler: () => ({ data: null }) });
+
+    const res = await sheetsRoute.DELETE(delReq({ kind: "submission", id: SUB }), p({ eventId: GAME }));
+    expect(res.status).toBe(200);
+    expect(removedPaths).toContain("u/2026/g/del.jpg");
+  });
+
+  it("apaga kind=submission: mantém Storage se outra importação usa o mesmo path", async () => {
+    let storageCalled = false;
+    userClient = fakeSupabase({
+      user: { id: ADMIN },
+      handler: (q) => (q.table === "events" ? { data: EVENT() } : { data: null }),
+      rpc: () => ({ data: { storage_path: null, can_remove: false } }),
+    });
+    serviceClient = fakeSupabase({
+      user: null,
+      handler: (q) => {
+        if (q.table === "result_submissions") return { data: { id: SUB, event_id: GAME, photo_url: "u/2026/g/del.jpg" } };
+        if (q.table === "game_sheet_imports") return { data: [{ id: IMP }] }; // outra importação usa este path
+        return { data: null };
+      },
+      storage: { remove: () => { storageCalled = true; return {}; } },
+    });
+    adminClient = fakeSupabase({ user: null, handler: () => ({ data: null }) });
+
+    const res = await sheetsRoute.DELETE(delReq({ kind: "submission", id: SUB }), p({ eventId: GAME }));
+    expect(res.status).toBe(200);
+    expect(storageCalled).toBe(false);
   });
 });

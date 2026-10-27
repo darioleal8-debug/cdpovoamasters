@@ -83,7 +83,8 @@ export async function listGameSheets(access: Access, admin: AdminClient, game: G
   const subName = new Map((subs ?? []).map((s) => [s.id as string, (s.submitted_by_team ?? s.submitted_by_name) as string]));
 
   const sign = async (bucket: string, path: string) => {
-    const { data } = await admin.storage.from(bucket).createSignedUrl(path, SIGNED_URL_TTL);
+    const { data, error } = await admin.storage.from(bucket).createSignedUrl(path, SIGNED_URL_TTL);
+    if (error) console.error(`[game-sheets] signed URL ${bucket}/${path}: ${error.message}`);
     return data?.signedUrl ?? null;
   };
 
@@ -175,51 +176,71 @@ export async function createAndAnalyze(
 ): Promise<AnalyzeOutcome> {
   const hash = sha256(buffer);
 
+  // Inclui linhas "failed" para as reutilizar em vez de criar duplicados
   const { data: same } = await access.supabase
     .from("game_sheet_imports")
-    .select("id")
+    .select("id, status")
     .eq("event_id", game.id)
     .eq("image_sha256", hash)
-    .neq("status", "failed")
     .maybeSingle();
-  if (same) return { ok: true, import_id: same.id as string, analysis_error: null, skipped: true };
+
+  if (same && same.status !== "failed") {
+    return { ok: true, import_id: same.id as string, analysis_error: null, skipped: true };
+  }
 
   await releaseStale(access, game.id);
 
   const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
   const imagePath = opts.existingPath ?? `admin/${game.id}/${hash}.${ext}`;
 
-  const { data: created, error: insErr } = await access.supabase
-    .from("game_sheet_imports")
-    .insert({
-      event_id: game.id,
-      team_id: null,
-      created_by: access.user.id,
-      status: "processing",
-      image_path: imagePath,
-      image_sha256: hash,
-      image_mime: mime,
-      model: visionConfig().model,
-      source_submission_id: opts.sourceSubmissionId ?? null,
-    })
-    .select("id")
-    .single();
-  if (insErr || !created) {
-    if (insErr?.code === "23505") return { ok: false, status: 409, error: "Já existe uma análise em curso para este jogo. Aguarde." };
-    return { ok: false, status: 500, error: `Erro ao criar importação: ${insErr?.message ?? "desconhecido"}` };
-  }
-
+  // Upload ANTES do insert: se falhar não fica linha órfã na BD
   if (!opts.existingPath) {
-    // Bucket privado; o admin não está nas políticas de upload dos delegados → service role
     const { error: upErr } = await admin.storage.from(BUCKET).upload(imagePath, buffer, { contentType: mime, upsert: false });
     if (upErr && !/exists|duplicate/i.test(upErr.message)) {
-      await access.supabase.from("game_sheet_imports").update({ status: "failed", error: "Falha no upload da imagem" }).eq("id", created.id);
+      console.error(`[game-sheets] upload ${imagePath}: ${upErr.message}`);
       return { ok: false, status: 500, error: `Erro no upload: ${upErr.message}` };
     }
   }
 
-  const run = await runAndStore(access, created.id as string, buffer, game, 0);
-  return { ok: true, import_id: created.id as string, analysis_error: run.ok ? null : run.error ?? null };
+  let importId: string;
+
+  if (same?.status === "failed") {
+    // Reutiliza a linha falhada em vez de criar outra
+    const { error: updErr } = await access.supabase
+      .from("game_sheet_imports")
+      .update({ status: "processing", error: null, model: visionConfig().model, updated_at: new Date().toISOString() })
+      .eq("id", same.id);
+    if (updErr) {
+      if (!opts.existingPath) await admin.storage.from(BUCKET).remove([imagePath]);
+      return { ok: false, status: 500, error: `Erro ao reutilizar importação: ${updErr.message}` };
+    }
+    importId = same.id as string;
+  } else {
+    const { data: created, error: insErr } = await access.supabase
+      .from("game_sheet_imports")
+      .insert({
+        event_id: game.id,
+        team_id: null,
+        created_by: access.user.id,
+        status: "processing",
+        image_path: imagePath,
+        image_sha256: hash,
+        image_mime: mime,
+        model: visionConfig().model,
+        source_submission_id: opts.sourceSubmissionId ?? null,
+      })
+      .select("id")
+      .single();
+    if (insErr || !created) {
+      if (!opts.existingPath) await admin.storage.from(BUCKET).remove([imagePath]);
+      if (insErr?.code === "23505") return { ok: false, status: 409, error: "Já existe uma análise em curso para este jogo. Aguarde." };
+      return { ok: false, status: 500, error: `Erro ao criar importação: ${insErr?.message ?? "desconhecido"}` };
+    }
+    importId = created.id as string;
+  }
+
+  const run = await runAndStore(access, importId, buffer, game, 0);
+  return { ok: true, import_id: importId, analysis_error: run.ok ? null : run.error ?? null };
 }
 
 /** Analisa uma folha concreta do jogo (importação existente ou foto de uma submissão). */
