@@ -41,7 +41,7 @@ export function PlayerBottomNav() {
       <nav
         role="navigation"
         aria-label="Navegação do jogador"
-        className="md:hidden fixed bottom-0 inset-x-0 z-50 flex"
+        className="desk:hidden fixed bottom-0 inset-x-0 z-50 flex"
         style={{
           background:    "#15110E",
           borderTop:     "1px solid rgba(255,255,255,.1)",
@@ -148,7 +148,7 @@ export function PlayerBottomNav() {
       {/* ── Bottom sheet backdrop ── */}
       {sheetOpen && (
         <div
-          className="md:hidden fixed inset-0 z-40"
+          className="desk:hidden fixed inset-0 z-40"
           style={{ background: "rgba(21,17,14,.6)", backdropFilter: "blur(2px)" }}
           onClick={() => setSheetOpen(false)}
           aria-hidden
@@ -160,7 +160,7 @@ export function PlayerBottomNav() {
         role="dialog"
         aria-label="Mais secções"
         aria-modal="true"
-        className="md:hidden fixed inset-x-0 bottom-0 z-50"
+        className="desk:hidden fixed inset-x-0 bottom-0 z-50"
         style={{
           background: "#1A1612",
           borderRadius: "16px 16px 0 0",

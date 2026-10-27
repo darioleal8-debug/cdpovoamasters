@@ -8,20 +8,21 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
+import { usePlayerPending } from "./player-pending-context";
 import { toast } from "@/components/ui/toaster";
 import { RoleSwitcherChip } from "@/components/auth/role-switcher";
 
 const PLAYER_NAV = [
-  { href: "/player/minha-area",       label: "Início",              icon: Home,          exact: true  },
-  { href: "/player/plantel",          label: "Plantel",             icon: Users,         exact: false },
-  { href: "/player/meu-perfil",       label: "O Meu Perfil",        icon: User,          exact: false },
-  { href: "/player/meus-jogos",       label: "Os Meus Jogos",       icon: Calendar,      exact: false },
-  { href: "/player/meus-treinos",     label: "Os Meus Treinos",     icon: Dumbbell,      exact: false },
-  { href: "/player/assiduidade",      label: "A Minha Assiduidade", icon: BarChart2,     exact: false },
-  { href: "/player/meus-pagamentos",  label: "Os Meus Pagamentos",  icon: CreditCard,    exact: false },
-  { href: "/player/laboratorio",      label: "Laboratório",         icon: ClipboardList, exact: false },
-  { href: "/player/palmares",         label: "Palmarés",            icon: Trophy,        exact: false },
-  { href: "/player/chat",             label: "Chat",                icon: MessageSquare, exact: false },
+  { href: "/player/minha-area",       label: "Início",              icon: Home,          exact: true,  pendingKey: null          },
+  { href: "/player/plantel",          label: "Plantel",             icon: Users,         exact: false, pendingKey: null          },
+  { href: "/player/meu-perfil",       label: "O Meu Perfil",        icon: User,          exact: false, pendingKey: null          },
+  { href: "/player/meus-jogos",       label: "Os Meus Jogos",       icon: Calendar,      exact: false, pendingKey: "game"        },
+  { href: "/player/meus-treinos",     label: "Os Meus Treinos",     icon: Dumbbell,      exact: false, pendingKey: "training"    },
+  { href: "/player/assiduidade",      label: "A Minha Assiduidade", icon: BarChart2,     exact: false, pendingKey: null          },
+  { href: "/player/meus-pagamentos",  label: "Os Meus Pagamentos",  icon: CreditCard,    exact: false, pendingKey: null          },
+  { href: "/player/laboratorio",      label: "Laboratório",         icon: ClipboardList, exact: false, pendingKey: null          },
+  { href: "/player/palmares",         label: "Palmarés",            icon: Trophy,        exact: false, pendingKey: null          },
+  { href: "/player/chat",             label: "Chat",                icon: MessageSquare, exact: false, pendingKey: null          },
 ] as const;
 
 function initials(name: string) {
@@ -32,15 +33,20 @@ export function PlayerSidebar({
   playerName = "Jogador",
   availableRoles = [],
   activeRole = "jogador",
+  playerJersey,
+  playerPosition,
 }: {
   playerName?: string;
   availableRoles?: string[];
   activeRole?: string;
+  playerJersey?: string | null;
+  playerPosition?: string | null;
 }) {
   const pathname  = usePathname();
   const router    = useRouter();
   const supabase  = createClient();
   const chatBadge = useUnreadChatCount();
+  const pending   = usePlayerPending();
 
   function isActive(href: string, exact: boolean) {
     return exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
@@ -52,6 +58,11 @@ export function PlayerSidebar({
     router.push("/login");
     router.refresh();
   }
+
+  const subLine = [
+    playerJersey  ? `#${playerJersey}`  : null,
+    playerPosition ?? null,
+  ].filter(Boolean).join(" · ");
 
   return (
     <aside
@@ -68,7 +79,6 @@ export function PlayerSidebar({
           borderBottom: "1px solid rgba(255,255,255,.08)",
         }}
       >
-        {/* Bola laranja */}
         <div
           aria-hidden
           style={{
@@ -106,6 +116,10 @@ export function PlayerSidebar({
           {PLAYER_NAV.map((item) => {
             const active = isActive(item.href, item.exact);
             const badge  = item.href === "/player/chat" ? chatBadge : 0;
+            const hasPendingDot =
+              item.pendingKey === "training" ? pending.training :
+              item.pendingKey === "game"     ? pending.game     : false;
+
             return (
               <Link
                 key={item.href}
@@ -143,6 +157,18 @@ export function PlayerSidebar({
                 >
                   {item.label}
                 </span>
+                {hasPendingDot && (
+                  <span
+                    aria-label="por responder"
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      borderRadius: "50%",
+                      background: "#F97316",
+                      flexShrink: 0,
+                    }}
+                  />
+                )}
                 {badge > 0 && (
                   <span
                     style={{
@@ -204,10 +230,27 @@ export function PlayerSidebar({
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
                 lineHeight: 1.2,
+                margin: 0,
               }}
             >
               {playerName}
             </p>
+            {subLine && (
+              <p
+                style={{
+                  fontFamily: "var(--font-ibm-mono, monospace)",
+                  fontWeight: 500,
+                  fontSize: "10px",
+                  letterSpacing: ".08em",
+                  textTransform: "uppercase",
+                  color: "rgba(246,242,236,.45)",
+                  margin: "2px 0 0",
+                  lineHeight: 1,
+                }}
+              >
+                {subLine}
+              </p>
+            )}
           </div>
         </div>
         <button

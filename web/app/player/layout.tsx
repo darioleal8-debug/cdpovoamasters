@@ -35,11 +35,12 @@ export default async function PlayerLayout({ children }: { children: React.React
 
   if (!user) redirect("/login");
 
-  // Fetch club colors in parallel with profile — eliminates sidebar theme flash
-  const [{ data: profile }, { data: settingsRow }, { data: kitsRows }] = await Promise.all([
+  // Fetch club colors + player details in parallel — eliminates sidebar theme flash
+  const [{ data: profile }, { data: settingsRow }, { data: kitsRows }, { data: playerRow }] = await Promise.all([
     supabase.from("users").select("name, role, roles_extra, active").eq("id", user.id).single(),
     supabase.from("club_settings").select("club_name, primary_color, secondary_color, accent_color").eq("id", "default").maybeSingle(),
     supabase.from("team_kits").select("team_name, jersey_home_color, shorts_home_color, jersey_away_color"),
+    supabase.from("players").select("number, position").eq("user_id", user.id).maybeSingle(),
   ]);
 
   const clubName  = settingsRow?.club_name ?? "CD Póvoa";
@@ -74,13 +75,21 @@ export default async function PlayerLayout({ children }: { children: React.React
   // Seccionista não é jogador — redirecionar para a área de jogos
   if (effective.role === "seccionista") redirect("/jogos");
 
-  const playerName = profile.name || user.email || "Jogador";
+  const playerName     = profile.name || user.email || "Jogador";
+  const playerJersey   = playerRow?.number   ? String(playerRow.number)   : null;
+  const playerPosition = playerRow?.position ?? null;
 
   return (
     <div className={ibmMono.variable}>
       {/* Inject club CSS variables before first paint to prevent sidebar theme flash */}
       <style dangerouslySetInnerHTML={{ __html: clubCss }} />
-      <PlayerShell playerName={playerName} availableRoles={roles} activeRole={effective.role}>
+      <PlayerShell
+        playerName={playerName}
+        availableRoles={roles}
+        activeRole={effective.role}
+        playerJersey={playerJersey}
+        playerPosition={playerPosition}
+      >
         {children}
       </PlayerShell>
     </div>

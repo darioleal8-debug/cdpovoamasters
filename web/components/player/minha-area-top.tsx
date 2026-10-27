@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { toast } from "@/components/ui/toaster";
+import { usePlayerPending } from "./player-pending-context";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -352,10 +353,19 @@ export function MinhaAreaTop({
 }: Props) {
   const [tAnswer, setTAnswer] = useState<Answer | null>(trainingAnswer);
   const [gAnswer, setGAnswer] = useState<Answer | null>(gameAnswer);
+  const { update: updatePending } = usePlayerPending();
 
   const pending =
     (training     && tAnswer == null ? 1 : 0) +
     (gameData     && gAnswer == null ? 1 : 0);
+
+  // Sincroniza o contexto de pendentes (para dots na sidebar)
+  useEffect(() => {
+    updatePending({
+      training: !!(training && tAnswer == null),
+      game:     !!(gameData && gAnswer == null),
+    });
+  }, [tAnswer, gAnswer, training, gameData, updatePending]);
 
   const dateStr = todayLabel();
 
