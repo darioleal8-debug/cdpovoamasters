@@ -3,20 +3,18 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { authorize } from "@/lib/auth/guards";
 import { redirect } from "next/navigation";
 import {
-  AlertTriangle, BarChart2, Calendar, Clock, CreditCard,
-  Dumbbell, MapPin, MessageSquare, Trophy, User,
+  AlertTriangle, BarChart2, Calendar, CreditCard,
+  Dumbbell, MessageSquare, Trophy, User,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { NextGameCard } from "@/components/games/next-game-card";
 import { StatsSection } from "@/components/player/stats-section";
-import { AvailabilityPrompt } from "@/components/player/availability-prompt";
-import { GpsCheckinButton } from "@/components/trainings/gps-checkin-button";
 import { lisbonDateTime } from "@/lib/event-time";
 import { isAttendanceOpen, attendanceCloseHHMM } from "@/lib/time/attendance-window";
 import { pickNextTraining } from "@/lib/time/pick-next-training";
+import { GpsCheckinButton } from "@/components/trainings/gps-checkin-button";
 import type { AvailabilityRosterRow } from "@/types/availability";
 import { BirthdayBanner } from "@/components/birthday/birthday-banner";
 import Link from "next/link";
+import { MinhaAreaTop, type TrainingData, type GameData } from "@/components/player/minha-area-top";
 
 export const metadata = { title: "Minha Área" };
 
@@ -34,11 +32,6 @@ type TrainingRow = {
   deleted_at: string | null;
 };
 
-type TrainingRsvpProps = {
-  answer: "yes" | "no" | null;
-  roster: AvailabilityRosterRow[];
-} | null;
-
 type ComunicadoRow = {
   id:          string;
   content:     string | null;
@@ -48,28 +41,6 @@ type ComunicadoRow = {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-const TYPE_LABELS: Record<string, string> = {
-  tecnico: "Técnico", fisico: "Físico", tatico: "Tático",
-  recuperacao: "Recuperação", coletivo: "Coletivo",
-  individual: "Individual", geral: "Geral",
-};
-
-function dateLabel(dateStr: string): string {
-  const todayMs = new Date(todayInClubTz() + "T00:00:00").getTime();
-  const tMs     = new Date(dateStr + "T00:00:00").getTime();
-  const diff    = Math.round((tMs - todayMs) / 86_400_000);
-  if (diff === 0)  return "Hoje";
-  if (diff === 1)  return "Amanhã";
-  if (diff === -1) return "Ontem";
-  return `Em ${diff} dias`;
-}
-
-function fmtDate(dateStr: string): string {
-  return new Date(dateStr + "T00:00:00").toLocaleDateString("pt-PT", {
-    weekday: "short", day: "numeric", month: "short", year: "numeric",
-  });
-}
 
 function relTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -84,152 +55,9 @@ function initials(name: string): string {
   return name.split(" ").filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
 }
 
-// ── Cartão Próximo Treino ─────────────────────────────────────────────────────
-
-function NextTrainingCard({
-  training,
-  note,
-  rsvp,
-  hasAttendance = false,
-  checkinOpen = false,
-  closeHHMM = null,
-}: {
-  training:      TrainingRow | null;
-  note:          string | null;
-  /** null = utilizador sem perfil de jogador → não mostra os botões */
-  rsvp:          TrainingRsvpProps;
-  /** true se a presença GPS/manual já foi registada */
-  hasAttendance?: boolean;
-  /** true se a janela de check-in está aberta agora */
-  checkinOpen?:  boolean;
-  /** hora de fecho da janela em formato HH:MM */
-  closeHHMM?:   string | null;
-}) {
-  const TRAINING_BG = "#3b5f92";
-
-  if (!training) {
-    return (
-      <div className="overflow-hidden rounded-xl border shadow-sm flex flex-col">
-        <div className="px-5 py-5" style={{ backgroundColor: TRAINING_BG, color: "#fff" }}>
-          <span className="text-[0.65rem] font-bold uppercase tracking-widest opacity-60">
-            Próximo Treino
-          </span>
-          <p className="mt-3 text-sm opacity-70">Sem treinos agendados.</p>
-        </div>
-        <div className="bg-background flex-1 px-5 py-4" />
-      </div>
-    );
-  }
-
-  const label   = dateLabel(training.date);
-  const isToday = label === "Hoje";
-  const typeLabel = training.type ? (TYPE_LABELS[training.type] ?? training.type) : null;
-  const deadlineIso = lisbonDateTime(training.date, training.start_time).toISOString();
-
-  return (
-    <div className="overflow-hidden rounded-xl border shadow-sm flex flex-col">
-      {/* ── Topo colorido ── */}
-      <div className="relative px-5 py-5" style={{ backgroundColor: TRAINING_BG, color: "#fff" }}>
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <span className="text-[0.65rem] font-bold uppercase tracking-widest opacity-60">
-            Próximo Treino
-          </span>
-          <Badge
-            className="text-[11px] font-semibold"
-            style={{
-              backgroundColor: isToday
-                ? "var(--club-secondary, #F28C28)"
-                : "rgba(255,255,255,0.15)",
-              color:  "#fff",
-              border: "none",
-            }}
-          >
-            {label}
-          </Badge>
-        </div>
-
-        <h2 className="mb-3 text-lg font-bold leading-tight">
-          Treino{typeLabel ? ` · ${typeLabel}` : ""}
-        </h2>
-
-        <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm opacity-80">
-          <span className="flex items-center gap-1.5">
-            <Calendar className="h-3.5 w-3.5 shrink-0" />
-            {fmtDate(training.date)}
-          </span>
-          {training.start_time && (
-            <span className="flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5 shrink-0" />
-              {training.start_time.slice(0, 5)}h
-            </span>
-          )}
-          {training.location && (
-            <span className="flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5 shrink-0" />
-              {training.location}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* ── Disponibilidade do jogador ── */}
-      {rsvp && (
-        <div className="border-b bg-background px-5 py-4">
-          <AvailabilityPrompt
-            kind="training"
-            eventId={training.id}
-            deadlineIso={deadlineIso}
-            initialAnswer={rsvp.answer}
-            initialRoster={rsvp.roster}
-          />
-        </div>
-      )}
-
-      {/* ── Marcar Presença GPS — durante a janela de check-in ── */}
-      {checkinOpen && rsvp !== null && !hasAttendance && (
-        <div className="border-b bg-background px-5 py-4">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-            Presença
-          </p>
-          {closeHHMM && (
-            <p className="mb-2 text-xs text-muted-foreground">
-              Confirma a tua presença — fecha às {closeHHMM}h.
-            </p>
-          )}
-          <GpsCheckinButton trainingId={training.id} />
-        </div>
-      )}
-
-      {/* ── Zona branca — Foco do treino ── */}
-      <div className="bg-background flex-1 px-5 py-4">
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-          Foco do treino
-        </p>
-        {note ? (
-          <p className="text-sm text-foreground/80 leading-relaxed">{note}</p>
-        ) : (
-          <p className="text-sm text-muted-foreground">Sem notas para este treino.</p>
-        )}
-      </div>
-
-      {/* ── Rodapé — ver respostas ── */}
-      <div className="border-t bg-background px-5 py-3">
-        <Link
-          href={`/player/meus-treinos/${training.id}`}
-          className="text-xs font-medium hover:underline"
-          style={{ color: "var(--club-primary, #1d4079)" }}
-        >
-          Ver quem vai →
-        </Link>
-      </div>
-    </div>
-  );
-}
-
 // ── Página principal ──────────────────────────────────────────────────────────
 
 export default async function MinhaAreaPage() {
-  // Verificação própria: na navegação cliente o layout não volta a correr (revisão final, Importante 3)
   const authz = await authorize();
   if (!authz.ok) redirect(authz.response.status === 401 ? "/login" : "/login?reason=inactive");
   const supabase = await createClient();
@@ -247,7 +75,7 @@ export default async function MinhaAreaPage() {
     .eq("status", "ativa")
     .maybeSingle();
 
-  // Um perfil por época: primeiro o da época ativa (UX-19); senão o mais recente
+  // Perfil de jogador ligado à época ativa; senão o mais recente
   let linkedPlayer: { id: string } | null = null;
   if (activeSeason) {
     const { data } = await supabase
@@ -278,9 +106,11 @@ export default async function MinhaAreaPage() {
     isPaymentLate = (paymentSummary?.months_late ?? 0) > 0;
   }
 
-  // ── Próximo treino (inclui ontem para cobrir a janela pós-treino de 3h) ──────
+  // ── Próximo treino ────────────────────────────────────────
   const now = new Date();
+  const today = todayInClubTz(now);
   const yesterday = todayInClubTz(new Date(now.getTime() - 86_400_000));
+
   const { data: nextTrainingRows } = activeSeason?.id
     ? await supabase
         .from("trainings")
@@ -315,8 +145,10 @@ export default async function MinhaAreaPage() {
     }
   }
 
-  // ── Confirmação de presença no próximo treino ─────────────
-  let trainingRsvp: TrainingRsvpProps = null;
+  // ── RSVP do treino ────────────────────────────────────────
+  let trainingAnswer: "yes" | "no" | null = null;
+  let trainingRoster: AvailabilityRosterRow[] = [];
+
   if (nextTraining && linkedPlayer?.id) {
     const [{ data: ownRsvp }, { data: rosterRows }] = await Promise.all([
       supabase
@@ -327,16 +159,14 @@ export default async function MinhaAreaPage() {
         .maybeSingle(),
       supabase.rpc("training_rsvp_roster", { p_training_id: nextTraining.id }),
     ]);
-    trainingRsvp = {
-      answer:
-        ownRsvp?.status === "going" ? "yes"
-        : ownRsvp?.status === "not_going" ? "no"
-        : null,
-      roster: (rosterRows ?? []) as AvailabilityRosterRow[],
-    };
+    trainingAnswer =
+      ownRsvp?.status === "going"     ? "yes"
+      : ownRsvp?.status === "not_going" ? "no"
+      : null;
+    trainingRoster = (rosterRows ?? []) as AvailabilityRosterRow[];
   }
 
-  // ── Presença durante a janela de check-in ───────────────
+  // ── Check-in GPS ──────────────────────────────────────────
   const checkinOpen = nextTraining ? isAttendanceOpen(nextTraining, now) : false;
   const closeHHMM   = checkinOpen && nextTraining ? attendanceCloseHHMM(nextTraining) : null;
 
@@ -352,8 +182,74 @@ export default async function MinhaAreaPage() {
     hasTrainingAttendance = att !== null;
   }
 
-  // ── Comunicados (canal 'announcement', onde o admin publica — UX-12) ───────
-  // Lido com service role: é para todos os membros ativos (authorize() acima garante sessão ativa).
+  // ── Próximo jogo (inline para calcular pending + evitar re-render) ────────────
+  const { data: nextGameRaw } = await supabase
+    .from("events")
+    .select("id, title, event_date, event_time, location, description, opponent")
+    .eq("type", "jogo")
+    .eq("is_club_game", true)
+    .is("deleted_at", null)
+    .gte("event_date", today)
+    .order("event_date", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  // Parse gameMeta from description
+  let gameMeta: { home_team: string; away_team: string; is_home: boolean } | null = null;
+  if (nextGameRaw?.description) {
+    try {
+      const m = JSON.parse(nextGameRaw.description as string) as { home_team?: unknown; away_team?: unknown; is_home?: unknown };
+      if (m.home_team && m.away_team && typeof m.is_home === "boolean") {
+        gameMeta = { home_team: String(m.home_team), away_team: String(m.away_team), is_home: m.is_home };
+      }
+    } catch { /* silently ignore */ }
+  }
+
+  const nextGame: GameData | null = nextGameRaw
+    ? {
+        id:         nextGameRaw.id as string,
+        event_date: nextGameRaw.event_date as string,
+        event_time: nextGameRaw.event_time as string | null,
+        location:   nextGameRaw.location as string | null,
+        opponent:   nextGameRaw.opponent as string | null,
+        title:      nextGameRaw.title as string,
+        gameMeta,
+      }
+    : null;
+
+  // ── Disponibilidade no jogo ───────────────────────────────
+  let gameAnswer: "yes" | "no" | null = null;
+  if (nextGame && linkedPlayer?.id) {
+    const { data: av } = await supabase
+      .from("game_availability")
+      .select("status")
+      .eq("game_id", nextGame.id)
+      .eq("player_id", linkedPlayer.id)
+      .maybeSingle();
+    if (av?.status === "available")   gameAnswer = "yes";
+    if (av?.status === "unavailable") gameAnswer = "no";
+  }
+
+  // Confirmados no jogo (respostas "available")
+  const { count: gameConfirmedCount } = nextGame
+    ? await supabase
+        .from("game_availability")
+        .select("*", { count: "exact", head: true })
+        .eq("game_id", nextGame.id)
+        .eq("status", "available")
+    : { count: 0 };
+
+  const trainingConfirmedCount = trainingRoster.filter((r) => r.status === "going").length;
+
+  // Deadline para os cartões (abertura de botões)
+  const trainingDeadlineIso = nextTraining
+    ? lisbonDateTime(nextTraining.date, nextTraining.start_time).toISOString()
+    : null;
+  const gameDeadlineIso = nextGame
+    ? lisbonDateTime(nextGame.event_date, nextGame.event_time).toISOString()
+    : null;
+
+  // ── Comunicados ───────────────────────────────────────────
   let comunicados: ComunicadoRow[] = [];
   try {
     const admin = await createAdminClient();
@@ -383,16 +279,13 @@ export default async function MinhaAreaPage() {
               .filter((id): id is string => id !== null)
           ),
         ];
-
         const { data: senders } = senderIds.length > 0
           ? await supabase.from("user_display_names").select("id, name, role").in("id", senderIds)
           : { data: [] };
-
         const senderById = new Map(
           ((senders ?? []) as Array<{ id: string; name: string; role: string }>)
             .map((s) => [s.id, s])
         );
-
         comunicados = (msgs as Array<{ id: string; content: string | null; created_at: string; sender_id: string | null }>)
           .map((m) => {
             const sender = m.sender_id ? senderById.get(m.sender_id) : undefined;
@@ -406,147 +299,264 @@ export default async function MinhaAreaPage() {
           });
       }
     }
-  } catch {
-    // Comunicados não-fatal — se falhar, mostra lista vazia
-  }
+  } catch { /* Comunicados não-fatal */ }
 
   const name = profile?.name || user.email || "Jogador";
+  const firstName = name.split(" ").filter(Boolean)[0] ?? name;
 
-  // ── Atalhos ───────────────────────────────────────────────
+  // Atalhos de navegação rápida
   const shortcuts = [
-    { href: "/player/meu-perfil",      icon: User,           label: "O Meu Perfil",       desc: "Ver e editar"       },
-    { href: "/player/meus-jogos",      icon: Calendar,       label: "Os Meus Jogos",      desc: "Próximos jogos"     },
-    { href: "/player/meus-treinos",    icon: Dumbbell,   label: "Os Meus Treinos",       desc: "Agenda de treinos"  },
-    { href: "/player/assiduidade",    icon: BarChart2,  label: "A Minha Assiduidade",   desc: "Treinos e jogos"    },
-    { href: "/player/meus-pagamentos", icon: CreditCard, label: "Os Meus Pagamentos",    desc: "Quotas"             },
-    { href: "/player/palmares",        icon: Trophy,     label: "Palmarés",              desc: "Historial"          },
+    { href: "/player/meu-perfil",      icon: User,       label: "O Meu Perfil",       desc: "Ver e editar"      },
+    { href: "/player/meus-jogos",      icon: Calendar,   label: "Os Meus Jogos",      desc: "Próximos jogos"    },
+    { href: "/player/meus-treinos",    icon: Dumbbell,   label: "Os Meus Treinos",    desc: "Agenda de treinos" },
+    { href: "/player/assiduidade",     icon: BarChart2,  label: "A Minha Assiduidade",desc: "Treinos e jogos"   },
+    { href: "/player/meus-pagamentos", icon: CreditCard, label: "Os Meus Pagamentos", desc: "Quotas"            },
+    { href: "/player/palmares",        icon: Trophy,     label: "Palmarés",           desc: "Historial"         },
   ] as const;
 
-  return (
-    <div className="space-y-6">
+  const trainingData: TrainingData | null = nextTraining
+    ? {
+        id:         nextTraining.id,
+        date:       nextTraining.date,
+        start_time: nextTraining.start_time,
+        end_time:   nextTraining.end_time,
+        location:   nextTraining.location,
+        type:       nextTraining.type,
+      }
+    : null;
 
-      {/* ── Cabeçalho ── */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Olá, {name.split(" ")[0]}!</h1>
-        <p className="text-muted-foreground">Bem-vindo à tua área pessoal.</p>
-      </div>
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+
+      {/* ── Cartões de evento (client component com disponibilidade) ── */}
+      <MinhaAreaTop
+        playerFirstName={firstName}
+        training={trainingData}
+        trainingAnswer={trainingAnswer}
+        trainingConfirmedCount={trainingConfirmedCount}
+        trainingDeadlineIso={trainingDeadlineIso}
+        gameData={nextGame}
+        gameAnswer={gameAnswer}
+        gameConfirmedCount={gameConfirmedCount ?? 0}
+        gameDeadlineIso={gameDeadlineIso}
+        noPlayerProfile={linkedPlayer === null}
+      />
 
       {/* ── Aviso de quotas em atraso ── */}
       {isPaymentLate && (
-        <div className="rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 dark:border-amber-700/40 dark:bg-amber-950/20">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
-            <div>
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                Quotas em atraso
-              </p>
-              <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-                Tens quotas por pagar. Enquanto não regularizares a situação, não poderás ser convocado para jogos.{" "}
-                <Link href="/player/meus-pagamentos" className="underline font-medium">
-                  Ver pagamentos
-                </Link>
-              </p>
-            </div>
+        <div
+          style={{
+            borderRadius: "8px",
+            border: "1px solid rgba(249,115,22,.4)",
+            background: "rgba(249,115,22,.08)",
+            padding: "12px 16px",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "12px",
+          }}
+        >
+          <AlertTriangle size={18} style={{ color: "#F97316", flexShrink: 0, marginTop: "1px" }} />
+          <div>
+            <p style={{ fontFamily: "var(--font-barlow-condensed, sans-serif)", fontWeight: 700, fontSize: "14px", letterSpacing: ".04em", textTransform: "uppercase", color: "#1A1612", marginBottom: "4px" }}>
+              Quotas em atraso
+            </p>
+            <p style={{ fontFamily: "var(--font-barlow, sans-serif)", fontSize: "13px", color: "#6F675F" }}>
+              Tens quotas por pagar. Enquanto não regularizares, não poderás ser convocado para jogos.{" "}
+              <Link href="/player/meus-pagamentos" style={{ color: "#C2530A", fontWeight: 600 }}>
+                Ver pagamentos
+              </Link>
+            </p>
           </div>
         </div>
       )}
 
-      {/* ── Aniversários de hoje ── */}
+      {/* ── Aniversários ── */}
       <BirthdayBanner isAdmin={false} />
 
-      {/* ── Par de cartões: Próximo Jogo + Próximo Treino ── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <NextGameCard
-          highlightPlayerId={linkedPlayer?.id ?? null}
-          availabilityPlayerId={linkedPlayer?.id ?? null}
-        />
-        <NextTrainingCard training={nextTraining} note={trainingNote} rsvp={trainingRsvp} hasAttendance={hasTrainingAttendance} checkinOpen={checkinOpen} closeHHMM={closeHHMM} />
-      </div>
+      {/* ── Check-in GPS (janela aberta) ── */}
+      {checkinOpen && linkedPlayer && !hasTrainingAttendance && nextTraining && (
+        <div
+          style={{
+            background: "#FFFDFA",
+            borderRadius: "8px",
+            boxShadow: "0 1px 0 rgba(26,22,18,.08), 0 8px 24px -12px rgba(26,22,18,.25)",
+            padding: "16px",
+          }}
+        >
+          <p
+            style={{
+              fontFamily: "var(--font-ibm-mono, monospace)",
+              fontSize: "10px",
+              fontWeight: 500,
+              letterSpacing: ".1em",
+              textTransform: "uppercase",
+              color: "#8C837A",
+              marginBottom: "8px",
+            }}
+          >
+            Marcar presença{closeHHMM ? ` · fecha às ${closeHHMM}h` : ""}
+          </p>
+          <GpsCheckinButton trainingId={nextTraining.id} />
+        </div>
+      )}
 
-      {/* ── Linha 2: Estatísticas (2/3) + Comunicados (1/3) ── */}
+      {/* ── Foco do treino ── */}
+      {nextTraining && trainingNote && (
+        <div
+          style={{
+            background: "#FFFDFA",
+            borderRadius: "8px",
+            boxShadow: "0 1px 0 rgba(26,22,18,.08), 0 8px 24px -12px rgba(26,22,18,.25)",
+            padding: "16px",
+          }}
+        >
+          <p
+            style={{
+              fontFamily: "var(--font-ibm-mono, monospace)",
+              fontSize: "10px",
+              fontWeight: 500,
+              letterSpacing: ".1em",
+              textTransform: "uppercase",
+              color: "#8C837A",
+              marginBottom: "8px",
+            }}
+          >
+            Foco do treino
+          </p>
+          <p style={{ fontFamily: "var(--font-barlow, sans-serif)", fontSize: "14px", color: "#1A1612", lineHeight: 1.5 }}>
+            {trainingNote}
+          </p>
+        </div>
+      )}
+
+      {/* ── Linha 2: Estatísticas + Comunicados ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-
-        {/* Estatísticas */}
         <div className="sm:col-span-2">
           <StatsSection seasonId={activeSeason?.id ?? null} />
         </div>
-
-        {/* Comunicados */}
         <div>
-          <div className="bg-card border rounded-xl shadow-sm flex flex-col h-full">
-            {/* Cabeçalho do cartão */}
-            <div className="px-4 pt-4 pb-3 border-b flex items-center gap-2">
-              <MessageSquare className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-semibold">Comunicados</span>
+          <div
+            style={{
+              background: "#FFFDFA",
+              borderRadius: "8px",
+              boxShadow: "0 1px 0 rgba(26,22,18,.08), 0 8px 24px -12px rgba(26,22,18,.25)",
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ padding: "14px 16px 10px", borderBottom: "1px solid rgba(26,22,18,.06)", display: "flex", alignItems: "center", gap: "8px" }}>
+              <MessageSquare size={14} style={{ color: "#8C837A" }} />
+              <span style={{ fontFamily: "var(--font-barlow-condensed, sans-serif)", fontWeight: 700, fontSize: "14px", letterSpacing: ".04em", textTransform: "uppercase", color: "#1A1612" }}>
+                Comunicados
+              </span>
             </div>
-
-            {/* Lista */}
-            <div className="flex-1 flex flex-col divide-y overflow-hidden">
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
               {comunicados.length === 0 ? (
-                <div className="px-4 py-5 flex-1 flex items-center">
-                  <p className="text-sm text-muted-foreground">Sem comunicados recentes.</p>
+                <div style={{ padding: "16px", flex: 1, display: "flex", alignItems: "center" }}>
+                  <p style={{ fontFamily: "var(--font-barlow, sans-serif)", fontSize: "13px", color: "#8C837A" }}>
+                    Sem comunicados recentes.
+                  </p>
                 </div>
               ) : (
-                comunicados.map((c) => (
-                  <div key={c.id} className="px-4 py-3">
-                    <div className="flex items-start gap-2.5">
-                      {/* Avatar */}
-                      <div
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
-                        style={{ backgroundColor: "var(--club-primary, #1d4079)" }}
-                      >
-                        {initials(c.sender_name)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-1">
-                          <p className="text-xs font-semibold truncate">{c.sender_name}</p>
-                          <p className="text-[11px] text-muted-foreground shrink-0">{relTime(c.created_at)}</p>
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  {comunicados.map((c, i) => (
+                    <div
+                      key={c.id}
+                      style={{
+                        padding: "12px 16px",
+                        borderBottom: i < comunicados.length - 1 ? "1px solid rgba(26,22,18,.06)" : undefined,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+                        <div
+                          style={{
+                            width: "28px",
+                            height: "28px",
+                            borderRadius: "50%",
+                            background: "#1A1612",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                            fontFamily: "var(--font-barlow-condensed, sans-serif)",
+                            fontWeight: 700,
+                            fontSize: "11px",
+                            color: "#fff",
+                            letterSpacing: ".04em",
+                          }}
+                        >
+                          {initials(c.sender_name)}
                         </div>
-                        {c.sender_role && (
-                          <p className="text-[11px] text-muted-foreground capitalize">{c.sender_role}</p>
-                        )}
-                        <p className="text-xs text-foreground/80 mt-1 line-clamp-2 leading-relaxed">
-                          {c.content}
-                        </p>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: "4px" }}>
+                            <p style={{ fontFamily: "var(--font-barlow, sans-serif)", fontSize: "12px", fontWeight: 600, color: "#1A1612", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {c.sender_name}
+                            </p>
+                            <p style={{ fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "10px", color: "#8C837A", flexShrink: 0 }}>
+                              {relTime(c.created_at)}
+                            </p>
+                          </div>
+                          <p style={{ fontFamily: "var(--font-barlow, sans-serif)", fontSize: "12px", color: "#6F675F", marginTop: "4px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                            {c.content}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
             </div>
-
-            {/* Rodapé */}
-            <div className="px-4 py-3 border-t">
-              <Link
-                href="/player/chat"
-                className="text-xs font-medium hover:underline"
-                style={{ color: "var(--club-primary, #1d4079)" }}
-              >
+            <div style={{ padding: "10px 16px", borderTop: "1px solid rgba(26,22,18,.06)" }}>
+              <Link href="/player/chat" style={{ fontFamily: "var(--font-barlow, sans-serif)", fontSize: "12px", fontWeight: 600, color: "#C2530A" }}>
                 Ver tudo no chat →
               </Link>
             </div>
           </div>
         </div>
-
       </div>
 
       {/* ── Atalhos de navegação rápida ── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
         {shortcuts.map(({ href, icon: Icon, label, desc }) => (
           <Link
             key={href}
             href={href}
-            className="group flex flex-col items-center gap-2 rounded-xl border bg-card p-4 text-center shadow-sm transition-all hover:shadow-md"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "8px",
+              borderRadius: "8px",
+              background: "#FFFDFA",
+              boxShadow: "0 1px 0 rgba(26,22,18,.08), 0 4px 12px -6px rgba(26,22,18,.15)",
+              padding: "16px 12px",
+              textAlign: "center",
+              textDecoration: "none",
+              transition: "box-shadow .15s",
+            }}
           >
             <div
-              className="flex h-10 w-10 items-center justify-center rounded-lg"
-              style={{ backgroundColor: "var(--club-bg, #eeeeee)", color: "var(--club-primary, #111111)" }}
+              style={{
+                width: "40px",
+                height: "40px",
+                borderRadius: "8px",
+                background: "#F4EFE8",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
             >
-              <Icon className="h-5 w-5" />
+              <Icon size={18} style={{ color: "#1A1612" }} />
             </div>
             <div>
-              <p className="text-sm font-semibold">{label}</p>
-              <p className="text-[11px] text-muted-foreground">{desc}</p>
+              <p style={{ fontFamily: "var(--font-barlow-condensed, sans-serif)", fontWeight: 700, fontSize: "13px", letterSpacing: ".04em", textTransform: "uppercase", color: "#1A1612" }}>
+                {label}
+              </p>
+              <p style={{ fontFamily: "var(--font-barlow, sans-serif)", fontSize: "11px", color: "#8C837A" }}>
+                {desc}
+              </p>
             </div>
           </Link>
         ))}

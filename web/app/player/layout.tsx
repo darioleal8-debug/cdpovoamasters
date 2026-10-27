@@ -4,6 +4,14 @@ import { PlayerShell } from "@/components/player/player-shell";
 import { readActiveRoleCookie } from "@/lib/auth/guards";
 import { applyActiveRole, availableRoles } from "@/lib/auth/active-role";
 import type { UserRole } from "@/types/database";
+import { IBM_Plex_Mono } from "next/font/google";
+
+const ibmMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["500"],
+  variable: "--font-ibm-mono",
+  display: "swap",
+});
 
 const DEFAULT_PRIMARY   = "#111111";
 const DEFAULT_SECONDARY = "#F28C28";
@@ -69,12 +77,12 @@ export default async function PlayerLayout({ children }: { children: React.React
   const playerName = profile.name || user.email || "Jogador";
 
   return (
-    <>
+    <div className={ibmMono.variable}>
       {/* Inject club CSS variables before first paint to prevent sidebar theme flash */}
       <style dangerouslySetInnerHTML={{ __html: clubCss }} />
       <PlayerShell playerName={playerName} availableRoles={roles} activeRole={effective.role}>
         {children}
       </PlayerShell>
-    </>
+    </div>
   );
 }
