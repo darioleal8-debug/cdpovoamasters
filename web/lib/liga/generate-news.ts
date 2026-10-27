@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { computeStandings, groupStandingsBySeries, normalizeName } from "@/types/competitions";
 import { deepseekJSON } from "@/lib/deepseek";
+import { buildNewsFacts, unknownScores } from "@/lib/game-sheet/news-facts";
 
 function slugify(text: string): string {
   return text
@@ -26,11 +27,23 @@ const NEWS_SYSTEM = `Escreves notícias de jornalismo desportivo local em portug
 Usa APENAS os factos fornecidos — nunca inventes dados.
 Tom entusiasta mas sóbrio. Português europeu (não do Brasil).
 
+Estrutura do corpo (proporcional aos dados disponíveis — omite secções sem factos):
+1. Introdução: equipas, competição, data e local.
+2. Resumo do encontro e evolução do marcador por período (só com os parciais fornecidos).
+3. Momentos decisivos — apenas os que os factos demonstram (ex.: maior parcial, reviravolta no último período).
+4. Destaques individuais — apenas marcadores confirmados, com o total exato.
+5. Contexto da competição/classificação, se fornecido.
+6. Conclusão sobre o impacto do resultado.
+
+PROIBIDO inventar: declarações de jogadores ou treinadores, lesões, arbitragem, táticas, emoções, corridas de pontos
+dentro de um período, estatísticas não fornecidas, consequências competitivas não indicadas. Não cites pontuações que
+não constem dos factos.
+
 Responde APENAS com JSON válido (sem markdown) com este esquema:
 {
-  "titulo": "título da notícia (máx. 80 caracteres)",
-  "entrada": "1-2 frases de entrada/lide",
-  "corpo": "corpo da notícia, 150-250 palavras"
+  "titulo": "título apelativo mas factual (máx. 80 caracteres)",
+  "entrada": "1-2 frases de entrada/lide com o resultado (máx. 200 caracteres; serve também de descrição SEO)",
+  "corpo": "corpo da notícia, 120-400 palavras, em parágrafos separados por linha em branco"
 }`;
 
 export async function generateLigaNews(
@@ -43,7 +56,7 @@ export async function generateLigaNews(
     adminClient.from("league_game_results").select("*").eq("event_id", gameId).maybeSingle(),
     adminClient.from("competitions").select("id, name").eq("slug", "liga-inatel").single(),
     adminClient.from("league_game_periods").select("periodo, home_points, away_points").eq("event_id", gameId).order("periodo"),
-    adminClient.from("league_game_player_stats").select("nome, side, pontos").eq("event_id", gameId).order("pontos", { ascending: false }),
+    adminClient.from("league_game_player_stats").select("nome, side, pontos, triplos, lances_livres").eq("event_id", gameId).order("pontos", { ascending: false }),
   ]);
 
   const event = eventRes.data;
@@ -94,7 +107,7 @@ export async function generateLigaNews(
     .select("id, extraction_raw, notes")
     .eq("event_id", gameId)
     .eq("status", "approved")
-    .order("created_at", { ascending: false })
+    .order("reviewed_at", { ascending: false, nullsFirst: false })
     .limit(1)
     .maybeSingle();
 
@@ -111,46 +124,22 @@ export async function generateLigaNews(
     } catch { /* ignore */ }
   }
 
-  // Parciais vindos da DB (fonte de verdade após aprovação)
+  // Factos determinísticos a partir dos dados aprovados (fonte de verdade)
   const periods = (periodsRes.data ?? []) as { periodo: number; home_points: number; away_points: number }[];
-  let periodsBlock = "";
-  let decisivePeriodLine = "";
-  if (periods.length > 0) {
-    let cumHome = 0;
-    let cumAway = 0;
-    const lines: string[] = ["PARCIAIS (casa | fora | acumulado):"];
-    let maxSwing = 0;
-    let decisivePeriod = 0;
-    let decisiveDesc = "";
-    for (const p of periods) {
-      cumHome += p.home_points;
-      cumAway += p.away_points;
-      lines.push(`P${p.periodo}: ${p.home_points} | ${p.away_points} | ${cumHome}-${cumAway}`);
-      const swing = p.home_points - p.away_points;
-      if (Math.abs(swing) > Math.abs(maxSwing)) {
-        maxSwing = swing;
-        decisivePeriod = p.periodo;
-        const side = swing > 0 ? "casa" : "fora";
-        decisiveDesc = `P${p.periodo} (${side} +${Math.abs(swing)}, ${cumHome}-${cumAway} acumulado)`;
-      }
-    }
-    periodsBlock = lines.join("\n");
-    if (decisivePeriod > 0) decisivePeriodLine = `Período decisivo: ${decisiveDesc}`;
-  }
-
-  // Top marcadores por equipa (DB tem prioridade; fallback para extraction_raw)
-  const dbPlayers = (playerStatsRes.data ?? []) as { nome: string; side: string; pontos: number }[];
-  let topScorersByTeamBlock = "";
-  if (dbPlayers.length > 0) {
-    const homeTop = dbPlayers.filter((j) => j.side === "home" && j.pontos > 0).slice(0, 3);
-    const awayTop = dbPlayers.filter((j) => j.side === "away" && j.pontos > 0).slice(0, 3);
-    const parts: string[] = [];
-    if (homeTop.length > 0) parts.push(`Casa: ${homeTop.map((j) => `${j.nome} (${j.pontos} pts)`).join(", ")}`);
-    if (awayTop.length > 0) parts.push(`Fora: ${awayTop.map((j) => `${j.nome} (${j.pontos} pts)`).join(", ")}`);
-    if (parts.length > 0) topScorersByTeamBlock = `Marcadores por equipa:\n${parts.join("\n")}`;
-  } else if (topScorers) {
-    topScorersByTeamBlock = `Destaques: ${topScorers}`;
-  }
+  const dbPlayers = (playerStatsRes.data ?? []) as { nome: string; side: "home" | "away"; pontos: number; triplos: number | null; lances_livres: number | null }[];
+  const facts = buildNewsFacts({
+    home: result.home_team_name,
+    away: result.away_team_name,
+    homeScore: result.home_score,
+    awayScore: result.away_score,
+    periods,
+    players: dbPlayers,
+    unattributed: result.home_unattributed_points != null || result.away_unattributed_points != null
+      ? { home: result.home_unattributed_points ?? null, away: result.away_unattributed_points ?? null }
+      : null,
+  });
+  // Submissões antigas sem estatísticas na BD: destaques vindos da extração revista
+  const topScorersByTeamBlock = dbPlayers.length === 0 && topScorers ? `Destaques: ${topScorers}` : "";
 
   let jornadaInfo = "";
   try {
@@ -180,8 +169,9 @@ Vencedor: ${winner}
 Data: ${event.event_date}
 Local: ${event.location ?? "não especificado"}
 ${jornadaInfo}
-${periodsBlock ? `\n${periodsBlock}` : ""}
-${decisivePeriodLine ? decisivePeriodLine : ""}
+
+FACTOS VERIFICADOS:
+${facts.lines.join("\n")}
 ${topScorersByTeamBlock ? `\n${topScorersByTeamBlock}` : ""}
 ${submission?.notes ? `Notas: ${submission.notes}` : ""}
 ${photoCaptions ? `Descrição das fotografias do jogo: ${photoCaptions}` : ""}
@@ -193,19 +183,33 @@ Regras:
 - Menciona o contexto da jornada e o impacto na classificação se relevante (a classificação é por série — refere a série, ex.: "na Série B", e nunca compares com equipas de outras séries)
 - Usa APENAS os dados fornecidos acima — nunca inventes pontuações, nomes ou factos`;
 
-  const aiResult = await deepseekJSON<{ titulo?: string; entrada?: string; corpo?: string }>({
-    system: NEWS_SYSTEM,
-    user: userPrompt,
-    maxTokens: 4096,
-    temperature: 0.4,
-  });
-
-  if (!aiResult.ok) {
-    console.error(`[generateLigaNews] deepseekJSON failed: ${aiResult.error}`);
-    return { ok: false, error: aiResult.error };
+  type NewsJSON = { titulo?: string; entrada?: string; corpo?: string };
+  let newsData: NewsJSON | null = null;
+  let feedback = "";
+  for (let attempt = 0; attempt < 2 && !newsData; attempt++) {
+    const aiResult = await deepseekJSON<NewsJSON>({
+      system: NEWS_SYSTEM,
+      user: userPrompt + feedback,
+      maxTokens: 4096,
+      temperature: attempt === 0 ? 0.4 : 0.2,
+    });
+    if (!aiResult.ok) {
+      console.error(`[generateLigaNews] deepseekJSON failed: ${aiResult.error}`);
+      return { ok: false, error: aiResult.error };
+    }
+    // Verificação: o texto não pode citar pontuações que não constam dos factos
+    const text = `${aiResult.data.titulo ?? ""}\n${aiResult.data.entrada ?? ""}\n${aiResult.data.corpo ?? ""}`;
+    const bad = unknownScores(text, facts.allowedScores);
+    if (bad.length === 0) {
+      newsData = aiResult.data;
+    } else {
+      console.warn(`[generateLigaNews] pontuações não verificadas no texto (${bad.join(", ")}) — nova tentativa`);
+      feedback = `\n\nATENÇÃO: a versão anterior citou pontuações que não constam dos factos (${bad.join(", ")}). Remove-as.`;
+    }
   }
-
-  const newsData = aiResult.data;
+  if (!newsData) {
+    return { ok: false, error: "A notícia gerada citava dados não verificados — gere novamente ou escreva manualmente." };
+  }
 
   let titulo = (newsData.titulo ?? "").trim();
   const corpo = (newsData.corpo ?? "").trim();
@@ -217,6 +221,7 @@ Regras:
   }
 
   if (titulo.length > 80) titulo = titulo.slice(0, 80);
+  const entrada = (newsData.entrada ?? "").trim().slice(0, 200);
 
   const datePart = event.event_date.slice(0, 10);
   const slug = `liga-inatel-${slugify(result.home_team_name)}-${slugify(result.away_team_name)}-${datePart}`;
@@ -234,7 +239,7 @@ Regras:
       .from("news")
       .update({
         title: titulo,
-        excerpt: newsData.entrada ?? "",
+        excerpt: entrada,
         body: corpo,
         home_team_name: result.home_team_name,
         away_team_name: result.away_team_name,
@@ -255,7 +260,7 @@ Regras:
         game_id: gameId,
         source_submission_id: submission?.id ?? null,
         title: titulo,
-        excerpt: newsData.entrada ?? "",
+        excerpt: entrada,
         body: corpo,
         category: "Liga INATEL",
         home_team_name: result.home_team_name,
@@ -278,7 +283,7 @@ Regras:
     news_id,
     newsContext: {
       title: titulo,
-      excerpt: newsData.entrada ?? "",
+      excerpt: entrada,
       homeTeamName: result.home_team_name,
       awayTeamName: result.away_team_name,
       scoreStr,

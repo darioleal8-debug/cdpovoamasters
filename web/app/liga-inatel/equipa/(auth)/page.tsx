@@ -184,6 +184,23 @@ export default async function DelegateDashboardPage({
     );
   }
 
+  // Boletins importados com IA ainda em revisão / a aguardar aprovação (RLS: só os da equipa)
+  const { data: draftRows } = await supabase
+    .from("game_sheet_imports")
+    .select("id, event_id, status, updated_at")
+    .eq("team_id", team.id)
+    .in("status", ["needs_review", "ready_to_confirm", "confirmed", "failed"])
+    .order("updated_at", { ascending: false })
+    .limit(10);
+  const gameById = new Map(games.map((g) => [g.id, g]));
+  const drafts = (draftRows ?? []).filter((d) => gameById.has(d.event_id as string));
+  const DRAFT_LABEL: Record<string, string> = {
+    needs_review: "Precisa de revisão",
+    ready_to_confirm: "Pronto a confirmar",
+    confirmed: "Aguarda aprovação",
+    failed: "Leitura falhou — preencher",
+  };
+
   const today = todayInClubTz();
   const upcoming = games.filter((g) => g.event_date >= today).slice(0, 5);
   const pastAll = games.filter((g) => g.event_date < today).reverse();
@@ -305,6 +322,24 @@ export default async function DelegateDashboardPage({
           <h2 style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted, #6F675F)", margin: "0 0 12px" }}>
             Resultados
           </h2>
+          {drafts.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "12px" }}>
+              {drafts.map((d) => {
+                const g = gameById.get(d.event_id as string)!;
+                const opponent = g.home_team === team.name ? g.away_team : g.home_team;
+                return (
+                  <Link
+                    key={d.id as string}
+                    href={`/liga-inatel/boletim/${d.id}`}
+                    style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", padding: "10px 14px", borderRadius: "10px", border: "1px solid #FDBA74", background: "#FFF7ED", textDecoration: "none", color: "var(--fg, #15110E)" }}
+                  >
+                    <span style={{ fontSize: "13px", fontWeight: 600 }}>Boletim vs {opponent} · {fmt(g.event_date, g.event_time)}</span>
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: "#C2410C", whiteSpace: "nowrap" }}>{DRAFT_LABEL[d.status as string]} →</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
           <SubmitResultFlow games={submittable} teamName={team.name} preselectedGameId={jogo ?? null} />
         </section>
 

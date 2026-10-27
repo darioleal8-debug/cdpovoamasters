@@ -31,7 +31,7 @@ export async function GET() {
     adminClient.from("league_game_results").select("*"),
     adminClient
       .from("result_submissions")
-      .select("id, event_id, status, home_team_name, away_team_name, home_score, away_score, submitted_by_name, submitted_by_team, submitted_at, notes")
+      .select("id, event_id, status, home_team_name, away_team_name, home_score, away_score, submitted_by_name, submitted_by_team, submitted_at, notes, import_id")
       .order("submitted_at", { ascending: false }),
   ]);
 
