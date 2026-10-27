@@ -131,3 +131,23 @@ RESET ROLE;
 INSERT INTO public._results (test, ok, detail)
 SELECT 'legado_mantem_stats', count(*) = 2, count(*)::text
   FROM public.league_game_player_stats WHERE event_id = '00000000-0000-0000-0000-0000000000e1';
+
+-- 8. (migração 112) admin da liga cria importação sem equipa; delegado não a vê
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+INSERT INTO public.game_sheet_imports (id, event_id, team_id, created_by, status)
+VALUES ('00000000-0000-0000-0000-0000000000a9', '00000000-0000-0000-0000-0000000000e1', NULL,
+        '00000000-0000-0000-0000-00000000000a', 'processing');
+SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000d', false);
+INSERT INTO public._results (test, ok, detail)
+SELECT 'admin_import_invisivel_delegado', count(*) = 0, count(*)::text
+  FROM public.game_sheet_imports WHERE id = '00000000-0000-0000-0000-0000000000a9';
+-- delegado não consegue criar importação sem equipa
+DO $$ BEGIN
+  INSERT INTO public.game_sheet_imports (event_id, team_id, created_by)
+  VALUES ('00000000-0000-0000-0000-0000000000e1', NULL, '00000000-0000-0000-0000-00000000000d');
+  INSERT INTO public._results (test, ok, detail) VALUES ('delegado_sem_equipa_bloqueado', false, 'inseriu');
+EXCEPTION WHEN insufficient_privilege THEN
+  INSERT INTO public._results (test, ok, detail) VALUES ('delegado_sem_equipa_bloqueado', true, 'RLS bloqueou');
+END $$;
+RESET ROLE;

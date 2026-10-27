@@ -1,6 +1,6 @@
 import { analyzeSheet } from "./engine";
 import { emptySheetData, PROCESSING_VERSION, SHEET_SCHEMA_VERSION } from "./schema";
-import { enrichWithRoster, type Access, type GameInfo } from "./service";
+import { BUCKET, enrichWithRoster, type Access, type GameInfo, type ImportRow } from "./service";
 import { analyzeGameSheet, visionConfig } from "./vision";
 
 /**
@@ -55,4 +55,40 @@ export async function runAndStore(
   }).eq("id", importId);
   if (error) return { ok: false, error: `Erro ao gravar a análise: ${error.message}` };
   return { ok: true };
+}
+
+export type ReanalyzeResult =
+  | { ok: true; error?: string; kind?: string }
+  | { ok: false; status: number; error: string };
+
+/**
+ * Volta a analisar a imagem guardada de uma importação: bloqueia (status 'processing', com
+ * concorrência otimista), descarrega a imagem original e corre a análise.
+ */
+export async function reanalyzeImport(access: Access, row: ImportRow, game: GameInfo): Promise<ReanalyzeResult> {
+  const { maxAnalyses } = visionConfig();
+  if (row.analysis_count >= maxAnalyses) {
+    return { ok: false, status: 429, error: `Limite de ${maxAnalyses} análises atingido para este boletim. Corrija os dados manualmente.` };
+  }
+  if (!row.image_path) return { ok: false, status: 404, error: "Imagem original indisponível" };
+
+  // Passa a 'processing' só se ninguém o fez entretanto (o índice único impede 2 análises do mesmo jogo)
+  const { data: locked, error: lockErr } = await access.supabase
+    .from("game_sheet_imports")
+    .update({ status: "processing", updated_at: new Date().toISOString() })
+    .eq("id", row.id)
+    .eq("updated_at", row.updated_at)
+    .select("id")
+    .maybeSingle();
+  if (lockErr && lockErr.code !== "23505") return { ok: false, status: 500, error: lockErr.message };
+  if (!locked) return { ok: false, status: 409, error: "Já existe uma análise em curso para este jogo" };
+
+  const { data: blob, error: dlErr } = await access.supabase.storage.from(BUCKET).download(row.image_path);
+  if (dlErr || !blob) {
+    await access.supabase.from("game_sheet_imports").update({ status: row.status }).eq("id", row.id);
+    return { ok: false, status: 500, error: "Não foi possível obter a imagem original" };
+  }
+
+  const run = await runAndStore(access, row.id, Buffer.from(await blob.arrayBuffer()), game, row.analysis_count);
+  return { ok: true, error: run.ok ? undefined : run.error, kind: run.kind };
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Testa a migração 111 (importação do boletim) num Postgres EFÉMERO (nunca toca em produção).
+# Testa as migrações 111/112 (importação do boletim) num Postgres EFÉMERO (nunca toca em produção).
 # Uso: bash supabase/tests/run-game-sheet.sh
 set -euo pipefail
 export LC_ALL=C LANG=C
@@ -15,6 +15,7 @@ PSQL=(psql -h "$PGTMP" -p "$PORT" -U postgres -d postgres -v ON_ERROR_STOP=1 -qA
 "${PSQL[@]}" -f "$ROOT/supabase/migrations/111_game_sheet_imports.sql" >/dev/null 2>&1
 # idempotência: aplicar duas vezes não pode falhar
 "${PSQL[@]}" -f "$ROOT/supabase/migrations/111_game_sheet_imports.sql" >/dev/null 2>&1
+"${PSQL[@]}" -f "$ROOT/supabase/migrations/112_game_sheet_admin_imports.sql" >/dev/null 2>&1
 "${PSQL[@]}" -f "$HERE/local/21_game_sheet_expectations.sql" >/dev/null
 fail=0
 while IFS='|' read -r t ok d; do

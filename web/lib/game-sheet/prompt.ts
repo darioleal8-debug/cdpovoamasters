@@ -56,6 +56,9 @@ PROCEDIMENTO:
 8. Indica em "region" a área aproximada da marcação na imagem, normalizada 0–1 (x,y = canto superior esquerdo; w,h = largura/altura).
 9. NUNCA inventes jogadores, lançamentos, pontuações ou estatísticas. Campo ilegível = null + aviso.
 10. Não calcules totais por jogador — isso é feito pela aplicação.
+11. Avalia a qualidade da FOTOGRAFIA em "imageQuality": legibility (0–1: quão legível está a escrita manuscrita),
+    wholeSheetVisible (a folha inteira está no enquadramento?) e issues (ex.: "desfocada", "reflexo", "cortada à direita",
+    "inclinada", "sombra"). Sê exigente: serve para escolher a melhor entre várias fotografias da mesma folha.
 
 Responde EXCLUSIVAMENTE com um objeto JSON válido (sem markdown) com este esquema (schemaVersion ${SHEET_SCHEMA_VERSION}):
 {
@@ -75,6 +78,7 @@ Responde EXCLUSIVAMENTE com um objeto JSON válido (sem markdown) com este esque
   "officials": { "referees": ["Nome"], "scorer": "Nome|null", "timekeeper": "Nome|null" },
   "confidence": 0.8,
   "warnings": ["texto curto em português de Portugal"],
+  "imageQuality": { "legibility": 0.8, "wholeSheetVisible": true, "issues": ["reflexo no canto superior"] },
   "validation": { "notes": ["discrepâncias encontradas entre marcha, parciais e final"] }
 }
 "seq" é a ordem visual dentro da marcha da respetiva equipa (0, 1, 2, …).`;
