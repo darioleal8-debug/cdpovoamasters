@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
+import { authorizeLeagueDelegate } from "@/lib/auth/liga-delegate-guard";
 
 // DELETE /api/liga/equipa/game-photos/[id]
 // Apaga uma foto de jogo. Só o uploader pode apagar.
@@ -7,9 +8,9 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  const auth = await authorizeLeagueDelegate();
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
 
   const { id } = await params;
   const admin = await createAdminClient();
