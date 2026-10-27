@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
 import { createAdminClient } from "@/lib/supabase/server";
 import { parseGameMeta } from "@/types/competitions";
+import { resolveSheetLocation } from "@/lib/liga/sheet-location";
 
 export async function GET() {
   const auth = await authorizeAsLigaAdmin();
@@ -31,13 +32,15 @@ export async function GET() {
     adminClient.from("league_game_results").select("*"),
     adminClient
       .from("result_submissions")
-      .select("id, event_id, status, home_team_name, away_team_name, home_score, away_score, submitted_by_name, submitted_by_team, submitted_at, notes, import_id")
+      .select("id, event_id, status, home_team_name, away_team_name, home_score, away_score, submitted_by_name, submitted_by_team, submitted_at, notes, import_id, photo_url")
       .order("submitted_at", { ascending: false }),
   ]);
 
   const resultMap = new Map((resultsRes.data ?? []).map((r: { event_id: string }) => [r.event_id, r]));
-  const subsByEvent = (submissionsRes.data ?? []).reduce((acc: Record<string, unknown[]>, s: { event_id: string }) => {
-    (acc[s.event_id] ??= []).push(s);
+  // O caminho da folha de jogo não sai do servidor: só o tipo (abre via /submissions/[id]/sheet)
+  const subsByEvent = (submissionsRes.data ?? []).reduce((acc: Record<string, unknown[]>, s: { event_id: string; photo_url?: string | null }) => {
+    const { photo_url, ...rest } = s;
+    (acc[s.event_id] ??= []).push({ ...rest, sheet_kind: resolveSheetLocation(photo_url)?.kind ?? null });
     return acc;
   }, {} as Record<string, unknown[]>);
 
