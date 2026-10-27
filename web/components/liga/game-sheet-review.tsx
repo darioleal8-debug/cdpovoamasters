@@ -74,7 +74,10 @@ export function GameSheetReview({ importId, backHref }: { importId: string; back
   const [view, setView] = useState<ImportView | null>(null);
   const [sheet, setSheet] = useState<SheetData | null>(null);
   const [dirty, setDirty] = useState(false);
-  const [busy, setBusy] = useState<null | "load" | "save" | "reanalyze" | "confirm">("load");
+  const [busy, setBusy] = useState<null | "load" | "save" | "reanalyze" | "confirm" | "apply">("load");
+  // Admin da liga: aplicar o boletim diretamente ao jogo
+  const [motivo, setMotivo] = useState("");
+  const [regenNews, setRegenNews] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [ack, setAck] = useState(false);
@@ -178,14 +181,14 @@ export function GameSheetReview({ importId, backHref }: { importId: string; back
     }));
   }
 
-  async function call(kind: "save" | "reanalyze" | "confirm"): Promise<ImportView | null> {
+  async function call(kind: "save" | "reanalyze" | "confirm" | "apply"): Promise<ImportView | null> {
     if (!view || !sheet) return null;
     setBusy(kind);
     setError(null);
     setNotice(null);
     try {
       let current = view;
-      if (kind === "save" || (kind === "confirm" && dirty)) {
+      if (kind === "save" || ((kind === "confirm" || kind === "apply") && dirty)) {
         const res = await fetch(`/api/liga/equipa/game-sheet/imports/${view.id}`, {
           method: "PATCH", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sheet, version: view.updated_at }),
@@ -198,6 +201,20 @@ export function GameSheetReview({ importId, backHref }: { importId: string; back
           setNotice(json.needs_reconfirmation ? "Rascunho guardado. O boletim tem de ser confirmado novamente." : "Rascunho guardado.");
           return json;
         }
+      }
+      if (kind === "apply") {
+        const res = await fetch(`/api/liga/admin/game-sheets/${view.id}/apply`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ motivo, acknowledge_warnings: ack, regenerate_news: regenNews, version: current.updated_at }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Erro ao aplicar");
+        const fresh = await fetch(`/api/liga/equipa/game-sheet/imports/${view.id}`);
+        if (fresh.ok) apply(await fresh.json());
+        setNotice(json.news_regenerating
+          ? "Boletim aplicado ao jogo: resultado e estatísticas atualizados. A notícia está a ser regenerada."
+          : "Boletim aplicado ao jogo: resultado e estatísticas atualizados.");
+        return null;
       }
       const res = await fetch(`/api/liga/equipa/game-sheet/imports/${view.id}/${kind}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -586,9 +603,10 @@ export function GameSheetReview({ importId, backHref }: { importId: string; back
 
   const canConfirm = analysis.canConfirm && (!analysis.requiresAcknowledgement || ack);
   const showActions = view.can_edit && !view.is_liga_admin;
+  const showAdminActions = view.is_liga_admin && ["needs_review", "ready_to_confirm", "confirmed", "failed"].includes(view.status);
 
   return (
-    <div style={{ background: C.bg, minHeight: "100dvh", paddingBottom: showActions ? 150 : 40, color: C.fg }}>
+    <div style={{ background: C.bg, minHeight: "100dvh", paddingBottom: showActions || showAdminActions ? 170 : 40, color: C.fg }}>
       {/* A. Cabeçalho */}
       <div style={{ background: "#0A1220", color: "#F6F2EC", padding: "18px 16px" }}>
         <div style={{ maxWidth: 1280, margin: "0 auto" }}>
@@ -629,7 +647,8 @@ export function GameSheetReview({ importId, backHref }: { importId: string; back
         )}
         {view.is_liga_admin && view.status === "confirmed" && (
           <div style={{ ...card, marginBottom: 12, fontSize: 13 }}>
-            Vista do admin: aprove ou rejeite esta submissão em <Link href="/liga-inatel/admin" style={{ color: C.accent }}>Administração da liga</Link>.
+            Vista do admin: pode aprovar ou rejeitar a submissão do delegado em <Link href="/liga-inatel/admin" style={{ color: C.accent }}>Administração da liga</Link>,
+            ou corrigir aqui e aplicar o boletim diretamente ao jogo.
           </div>
         )}
         {error && <div role="alert" style={{ ...card, background: C.errBg, borderColor: "#FECACA", color: C.err, fontSize: 13, marginBottom: 12 }}>{error}</div>}
@@ -684,6 +703,58 @@ export function GameSheetReview({ importId, backHref }: { importId: string; back
               </button>
               <button style={{ ...btn("primary", busy !== null || !canConfirm), flex: 1, minWidth: 180 }} disabled={busy !== null || !canConfirm} onClick={() => call("confirm")}>
                 {busy === "confirm" ? "A submeter…" : view.status === "confirmed" && !dirty ? "Submeter de novo" : "Confirmar e submeter resultado"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ações do admin da liga */}
+      {showAdminActions && (
+        <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#fff", borderTop: `1px solid ${C.border}`, padding: "10px 16px", boxShadow: "0 -6px 20px rgba(0,0,0,0.08)", zIndex: 20 }}>
+          <div style={{ maxWidth: 1280, margin: "0 auto", display: "flex", flexDirection: "column", gap: 8 }}>
+            {analysis.requiresAcknowledgement && (
+              <label style={{ display: "flex", gap: 8, fontSize: 12, alignItems: "flex-start" }}>
+                <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} style={{ marginTop: 2 }} />
+                Revi os {warnings.length} aviso(s). Os pontos não confirmados ficam &quot;por atribuir&quot;.
+              </label>
+            )}
+            {!analysis.canConfirm && (
+              <p style={{ fontSize: 12, color: C.err, margin: 0 }}>Corrija os {errors.length} erro(s) assinalados antes de aplicar.</p>
+            )}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <input placeholder="Motivo (obrigatório) — ex.: folha melhorada, mais legível" value={motivo} maxLength={500}
+                onChange={(e) => setMotivo(e.target.value)} style={{ ...inp("auto"), flex: 1, minWidth: 220, fontSize: 12, padding: "6px 8px" }} />
+              <label style={{ display: "flex", gap: 6, fontSize: 12, alignItems: "center" }}>
+                <input type="checkbox" checked={regenNews} onChange={(e) => setRegenNews(e.target.checked)} />
+                Atualizar a notícia com as novas estatísticas
+              </label>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button style={btn("ghost", busy !== null || !dirty)} disabled={busy !== null || !dirty} onClick={() => call("save")}>
+                {busy === "save" ? "A guardar…" : "Guardar rascunho"}
+              </button>
+              <button
+                style={btn("ghost", busy !== null || view.analysis_count >= view.max_analyses || view.status === "confirmed")}
+                disabled={busy !== null || view.analysis_count >= view.max_analyses || view.status === "confirmed"}
+                onClick={() => {
+                  if (dirty || view.corrections.length > 0) {
+                    if (!window.confirm("Reanalisar substitui os dados atuais (incluindo correções manuais). Continuar?")) return;
+                  }
+                  void call("reanalyze");
+                }}
+              >
+                {busy === "reanalyze" ? "A reanalisar… (até 1 min)" : `Reanalisar imagem (${view.analysis_count}/${view.max_analyses})`}
+              </button>
+              <button
+                style={{ ...btn("primary", busy !== null || !canConfirm || !motivo.trim()), flex: 1, minWidth: 200 }}
+                disabled={busy !== null || !canConfirm || !motivo.trim()}
+                onClick={() => {
+                  if (!window.confirm("Aplicar este boletim ao jogo? O resultado, os parciais e as estatísticas atuais serão substituídos (fica registado na auditoria).")) return;
+                  void call("apply");
+                }}
+              >
+                {busy === "apply" ? "A aplicar…" : "Aplicar ao jogo"}
               </button>
             </div>
           </div>

@@ -20,4 +20,5 @@ ALTER TABLE public.league_game_player_stats
 DROP POLICY IF EXISTS rs_update_own_pending_delegate ON public.result_submissions;
 ALTER TABLE public.result_submissions DROP COLUMN IF EXISTS import_id;
 
+DROP POLICY IF EXISTS gsi_admin_insert ON public.game_sheet_imports; -- 112
 DROP TABLE IF EXISTS public.game_sheet_imports;

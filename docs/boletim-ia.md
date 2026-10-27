@@ -37,6 +37,25 @@ Reimportar a mesma imagem devolve o rascunho existente (idempotência por SHA-25
 os dados do jogo, sem duplicar, e fica auditado com o valor antigo. Para alterar um resultado já
 publicado, importa-se novamente o boletim; a nova submissão substitui a anterior quando é aprovada.
 
+## Folhas melhoradas e escolha da melhor leitura (admin da liga)
+
+Em `/liga-inatel/admin`, cada jogo tem a secção **Folhas de jogo**:
+
+- **Carregar folha melhorada**: só para jogos já realizados (data passada ou resultado aprovado). A imagem fica no
+  bucket privado (`folhas-jogo/admin/<jogo>/<sha256>`) e é analisada de imediato.
+- **Analisar todas as folhas**: analisa, uma a uma, todas as imagens do jogo: fotos submetidas pelos delegados
+  (incluindo o fluxo antigo), importações com IA e uploads do admin. A mesma imagem nunca é analisada duas vezes
+  (SHA-256 e ligação `source_submission_id`). Os PDFs não entram na análise automática.
+- **Pontuação 0–100** (`lib/game-sheet/quality.ts`): legibilidade e enquadramento avaliados pelo DeepSeek
+  (`imageQuality` na resposta), mais o que o código verifica: marcha lida, pontos atribuídos, confiança média das
+  marcações e consistência com parciais e resultado. A melhor fica marcada como **MELHOR**, com as razões.
+- **Aplicar ao jogo**: na página de revisão, o admin corrige se preciso, indica o motivo e aplica. É criada uma
+  submissão do admin ligada à importação, aprovada na mesma transação (`liga_apply_game_sheet`). O resultado, os
+  parciais, as estatísticas e a marcha são substituídos e o valor anterior fica na auditoria. A notícia só é
+  regenerada se for pedido.
+
+Requer a migração `112_game_sheet_admin_imports.sql` (importações do admin sem equipa e `source_submission_id`).
+
 ## Notícia
 
 `lib/liga/generate-news.ts` recebe **factos verificados** (`lib/game-sheet/news-facts.ts`): resultado,

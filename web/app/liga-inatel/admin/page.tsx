@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TeamKitEditor } from "@/components/liga/team-kit-editor";
+import { AdminGameSheets } from "@/components/liga/admin-game-sheets";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1038,6 +1039,12 @@ export default function LigaAdminPage() {
                         </div>
                       )}
                     </div>
+                  </div>
+
+                  {/* Folhas de jogo: carregar folha melhorada, analisar todas e escolher a melhor leitura */}
+                  <div style={{ marginTop: "16px" }}>
+                    <h3 style={sectionTitle}>Folhas de jogo</h3>
+                    <AdminGameSheets key={game.id} eventId={game.id} />
                   </div>
 
                   {/* Fotografias */}

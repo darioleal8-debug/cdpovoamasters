@@ -152,6 +152,12 @@ export const AiSheetSchema = z.object({
   validation: z.preprocess((v) => (v && typeof v === "object" ? v : {}), z.object({
     notes: stringList,
   }).passthrough()),
+  /** Avaliação da própria fotografia pelo modelo (para escolher a melhor entre várias folhas) */
+  imageQuality: z.preprocess((v) => (v && typeof v === "object" ? v : {}), z.object({
+    legibility: confidence,
+    wholeSheetVisible: z.preprocess((v) => (typeof v === "boolean" ? v : null), z.boolean().nullable()),
+    issues: stringList,
+  })),
 });
 export type AiSheet = z.infer<typeof AiSheetSchema>;
 
