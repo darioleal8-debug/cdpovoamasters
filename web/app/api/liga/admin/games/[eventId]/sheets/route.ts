@@ -3,7 +3,7 @@ import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
 import { createAdminClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { adminAccess, createAndAnalyze, isGameFinished, listGameSheets } from "@/lib/game-sheet/admin-sheets";
-import { MAX_UPLOAD_BYTES, sniffImageMime } from "@/lib/game-sheet/image";
+import { MAX_REQUEST_BYTES, sniffImageMime } from "@/lib/game-sheet/image";
 import { jsonError, isUuid, loadGameForAccess } from "@/lib/game-sheet/service";
 import { resolveSheetLocation } from "@/lib/liga/sheet-location";
 
@@ -47,8 +47,8 @@ export async function POST(req: Request, { params }: Params) {
   try { form = await req.formData(); } catch { return jsonError("Payload inválido", 400); }
   const file = form.get("photo");
   if (!(file instanceof File)) return jsonError("Campo 'photo' em falta", 400);
-  if (file.size === 0 || file.size > MAX_UPLOAD_BYTES) {
-    return jsonError(`Ficheiro vazio ou demasiado grande (máx. ${MAX_UPLOAD_BYTES / 1024 / 1024} MB)`, 400);
+  if (file.size === 0 || file.size > MAX_REQUEST_BYTES) {
+    return jsonError(`Ficheiro vazio ou demasiado grande (máx. ${MAX_REQUEST_BYTES / 1024 / 1024} MB após compressão)`, 400);
   }
   const buffer = Buffer.from(await file.arrayBuffer());
   const mime = sniffImageMime(buffer);

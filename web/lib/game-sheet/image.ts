@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 
 export const ACCEPTED_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
 export type AcceptedMime = (typeof ACCEPTED_MIME)[number];
+export const MAX_REQUEST_BYTES = 4 * 1024 * 1024;  // limite Vercel Hobby (~4,5 MB)
 export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // igual ao bucket folhas-jogo
 
 /** Deteta o tipo REAL pelo conteúdo (magic bytes), ignorando o Content-Type do cliente. */

@@ -33,6 +33,8 @@ const s = {
   numInput: { width: "100%", padding: "12px", fontSize: "28px", fontWeight: 800, textAlign: "center" as const, borderRadius: "10px", border: "1.5px solid var(--border,#E8E0D4)", background: "var(--card,#fff)", fontFamily: "var(--font-ibm-mono,monospace)", boxSizing: "border-box" as const },
 };
 
+import { heicToJpeg, isHeic, normalizeImage } from "@/lib/game-sheet/client-image";
+
 // Comprime fotos de jogo: lado maior ≤ 1920 px, JPEG 0.8, remove EXIF via canvas
 async function compressGamePhoto(file: File): Promise<File> {
   const MAX_PX = 1920;
@@ -54,43 +56,7 @@ async function compressGamePhoto(file: File): Promise<File> {
   });
 }
 
-/**
- * Normaliza SEMPRE a imagem: corrige orientação EXIF, limita o lado maior a 3200px
- * (preserva o texto manuscrito pequeno) e exporta como JPEG qualidade 0.92.
- */
-async function normalizeImage(file: File): Promise<File> {
-  const MAX_PX = 3200;
-
-  return new Promise<File>((resolve, reject) => {
-    createImageBitmap(file, { imageOrientation: "from-image" }).then((bitmap) => {
-      let { width, height } = bitmap;
-      const scale = Math.min(1, MAX_PX / Math.max(width, height));
-      width  = Math.round(width  * scale);
-      height = Math.round(height * scale);
-
-      const canvas = document.createElement("canvas");
-      canvas.width = width; canvas.height = height;
-      canvas.getContext("2d")!.drawImage(bitmap, 0, 0, width, height);
-      bitmap.close();
-
-      canvas.toBlob((blob) => {
-        if (!blob) { resolve(file); return; }
-        resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }));
-      }, "image/jpeg", 0.92);
-    }).catch(reject);
-  });
-}
-
-// Converter HEIC para JPEG no browser
-async function heicToJpeg(file: File): Promise<File> {
-  const heic2any = (await import("heic2any")).default;
-  const result = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
-  const blob = Array.isArray(result) ? result[0] : result;
-  return new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
-}
-
-const HEIC_TYPES = ["image/heic", "image/heif"];
-const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", ...HEIC_TYPES];
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
 const PDF_TYPE = "application/pdf";
 
 interface ScanResult {
@@ -192,7 +158,7 @@ export function SubmitResultFlow({ games, teamName, preselectedGameId = null }: 
     let file = raw;
 
     try {
-      if (HEIC_TYPES.includes(raw.type) || raw.name.toLowerCase().endsWith(".heic") || raw.name.toLowerCase().endsWith(".heif")) {
+      if (isHeic(raw)) {
         file = await heicToJpeg(raw);
       }
 
@@ -270,7 +236,7 @@ export function SubmitResultFlow({ games, teamName, preselectedGameId = null }: 
     if (gamePhotoInputRef.current) gamePhotoInputRef.current.value = "";
     let file = raw;
     try {
-      if (HEIC_TYPES.includes(raw.type) || raw.name.toLowerCase().endsWith(".heic") || raw.name.toLowerCase().endsWith(".heif")) {
+      if (isHeic(raw)) {
         file = await heicToJpeg(raw);
       }
       if (IMAGE_TYPES.includes(file.type)) {

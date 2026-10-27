@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeGameSheet, BUCKET, importView, isUuid, jsonError, loadGameForAccess, loadImport } from "@/lib/game-sheet/service";
-import { MAX_UPLOAD_BYTES, sha256, sniffImageMime } from "@/lib/game-sheet/image";
+import { MAX_REQUEST_BYTES, sha256, sniffImageMime } from "@/lib/game-sheet/image";
 import { runAndStore } from "@/lib/game-sheet/run";
 import { visionConfig } from "@/lib/game-sheet/vision";
 
@@ -27,8 +27,8 @@ export async function POST(req: Request) {
   const gameId = form.get("game_id");
   if (!(file instanceof File)) return jsonError("Campo 'photo' em falta", 400);
   if (!isUuid(gameId)) return jsonError("Jogo inválido", 400);
-  if (file.size === 0 || file.size > MAX_UPLOAD_BYTES) {
-    return jsonError(`Ficheiro vazio ou demasiado grande (máx. ${MAX_UPLOAD_BYTES / 1024 / 1024} MB)`, 400);
+  if (file.size === 0 || file.size > MAX_REQUEST_BYTES) {
+    return jsonError(`Ficheiro vazio ou demasiado grande (máx. ${MAX_REQUEST_BYTES / 1024 / 1024} MB após compressão)`, 400);
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());

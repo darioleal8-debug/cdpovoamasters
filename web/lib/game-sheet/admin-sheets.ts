@@ -34,7 +34,7 @@ export interface SheetCandidate {
   origin: "delegado" | "admin";
   label: string;
   created_at: string;
-  status: ImportStatus | "por_analisar" | "nao_suportado";
+  status: ImportStatus | "por_analisar" | "nao_suportado" | "ficheiro_em_falta";
   image_url: string | null;
   is_pdf: boolean;
   quality: ReadingQuality | null;
@@ -82,10 +82,14 @@ export async function listGameSheets(access: Access, admin: AdminClient, game: G
   const importedSubs = new Set(imports.map((i) => i.source_submission_id).filter(Boolean));
   const subName = new Map((subs ?? []).map((s) => [s.id as string, (s.submitted_by_team ?? s.submitted_by_name) as string]));
 
-  const sign = async (bucket: string, path: string) => {
+  const sign = async (bucket: string, path: string): Promise<{ url: string | null; missing: boolean }> => {
     const { data, error } = await admin.storage.from(bucket).createSignedUrl(path, SIGNED_URL_TTL);
-    if (error) console.error(`[game-sheets] signed URL ${bucket}/${path}: ${error.message}`);
-    return data?.signedUrl ?? null;
+    if (error) {
+      const missing = /object not found/i.test(error.message);
+      if (!missing) console.error(`[game-sheets] signed URL ${bucket}/${path}: ${error.message}`);
+      return { url: null, missing };
+    }
+    return { url: data.signedUrl, missing: false };
   };
 
   const candidates: SheetCandidate[] = [];
@@ -98,6 +102,7 @@ export async function listGameSheets(access: Access, admin: AdminClient, game: G
       quality = scoreReading(sheet.data, ai.success ? ai.data.imageQuality : null);
     }
     const fromSub = imp.source_submission_id ? subName.get(imp.source_submission_id) : null;
+    const { url: impUrl, missing: impMissing } = imp.image_path ? await sign(BUCKET, imp.image_path) : { url: null, missing: false };
     candidates.push({
       key: `imp:${imp.id}`,
       kind: "import",
@@ -106,13 +111,13 @@ export async function listGameSheets(access: Access, admin: AdminClient, game: G
       origin: imp.team_id ? "delegado" : fromSub ? "delegado" : "admin",
       label: imp.team_id ? "Importação do delegado" : fromSub ? `Folha submetida (${fromSub})` : "Folha carregada pelo admin",
       created_at: imp.created_at,
-      status: imp.status,
-      image_url: imp.image_path ? await sign(BUCKET, imp.image_path) : null,
+      status: impMissing ? "ficheiro_em_falta" : imp.status,
+      image_url: impUrl,
       is_pdf: false,
-      quality,
-      analyzed_at: quality ? imp.updated_at : null,
+      quality: impMissing ? null : quality,
+      analyzed_at: quality && !impMissing ? imp.updated_at : null,
       analysis_count: imp.analysis_count,
-      error: imp.error,
+      error: impMissing ? "Ficheiro em falta — volte a carregar" : imp.error,
       is_best: false,
     });
   }
@@ -121,6 +126,7 @@ export async function listGameSheets(access: Access, admin: AdminClient, game: G
     const loc = resolveSheetLocation(s.photo_url as string | null);
     if (!loc) continue;
     if (importedSubs.has(s.id) || (loc.bucket === BUCKET && importedPaths.has(loc.path))) continue;
+    const { url: subUrl, missing: subMissing } = await sign(loc.bucket, loc.path);
     candidates.push({
       key: `sub:${s.id}`,
       kind: "submission",
@@ -129,13 +135,13 @@ export async function listGameSheets(access: Access, admin: AdminClient, game: G
       origin: "delegado",
       label: `Folha submetida (${(s.submitted_by_team ?? s.submitted_by_name) as string})`,
       created_at: s.submitted_at as string,
-      status: loc.kind === "pdf" ? "nao_suportado" : "por_analisar",
-      image_url: await sign(loc.bucket, loc.path),
+      status: subMissing ? "ficheiro_em_falta" : loc.kind === "pdf" ? "nao_suportado" : "por_analisar",
+      image_url: subUrl,
       is_pdf: loc.kind === "pdf",
       quality: null,
       analyzed_at: null,
       analysis_count: 0,
-      error: null,
+      error: subMissing ? "Ficheiro em falta — volte a carregar" : null,
       is_best: false,
     });
   }
@@ -196,9 +202,21 @@ export async function createAndAnalyze(
   // Upload ANTES do insert: se falhar não fica linha órfã na BD
   if (!opts.existingPath) {
     const { error: upErr } = await admin.storage.from(BUCKET).upload(imagePath, buffer, { contentType: mime, upsert: false });
-    if (upErr && !/exists|duplicate/i.test(upErr.message)) {
-      console.error(`[game-sheets] upload ${imagePath}: ${upErr.message}`);
-      return { ok: false, status: 500, error: `Erro no upload: ${upErr.message}` };
+    if (upErr) {
+      if (/exists|duplicate/i.test(upErr.message)) {
+        // "Exists" pode ser falso positivo — verifica que o objeto está mesmo lá
+        const { error: chkErr } = await admin.storage.from(BUCKET).createSignedUrl(imagePath, 10);
+        if (chkErr && /object not found/i.test(chkErr.message)) {
+          const { error: reupErr } = await admin.storage.from(BUCKET).upload(imagePath, buffer, { contentType: mime, upsert: true });
+          if (reupErr) {
+            console.error(`[game-sheets] upload retry ${imagePath}: ${reupErr.message}`);
+            return { ok: false, status: 500, error: `Erro no upload: ${reupErr.message}` };
+          }
+        }
+      } else {
+        console.error(`[game-sheets] upload ${imagePath}: ${upErr.message}`);
+        return { ok: false, status: 500, error: `Erro no upload: ${upErr.message}` };
+      }
     }
   }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { prepareSheetForUpload } from "@/lib/game-sheet/client-image";
 
 type Candidate = {
   key: string;
@@ -31,6 +32,19 @@ const STATUS: Record<string, string> = {
   published: "Aplicada ao jogo",
   failed: "Leitura falhou",
 };
+
+/** Parseia a resposta como JSON; se não for JSON usa o status HTTP para a mensagem. */
+async function parseResponse(res: Response): Promise<{ ok: boolean; json: Record<string, unknown> }> {
+  const text = await res.text();
+  let json: Record<string, unknown> = {};
+  try { json = JSON.parse(text) as Record<string, unknown>; } catch { /* não é JSON */ }
+  if (!res.ok && !json.error) {
+    json.error = res.status === 413
+      ? "Imagem demasiado grande (máx. 4 MB após compressão). Tire a foto com menos resolução ou recorte a folha."
+      : `Erro no upload (HTTP ${res.status})`;
+  }
+  return { ok: res.ok, json };
+}
 
 const small = { fontSize: "11px", color: "#6B7280", margin: 0 } as const;
 const btn = (primary = false, disabled = false): React.CSSProperties => ({
@@ -78,9 +92,9 @@ export function AdminGameSheets({ eventId }: { eventId: string }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ kind: c.kind, id: c.id, force }),
     });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) return json.error ?? "Erro na análise";
-    return json.analysis_error ?? null;
+    const { ok, json } = await parseResponse(res);
+    if (!ok) return (json.error as string | undefined) ?? "Erro na análise";
+    return (json.analysis_error as string | undefined) ?? null;
   }
 
   async function analyzeAll() {
@@ -121,8 +135,8 @@ export function AdminGameSheets({ eventId }: { eventId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ kind: c.kind, id: c.id, reason: reason.trim() || "Apagado pelo admin" }),
       });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error ?? "Erro ao apagar");
+      const { ok, json } = await parseResponse(res);
+      if (!ok) throw new Error((json.error as string | undefined) ?? "Erro ao apagar");
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -131,16 +145,22 @@ export function AdminGameSheets({ eventId }: { eventId: string }) {
     }
   }
 
-  async function upload(file: File) {
-    setBusy("upload"); setError(null); setProgress("A carregar e analisar a folha… (até 1 min)");
+  async function upload(rawFile: File) {
+    setBusy("upload"); setError(null); setProgress("A comprimir imagem…");
     try {
+      const prepared = await prepareSheetForUpload(rawFile);
+      if ("error" in prepared) { setError(prepared.error); setProgress(null); return; }
+      const { file, warning } = prepared;
+      if (warning) setProgress(warning);
+      else setProgress("A carregar e analisar a folha… (até 1 min)");
+
       const fd = new FormData();
       fd.append("photo", file);
       const res = await fetch(`/api/liga/admin/games/${eventId}/sheets`, { method: "POST", body: fd });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error ?? "Erro no upload");
+      const { ok, json } = await parseResponse(res);
+      if (!ok) throw new Error((json.error as string | undefined) ?? "Erro no upload");
       setProgress(json.skipped ? "Esta imagem já tinha sido carregada." : json.analysis_error ? null : "Folha carregada e analisada.");
-      if (json.analysis_error) setError(`Leitura automática falhou: ${json.analysis_error}`);
+      if (json.analysis_error) setError(`Leitura automática falhou: ${json.analysis_error as string}`);
     } catch (e) {
       setProgress(null);
       setError(e instanceof Error ? e.message : String(e));
@@ -192,7 +212,7 @@ export function AdminGameSheets({ eventId }: { eventId: string }) {
       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center", marginBottom: "8px" }}>
         {data.finished && (
           <>
-            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }}
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" style={{ display: "none" }}
               onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); }} />
             <button style={btn(false, busy !== null)} disabled={busy !== null} onClick={() => fileRef.current?.click()}>
               ⬆ Carregar folha melhorada
