@@ -13,6 +13,7 @@ import { AvailabilityPrompt } from "@/components/player/availability-prompt";
 import { GpsCheckinButton } from "@/components/trainings/gps-checkin-button";
 import { lisbonDateTime } from "@/lib/event-time";
 import { isAttendanceOpen, attendanceCloseHHMM } from "@/lib/time/attendance-window";
+import { pickNextTraining } from "@/lib/time/pick-next-training";
 import type { AvailabilityRosterRow } from "@/types/availability";
 import { BirthdayBanner } from "@/components/birthday/birthday-banner";
 import Link from "next/link";
@@ -30,6 +31,7 @@ type TrainingRow = {
   type:       string | null;
   notes:      string | null;
   rsvp_deadline_hours: number | null;
+  deleted_at: string | null;
 };
 
 type TrainingRsvpProps = {
@@ -239,8 +241,6 @@ export default async function MinhaAreaPage() {
     .eq("id", user.id)
     .single();
 
-  const today = todayInClubTz();
-
   const { data: activeSeason } = await supabase
     .from("seasons")
     .select("id")
@@ -281,18 +281,22 @@ export default async function MinhaAreaPage() {
   // ── Próximo treino (inclui ontem para cobrir a janela pós-treino de 3h) ──────
   const now = new Date();
   const yesterday = todayInClubTz(new Date(now.getTime() - 86_400_000));
-  const { data: nextTrainingRaw } = activeSeason?.id
+  const { data: nextTrainingRows } = activeSeason?.id
     ? await supabase
         .from("trainings")
-        .select("id, date, start_time, end_time, location, type, notes, rsvp_deadline_hours")
+        .select("id, date, start_time, end_time, location, type, notes, rsvp_deadline_hours, deleted_at")
         .eq("season_id", activeSeason.id)
+        .is("deleted_at", null)
         .gte("date", yesterday)
         .order("date", { ascending: true })
-        .limit(1)
-        .maybeSingle()
+        .order("start_time", { ascending: true })
+        .limit(5)
     : { data: null };
 
-  const nextTraining = nextTrainingRaw as TrainingRow | null;
+  const nextTraining = pickNextTraining(
+    (nextTrainingRows ?? []) as TrainingRow[],
+    now,
+  );
 
   // ── Nota do treino ────────────────────────────────────────
   let trainingNote: string | null = null;

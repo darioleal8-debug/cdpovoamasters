@@ -42,6 +42,14 @@ function firstName(name: string) {
   return name.split(" ").filter(Boolean)[0] ?? name;
 }
 
+function displayName(name: string, duplicates: Set<string>): string {
+  const parts = name.trim().split(" ").filter(Boolean);
+  const first = parts[0] ?? name;
+  return duplicates.has(first) && parts.length > 1
+    ? `${parts[0]} ${parts[parts.length - 1]}`
+    : first;
+}
+
 export function AvailabilityPrompt({
   kind, eventId, deadlineIso, initialAnswer, initialRoster,
 }: Props) {
@@ -112,6 +120,14 @@ export function AvailabilityPrompt({
   const going    = (roster ?? []).filter((r) => r.status === "going");
   const notGoing = (roster ?? []).filter((r) => r.status === "not_going");
   const pending  = (roster ?? []).filter((r) => !r.status);
+
+  // Nomes duplicados: quando dois jogadores partilham o primeiro nome, mostrar primeiro+último
+  const allFirstNames = (roster ?? []).map((r) => firstName(r.name));
+  const firstNameCount = new Map<string, number>();
+  for (const fn of allFirstNames) firstNameCount.set(fn, (firstNameCount.get(fn) ?? 0) + 1);
+  const duplicateFirstNames = new Set(
+    [...firstNameCount.entries()].filter(([, c]) => c > 1).map(([fn]) => fn),
+  );
 
   return (
     <div className="space-y-3">
@@ -249,7 +265,7 @@ export function AvailabilityPrompt({
               <span className="font-semibold">Vão ({going.length})</span>
               {going.length > 0 && (
                 <span className="text-muted-foreground">
-                  {" · "}{going.map((r) => firstName(r.name)).join(", ")}
+                  {" · "}{going.map((r) => displayName(r.name, duplicateFirstNames)).join(", ")}
                 </span>
               )}
             </span>
@@ -260,7 +276,7 @@ export function AvailabilityPrompt({
               <span>
                 <span className="font-semibold">Não vão ({notGoing.length})</span>
                 <span className="text-muted-foreground">
-                  {" · "}{notGoing.map((r) => firstName(r.name)).join(", ")}
+                  {" · "}{notGoing.map((r) => displayName(r.name, duplicateFirstNames)).join(", ")}
                 </span>
               </span>
             </p>

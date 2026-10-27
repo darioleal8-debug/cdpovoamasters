@@ -1,4 +1,5 @@
 import { todayInClubTz } from "@/lib/time/club-time";
+import { pickNextTraining } from "@/lib/time/pick-next-training";
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/auth/guards";
 import { createAdminClient } from "@/lib/supabase/server";
@@ -31,7 +32,9 @@ export async function GET(req: NextRequest) {
 
   const sp        = req.nextUrl.searchParams;
   const seasonId  = sp.get("season_id");
+  const now       = new Date();
   const today     = todayInClubTz();
+  const yesterday = todayInClubTz(new Date(now.getTime() - 86_400_000));
   const ago14     = todayInClubTz(new Date(Date.now() - 14 * 86_400_000));
 
   // Temporada de contexto (ou activa)
@@ -68,14 +71,15 @@ export async function GET(req: NextRequest) {
       .gte("event_date", today)
       .order("event_date", { ascending: true }).limit(1).maybeSingle(),
 
-    // Próximo treino — tabela separada "trainings" (date, start_time, type)
+    // Próximo treino — inclui ontem para cobrir janela pós-treino de 3h
     supabase.from("trainings")
-      .select("id,date,start_time,location,type")
+      .select("id,date,start_time,end_time,location,type,deleted_at")
       .eq("season_id", sid)
-      .gte("date", today)
+      .is("deleted_at", null)
+      .gte("date", yesterday)
       .order("date", { ascending: true })
       .order("start_time", { ascending: true })
-      .limit(1).maybeSingle(),
+      .limit(5),
 
     // Quotas em atraso — player_payments com status late/partial
     // players.name foi removido na migration 041; nome enriquecido abaixo via v_roster
@@ -98,7 +102,7 @@ export async function GET(req: NextRequest) {
   ]);
 
   const nextGame      = nextGameRes.data ?? null;
-  const nextTraining  = nextTrainingRes.data ?? null;
+  const nextTraining  = pickNextTraining(nextTrainingRes.data ?? [], now);
   const playerCount   = playersRes.count ?? 0;
   const rosterSize    = rosterSizeRes.count ?? 0;
   const ourTeamName   = ourTeamRes.data?.name ?? null;
