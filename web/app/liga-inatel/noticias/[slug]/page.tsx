@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/public";
 import { markdownToHtml } from "@/lib/markdown";
 import type { Metadata } from "next";
 import { ShareButtons } from "./_share-buttons";
@@ -15,7 +15,7 @@ interface Props {
 }
 
 async function getArticle(slug: string) {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data } = await supabase
     .from("news")
     .select("id, slug, title, excerpt, body, category, published_at, cover_image_url, game_id, cover_photo_id, home_team_name, away_team_name")
@@ -27,7 +27,7 @@ async function getArticle(slug: string) {
 }
 
 async function getGalleryPhotos(gameId: string, coverPhotoId: string | null): Promise<GalleryPhoto[]> {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   // RLS enforces hidden=false; we skip the cover photo (it is shown above the article)
   const { data: photos } = await supabase
     .from("game_photos")
@@ -58,7 +58,7 @@ type GamePeriod = { periodo: number; home_points: number; away_points: number };
 type PlayerStat = { nome: string; side: string; numero: number | null; pontos: number; faltas: number | null };
 
 async function getGamePeriods(gameId: string): Promise<GamePeriod[]> {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data } = await supabase
     .from("league_game_periods")
     .select("periodo, home_points, away_points")
@@ -68,7 +68,7 @@ async function getGamePeriods(gameId: string): Promise<GamePeriod[]> {
 }
 
 async function getGamePlayerStats(gameId: string): Promise<PlayerStat[]> {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data } = await supabase
     .from("league_game_player_stats")
     .select("nome, side, numero, pontos, faltas")
@@ -78,7 +78,7 @@ async function getGamePlayerStats(gameId: string): Promise<PlayerStat[]> {
 }
 
 async function getRelated(currentId: string, limit = 3) {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data } = await supabase
     .from("news")
     .select("id, slug, title, cover_image_url, published_at")

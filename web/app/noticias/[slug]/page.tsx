@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { notFound, permanentRedirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/public";
 import { markdownToHtml } from "@/lib/markdown";
 import type { Metadata } from "next";
 
@@ -12,7 +12,7 @@ interface Props {
 }
 
 async function getArticle(slug: string) {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data } = await supabase
     .from("news")
     .select("id, slug, title, excerpt, body, category, published_at, is_featured, cover_image_url")

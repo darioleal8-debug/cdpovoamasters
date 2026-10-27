@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/public";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -40,7 +40,7 @@ const LIGHT       = "#F2F4F7";
 const BORDER      = "#E5E7EB";
 
 export default async function NoticiasPage() {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data } = await supabase
     .from("news")
     .select("id, slug, title, excerpt, category, published_at, is_featured")

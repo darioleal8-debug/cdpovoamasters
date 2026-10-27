@@ -1,4 +1,5 @@
-import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/public";
 import { computeStandings, groupStandingsBySeries, normalizeName, parseGameMeta, type SeriesStandings, type Competition, type LeagueGameResult, type LeagueTeam, type PublicGame, type StandingRow } from "@/types/competitions";
 
 // ─── Competition ─────────────────────────────────────────────────────────────
@@ -421,7 +422,8 @@ export type NoticiaPublic = {
 };
 
 export async function getLatestNoticias(limit = 4): Promise<NoticiaPublic[]> {
-  const supabase = await createClient();
+  // Cliente sem sessão: um token expirado do visitante não pode esconder notícias públicas
+  const supabase = createPublicClient();
   const { data } = await supabase
     .from("news")
     .select("id, slug, game_id, title, excerpt, body, cover_image_url, home_team_name, away_team_name, published_at, created_at")

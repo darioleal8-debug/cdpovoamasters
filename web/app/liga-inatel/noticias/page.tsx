@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/public";
 import type { Metadata } from "next";
 
 export const revalidate = 60;
@@ -41,7 +41,7 @@ interface Article {
 }
 
 export default async function LigaNoticiasPage() {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data } = await supabase
     .from("news")
     .select("id, slug, title, excerpt, published_at, cover_image_url, is_featured")
