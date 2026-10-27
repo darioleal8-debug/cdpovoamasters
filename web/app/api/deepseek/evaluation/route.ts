@@ -262,7 +262,7 @@ Devolve exatamente este JSON:
     return NextResponse.json({ error: aiResult.error }, { status: 502 });
   }
 
-  let evaluation: {
+  const evaluation: {
     recommended_players: Array<{ player_id: string; name: string; score: number; reason: string }>;
     excluded_players: Array<{ player_id: string; name: string; reason: string }>;
     tactical_notes?: string;
