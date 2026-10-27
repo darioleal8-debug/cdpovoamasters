@@ -22,7 +22,7 @@ export async function GET() {
   const [stRes, teamsRes, eventsRes] = await Promise.all([
     adminClient
       .from("season_teams")
-      .select("team_id, active")
+      .select("team_id, active, series")
       .eq("competition_id", comp.id),
 
     adminClient
@@ -43,6 +43,9 @@ export async function GET() {
   const stMap = new Map(
     (stRes.data ?? []).map((r: { team_id: string; active: boolean }) => [r.team_id, r.active])
   );
+  const seriesMap = new Map(
+    (stRes.data ?? []).map((r: { team_id: string; series: string | null }) => [r.team_id, r.series ?? null])
+  );
 
   // Contar jogos por nome de equipa (a partir dos eventos)
   const gamesByName = new Map<string, number>();
@@ -59,6 +62,7 @@ export async function GET() {
     active: stMap.get(t.id) ?? false,
     game_count: gamesByName.get(t.name) ?? 0,
     in_season: stMap.has(t.id),
+    series: seriesMap.get(t.id) ?? null,
   }));
 
   return NextResponse.json({ teams, competition_id: comp.id });

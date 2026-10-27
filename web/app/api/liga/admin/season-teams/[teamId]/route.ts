@@ -4,7 +4,8 @@ import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
 import { createAdminClient } from "@/lib/supabase/server";
 
 // PATCH /api/liga/admin/season-teams/[teamId]
-// Ativa ou desativa uma equipa para a temporada atual da Liga INATEL.
+// Ativa/desativa uma equipa e/ou define a sua série (A, B, C…) na temporada atual da Liga INATEL.
+// Body: { active?: boolean, series?: string | null }
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ teamId: string }> }
@@ -14,8 +15,21 @@ export async function PATCH(
 
   const { teamId } = await params;
   const body = await req.json().catch(() => null);
-  if (typeof body?.active !== "boolean") {
-    return NextResponse.json({ error: "active (boolean) obrigatório" }, { status: 400 });
+  const hasActive = typeof body?.active === "boolean";
+  const hasSeries = body && "series" in body;
+  if (!hasActive && !hasSeries) {
+    return NextResponse.json({ error: "active (boolean) ou series obrigatório" }, { status: 400 });
+  }
+
+  let series: string | null | undefined;
+  if (hasSeries) {
+    if (body.series === null || body.series === "") {
+      series = null;
+    } else if (typeof body.series === "string" && /^[A-Za-z]$/.test(body.series.trim())) {
+      series = body.series.trim().toUpperCase();
+    } else {
+      return NextResponse.json({ error: "series deve ser uma letra (A, B, C…) ou null" }, { status: 400 });
+    }
   }
 
   const adminClient = await createAdminClient();
@@ -31,7 +45,12 @@ export async function PATCH(
   const { error } = await adminClient
     .from("season_teams")
     .upsert(
-      { competition_id: comp.id, team_id: teamId, active: body.active },
+      {
+        competition_id: comp.id,
+        team_id: teamId,
+        ...(hasActive ? { active: body.active } : {}),
+        ...(series !== undefined ? { series } : {}),
+      },
       { onConflict: "competition_id,team_id" }
     );
 

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getCompetitionBySlug, getCompetitionGames, getStandings, getLatestNoticias } from "@/lib/competitions-data";
+import { getCompetitionBySlug, getCompetitionGames, getStandingsBySeries, getLatestNoticias } from "@/lib/competitions-data";
 import { createAdminClient } from "@/lib/supabase/server";
 import { todayInClubTz } from "@/lib/time/club-time";
 import { CourtBg } from "@/components/competitions/court-bg";
@@ -8,7 +8,7 @@ import { TeamMono } from "@/components/competitions/team-mono";
 import { teamAbbr } from "@/lib/liga/format";
 import { ScoreTicker } from "@/components/competitions/score-ticker";
 import { ScoreCard } from "@/components/competitions/score-card";
-import { StandingsTable } from "@/components/competitions/standings-table";
+import { SeriesStandingsTabs } from "@/components/competitions/series-standings-tabs";
 import type { PublicGame } from "@/types/competitions";
 import { NoticiasSection } from "@/components/liga/noticias-section";
 
@@ -58,9 +58,9 @@ export default async function LigaInatelHomePage() {
 
   const supabase = await createAdminClient();
 
-  const [games, standings, noticias, seasonRes, teamsRes] = await Promise.all([
+  const [games, standingsBySeries, noticias, seasonRes, teamsRes] = await Promise.all([
     getCompetitionGames(competition.competition_key ?? "Liga", competition.season_id),
-    getStandings(competition.id),
+    getStandingsBySeries(competition.id),
     getLatestNoticias(4),
     supabase.from("seasons").select("name").eq("id", competition.season_id).single(),
     supabase.from("league_teams").select("name, logo_url").not("logo_url", "is", null),
@@ -313,16 +313,8 @@ export default async function LigaInatelHomePage() {
                 marginTop: "16px",
               }}
             >
-              <StandingsTable standings={standings} limit={5} mini />
+              <SeriesStandingsTabs groups={standingsBySeries} limit={6} mini />
             </div>
-            {standings.length > 5 && (
-              <p style={{ textAlign: "center", marginTop: "8px", fontSize: "12px", color: "#8C837A" }}>
-                Top 5 de {standings.length} equipas ·{" "}
-                <Link href="/liga-inatel/classificacao" style={{ color: "#C2530A" }}>
-                  ver completa
-                </Link>
-              </p>
-            )}
           </div>
 
           {/* Próxima jornada */}

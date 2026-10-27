@@ -74,6 +74,7 @@ type TeamAccess = {
 type SeasonTeamEntry = {
   team_id: string; name: string; logo_url: string | null;
   active: boolean; game_count: number; in_season: boolean;
+  series: string | null;
 };
 
 type AdminGamePhoto = {
@@ -576,6 +577,19 @@ export default function LigaAdminPage() {
       });
       if (!res.ok) return;
       setSeasonTeams(prev => prev.map(t => t.team_id === teamId ? { ...t, active } : t));
+    } finally { setToggleLoading(null); }
+  }
+
+  async function setTeamSeries(teamId: string, series: string | null) {
+    setToggleLoading(teamId);
+    try {
+      const res = await fetch(`/api/liga/admin/season-teams/${teamId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ series }),
+      });
+      if (!res.ok) return;
+      setSeasonTeams(prev => prev.map(t => t.team_id === teamId ? { ...t, series } : t));
     } finally { setToggleLoading(null); }
   }
 
@@ -1896,6 +1910,7 @@ export default function LigaAdminPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {seasonTeams.map(team => {
                 const warn = team.active && team.game_count === 0;
+                const noSeries = team.active && !team.series;
                 return (
                   <div key={team.team_id} style={{
                     display: "flex", alignItems: "center", gap: "12px",
@@ -1912,8 +1927,22 @@ export default function LigaAdminPage() {
                       <p style={{ margin: 0, fontSize: "12px", color: warn ? "#C2410C" : "#8C837A" }}>
                         {team.game_count} jogo{team.game_count !== 1 ? "s" : ""} agendado{team.game_count !== 1 ? "s" : ""}
                         {warn ? " — ativa sem jogos" : ""}
+                        {noSeries ? <span style={{ color: "#C2410C" }}> — sem série atribuída</span> : null}
                       </p>
                     </div>
+                    <label style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span style={{ fontSize: "12px", color: "#8C837A", fontWeight: 600 }}>Série</span>
+                      <select
+                        value={team.series ?? ""}
+                        disabled={toggleLoading === team.team_id}
+                        onChange={e => setTeamSeries(team.team_id, e.target.value || null)}
+                        aria-label={`Série de ${team.name}`}
+                        style={{ fontSize: "13px", padding: "4px 6px", borderRadius: "6px", border: `1px solid ${noSeries ? "#FED7AA" : "#E8E0D6"}`, background: "#FFFDFA", color: "#1A1612" }}
+                      >
+                        <option value="">—</option>
+                        {["A", "B", "C", "D", "E", "F"].map(l => <option key={l} value={l}>{l}</option>)}
+                      </select>
+                    </label>
                     <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none" }}>
                       <span style={{ fontSize: "12px", color: team.active ? "#16A34A" : "#8C837A", fontWeight: 600 }}>
                         {team.active ? "Ativa" : "Inativa"}
@@ -1932,7 +1961,7 @@ export default function LigaAdminPage() {
             </div>
           )}
           <p style={{ marginTop: "16px", fontSize: "12px", color: "#B9AFA4" }}>
-            Equipas inativas não aparecem na classificação nem no filtro do calendário.
+            Equipas inativas não aparecem na classificação nem no filtro do calendário. A classificação é apresentada separada por série; equipas ativas sem série aparecem num grupo "Sem série".
           </p>
         </div>
       )}

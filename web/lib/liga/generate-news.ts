@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import { computeStandings } from "@/types/competitions";
+import { computeStandings, groupStandingsBySeries, normalizeName } from "@/types/competitions";
 import { deepseekJSON } from "@/lib/deepseek";
 
 function slugify(text: string): string {
@@ -58,9 +58,34 @@ export async function generateLigaNews(
     .select("home_team_name, away_team_name, home_score, away_score")
     .eq("competition_id", result.competition_id ?? compRes.data?.id ?? "");
 
-  const standings = computeStandings(allResults ?? []);
-  const top5 = standings
-    .slice(0, 5)
+  // Classificação por série: só a série das equipas deste jogo interessa à notícia
+  const competitionId = result.competition_id ?? compRes.data?.id ?? "";
+  const { data: stRows } = await adminClient
+    .from("season_teams")
+    .select("team_id, series, team:league_teams(id, name, normalized_name)")
+    .eq("competition_id", competitionId)
+    .eq("active", true);
+
+  type StRow = { team_id: string; series: string | null; team: { id: string; name: string; normalized_name: string } | null };
+  const seasonRows = ((stRows ?? []) as unknown as StRow[]).filter((r) => r.team);
+  const seedTeams = seasonRows.map((r) => r.team!);
+  const seriesByTeamId = new Map(seasonRows.map((r) => [r.team_id, r.series ?? null]));
+
+  const standings = computeStandings(allResults ?? [], seedTeams.length > 0 ? seedTeams : undefined);
+  const groups = groupStandingsBySeries(standings, seriesByTeamId);
+
+  const homeNorm = normalizeName(result.home_team_name ?? "");
+  const awayNorm = normalizeName(result.away_team_name ?? "");
+  const seriesOf = (norm: string) =>
+    groups.find((g) => g.rows.some((r) => normalizeName(r.team_name) === norm))?.series ?? null;
+  const gameSeries = seriesOf(homeNorm) ?? seriesOf(awayNorm);
+  const gameGroup = groups.find((g) => g.series === gameSeries && g.series !== null);
+
+  const standingsRows = gameGroup ? gameGroup.rows : standings.slice(0, 5);
+  const standingsTitle = gameGroup
+    ? `CLASSIFICAÇÃO ACTUALIZADA DA ${gameGroup.label.toUpperCase()} (o jogo pertence à ${gameGroup.label}; a liga tem ${groups.filter((g) => g.series).length} séries)`
+    : "CLASSIFICAÇÃO ACTUALIZADA (top 5)";
+  const top5 = standingsRows
     .map((s, i) => `${i + 1}. ${s.team_name} — ${s.pts} pts (${s.wins}V ${s.losses}D)`)
     .join("\n");
 
@@ -161,11 +186,11 @@ ${topScorersByTeamBlock ? `\n${topScorersByTeamBlock}` : ""}
 ${submission?.notes ? `Notas: ${submission.notes}` : ""}
 ${photoCaptions ? `Descrição das fotografias do jogo: ${photoCaptions}` : ""}
 
-CLASSIFICAÇÃO ACTUALIZADA (top 5):
+${standingsTitle}:
 ${top5}
 
 Regras:
-- Menciona o contexto da jornada e o impacto na classificação se relevante
+- Menciona o contexto da jornada e o impacto na classificação se relevante (a classificação é por série — refere a série, ex.: "na Série B", e nunca compares com equipas de outras séries)
 - Usa APENAS os dados fornecidos acima — nunca inventes pontuações, nomes ou factos`;
 
   const aiResult = await deepseekJSON<{ titulo?: string; entrada?: string; corpo?: string }>({

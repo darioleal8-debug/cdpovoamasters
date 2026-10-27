@@ -171,6 +171,45 @@ export function computeStandings(
     .sort((a, b) => b.pts - a.pts || b.diff - a.diff || b.pf - a.pf);
 }
 
+// ─── Séries (grupos) ──────────────────────────────────────────────────────────
+
+export interface SeriesStandings<T extends StandingRow = StandingRow> {
+  /** Letra da série ("A", "B", …) ou null para equipas sem série atribuída */
+  series: string | null;
+  /** Rótulo a mostrar: "Série A" ou "Sem série" */
+  label: string;
+  rows: T[];
+}
+
+export function seriesLabel(series: string | null): string {
+  return series ? `Série ${series}` : "Sem série";
+}
+
+/**
+ * Divide uma classificação já ordenada em séries, mantendo a ordem dentro de cada uma.
+ * As séries aparecem por ordem alfabética; equipas sem série vão para o fim
+ * (e só aparecem se existirem).
+ */
+export function groupStandingsBySeries<T extends StandingRow>(
+  rows: T[],
+  seriesByTeamId: Map<string, string | null>
+): SeriesStandings<T>[] {
+  const groups = new Map<string | null, T[]>();
+  for (const row of rows) {
+    const s = row.team_id ? seriesByTeamId.get(row.team_id) ?? null : null;
+    if (!groups.has(s)) groups.set(s, []);
+    groups.get(s)!.push(row);
+  }
+  // Séries sem jogos ainda também aparecem (ex.: início de época)
+  for (const s of new Set(seriesByTeamId.values())) {
+    if (!groups.has(s)) groups.set(s, []);
+  }
+  return Array.from(groups.entries())
+    .filter(([s, r]) => s !== null || r.length > 0)
+    .sort(([a], [b]) => (a === null ? 1 : b === null ? -1 : a.localeCompare(b)))
+    .map(([series, r]) => ({ series, label: seriesLabel(series), rows: r }));
+}
+
 /** Parse do campo description (JSON) dos eventos */
 export interface GameMeta {
   jornada?: number;

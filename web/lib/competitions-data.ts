@@ -1,5 +1,5 @@
 import { createAdminClient, createClient } from "@/lib/supabase/server";
-import { computeStandings, normalizeName, parseGameMeta, type Competition, type LeagueGameResult, type LeagueTeam, type PublicGame, type StandingRow } from "@/types/competitions";
+import { computeStandings, groupStandingsBySeries, normalizeName, parseGameMeta, type SeriesStandings, type Competition, type LeagueGameResult, type LeagueTeam, type PublicGame, type StandingRow } from "@/types/competitions";
 
 // ─── Competition ─────────────────────────────────────────────────────────────
 
@@ -287,6 +287,40 @@ export async function getStandingsWithForm(competitionId: string): Promise<Stand
         return ((isHome ? homeWon : !homeWon) ? "V" : "D") as "V" | "D";
       }),
   }));
+}
+
+// ─── Séries ──────────────────────────────────────────────────────────────────
+
+/** team_id → letra da série, para as equipas ativas da competição. */
+export async function getSeriesByTeamId(competitionId: string): Promise<Map<string, string | null>> {
+  const supabase = await createAdminClient();
+  const { data, error } = await supabase
+    .from("season_teams")
+    .select("team_id, series")
+    .eq("competition_id", competitionId)
+    .eq("active", true);
+  if (error) return new Map();
+  return new Map(
+    (data ?? []).map((r: { team_id: string; series: string | null }) => [r.team_id, r.series ?? null])
+  );
+}
+
+export async function getStandingsBySeries(competitionId: string): Promise<SeriesStandings[]> {
+  const [standings, seriesMap] = await Promise.all([
+    getStandings(competitionId),
+    getSeriesByTeamId(competitionId),
+  ]);
+  return groupStandingsBySeries(standings, seriesMap);
+}
+
+export async function getStandingsWithFormBySeries(
+  competitionId: string
+): Promise<SeriesStandings<StandingRowWithForm>[]> {
+  const [standings, seriesMap] = await Promise.all([
+    getStandingsWithForm(competitionId),
+    getSeriesByTeamId(competitionId),
+  ]);
+  return groupStandingsBySeries(standings, seriesMap);
 }
 
 export async function getTeamNames(competitionId: string): Promise<string[]> {

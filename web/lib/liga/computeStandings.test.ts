@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { computeStandings, normalizeName } from "@/types/competitions";
+import { computeStandings, groupStandingsBySeries as _group, normalizeName } from "@/types/competitions";
 import type { LeagueTeam } from "@/types/competitions";
 
 // ── normalizeName ─────────────────────────────────────────────────────────────
@@ -117,5 +117,37 @@ describe("computeStandings (com seedTeams)", () => {
     const unknown = s.find((r) => r.team_name === "Desconhecida FC")!;
     expect(a.team_id).toBe("id-a");
     expect(unknown.team_id).toBeUndefined(); // não estava no seed
+  });
+});
+
+
+describe("groupStandingsBySeries", () => {
+  const seed = [
+    { id: "a1", name: "CD Póvoa", normalized_name: "cd povoa" },
+    { id: "a2", name: "Barca BC", normalized_name: "barca bc" },
+    { id: "b1", name: "Matosinhos Basket CA", normalized_name: "matosinhos basket ca" },
+    { id: "b2", name: "Powertogether Associação", normalized_name: "powertogether associacao" },
+    { id: "x1", name: "Equipa Sem Série", normalized_name: "equipa sem serie" },
+  ];
+  const series = new Map<string, string | null>([
+    ["a1", "A"], ["a2", "A"], ["b1", "B"], ["b2", "B"], ["x1", null],
+  ]);
+
+  test("separa por série, com posições próprias e ordem alfabética", () => {
+    const rows = computeStandings(
+      [{ home_team_name: "Powertogether Associação", away_team_name: "Matosinhos Basket CA", home_score: 53, away_score: 55 }],
+      seed
+    );
+    const groups = _group(rows, series);
+    expect(groups.map((g) => g.label)).toEqual(["Série A", "Série B", "Sem série"]);
+    expect(groups[1].rows[0].team_name).toBe("Matosinhos Basket CA");
+    expect(groups[1].rows).toHaveLength(2);
+    expect(groups[0].rows).toHaveLength(2);
+  });
+
+  test("omite o grupo 'Sem série' quando todas as equipas têm série", () => {
+    const rows = computeStandings([], seed.slice(0, 4));
+    const groups = _group(rows, new Map([...series].filter(([k]) => k !== "x1")));
+    expect(groups.map((g) => g.series)).toEqual(["A", "B"]);
   });
 });
