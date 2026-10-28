@@ -26,6 +26,18 @@ export const metadata: Metadata = {
   description: "Plantel, convocatórias, quotas e estatística de jogo num só sítio.",
   // Cada página define os seus próprios robots; o default é indexável (landing)
   robots: { index: true, follow: true },
+  // Manifest, ícones e título PWA via Metadata API (e não <link> fixos no <head>)
+  // para que secções como /liga-inatel possam ter o seu próprio ícone no ecrã principal.
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/icon",
+    apple: "/icons/icon-192.png",
+  },
+  appleWebApp: {
+    capable: true,
+    title: "HoopHub",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export default function RootLayout({
@@ -38,12 +50,7 @@ export default function RootLayout({
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="HoopHub" />
         <meta name="theme-color" content="#F97316" />
-        <link rel="manifest" href="/manifest.json" />
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem("theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t)}catch(e){}` }} />
       </head>
       <body className={`${barlow.variable} ${barlowCondensed.variable} font-sans`}>

@@ -23,6 +23,17 @@ export const metadata: Metadata = {
   title: { default: "Liga INATEL", template: "%s · Liga INATEL" },
   description: "Classificação, calendário e resultados da Liga INATEL de basquetebol.",
   openGraph: { siteName: "HoopHub · Liga INATEL", locale: "pt_PT" },
+  // Ícone próprio da Liga quando adicionada ao ecrã principal (diferente do HoopHub)
+  manifest: "/liga-inatel.webmanifest",
+  icons: {
+    icon: [{ url: "/pwa/liga-inatel-32.png", sizes: "32x32", type: "image/png" }],
+    apple: [{ url: "/pwa/liga-inatel-180.png", sizes: "180x180", type: "image/png" }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "LIGA INATEL",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export default function LigaInatelLayout({ children }: { children: React.ReactNode }) {
