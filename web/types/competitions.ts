@@ -76,11 +76,12 @@ export interface StandingRow {
   team_name: string;
   gp: number;    // jogos disputados
   wins: number;
+  draws: number;
   losses: number;
   pf: number;    // pontos marcados
   pc: number;    // pontos sofridos
   diff: number;  // diferença
-  pts: number;   // pontos (vitória=2, derrota=1 — regras basquetebol INATEL)
+  pts: number;   // pontos (vitória=3, empate=1, derrota=0 — regulamento Liga INATEL)
 }
 
 // Jogo público (calendar + result merged)
@@ -118,8 +119,13 @@ export function normalizeName(name: string): string {
 }
 
 /** Calcula classificação a partir de resultados aprovados.
- *  Regras INATEL basketball: 2 pts vitória, 1 pt derrota.
+ *  Regulamento Liga INATEL: vitória 3 pts, empate 1 pt, derrota 0 pts.
  *  seedTeams: todas as equipas não-placeholder — garante que equipas sem jogos aparecem a zero. */
+/** Pontuação da classificação (regulamento Liga INATEL). */
+export const POINTS_WIN = 3;
+export const POINTS_DRAW = 1;
+export const POINTS_LOSS = 0;
+
 export function computeStandings(
   results: Pick<LeagueGameResult, "home_team_name" | "away_team_name" | "home_score" | "away_score">[],
   seedTeams?: Pick<LeagueTeam, "id" | "name" | "normalized_name">[]
@@ -131,7 +137,7 @@ export function computeStandings(
 
   if (seedTeams) {
     for (const t of seedTeams) {
-      map.set(t.id, { team_id: t.id, team_name: t.name, gp: 0, wins: 0, losses: 0, pf: 0, pc: 0, diff: 0, pts: 0 });
+      map.set(t.id, { team_id: t.id, team_name: t.name, gp: 0, wins: 0, draws: 0, losses: 0, pf: 0, pc: 0, diff: 0, pts: 0 });
       normToId.set(t.normalized_name, t.id);
       normToId.set(normalizeName(t.name), t.id);
     }
@@ -144,7 +150,7 @@ export function computeStandings(
     }
     const fallbackKey = normalizeName(name);
     if (!map.has(fallbackKey)) {
-      map.set(fallbackKey, { team_name: name, gp: 0, wins: 0, losses: 0, pf: 0, pc: 0, diff: 0, pts: 0 });
+      map.set(fallbackKey, { team_name: name, gp: 0, wins: 0, draws: 0, losses: 0, pf: 0, pc: 0, diff: 0, pts: 0 });
     }
     return map.get(fallbackKey)!;
   }
@@ -152,17 +158,18 @@ export function computeStandings(
   for (const r of results) {
     const home = get(r.home_team_name);
     const away = get(r.away_team_name);
-    const homeWin = r.home_score > r.away_score;
-
     home.gp++;  home.pf += r.home_score;  home.pc += r.away_score;
     away.gp++;  away.pf += r.away_score;  away.pc += r.home_score;
 
-    if (homeWin) {
-      home.wins++;  home.pts += 2;
-      away.losses++; away.pts += 1;
+    if (r.home_score > r.away_score) {
+      home.wins++;   home.pts += POINTS_WIN;
+      away.losses++; away.pts += POINTS_LOSS;
+    } else if (r.home_score < r.away_score) {
+      away.wins++;   away.pts += POINTS_WIN;
+      home.losses++; home.pts += POINTS_LOSS;
     } else {
-      away.wins++;  away.pts += 2;
-      home.losses++; home.pts += 1;
+      home.draws++;  home.pts += POINTS_DRAW;
+      away.draws++;  away.pts += POINTS_DRAW;
     }
   }
 

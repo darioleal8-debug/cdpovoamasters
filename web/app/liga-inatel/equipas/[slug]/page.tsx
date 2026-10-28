@@ -135,6 +135,7 @@ export default async function TeamPage({
               { label: "Posição", value: position ? `${position}º` : "—" },
               { label: "J",  value: teamStanding.gp },
               { label: "V",  value: teamStanding.wins },
+              { label: "E",  value: teamStanding.draws },
               { label: "D",  value: teamStanding.losses },
               { label: "PM", value: teamStanding.pf },
               { label: "PS", value: teamStanding.pc },

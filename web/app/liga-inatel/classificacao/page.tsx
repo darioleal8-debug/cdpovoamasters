@@ -144,7 +144,7 @@ export default async function ClassificacaoPage() {
             color: "#8C837A",
           }}
         >
-          <span>Pontuação: vitória 2 pts · derrota 1 pt</span>
+          <span>Pontuação: vitória 3 pts · empate 1 pt · derrota 0 pts</span>
           <span>Desempate: pontos → diferença → pm</span>
         </div>
       </div>

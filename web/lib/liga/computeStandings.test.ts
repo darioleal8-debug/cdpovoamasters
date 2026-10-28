@@ -25,13 +25,22 @@ describe("computeStandings (sem seedTeams)", () => {
     expect(computeStandings([])).toEqual([]);
   });
 
-  test("conta pontos INATEL correctamente (vitória=2, derrota=1)", () => {
+  test("conta pontos INATEL correctamente (vitória=3, derrota=0)", () => {
     const results = [{ home_team_name: "A", away_team_name: "B", home_score: 80, away_score: 70 }];
     const s = computeStandings(results);
     const a = s.find((r) => r.team_name === "A")!;
     const b = s.find((r) => r.team_name === "B")!;
-    expect(a.pts).toBe(2); expect(a.wins).toBe(1); expect(a.losses).toBe(0);
-    expect(b.pts).toBe(1); expect(b.wins).toBe(0); expect(b.losses).toBe(1);
+    expect(a.pts).toBe(3); expect(a.wins).toBe(1); expect(a.losses).toBe(0);
+    expect(b.pts).toBe(0); expect(b.wins).toBe(0); expect(b.losses).toBe(1);
+  });
+
+  test("empate vale 1 ponto para cada equipa", () => {
+    const results = [{ home_team_name: "A", away_team_name: "B", home_score: 70, away_score: 70 }];
+    const s = computeStandings(results);
+    const a = s.find((r) => r.team_name === "A")!;
+    const b = s.find((r) => r.team_name === "B")!;
+    expect(a.pts).toBe(1); expect(a.draws).toBe(1); expect(a.wins).toBe(0); expect(a.losses).toBe(0);
+    expect(b.pts).toBe(1); expect(b.draws).toBe(1); expect(b.wins).toBe(0); expect(b.losses).toBe(0);
   });
 
   test("ordena por pontos, depois diferença, depois PM", () => {
@@ -40,7 +49,7 @@ describe("computeStandings (sem seedTeams)", () => {
       { home_team_name: "C", away_team_name: "D", home_score: 90, away_score: 60 },
     ];
     const s = computeStandings(results);
-    // A e C têm 2 pts; C tem diff +30, A tem diff +10 → C primeiro
+    // A e C têm 3 pts; C tem diff +30, A tem diff +10 → C primeiro
     expect(s[0].team_name).toBe("C");
     expect(s[1].team_name).toBe("A");
   });
@@ -80,7 +89,7 @@ describe("computeStandings (com seedTeams)", () => {
     const a = s.find((r) => r.team_name === "Equipa A")!;
     expect(a).toBeDefined();
     expect(a.gp).toBe(1);
-    expect(a.pts).toBe(2);
+    expect(a.pts).toBe(3);
     expect(a.team_id).toBe("id-a");
   });
 
@@ -91,7 +100,7 @@ describe("computeStandings (com seedTeams)", () => {
     const s = computeStandings(results, seedTeams);
     const a = s.find((r) => r.team_id === "id-a")!;
     expect(a.team_name).toBe("Equipa A"); // nome canónico, não o lowercase do resultado
-    expect(a.pts).toBe(1);               // perdeu
+    expect(a.pts).toBe(0);               // perdeu
   });
 
   test("desempate por pontos → diferença → PM", () => {
@@ -100,8 +109,8 @@ describe("computeStandings (com seedTeams)", () => {
       { home_team_name: "Equipa A", away_team_name: "Equipa C", home_score: 70, away_score: 60 },
     ];
     const s = computeStandings(results, seedTeams);
-    // A: 4pts, diff +20, pf=160
-    // B: 1pt, diff -10; C: 1pt, diff -10, pf=60 vs pf=80
+    // A: 6pts, diff +20, pf=160
+    // B: 0pts, diff -10; C: 0pts, diff -10, pf=60 vs pf=80
     expect(s[0].team_id).toBe("id-a");
     // B e C: mesmo pts e diff (-10), B pf=80 > C pf=60 → B antes de C
     expect(s[1].team_id).toBe("id-b");

@@ -4,12 +4,13 @@ export interface StandingRow {
   team_name: string;
   gp: number;
   wins: number;
+  draws?: number;
   losses: number;
   pf: number;
   pc: number;
   diff: number;
   pts: number;
-  form?: ("V" | "D")[];
+  form?: ("V" | "E" | "D")[];
 }
 
 interface Props {
@@ -86,6 +87,7 @@ export function StandingsTable({ standings, ourTeamName, limit, mini, teamLogos 
             <TH>Equipa</TH>
             <TH right>J</TH>
             {!mini && <TH right hide="sm">V</TH>}
+            {!mini && <TH right hide="sm">E</TH>}
             {!mini && <TH right hide="sm">D</TH>}
             {!mini && <TH right hide="md">PM</TH>}
             {!mini && <TH right hide="md">PS</TH>}
@@ -151,6 +153,16 @@ export function StandingsTable({ standings, ourTeamName, limit, mini, teamLogos 
                     style={{ padding: "12px 10px", textAlign: "right", fontVariantNumeric: "tabular-nums", color: "#2F7A3E" }}
                   >
                     {row.wins}
+                  </td>
+                )}
+
+                {/* E */}
+                {!mini && (
+                  <td
+                    className="hidden sm:table-cell"
+                    style={{ padding: "12px 10px", textAlign: "right", fontVariantNumeric: "tabular-nums", color: "#6F675F" }}
+                  >
+                    {row.draws ?? 0}
                   </td>
                 )}
 
@@ -234,8 +246,9 @@ export function StandingsTable({ standings, ourTeamName, limit, mini, teamLogos 
                                 fontSize: "10px",
                                 fontWeight: 500,
                                 letterSpacing: 0,
-                                background: f === "V" ? "#1A1612" : "#E9E2D8",
-                                color: f === "V" ? "#F97316" : "#6F675F",
+                                background: f === "V" ? "#1A1612" : f === "E" ? "#F5EFE6" : "#E9E2D8",
+                                color: f === "V" ? "#F97316" : f === "E" ? "#8C837A" : "#6F675F",
+                                border: f === "E" ? "1px solid #E9E2D8" : undefined,
                               }}
                             >
                               {f}

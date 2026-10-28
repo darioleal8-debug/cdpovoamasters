@@ -253,7 +253,7 @@ export async function getStandings(competitionId: string): Promise<StandingRow[]
   return computeStandings(resultsRes.data ?? [], seedTeams);
 }
 
-export type StandingRowWithForm = StandingRow & { form: ("V" | "D")[] };
+export type StandingRowWithForm = StandingRow & { form: ("V" | "E" | "D")[] };
 
 export async function getStandingsWithForm(competitionId: string): Promise<StandingRowWithForm[]> {
   const supabase = await createAdminClient();
@@ -284,8 +284,9 @@ export async function getStandingsWithForm(competitionId: string): Promise<Stand
       .map((r) => {
         const norm = normalizeName(s.team_name);
         const isHome = normalizeName(r.home_team_name) === norm;
-        const homeWon = r.home_score > r.away_score;
-        return ((isHome ? homeWon : !homeWon) ? "V" : "D") as "V" | "D";
+        const own = isHome ? r.home_score : r.away_score;
+        const opp = isHome ? r.away_score : r.home_score;
+        return (own > opp ? "V" : own < opp ? "D" : "E") as "V" | "E" | "D";
       }),
   }));
 }

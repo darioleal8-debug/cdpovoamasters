@@ -99,7 +99,7 @@ export async function generateLigaNews(
     ? `CLASSIFICAÇÃO ACTUALIZADA DA ${gameGroup.label.toUpperCase()} (o jogo pertence à ${gameGroup.label}; a liga tem ${groups.filter((g) => g.series).length} séries)`
     : "CLASSIFICAÇÃO ACTUALIZADA (top 5)";
   const top5 = standingsRows
-    .map((s, i) => `${i + 1}. ${s.team_name} — ${s.pts} pts (${s.wins}V ${s.losses}D)`)
+    .map((s, i) => `${i + 1}. ${s.team_name} — ${s.pts} pts (${s.wins}V ${s.draws}E ${s.losses}D)`)
     .join("\n");
 
   const { data: submission } = await adminClient
