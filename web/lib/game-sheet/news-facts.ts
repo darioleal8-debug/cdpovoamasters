@@ -19,6 +19,28 @@ export interface NewsFacts {
   /** Pares de pontuação que a notícia pode citar (final, parciais, acumulados) */
   allowedScores: Set<string>;
   periodsConsistent: boolean;
+  /** true só se os pontos individuais lidos da folha batem certo com o resultado das duas equipas */
+  playerPointsReliable: boolean;
+  /** Nomes de jogadores que a notícia NÃO pode referir (preenchido quando a leitura individual não é fiável) */
+  forbiddenPlayerNames: string[];
+}
+
+/**
+ * Os pontos individuais só são fiáveis quando, para CADA equipa, a soma dos pontos dos jogadores
+ * é exatamente igual ao resultado da equipa e não há pontos por atribuir. Caso contrário, o
+ * DeepSeek não conseguiu ler corretamente a coluna de pontos da folha de jogo.
+ */
+export function playerPointsReliable(i: {
+  homeScore: number;
+  awayScore: number;
+  players: { side: "home" | "away" | string; pontos: number | null }[];
+  unattributed?: { home: number | null; away: number | null } | null;
+}): boolean {
+  if (!i.players.some((p) => (p.pontos ?? 0) > 0)) return false;
+  if ((i.unattributed?.home ?? 0) > 0 || (i.unattributed?.away ?? 0) > 0) return false;
+  const sum = (side: "home" | "away") =>
+    i.players.filter((p) => p.side === side).reduce((s, p) => s + (p.pontos ?? 0), 0);
+  return sum("home") === i.homeScore && sum("away") === i.awayScore;
 }
 
 const label = (p: number) => (p <= 4 ? `${p}.º período` : `prolongamento${p > 5 ? ` ${p - 4}` : ""}`);
@@ -79,20 +101,39 @@ export function buildNewsFacts(i: NewsFactsInput): NewsFacts {
     lines.push("Sem parciais por período — não descrevas a evolução do marcador.");
   }
 
-  const scorers = (side: "home" | "away") =>
-    i.players.filter((p) => p.side === side && p.pontos > 0).sort((a, b) => b.pontos - a.pontos).slice(0, 3);
-  for (const side of ["home", "away"] as const) {
-    const team = side === "home" ? i.home : i.away;
-    const top = scorers(side);
-    if (top.length) {
-      lines.push(`Marcadores confirmados ${team}: ${top.map((p) => `${p.nome} ${p.pontos} pts${p.triplos ? ` (${p.triplos} triplo${p.triplos > 1 ? "s" : ""})` : ""}`).join(", ")}.`);
-    }
-    const u = i.unattributed?.[side];
-    if (u && u > 0) lines.push(`${team}: ${u} ponto(s) sem marcador identificado — não os atribuas a ninguém e não afirmes quem foi o melhor marcador desta equipa se a diferença puder ser alterada por esses pontos.`);
-  }
-  if (!i.players.some((p) => p.pontos > 0)) lines.push("Sem estatísticas individuais confirmadas — não menciones marcadores individuais.");
+  const reliable = playerPointsReliable(i);
+  const forbiddenPlayerNames: string[] = [];
 
-  return { lines, allowedScores: allowed, periodsConsistent };
+  if (reliable) {
+    const scorers = (side: "home" | "away") =>
+      i.players.filter((p) => p.side === side && p.pontos > 0).sort((a, b) => b.pontos - a.pontos).slice(0, 3);
+    for (const side of ["home", "away"] as const) {
+      const team = side === "home" ? i.home : i.away;
+      const top = scorers(side);
+      if (top.length) {
+        lines.push(`Marcadores confirmados ${team}: ${top.map((p) => `${p.nome} ${p.pontos} pts${p.triplos ? ` (${p.triplos} triplo${p.triplos > 1 ? "s" : ""})` : ""}`).join(", ")}.`);
+      }
+    }
+  } else if (i.players.some((p) => p.pontos > 0)) {
+    // Leitura falhada: a soma dos pontos individuais não coincide com o resultado
+    forbiddenPlayerNames.push(...i.players.map((p) => p.nome.trim()).filter((n) => n.length >= 4));
+    lines.push("Os pontos individuais lidos da folha de jogo NÃO coincidem com o resultado das equipas (leitura não fiável) — NÃO menciones jogadores, marcadores nem pontuações individuais. Constrói a notícia à volta dos parciais e da posição de cada equipa na classificação.");
+  } else {
+    lines.push("Sem estatísticas individuais confirmadas — não menciones marcadores individuais.");
+  }
+
+  return { lines, allowedScores: allowed, periodsConsistent, playerPointsReliable: reliable, forbiddenPlayerNames };
+}
+
+const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+/** Nomes de jogadores proibidos que aparecem no texto (comparação sem acentos/maiúsculas). */
+export function mentionedPlayers(text: string, names: string[]): string[] {
+  const t = fold(text);
+  return [...new Set(names)].filter((n) => {
+    const re = new RegExp(`(^|[^a-z0-9])${fold(n).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`);
+    return re.test(t);
+  });
 }
 
 /** Pontuações do tipo "53-55" citadas no texto que não constam dos factos. */

@@ -3,6 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { createPublicClient } from "@/lib/supabase/public";
 import { markdownToHtml } from "@/lib/markdown";
+import { playerPointsReliable } from "@/lib/game-sheet/news-facts";
 import type { Metadata } from "next";
 import { ShareButtons } from "./_share-buttons";
 import { GamePhotoGallery } from "@/components/liga/game-photo-gallery";
@@ -77,6 +78,16 @@ async function getGamePlayerStats(gameId: string): Promise<PlayerStat[]> {
   return (data ?? []) as PlayerStat[];
 }
 
+async function getGameResult(gameId: string) {
+  const supabase = createPublicClient();
+  const { data } = await supabase
+    .from("league_game_results")
+    .select("home_score, away_score, home_unattributed_points, away_unattributed_points")
+    .eq("event_id", gameId)
+    .maybeSingle();
+  return data as { home_score: number; away_score: number; home_unattributed_points: number | null; away_unattributed_points: number | null } | null;
+}
+
 async function getRelated(currentId: string, limit = 3) {
   const supabase = createPublicClient();
   const { data } = await supabase
@@ -136,7 +147,7 @@ export default async function LigaNoticiaDetailPage({ params }: Props) {
   const article = await getArticle(slug);
   if (!article) notFound();
 
-  const [bodyHtml, related, galleryPhotos, periods, playerStats] = await Promise.all([
+  const [bodyHtml, related, galleryPhotos, periods, rawPlayerStats, gameResult] = await Promise.all([
     Promise.resolve(markdownToHtml(article.body)),
     getRelated(article.id),
     article.game_id
@@ -144,7 +155,20 @@ export default async function LigaNoticiaDetailPage({ params }: Props) {
       : Promise.resolve([] as GalleryPhoto[]),
     article.game_id ? getGamePeriods(article.game_id) : Promise.resolve([] as GamePeriod[]),
     article.game_id ? getGamePlayerStats(article.game_id) : Promise.resolve([] as PlayerStat[]),
+    article.game_id ? getGameResult(article.game_id) : Promise.resolve(null),
   ]);
+
+  // Pontos individuais só são mostrados se a leitura da folha bater certo com o resultado
+  const playerStats =
+    gameResult &&
+    playerPointsReliable({
+      homeScore: gameResult.home_score,
+      awayScore: gameResult.away_score,
+      players: rawPlayerStats,
+      unattributed: { home: gameResult.home_unattributed_points, away: gameResult.away_unattributed_points },
+    })
+      ? rawPlayerStats
+      : [];
 
   const canonicalUrl = `https://www.hoophub.pt/liga-inatel/noticias/${slug}`;
 

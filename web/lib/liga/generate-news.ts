@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { computeStandings, groupStandingsBySeries, normalizeName } from "@/types/competitions";
 import { deepseekJSON } from "@/lib/deepseek";
-import { buildNewsFacts, unknownScores } from "@/lib/game-sheet/news-facts";
+import { buildNewsFacts, mentionedPlayers, unknownScores } from "@/lib/game-sheet/news-facts";
 
 function slugify(text: string): string {
   return text
@@ -118,16 +118,18 @@ async function prepareNews(gameId: string) {
     .limit(1)
     .maybeSingle();
 
-  let topScorers = "";
+  // Submissões antigas sem estatísticas na BD: jogadores vindos da extração revista
+  type RawPlayer = { nome: string; pontos: number; equipa: string };
+  let rawPlayers: { nome: string; side: "home" | "away"; pontos: number }[] = [];
   if (submission?.extraction_raw) {
     try {
-      const raw = submission.extraction_raw as { jogadores?: { nome: string; pontos: number; equipa: string }[] };
-      const sorted = (raw.jogadores ?? [])
-        .filter((j) => j.pontos > 0)
-        .sort((a, b) => b.pontos - a.pontos)
-        .slice(0, 4);
-      if (sorted.length > 0)
-        topScorers = sorted.map((j) => `${j.nome} (${j.pontos} pts, ${j.equipa})`).join(", ");
+      const raw = submission.extraction_raw as { jogadores?: RawPlayer[] };
+      rawPlayers = (raw.jogadores ?? []).map((j) => {
+        const eq = normalizeName(j.equipa ?? "");
+        // equipa não identificável → lado inválido, a soma não bate e os pontos são descartados
+        const side = eq === homeNorm ? "home" : eq === awayNorm ? "away" : ("?" as "home");
+        return { nome: j.nome, side, pontos: Number(j.pontos) || 0 };
+      });
     } catch { /* ignore */ }
   }
 
@@ -140,13 +142,11 @@ async function prepareNews(gameId: string) {
     homeScore: result.home_score,
     awayScore: result.away_score,
     periods,
-    players: dbPlayers,
+    players: dbPlayers.length > 0 ? dbPlayers : rawPlayers,
     unattributed: result.home_unattributed_points != null || result.away_unattributed_points != null
       ? { home: result.home_unattributed_points ?? null, away: result.away_unattributed_points ?? null }
       : null,
   });
-  // Submissões antigas sem estatísticas na BD: destaques vindos da extração revista
-  const topScorersByTeamBlock = dbPlayers.length === 0 && topScorers ? `Destaques: ${topScorers}` : "";
 
   let jornadaInfo = "";
   try {
@@ -179,7 +179,6 @@ ${jornadaInfo}
 
 FACTOS VERIFICADOS:
 ${facts.lines.join("\n")}
-${topScorersByTeamBlock ? `\n${topScorersByTeamBlock}` : ""}
 ${submission?.notes ? `Notas: ${submission.notes}` : ""}
 ${photoCaptions ? `Descrição das fotografias do jogo: ${photoCaptions}` : ""}
 
@@ -223,6 +222,9 @@ export async function generateLigaNews(
     allowedScores.add(`${b}-${a}`);
   }
 
+  const adminText = `${customSystem}\n${customUser}`;
+  const forbiddenNames = facts.forbiddenPlayerNames.filter((n) => mentionedPlayers(adminText, [n]).length === 0);
+
   type NewsJSON = { titulo?: string; entrada?: string; corpo?: string };
   let newsData: NewsJSON | null = null;
   let feedback = "";
@@ -240,15 +242,20 @@ export async function generateLigaNews(
     // Verificação: o texto não pode citar pontuações que não constam dos factos
     const text = `${aiResult.data.titulo ?? ""}\n${aiResult.data.entrada ?? ""}\n${aiResult.data.corpo ?? ""}`;
     const bad = unknownScores(text, allowedScores);
-    if (bad.length === 0) {
+    // Leitura individual não fiável: a notícia não pode referir jogadores (salvo se o admin os escreveu no prompt)
+    const badPlayers = mentionedPlayers(text, forbiddenNames);
+    if (bad.length === 0 && badPlayers.length === 0) {
       newsData = aiResult.data;
     } else {
-      console.warn(`[generateLigaNews] pontuações não verificadas no texto (${bad.join(", ")}) — nova tentativa`);
-      feedback = `\n\nATENÇÃO: a versão anterior citou pontuações que não constam dos factos (${bad.join(", ")}). Remove-as.`;
+      console.warn(`[generateLigaNews] dados não verificados no texto (pontuações: ${bad.join(", ") || "-"}; jogadores: ${badPlayers.join(", ") || "-"}) — nova tentativa`);
+      const issues: string[] = [];
+      if (bad.length) issues.push(`citou pontuações que não constam dos factos (${bad.join(", ")})`);
+      if (badPlayers.length) issues.push(`mencionou jogadores (${badPlayers.join(", ")}) quando os pontos individuais não são fiáveis — não menciones nenhum jogador nem pontuações individuais`);
+      feedback = `\n\nATENÇÃO: a versão anterior ${issues.join(" e ")}. Corrige.`;
     }
   }
   if (!newsData) {
-    return { ok: false, error: "A notícia gerada citava dados não verificados — gere novamente ou escreva manualmente." };
+    return { ok: false, error: "A notícia gerada citava dados não verificados (pontuações ou jogadores) — gere novamente ou escreva manualmente." };
   }
 
   let titulo = (newsData.titulo ?? "").trim();

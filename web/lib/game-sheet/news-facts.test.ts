@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildNewsFacts, unknownScores } from "./news-facts";
+import { buildNewsFacts, mentionedPlayers, playerPointsReliable, unknownScores } from "./news-facts";
 
 const REF = {
   home: "PowerTogether",
@@ -34,16 +34,43 @@ describe("18. factos para a notícia (sem inventar)", () => {
     expect(f.lines.join("\n")).toContain("NÃO os uses");
   });
 
-  it("só marcadores confirmados e aviso de pontos por atribuir", () => {
+  it("caso PowerTogether 53–55: leitura individual falhada → sem jogadores na notícia", () => {
     const f = buildNewsFacts({
       ...REF,
-      players: [{ nome: "Ana", side: "home", pontos: 20, triplos: 2 }, { nome: "Rui", side: "away", pontos: 0 }],
-      unattributed: { home: 33, away: 55 },
+      players: [
+        { nome: "Luís Silva", side: "home", pontos: 21, triplos: 1 },
+        { nome: "Hong Sou", side: "home", pontos: 0 },
+        { nome: "Gonçalo Campos", side: "away", pontos: 15 },
+      ],
+      unattributed: { home: 32, away: 40 },
     });
     const text = f.lines.join("\n");
-    expect(text).toContain("Marcadores confirmados PowerTogether: Ana 20 pts (2 triplos)");
-    expect(text).not.toContain("Rui");
-    expect(text).toContain("33 ponto(s) sem marcador identificado");
+    expect(f.playerPointsReliable).toBe(false);
+    expect(text).not.toContain("Marcadores confirmados");
+    expect(text).not.toContain("Luís Silva");
+    expect(text).toContain("NÃO menciones jogadores");
+    expect(f.forbiddenPlayerNames).toContain("Luís Silva");
+    expect(mentionedPlayers("Luis Silva foi o melhor marcador.", f.forbiddenPlayerNames)).toEqual(["Luís Silva"]);
+    expect(mentionedPlayers("O Matosinhos venceu o 4.º período 17-6.", f.forbiddenPlayerNames)).toEqual([]);
+  });
+
+  it("soma que não bate mesmo sem pontos por atribuir registados → descartado", () => {
+    expect(playerPointsReliable({ homeScore: 53, awayScore: 55, players: [{ side: "home", pontos: 50 }, { side: "away", pontos: 55 }] })).toBe(false);
+  });
+
+  it("leitura completa e coerente → marcadores confirmados", () => {
+    const f = buildNewsFacts({
+      ...REF,
+      players: [
+        { nome: "Ana", side: "home", pontos: 33, triplos: 2 },
+        { nome: "Bia", side: "home", pontos: 20 },
+        { nome: "Rui", side: "away", pontos: 55 },
+      ],
+    });
+    const text = f.lines.join("\n");
+    expect(f.playerPointsReliable).toBe(true);
+    expect(text).toContain("Marcadores confirmados PowerTogether: Ana 33 pts (2 triplos), Bia 20 pts");
+    expect(f.forbiddenPlayerNames).toEqual([]);
   });
 
   it("deteta pontuações citadas que não constam dos factos", () => {
