@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MessageSquare } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useChatThreads } from "@/hooks/use-chat-threads";
@@ -8,6 +8,7 @@ import { useChatMessages } from "@/hooks/use-chat-messages";
 import { ThreadList } from "./thread-list";
 import { ChatWindow } from "./chat-window";
 import { EventPanel } from "./event-panel";
+import { setActiveChatId as registerActiveChat } from "@/lib/chat/active-chat";
 import type { EventGameThread, EventTrainingThread } from "@/types/database";
 
 export function ChatLayout() {
@@ -15,6 +16,18 @@ export function ChatLayout() {
   const { threads, loading: threadsLoading, createDirect } = useChatThreads();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [showPanel, setShowPanel]       = useState(true);
+
+  // Diz à notificação qual a conversa aberta (não avisa sobre essa)
+  useEffect(() => {
+    registerActiveChat(activeChatId);
+    return () => registerActiveChat(null);
+  }, [activeChatId]);
+
+  // Ligação direta: /chat?chat=<id> abre essa conversa
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("chat");
+    if (id) setActiveChatId(id);
+  }, []);
 
   const activeThread = threads.find((t) => t.id === activeChatId) ?? null;
   const msgHook      = useChatMessages(activeChatId);
@@ -93,7 +106,7 @@ export function ChatLayout() {
             Seleciona uma conversa
           </p>
           <p className="text-[13px]" style={{ color: "rgba(169,180,199,.25)" }}>
-            Cada jogo e treino abre um fio automático.
+            A conversa de cada jogo abre 7 dias antes e fecha 2 dias depois.
           </p>
         </div>
       )}

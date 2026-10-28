@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { toast } from "@/components/ui/toaster";
+import { getActiveChatId } from "@/lib/chat/active-chat";
 
 // ── Singleton de subscrição Realtime ─────────────────────────────────────────
 //
@@ -17,9 +19,12 @@ import { createClient } from "@/lib/supabase/client";
 // _setup() é idempotente (guarda por _ready).
 
 type Listener = (count: number) => void;
+type UnreadChat = { chat_id: string; name: string; unread: number };
 
 let _count       = 0;
 let _ready       = false;           // true após o primeiro subscribe()
+let _primed      = false;           // true após a 1.ª carga (evita avisar por mensagens antigas)
+let _prevByChat  = new Map<string, number>();
 const _listeners = new Set<Listener>();
 
 function _dispatch(count: number) {
@@ -27,14 +32,58 @@ function _dispatch(count: number) {
   _listeners.forEach((fn) => fn(count));
 }
 
+// Notificação: aparece um aviso quando chegam mensagens novas a uma conversa
+// que não está aberta. O badge e o contador no título do separador mantêm-se
+// enquanto houver mensagens por ler.
+function _notify(chats: UnreadChat[]) {
+  const active = getActiveChatId();
+  for (const c of chats) {
+    const before = _prevByChat.get(c.chat_id) ?? 0;
+    if (c.unread > before && c.chat_id !== active) {
+      const novas = c.unread - before;
+      toast({
+        title: `Nova mensagem · ${c.name}`,
+        description: c.unread === 1
+          ? "Tens 1 mensagem por ler."
+          : `Tens ${c.unread} mensagens por ler${novas > 0 && before > 0 ? ` (${novas} nova${novas > 1 ? "s" : ""})` : ""}.`,
+      });
+    }
+  }
+  _prevByChat = new Map(chats.map((c) => [c.chat_id, c.unread]));
+}
+
 async function _load() {
   try {
     const res = await fetch("/api/chat/unread-count", { cache: "no-store" });
     if (res.ok) {
-      const { unread_count } = await res.json();
+      const { unread_count, chats } = await res.json() as { unread_count?: number; chats?: UnreadChat[] };
+      const list = chats ?? [];
+      if (_primed) {
+        _notify(list);
+      } else {
+        _prevByChat = new Map(list.map((c) => [c.chat_id, c.unread]));
+        // Ao abrir a app com mensagens por ler: um único aviso-resumo
+        const total = unread_count ?? 0;
+        if (total > 0 && !list.some((c) => c.chat_id === getActiveChatId())) {
+          toast({
+            title: "Mensagens por ler",
+            description: total === 1
+              ? "Tens 1 mensagem por ler no chat."
+              : `Tens ${total} mensagens por ler no chat.`,
+          });
+        }
+      }
+      _primed = true;
       _dispatch(unread_count ?? 0);
     }
   } catch { /* silencioso — badge fica no valor anterior */ }
+}
+
+// "(3) Título" no separador do browser enquanto houver mensagens por ler
+function _setTitleCount(count: number) {
+  if (typeof document === "undefined") return;
+  const base = document.title.replace(/^\(\d+\)\s/, "");
+  document.title = count > 0 ? `(${count}) ${base}` : base;
 }
 
 function _setup() {
@@ -64,6 +113,8 @@ export function useUnreadChatCount(): number {
     setCount(_count);            // sincroniza caso _count mudou antes do mount
     return () => { _listeners.delete(setCount); }; // limpa ao desmontar
   }, []); // sem dependências — o singleton garante consistência entre instâncias
+
+  useEffect(() => { _setTitleCount(count); }, [count]);
 
   return count;
 }
