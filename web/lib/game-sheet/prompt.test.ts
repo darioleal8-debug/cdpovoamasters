@@ -15,7 +15,7 @@ describe("buildSystemPrompt com instruções do admin", () => {
   });
 
   test("limita o tamanho das instruções", () => {
-    const p = buildSystemPrompt("inatel-fiba", "x".repeat(MAX_ADMIN_INSTRUCTIONS + 500));
-    expect(p.match(/x/g)!.length).toBe(MAX_ADMIN_INSTRUCTIONS);
+    const p = buildSystemPrompt("inatel-fiba", "§".repeat(MAX_ADMIN_INSTRUCTIONS + 500));
+    expect(p.match(/§/g)!.length).toBe(MAX_ADMIN_INSTRUCTIONS);
   });
 });
