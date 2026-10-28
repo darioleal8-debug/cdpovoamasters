@@ -16,6 +16,8 @@ export function visionConfig() {
   return {
     model: process.env.DEEPSEEK_VISION_MODEL || "deepseek-flash",
     secondPass: (process.env.GAME_SHEET_SECOND_PASS ?? "on") !== "off",
+    /** Raciocínio do modelo na leitura completa (GAME_SHEET_THINKING=on). Mais preciso, mais lento. */
+    thinking: process.env.GAME_SHEET_THINKING === "on",
     maxAnalyses: num(process.env.GAME_SHEET_MAX_ANALYSES, 3),
     maxOutputTokens: num(process.env.GAME_SHEET_MAX_OUTPUT_TOKENS, 8192),
     timeBudgetMs: num(process.env.GAME_SHEET_TIME_BUDGET_MS, 50_000),
@@ -72,6 +74,7 @@ export async function analyzeGameSheet(input: {
       { type: "text", text: buildUserPrompt(input.game) },
     ],
     temperature: 0,
+    thinking: cfg.thinking,
     maxTokens: cfg.maxOutputTokens,
     maxRetryTokens: cfg.maxOutputTokens * 2,
     timeoutMs: Math.max(10_000, cfg.timeBudgetMs - 5_000),

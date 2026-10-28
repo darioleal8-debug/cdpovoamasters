@@ -101,6 +101,17 @@ describe("analyzeGameSheet", () => {
     expect(r.ok && r.usage.calls.length).toBe(1);
   });
 
+  it("raciocínio desligado por omissão e ligado com GAME_SHEET_THINKING=on", async () => {
+    process.env.GAME_SHEET_SECOND_PASS = "off";
+    vi.mocked(fetch).mockImplementation(async () => apiResponse(AI_OK));
+    await analyzeGameSheet({ image: await sheetImage(), game: GAME });
+    process.env.GAME_SHEET_THINKING = "on";
+    await analyzeGameSheet({ image: await sheetImage(), game: GAME });
+    delete process.env.GAME_SHEET_THINKING;
+    const thinking = vi.mocked(fetch).mock.calls.map((c) => JSON.parse((c[1] as RequestInit).body as string).thinking.type);
+    expect(thinking).toEqual(["disabled", "enabled"]);
+  });
+
   it("modelo sem suporte a imagens dá erro claro (sem trocar de modelo em silêncio)", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(apiResponse("unknown variant `image_url`, expected `text`", 400));
     const r = await analyzeGameSheet({ image: await sheetImage(), game: GAME });

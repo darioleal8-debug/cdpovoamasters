@@ -18,6 +18,8 @@ export interface DeepSeekJSONOptions {
   transientRetries?: number;
   /** Limite de tokens no retry por finish_reason=length (default 32 768) */
   maxRetryTokens?: number;
+  /** Ativa o modo de raciocínio do modelo (default false — mais lento e gasta mais tokens) */
+  thinking?: boolean;
 }
 
 export type DeepSeekJSONResult<T> =
@@ -65,7 +67,7 @@ function hasImagePart(user: string | MessagePart[]): boolean {
 /**
  * Wrapper partilhado para chamadas à API DeepSeek que devolvem JSON.
  * - Modelo: DEEPSEEK_MODEL env (default "deepseek-v4-flash")
- * - Thinking desligado explicitamente (evita consumo de tokens de raciocínio)
+ * - Thinking desligado por omissão (opts.thinking liga-o)
  * - response_format json_object
  * - Retry automático com 2× max_tokens se finish_reason=length
  * - Remove ```json fences antes do JSON.parse
@@ -112,7 +114,7 @@ export async function deepseekJSONDetailed<T = Record<string, unknown>>(
           model,
           messages,
           response_format: { type: "json_object" },
-          thinking: { type: "disabled" },
+          thinking: { type: opts.thinking ? "enabled" : "disabled" },
           temperature: opts.temperature ?? 0.4,
           max_tokens: maxTok,
         }),
