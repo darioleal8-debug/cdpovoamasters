@@ -179,7 +179,14 @@ export async function POST(
   const chat = await canSeeChat(admin, chatId, caller.id, caller.role);
   if (!chat) return fail("Sem permissão", 403);
 
-  if (chat.status === "archived") return fail("Este fio está arquivado e é só de leitura", 403);
+  if (chat.status === "archived") return fail("Esta conversa está fechada e é só de leitura", 403);
+
+  // Conversas de jogo: validar a janela (abre 7 dias antes, fecha 2 dias depois)
+  // em tempo real, sem esperar pelo próximo ciclo de sincronização.
+  const { data: writable } = await admin.rpc("chat_is_writable", { p_chat: chatId });
+  if (writable === false) {
+    return fail("A conversa deste jogo está fechada (ou ainda não abriu)", 403);
+  }
 
   // Verificar se pode escrever
   if (caller.role !== "admin" && chat.post_policy === "admin_only") {
