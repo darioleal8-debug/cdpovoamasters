@@ -148,7 +148,7 @@ export default function LigaInatelLayout({ children }: { children: React.ReactNo
         /* ── Header layout ── */
         .liga-nav-wrap { flex: 1; overflow: hidden; }
         .liga-desktop-cta { display: flex; align-items: center; gap: 8px; }
-        .liga-mobile-bar  { display: none; align-items: center; gap: 8px; flex-shrink: 0; }
+        .liga-mobile-bar  { display: none; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto; }
         .liga-hamburger {
           display: flex; align-items: center; justify-content: center;
           padding: 8px; min-width: 44px; min-height: 44px;

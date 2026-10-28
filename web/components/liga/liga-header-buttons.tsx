@@ -176,6 +176,29 @@ export function LigaHeaderButtons() {
 
       {/* ── Mobile bar: compact CTA + hamburger (≤768px) ─────── */}
       <div className="liga-mobile-bar">
+        {team ? (
+          <Link
+            href="/liga-inatel/equipa"
+            aria-label={`Área de equipa — ${team.name}`}
+            style={{ ...secondaryBtn, padding: "6px 10px", fontSize: "11px" }}
+          >
+            {team.logo_url ? (
+              <img src={team.logo_url} alt="" style={{ width: 14, height: 14, objectFit: "contain", borderRadius: 2 }} aria-hidden />
+            ) : (
+              <ShieldCheck size={12} aria-hidden />
+            )}
+            {teamLabel}
+          </Link>
+        ) : (
+          <Link
+            href="/liga-inatel/equipa/login"
+            aria-label="Login de delegado de equipa"
+            style={{ ...secondaryBtn, padding: "6px 12px", fontSize: "11px" }}
+          >
+            <ShieldCheck size={12} aria-hidden />
+            Login
+          </Link>
+        )}
         <button
           className="liga-hamburger"
           onClick={() => setMenuOpen((v) => !v)}
