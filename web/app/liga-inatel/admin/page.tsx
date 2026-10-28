@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { TeamKitEditor } from "@/components/liga/team-kit-editor";
 import { AdminGameSheets } from "@/components/liga/admin-game-sheets";
 import { NewsPromptDialog } from "@/components/liga/news-prompt-dialog";
+import { LigaAnalyticsPanel } from "@/components/liga/liga-analytics-panel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -187,7 +188,7 @@ export default function LigaAdminPage() {
   const [restoring, setRestoring]             = useState<string | null>(null);
 
   // Team access tab
-  const [activeTab, setActiveTab]             = useState<"games" | "access" | "noticias" | "equipas">("games");
+  const [activeTab, setActiveTab]             = useState<"games" | "access" | "noticias" | "equipas" | "estatisticas">("games");
 
   // Season teams tab
   const [seasonTeams, setSeasonTeams]         = useState<SeasonTeamEntry[]>([]);
@@ -724,8 +725,8 @@ export default function LigaAdminPage() {
       </div>
 
       {/* ── Tab switcher ── */}
-      <div style={{ display: "flex", gap: "0", marginBottom: "24px", borderBottom: "2px solid #E8E0D6" }}>
-        {(["games", "access", "noticias", "equipas"] as const).map(tab => (
+      <div style={{ display: "flex", gap: "0", marginBottom: "24px", borderBottom: "2px solid #E8E0D6", overflowX: "auto" }}>
+        {(["games", "access", "noticias", "equipas", "estatisticas"] as const).map(tab => (
           <button key={tab}
             onClick={() => {
               setActiveTab(tab);
@@ -734,14 +735,14 @@ export default function LigaAdminPage() {
               if (tab === "equipas" && seasonTeams.length === 0) loadSeasonTeams();
             }}
             style={{
-              padding: "8px 20px", fontWeight: 700, fontSize: "12px",
+              padding: "8px 20px", fontWeight: 700, fontSize: "12px", whiteSpace: "nowrap",
               letterSpacing: "0.06em", textTransform: "uppercase",
               border: "none", background: "none", cursor: "pointer",
               color: activeTab === tab ? "#F97316" : "#8C837A",
               borderBottom: `2px solid ${activeTab === tab ? "#F97316" : "transparent"}`,
               marginBottom: "-2px",
             }}>
-            {tab === "games" ? "Jogos" : tab === "access" ? "Acessos das Equipas" : tab === "noticias" ? "Notícias" : "Equipas"}
+            {tab === "games" ? "Jogos" : tab === "access" ? "Acessos das Equipas" : tab === "noticias" ? "Notícias" : tab === "equipas" ? "Equipas" : "Estatísticas"}
           </button>
         ))}
       </div>
@@ -1934,6 +1935,9 @@ export default function LigaAdminPage() {
           </div>
         </div>
       )}
+
+      {/* ── Estatísticas tab ── */}
+      {activeTab === "estatisticas" && <LigaAnalyticsPanel />}
 
       {/* ── Equipas tab ── */}
       {activeTab === "equipas" && (

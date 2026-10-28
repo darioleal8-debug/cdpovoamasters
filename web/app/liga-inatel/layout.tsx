@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Barlow_Condensed, IBM_Plex_Mono } from "next/font/google";
 import { CompNav } from "@/components/competitions/comp-nav";
 import { LigaHeaderButtons } from "@/components/liga/liga-header-buttons";
+import { LigaTracker } from "@/components/liga/liga-tracker";
 
 // Peso 800 (não carregado no root layout)
 const bcHeavy = Barlow_Condensed({
@@ -227,6 +228,7 @@ export default function LigaInatelLayout({ children }: { children: React.ReactNo
       `}</style>
 
       {/* Conteúdo */}
+      <LigaTracker />
       <main style={{ flex: 1 }}>{children}</main>
 
       {/* Rodapé */}
