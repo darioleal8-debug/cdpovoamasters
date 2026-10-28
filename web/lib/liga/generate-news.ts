@@ -23,7 +23,8 @@ export type NewsContext = {
   jornadaInfo: string;
 };
 
-const NEWS_SYSTEM = `Escreves notícias de jornalismo desportivo local em português de Portugal sobre basquetebol da Liga INATEL Masters.
+/** Parte editável pelo admin: tom, estrutura e restrições editoriais. */
+export const NEWS_STYLE = `Escreves notícias de jornalismo desportivo local em português de Portugal sobre basquetebol da Liga INATEL Masters.
 Usa APENAS os factos fornecidos — nunca inventes dados.
 Tom entusiasta mas sóbrio. Português europeu (não do Brasil).
 
@@ -37,18 +38,24 @@ Estrutura do corpo (proporcional aos dados disponíveis — omite secções sem 
 
 PROIBIDO inventar: declarações de jogadores ou treinadores, lesões, arbitragem, táticas, emoções, corridas de pontos
 dentro de um período, estatísticas não fornecidas, consequências competitivas não indicadas. Não cites pontuações que
-não constem dos factos.
+não constem dos factos.`;
 
-Responde APENAS com JSON válido (sem markdown) com este esquema:
+/** Formato de resposta: fixo (a aplicação precisa de JSON), acrescentado a qualquer prompt. */
+export const NEWS_FORMAT = `Responde APENAS com JSON válido (sem markdown) com este esquema:
 {
   "titulo": "título apelativo mas factual (máx. 80 caracteres)",
   "entrada": "1-2 frases de entrada/lide com o resultado (máx. 200 caracteres; serve também de descrição SEO)",
   "corpo": "corpo da notícia, 120-400 palavras, em parágrafos separados por linha em branco"
 }`;
 
-export async function generateLigaNews(
-  gameId: string
-): Promise<{ ok: true; news_id: string; newsContext: NewsContext } | { ok: false; error: string }> {
+export type NewsPromptOverrides = {
+  /** Substitui as instruções editoriais (NEWS_STYLE). O formato JSON é sempre acrescentado. */
+  systemPrompt?: string;
+  /** Substitui o pedido completo (factos + regras) enviado ao modelo. */
+  userPrompt?: string;
+};
+
+async function prepareNews(gameId: string) {
   const adminClient = await createAdminClient();
 
   const [eventRes, resultRes, compRes, periodsRes, playerStatsRes] = await Promise.all([
@@ -63,7 +70,7 @@ export async function generateLigaNews(
   const result = resultRes.data;
   if (!event || !result) {
     console.error(`[generateLigaNews] jogo ou resultado não encontrado para game_id=${gameId}`);
-    return { ok: false, error: "Jogo ou resultado não encontrado" };
+    return { ok: false as const, error: "Jogo ou resultado não encontrado" };
   }
 
   const { data: allResults } = await adminClient
@@ -183,12 +190,45 @@ Regras:
 - Menciona o contexto da jornada e o impacto na classificação se relevante (a classificação é por série — refere a série, ex.: "na Série B", e nunca compares com equipas de outras séries)
 - Usa APENAS os dados fornecidos acima — nunca inventes pontuações, nomes ou factos`;
 
+  return { ok: true as const, adminClient, event, result, submission, facts, jornadaInfo, scoreStr, userPrompt };
+}
+
+/** Prompts por defeito de um jogo, para o admin os ver e editar antes de gerar. */
+export async function getDefaultNewsPrompts(
+  gameId: string
+): Promise<{ ok: true; system: string; user: string; format: string } | { ok: false; error: string }> {
+  const prep = await prepareNews(gameId);
+  if (!prep.ok) return prep;
+  return { ok: true, system: NEWS_STYLE, user: prep.userPrompt, format: NEWS_FORMAT };
+}
+
+export async function generateLigaNews(
+  gameId: string,
+  overrides: NewsPromptOverrides = {}
+): Promise<{ ok: true; news_id: string; newsContext: NewsContext } | { ok: false; error: string }> {
+  const prep = await prepareNews(gameId);
+  if (!prep.ok) return prep;
+  const { adminClient, event, result, submission, facts, jornadaInfo, scoreStr, userPrompt: defaultUserPrompt } = prep;
+
+  const customSystem = overrides.systemPrompt?.trim() ?? "";
+  const customUser = overrides.userPrompt?.trim() ?? "";
+  const system = `${customSystem || NEWS_STYLE}\n\n${NEWS_FORMAT}`;
+  const userPrompt = customUser || defaultUserPrompt;
+
+  // Pontuações escritas pelo próprio admin no prompt contam como factos permitidos
+  const allowedScores = new Set(facts.allowedScores);
+  for (const sc of unknownScores(`${customSystem}\n${customUser}`, new Set())) {
+    const [a, b] = sc.split("-");
+    allowedScores.add(`${a}-${b}`);
+    allowedScores.add(`${b}-${a}`);
+  }
+
   type NewsJSON = { titulo?: string; entrada?: string; corpo?: string };
   let newsData: NewsJSON | null = null;
   let feedback = "";
   for (let attempt = 0; attempt < 2 && !newsData; attempt++) {
     const aiResult = await deepseekJSON<NewsJSON>({
-      system: NEWS_SYSTEM,
+      system,
       user: userPrompt + feedback,
       maxTokens: 4096,
       temperature: attempt === 0 ? 0.4 : 0.2,
@@ -199,7 +239,7 @@ Regras:
     }
     // Verificação: o texto não pode citar pontuações que não constam dos factos
     const text = `${aiResult.data.titulo ?? ""}\n${aiResult.data.entrada ?? ""}\n${aiResult.data.corpo ?? ""}`;
-    const bad = unknownScores(text, facts.allowedScores);
+    const bad = unknownScores(text, allowedScores);
     if (bad.length === 0) {
       newsData = aiResult.data;
     } else {

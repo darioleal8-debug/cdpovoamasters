@@ -78,6 +78,8 @@ export function GameSheetReview({ importId, backHref }: { importId: string; back
   // Admin da liga: aplicar o boletim diretamente ao jogo
   const [motivo, setMotivo] = useState("");
   const [regenNews, setRegenNews] = useState(false);
+  // Admin da liga: instruções livres para a IA ao reanalisar a imagem
+  const [aiInstructions, setAiInstructions] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [ack, setAck] = useState(false);
@@ -218,7 +220,11 @@ export function GameSheetReview({ importId, backHref }: { importId: string; back
       }
       const res = await fetch(`/api/liga/equipa/game-sheet/imports/${view.id}/${kind}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(kind === "confirm" ? { acknowledge_warnings: ack, notes, version: current.updated_at } : {}),
+        body: JSON.stringify(
+          kind === "confirm" ? { acknowledge_warnings: ack, notes, version: current.updated_at }
+            : kind === "reanalyze" && view.is_liga_admin && aiInstructions.trim() ? { instructions: aiInstructions.trim() }
+            : {},
+        ),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Erro");
@@ -654,6 +660,29 @@ export function GameSheetReview({ importId, backHref }: { importId: string; back
         {error && <div role="alert" style={{ ...card, background: C.errBg, borderColor: "#FECACA", color: C.err, fontSize: 13, marginBottom: 12 }}>{error}</div>}
         {notice && <div role="status" style={{ ...card, background: C.okBg, borderColor: "#A7F3D0", color: C.ok, fontSize: 13, marginBottom: 12 }}>{notice}</div>}
 
+        {showAdminActions && view.status !== "confirmed" && (
+          <details style={{ ...card, marginBottom: 12 }} open={aiInstructions.trim().length > 0}>
+            <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
+              Não está contente com a leitura da IA? Dê-lhe instruções
+            </summary>
+            <p style={{ fontSize: 12, color: C.muted, margin: "8px 0" }}>
+              Escreva o que a IA deve ter em conta ao reler a folha (ex.: &quot;a equipa A é a visitante&quot;, &quot;o jogador n.º 7 é o Rui Costa&quot;,
+              &quot;o 3.º período termina em 41-38&quot;, &quot;os acumulados a azul são do 2.º período&quot;). As instruções têm prioridade sobre as
+              convenções por defeito; a IA continua a não poder inventar o que não está na folha. Use depois &quot;Reanalisar imagem&quot;
+              (com instruções não há limite de análises).
+            </p>
+            <textarea
+              value={aiInstructions}
+              maxLength={4000}
+              rows={6}
+              onChange={(e) => setAiInstructions(e.target.value)}
+              placeholder="Instruções para a IA…"
+              style={{ ...inp("100%"), fontSize: 12, padding: "8px", lineHeight: 1.45, resize: "vertical", boxSizing: "border-box" }}
+            />
+            <p style={{ fontSize: 11, color: C.muted, margin: "4px 0 0" }}>{aiInstructions.length}/4000</p>
+          </details>
+        )}
+
         {wide ? (
           <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 5fr) minmax(0, 7fr)", gap: 14, alignItems: "start" }}>
             {imagePanel}
@@ -735,8 +764,8 @@ export function GameSheetReview({ importId, backHref }: { importId: string; back
                 {busy === "save" ? "A guardar…" : "Guardar rascunho"}
               </button>
               <button
-                style={btn("ghost", busy !== null || view.analysis_count >= view.max_analyses || view.status === "confirmed")}
-                disabled={busy !== null || view.analysis_count >= view.max_analyses || view.status === "confirmed"}
+                style={btn("ghost", busy !== null || (view.analysis_count >= view.max_analyses && !aiInstructions.trim()) || view.status === "confirmed")}
+                disabled={busy !== null || (view.analysis_count >= view.max_analyses && !aiInstructions.trim()) || view.status === "confirmed"}
                 onClick={() => {
                   if (dirty || view.corrections.length > 0) {
                     if (!window.confirm("Reanalisar substitui os dados atuais (incluindo correções manuais). Continuar?")) return;
@@ -744,7 +773,7 @@ export function GameSheetReview({ importId, backHref }: { importId: string; back
                   void call("reanalyze");
                 }}
               >
-                {busy === "reanalyze" ? "A reanalisar… (até 1 min)" : `Reanalisar imagem (${view.analysis_count}/${view.max_analyses})`}
+                {busy === "reanalyze" ? "A reanalisar… (até 1 min)" : aiInstructions.trim() ? `Reanalisar com as minhas instruções (${view.analysis_count})` : `Reanalisar imagem (${view.analysis_count}/${view.max_analyses})`}
               </button>
               <button
                 style={{ ...btn("primary", busy !== null || !canConfirm || !motivo.trim()), flex: 1, minWidth: 200 }}

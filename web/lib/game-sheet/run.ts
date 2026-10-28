@@ -13,9 +13,14 @@ export async function runAndStore(
   image: Buffer,
   game: GameInfo,
   previousCount: number,
+  adminInstructions?: string,
 ): Promise<{ ok: boolean; error?: string; kind?: string }> {
   const cfg = visionConfig();
-  const result = await analyzeGameSheet({ image, game: { home: game.home, away: game.away, date: game.date } });
+  const result = await analyzeGameSheet({
+    image,
+    game: { home: game.home, away: game.away, date: game.date },
+    adminInstructions,
+  });
 
   if (!result.ok) {
     // Falha: o rascunho fica disponível para preenchimento manual (sem inventar dados)
@@ -46,7 +51,11 @@ export async function runAndStore(
     schema_version: SHEET_SCHEMA_VERSION,
     processing_version: PROCESSING_VERSION,
     model: cfg.model,
-    extraction_raw: { ...result.ai, rechecked_event_ids: result.recheckedEventIds },
+    extraction_raw: {
+      ...result.ai,
+      rechecked_event_ids: result.recheckedEventIds,
+      ...(adminInstructions?.trim() ? { admin_instructions: adminInstructions.trim() } : {}),
+    },
     sheet_data: sheet,
     validation: analysis,
     ai_usage: result.usage,
@@ -65,9 +74,16 @@ export type ReanalyzeResult =
  * Volta a analisar a imagem guardada de uma importação: bloqueia (status 'processing', com
  * concorrência otimista), descarrega a imagem original e corre a análise.
  */
-export async function reanalyzeImport(access: Access, row: ImportRow, game: GameInfo): Promise<ReanalyzeResult> {
+export async function reanalyzeImport(
+  access: Access,
+  row: ImportRow,
+  game: GameInfo,
+  opts: { instructions?: string } = {},
+): Promise<ReanalyzeResult> {
   const { maxAnalyses } = visionConfig();
-  if (row.analysis_count >= maxAnalyses) {
+  // O admin da liga não fica preso ao limite quando dá instruções à IA (é a forma de corrigir a leitura)
+  const adminOverride = access.isLigaAdmin && Boolean(opts.instructions?.trim());
+  if (row.analysis_count >= maxAnalyses && !adminOverride) {
     return { ok: false, status: 429, error: `Limite de ${maxAnalyses} análises atingido para este boletim. Corrija os dados manualmente.` };
   }
   if (!row.image_path) return { ok: false, status: 404, error: "Imagem original indisponível" };
@@ -89,6 +105,6 @@ export async function reanalyzeImport(access: Access, row: ImportRow, game: Game
     return { ok: false, status: 500, error: "Não foi possível obter a imagem original" };
   }
 
-  const run = await runAndStore(access, row.id, Buffer.from(await blob.arrayBuffer()), game, row.analysis_count);
+  const run = await runAndStore(access, row.id, Buffer.from(await blob.arrayBuffer()), game, row.analysis_count, opts.instructions);
   return { ok: true, error: run.ok ? undefined : run.error, kind: run.kind };
 }

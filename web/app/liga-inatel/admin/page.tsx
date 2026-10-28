@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TeamKitEditor } from "@/components/liga/team-kit-editor";
 import { AdminGameSheets } from "@/components/liga/admin-game-sheets";
+import { NewsPromptDialog } from "@/components/liga/news-prompt-dialog";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -158,6 +159,7 @@ export default function LigaAdminPage() {
   const [subMotivo, setSubMotivo]     = useState<Record<string, string>>({});
   const [regenerating, setRegenerating] = useState<string | null>(null);
   const [regenMsg, setRegenMsg]       = useState<Record<string, string>>({});
+  const [promptGameId, setPromptGameId] = useState<string | null>(null);
 
   // Edit game modal
   const [editingGame, setEditingGame]         = useState<AdminGame | null>(null);
@@ -688,6 +690,16 @@ export default function LigaAdminPage() {
 
   return (
     <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "24px 16px 64px" }}>
+      {promptGameId && (
+        <NewsPromptDialog
+          gameId={promptGameId}
+          onClose={() => setPromptGameId(null)}
+          onDone={(msg) => {
+            setRegenMsg((m) => ({ ...m, [promptGameId]: msg }));
+            setPromptGameId(null);
+          }}
+        />
+      )}
       {/* ── Header ── */}
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "24px" }}>
         <div>
@@ -958,6 +970,18 @@ export default function LigaAdminPage() {
                             }}
                           >
                             {regenerating === selectedGame.id ? "A gerar…" : "⟳ Regenerar notícia"}
+                          </button>
+                          <button
+                            onClick={() => setPromptGameId(selectedGame.id)}
+                            disabled={regenerating === selectedGame.id}
+                            title="Não está contente com a notícia? Escreva o seu próprio prompt para o DeepSeek."
+                            style={{
+                              marginLeft: "6px", padding: "7px 14px", background: "#FFFDFA", color: "#1A1612",
+                              fontWeight: 600, fontSize: "12px", border: "1.5px solid #E8E0D6", borderRadius: "6px",
+                              cursor: regenerating === selectedGame.id ? "not-allowed" : "pointer",
+                            }}
+                          >
+                            ✎ Com prompt personalizado
                           </button>
                           {regenMsg[selectedGame.id] && (
                             <p style={{

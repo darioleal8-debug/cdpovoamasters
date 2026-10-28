@@ -35,7 +35,25 @@ export const LAYOUTS: Record<string, SheetLayout> = {
 
 export const DEFAULT_LAYOUT = "inatel-fiba";
 
-export function buildSystemPrompt(layoutId: string = DEFAULT_LAYOUT): string {
+export const MAX_ADMIN_INSTRUCTIONS = 4000;
+
+/**
+ * Instruções livres do admin da liga para uma releitura. Têm prioridade sobre as convenções
+ * e o procedimento, mas nunca alteram o formato JSON de resposta nem a regra de não inventar.
+ */
+function adminBlock(instructions?: string): string {
+  const text = instructions?.trim().slice(0, MAX_ADMIN_INSTRUCTIONS);
+  if (!text) return "";
+  return `
+
+INSTRUÇÕES DO ADMIN DA LIGA (têm prioridade sobre as convenções e o procedimento acima; usa-as para corrigir interpretações anteriores).
+Mantêm-se SEMPRE: o formato JSON de resposta e a regra de nunca inventar dados que não estejam na folha.
+"""
+${text}
+"""`;
+}
+
+export function buildSystemPrompt(layoutId: string = DEFAULT_LAYOUT, adminInstructions?: string): string {
   const layout = LAYOUTS[layoutId] ?? LAYOUTS[DEFAULT_LAYOUT];
   return `És um especialista em ler boletins oficiais de basquetebol (folhas de jogo manuscritas) e devolves dados estruturados em JSON.
 
@@ -81,7 +99,7 @@ Responde EXCLUSIVAMENTE com um objeto JSON válido (sem markdown) com este esque
   "imageQuality": { "legibility": 0.8, "wholeSheetVisible": true, "issues": ["reflexo no canto superior"] },
   "validation": { "notes": ["discrepâncias encontradas entre marcha, parciais e final"] }
 }
-"seq" é a ordem visual dentro da marcha da respetiva equipa (0, 1, 2, …).`;
+"seq" é a ordem visual dentro da marcha da respetiva equipa (0, 1, 2, …).${adminBlock(adminInstructions)}`;
 }
 
 export function buildUserPrompt(game: { home: string; away: string; date?: string | null }): string {

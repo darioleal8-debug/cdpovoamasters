@@ -49,6 +49,8 @@ function summarize(usage: VisionUsage, started: number): VisionUsage {
 export async function analyzeGameSheet(input: {
   image: Buffer;
   game: { home: string; away: string; date?: string | null };
+  /** Instruções livres do admin da liga (releitura dirigida). */
+  adminInstructions?: string;
 }): Promise<VisionResult> {
   const cfg = visionConfig();
   const started = Date.now();
@@ -66,7 +68,7 @@ export async function analyzeGameSheet(input: {
   // ── 1. Leitura completa ──
   const full = await deepseekJSONDetailed<unknown>({
     model: cfg.model,
-    system: buildSystemPrompt(DEFAULT_LAYOUT),
+    system: buildSystemPrompt(DEFAULT_LAYOUT, input.adminInstructions),
     user: [
       { type: "image_url", image_url: { url: dataUrl(prepared.buffer) } },
       { type: "text", text: buildUserPrompt(input.game) },
@@ -100,7 +102,7 @@ export async function analyzeGameSheet(input: {
     if (crop) {
       const recheck = await deepseekJSONDetailed<unknown>({
         model: cfg.model,
-        system: buildSystemPrompt(DEFAULT_LAYOUT),
+        system: buildSystemPrompt(DEFAULT_LAYOUT, input.adminInstructions),
         user: [
           { type: "image_url", image_url: { url: dataUrl(crop) } },
           {
