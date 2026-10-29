@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { PublicGame } from "@/types/competitions";
 import { TeamMono } from "./team-mono";
 import { teamAbbr } from "@/lib/liga/format";
+import { LiveBadge } from "./live-badge";
 
 const PT_MONTHS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 const PT_DAYS   = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
@@ -386,11 +387,18 @@ function GameRow({
               </span>
             </div>
           ) : (
-            <div style={{ background: "#F0EAE1", borderRadius: "6px", padding: "5px 10px" }}>
-              <span style={{ fontFamily: "var(--font-barlow-condensed, sans-serif)", fontWeight: 600, fontSize: "13px", letterSpacing: "0.04em", color: "#C2530A" }}>
-                vs
-              </span>
-            </div>
+            <LiveBadge
+              date={event_date}
+              time={event_time}
+              disabled={isPostponed}
+              fallback={
+                <div style={{ background: "#F0EAE1", borderRadius: "6px", padding: "5px 10px" }}>
+                  <span style={{ fontFamily: "var(--font-barlow-condensed, sans-serif)", fontWeight: 600, fontSize: "13px", letterSpacing: "0.04em", color: "#C2530A" }}>
+                    vs
+                  </span>
+                </div>
+              }
+            />
           )}
           {statusInfo && result_status !== "live" && (
             <span

@@ -11,6 +11,7 @@ import { ScoreCard } from "@/components/competitions/score-card";
 import { SeriesStandingsTabs } from "@/components/competitions/series-standings-tabs";
 import type { PublicGame } from "@/types/competitions";
 import { NoticiasSection } from "@/components/liga/noticias-section";
+import { LiveBadge } from "@/components/competitions/live-badge";
 
 export const metadata: Metadata = {
   title: "Liga INATEL",
@@ -199,6 +200,13 @@ export default async function LigaInatelHomePage() {
                   >
                     PRÓXIMO JOGO{nextGame.syntheticJornada ? ` · J${nextGame.syntheticJornada}` : ""}
                   </span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                  <LiveBadge
+                    date={nextGame.event_date}
+                    time={nextGame.event_time}
+                    disabled={nextGame.result_status === "approved"}
+                    variant="dark"
+                  />
                   <span
                     style={{
                       fontFamily: "var(--font-ibm-mono, monospace)",
@@ -211,6 +219,7 @@ export default async function LigaInatelHomePage() {
                   >
                     {dayLabel(nextGame.event_date, todayStr, tomorrowStr)}
                     {nextGame.event_time ? ` · ${nextGame.event_time.slice(0, 5)}` : ""}
+                  </span>
                   </span>
                 </div>
 
@@ -430,6 +439,13 @@ export default async function LigaInatelHomePage() {
                             </div>
                           )
                         )}
+                        <div style={{ marginTop: "4px" }}>
+                          <LiveBadge
+                            date={g.event_date}
+                            time={g.event_time}
+                            disabled={g.result_status === "approved"}
+                          />
+                        </div>
                       </div>
 
                       {/* Equipas + pavilhão */}

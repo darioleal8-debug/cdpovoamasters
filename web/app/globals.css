@@ -144,3 +144,17 @@ input, textarea, select { font-size: max(16px, 1rem); }
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Sinal "LIVE" (jogo a decorrer) ───────────────────────── */
+.live-badge { animation: live-badge-blink 1.4s ease-in-out infinite; }
+.live-badge-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 0 0 0 rgba(255,255,255,.7);
+  animation: live-badge-pulse 1.4s ease-out infinite;
+}
+@keyframes live-badge-blink { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+@keyframes live-badge-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(255,255,255,.7); }
+  100% { box-shadow: 0 0 0 6px rgba(255,255,255,0); }
+}
