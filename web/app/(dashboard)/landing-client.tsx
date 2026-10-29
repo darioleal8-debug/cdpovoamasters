@@ -29,10 +29,21 @@ interface PublicClub {
   lastActivityAt: string;
 }
 
+interface PublicLeague {
+  id: string;
+  name: string;
+  slug: string;
+  logo_url: string | null;
+  teamCount: number;
+  seriesCount: number;
+  lastActivityLabel: string;
+}
+
 interface HomeData {
   clubCount: number;
   leagueCount: number;
   activeClubs: PublicClub[];
+  activeLeagues?: PublicLeague[];
 }
 
 // ─── Tokens (product, not club) ───────────────────────────────────────────────
@@ -483,6 +494,8 @@ function Features() {
 
 function ClubsSection({ data }: { data: HomeData | null }) {
   const clubs = data?.activeClubs ?? [];
+  const leagues = data?.activeLeagues ?? [];
+  const hasAny = clubs.length + leagues.length > 0;
 
   return (
     <section
@@ -504,7 +517,7 @@ function ClubsSection({ data }: { data: HomeData | null }) {
               Já a usar o hoophub esta época
             </p>
           </div>
-          {clubs.length > 0 && (
+          {hasAny && (
             <a
               href="#clubes"
               className="flex items-center gap-1 text-[14px] font-semibold transition-colors hover:opacity-70"
@@ -515,7 +528,7 @@ function ClubsSection({ data }: { data: HomeData | null }) {
           )}
         </div>
 
-        {clubs.length === 0 ? (
+        {!hasAny ? (
           // Fora de época ou sem clubes públicos
           <div
             className="rounded-2xl p-8 text-center"
@@ -530,6 +543,9 @@ function ClubsSection({ data }: { data: HomeData | null }) {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {leagues.map((league) => (
+              <LeagueCard key={league.id} league={league} />
+            ))}
             {clubs.map((club) => (
               <ClubCard key={club.id} club={club} />
             ))}
@@ -537,6 +553,58 @@ function ClubsSection({ data }: { data: HomeData | null }) {
         )}
       </div>
     </section>
+  );
+}
+
+function LeagueCard({ league }: { league: PublicLeague }) {
+  const meta = [
+    "Liga",
+    league.seriesCount > 1 ? `${league.seriesCount} séries` : null,
+    league.teamCount > 0 ? `${league.teamCount} equipas` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <Link href={`/${league.slug}`} className="block hover:opacity-90 transition-opacity">
+      <div
+        className="rounded-2xl overflow-hidden"
+        style={{ background: "#fff", border: `1px solid ${BORDER}` }}
+      >
+        <div className="px-5 py-5 flex items-center gap-3">
+          {league.logo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={league.logo_url}
+              alt={`Logótipo ${league.name}`}
+              className="h-9 w-9 rounded-[9px] object-contain"
+            />
+          ) : (
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] text-[14px] font-black text-white"
+              style={{ background: "#091021" }}
+              aria-hidden="true"
+            >
+              {league.name.charAt(0)}
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="text-[14px] font-bold truncate" style={{ color: BLACK }}>
+              {league.name}
+            </p>
+            <p className="text-[12px]" style={{ color: GRAY }}>
+              {meta}
+            </p>
+          </div>
+        </div>
+        <div
+          className="px-5 py-3 text-[12px] border-t truncate"
+          style={{ color: GRAY, borderColor: BORDER }}
+        >
+          {league.lastActivityLabel}
+        </div>
+      </div>
+    </Link>
   );
 }
 
