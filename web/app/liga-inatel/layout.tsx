@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Barlow_Condensed, IBM_Plex_Mono } from "next/font/google";
 import { CompNav } from "@/components/competitions/comp-nav";
 import { LigaHeaderButtons } from "@/components/liga/liga-header-buttons";
 import { LigaTracker } from "@/components/liga/liga-tracker";
+import { LigaPwa } from "@/components/liga/pwa/liga-pwa";
 
 // Peso 800 (não carregado no root layout)
 const bcHeavy = Barlow_Condensed({
@@ -20,11 +21,25 @@ const ibmMono = IBM_Plex_Mono({
   display: "swap",
 });
 
+// Ecrãs de arranque iOS (largura CSS, altura CSS, densidade)
+const IOS_SPLASH: [number, number, number][] = [
+  [440, 956, 3], [430, 932, 3], [428, 926, 3], [414, 896, 3], [414, 896, 2],
+  [402, 874, 3], [393, 852, 3], [390, 844, 3], [375, 812, 3], [375, 667, 2],
+];
+
+export const viewport: Viewport = { themeColor: "#15110E" };
+
+// Captura o evento de instalação do Android antes da hidratação do React
+// (pode disparar antes de os componentes montarem).
+const EARLY_BIP_SCRIPT =
+  'window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.__ligaBIP=e;window.dispatchEvent(new Event("liga-bip"))});';
+
 export const metadata: Metadata = {
   title: { default: "Liga INATEL", template: "%s · Liga INATEL" },
   description: "Classificação, calendário e resultados da Liga INATEL de basquetebol.",
   openGraph: { siteName: "HoopHub · Liga INATEL", locale: "pt_PT" },
-  // Ícone próprio da Liga quando adicionada ao ecrã principal (diferente do HoopHub)
+  // App própria "Liga INATEL" quando adicionada ao ecrã principal (diferente do HoopHub):
+  // manifest com id/scope /liga-inatel, ícones e título Apple próprios.
   manifest: "/liga-inatel.webmanifest",
   icons: {
     icon: [{ url: "/pwa/liga-inatel-32.png", sizes: "32x32", type: "image/png" }],
@@ -32,8 +47,12 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "LIGA INATEL",
+    title: "Liga INATEL",
     statusBarStyle: "black-translucent",
+    startupImage: IOS_SPLASH.map(([w, h, dpr]) => ({
+      url: `/pwa/splash/liga-inatel-${w * dpr}x${h * dpr}.png`,
+      media: `(device-width: ${w}px) and (device-height: ${h}px) and (-webkit-device-pixel-ratio: ${dpr}) and (orientation: portrait)`,
+    })),
   },
 };
 
@@ -50,6 +69,7 @@ export default function LigaInatelLayout({ children }: { children: React.ReactNo
         fontFamily: "var(--font-barlow, sans-serif)",
       }}
     >
+      <script dangerouslySetInnerHTML={{ __html: EARLY_BIP_SCRIPT }} />
       {/* Header fixo */}
       <header
         style={{
@@ -60,6 +80,8 @@ export default function LigaInatelLayout({ children }: { children: React.ReactNo
           borderBottom: "1px solid rgba(249,115,22,.25)",
           display: "flex",
           alignItems: "stretch",
+          // App instalada no iPhone (barra de estado translúcida): não ficar por baixo do notch
+          paddingTop: "env(safe-area-inset-top)",
         }}
       >
         <div
@@ -229,6 +251,7 @@ export default function LigaInatelLayout({ children }: { children: React.ReactNo
 
       {/* Conteúdo */}
       <LigaTracker />
+      <LigaPwa />
       <main style={{ flex: 1 }}>{children}</main>
 
       {/* Rodapé */}

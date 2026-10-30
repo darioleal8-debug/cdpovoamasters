@@ -148,6 +148,6 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     // Corre apenas em rotas de página; exclui assets estáticos, APIs e imagens
-    "/((?!_next/static|_next/image|favicon.ico|manifest.json|icons/|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.json|liga-inatel\\.webmanifest|liga-inatel-sw\\.js|liga-inatel-offline\\.html|pwa/|icons/|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
   ],
 };

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#15110E">
+<meta name="robots" content="noindex">
+<title>Sem ligação · Liga INATEL</title>
+<style>
+  html,body{margin:0;height:100%;background:#15110E;color:#F6F2EC;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  main{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+       padding:calc(24px + env(safe-area-inset-top)) 28px calc(24px + env(safe-area-inset-bottom));box-sizing:border-box;gap:18px}
+  img{width:96px;height:96px;border-radius:22px}
+  h1{margin:0;font-size:22px;letter-spacing:.06em;text-transform:uppercase;font-weight:800}
+  p{margin:0;color:#B9AFA4;font-size:15px;line-height:1.5;max-width:320px}
+  button{margin-top:6px;min-height:46px;padding:0 22px;border:0;border-radius:6px;background:#F97316;color:#15110E;
+         font-weight:800;font-size:14px;letter-spacing:.07em;text-transform:uppercase;cursor:pointer}
+</style>
+</head>
+<body>
+<main>
+  <img src="/pwa/liga-inatel-192.png" alt="Liga INATEL">
+  <h1>Sem ligação</h1>
+  <p>Não foi possível carregar a Liga INATEL. Os resultados, classificações e calendários só são mostrados com ligação, para estarem sempre atualizados.</p>
+  <button type="button" onclick="location.reload()">Tentar novamente</button>
+</main>
+<script>window.addEventListener("online",function(){location.reload()});</script>
+</body>
+</html>

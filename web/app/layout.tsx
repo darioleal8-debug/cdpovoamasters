@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Barlow, Barlow_Condensed } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
@@ -40,6 +40,15 @@ export const metadata: Metadata = {
   },
 };
 
+// Viewport/theme-color via API (e não <meta> fixos) para que /liga-inatel
+// possa definir a sua própria cor de tema.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#F97316",
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -48,9 +57,7 @@ export default function RootLayout({
   return (
     <html lang="pt-PT" suppressHydrationWarning>
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="theme-color" content="#F97316" />
         <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem("theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t)}catch(e){}` }} />
       </head>
       <body className={`${barlow.variable} ${barlowCondensed.variable} font-sans`}>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { ShieldCheck } from "lucide-react";
+import { InstallMenuItem } from "@/components/liga/pwa/install-entry";
 
 const NAV_LINKS = [
   { href: "/liga-inatel",               label: "Início" },
@@ -229,7 +230,7 @@ export function LigaHeaderButtons() {
             position: "fixed", inset: 0, zIndex: 49,
             background: "rgba(21,17,14,.97)",
             display: "flex", flexDirection: "column",
-            paddingTop: "52px",
+            paddingTop: "calc(52px + env(safe-area-inset-top))",
             overflowY: "auto",
           }}
         >
@@ -303,6 +304,9 @@ export function LigaHeaderButtons() {
                 </Link>
               );
             })}
+
+            {/* Instalar a Liga INATEL no ecrã principal (só mobile, se ainda não instalada) */}
+            <InstallMenuItem onOpen={() => setMenuOpen(false)} />
 
           </nav>
         </div>

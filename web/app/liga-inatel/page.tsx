@@ -12,6 +12,7 @@ import { SeriesStandingsTabs } from "@/components/competitions/series-standings-
 import type { PublicGame } from "@/types/competitions";
 import { NoticiasSection } from "@/components/liga/noticias-section";
 import { LiveBadge } from "@/components/competitions/live-badge";
+import { InstallBanner } from "@/components/liga/pwa/install-entry";
 
 export const metadata: Metadata = {
   title: "Liga INATEL",
@@ -270,6 +271,9 @@ export default async function LigaInatelHomePage() {
 
       {/* ── TICKER ── */}
       <ScoreTicker items={tickerItems} />
+
+      {/* ── CONVITE PARA INSTALAR (só mobile) ── */}
+      <InstallBanner />
 
       {/* ── NOTÍCIAS ── */}
       <NoticiasSection noticias={noticias} />
