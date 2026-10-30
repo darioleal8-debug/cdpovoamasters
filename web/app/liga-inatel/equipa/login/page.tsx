@@ -12,6 +12,8 @@ function DelegateLoginContent() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Enquanto true, verifica se já existe sessão activa → evita flash do formulário
+  const [checking, setChecking] = useState(true);
 
   // Modo "esqueci-me"
   const [forgotMode, setForgotMode] = useState(false);
@@ -27,16 +29,41 @@ function DelegateLoginContent() {
       ? rawRedirect
       : "/liga-inatel/equipa";
 
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  // Redirige automaticamente se já houver sessão válida
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (cancelled || !user) {
+        if (!cancelled) setChecking(false);
+        return;
+      }
+      fetch("/api/liga/auth/set-cookie", { method: "POST" })
+        .then((res) => {
+          if (cancelled) return;
+          if (!res.ok) { setChecking(false); return; }
+          return res.json().then((json: { role?: string }) => {
+            if (cancelled) return;
+            if (json.role === "liga_admin") router.push("/liga-inatel/admin");
+            else router.push(delegateRedirect);
+            router.refresh();
+          });
+        })
+        .catch(() => { if (!cancelled) setChecking(false); });
+    }).catch(() => { if (!cancelled) setChecking(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (searchParams.get("msg") === "admin_required") {
       setError("Não tens permissão para aceder à área de admin.");
     }
   }, [searchParams]);
-
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -98,6 +125,22 @@ function DelegateLoginContent() {
     color: "var(--fg, #15110E)",
     outline: "none",
   };
+
+  if (checking) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "var(--bg, #F6F2EC)",
+        }}
+      >
+        <p style={{ fontSize: "13px", color: "var(--muted, #6F675F)" }}>A verificar sessão…</p>
+      </div>
+    );
+  }
 
   return (
     <div

@@ -15,7 +15,7 @@ function isProtected(path: string) {
   return PROTECTED_PREFIXES.some((p) => path === p || path.startsWith(p + "/"));
 }
 
-// Rotas de delegado: requerem sessão Supabase + cookie hh_user_type=league_delegate
+// Rotas de delegado: requerem apenas sessão Supabase válida (membership verificada no layout)
 // Rotas de liga admin: requerem sessão Supabase + cookie hh_user_type=liga_admin
 const DELEGATE_LOGIN = "/liga-inatel/equipa/login";
 
@@ -68,11 +68,16 @@ export async function middleware(request: NextRequest) {
   // Nunca usar getSession() para decisões de redirect: confia apenas no JWT local.
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
 
-  // Cookies Auth presentes mas sem sessão válida → stale (revogado / logout noutro dispositivo)
+  // Cookies Auth presentes mas validação falhou com erro 4xx → stale (revogado/expirado).
+  // Não limpar em erros de rede (status ausente) para evitar logout acidental por falha transitória.
+  const authErrStatus = (authError as { status?: number } | null)?.status ?? 0;
   const hasStaleAuthCookie =
     !user &&
+    authErrStatus >= 400 &&
+    authErrStatus < 500 &&
     request.cookies.getAll().some((c) => isAuthCookie(c.name));
 
   // Copia cookies de refresh do supabaseResponse e, se stale, elimina-os do browser
@@ -117,16 +122,13 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Rota de delegado: requer sessão + cookie league_delegate
+  // Rota de delegado: requer apenas sessão Supabase válida.
+  // A verificação de membership (league_team_members) é feita no DelegateAuthLayout,
+  // evitando dependência do cookie hh_user_type que pode ficar dessincronizado.
   if (isDelegateRoute(path)) {
-    // Guarda o destino (ex.: /liga-inatel/equipa?jogo=…) para voltar lá depois do login
-    const loginUrl = new URL(DELEGATE_LOGIN, request.url);
-    loginUrl.searchParams.set("redirect", path + request.nextUrl.search);
     if (!user) {
-      return buildRedirect(loginUrl);
-    }
-    const userTypeCookie = request.cookies.get("hh_user_type")?.value;
-    if (userTypeCookie !== "league_delegate") {
+      const loginUrl = new URL(DELEGATE_LOGIN, request.url);
+      loginUrl.searchParams.set("redirect", path + request.nextUrl.search);
       return buildRedirect(loginUrl);
     }
   }
