@@ -5,6 +5,7 @@ services:
   - type: web
     name: hoophub-image-processor
     runtime: docker
+    rootDir: services/image-processor
     dockerfilePath: ./Dockerfile
     dockerContext: .
     region: frankfurt  # mais perto de Portugal
