@@ -609,7 +609,7 @@ export function GameSheetReview({ importId, backHref }: { importId: string; back
 
   const canConfirm = analysis.canConfirm && (!analysis.requiresAcknowledgement || ack);
   const showActions = view.can_edit && !view.is_liga_admin;
-  const showAdminActions = view.is_liga_admin && ["needs_review", "ready_to_confirm", "confirmed", "failed"].includes(view.status);
+  const showAdminActions = view.is_liga_admin && ["needs_review", "ready_to_confirm", "confirmed", "failed", "published"].includes(view.status);
 
   return (
     <div style={{ background: C.bg, minHeight: "100dvh", paddingBottom: showActions || showAdminActions ? 170 : 40, color: C.fg }}>
@@ -647,8 +647,10 @@ export function GameSheetReview({ importId, backHref }: { importId: string; back
           </div>
         )}
         {view.status === "published" && (
-          <div style={{ ...card, background: C.okBg, borderColor: "#A7F3D0", marginBottom: 12, fontSize: 13 }}>
-            Aprovado e publicado. Para corrigir um resultado já publicado, importe novamente o boletim — a nova versão substitui a anterior após aprovação.
+          <div style={{ ...card, background: view.is_liga_admin ? C.warnBg : C.okBg, borderColor: view.is_liga_admin ? "#FDE68A" : "#A7F3D0", marginBottom: 12, fontSize: 13 }}>
+            {view.is_liga_admin
+              ? "Boletim publicado. Pode editar e aplicar novamente ao jogo para corrigir nomes, pontuações ou estatísticas (fica registado na auditoria)."
+              : "Aprovado e publicado. Para corrigir um resultado já publicado, importe novamente o boletim — a nova versão substitui a anterior após aprovação."}
           </div>
         )}
         {view.is_liga_admin && view.status === "confirmed" && (

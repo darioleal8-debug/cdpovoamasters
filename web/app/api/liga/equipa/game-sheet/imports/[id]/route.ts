@@ -30,7 +30,7 @@ export async function PATCH(req: Request, { params }: Params) {
   const row = await loadImport(access, id);
   if (!row) return jsonError("Importação não encontrada", 404);
   if (row.status === "processing") return jsonError("A análise ainda está a decorrer", 409);
-  if (row.status === "published") {
+  if (row.status === "published" && !access.isLigaAdmin) {
     return jsonError("Este boletim já foi aprovado. Para corrigir, importe novamente o boletim.", 409);
   }
 

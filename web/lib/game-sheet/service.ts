@@ -201,7 +201,7 @@ export async function importView(access: Access, row: ImportRow, game: GameInfo 
     usage: usage ? { model: usage.model, durationMs: usage.totalDurationMs, calls: usage.calls?.length ?? 0, secondPass: usage.secondPass } : null,
     image_url: imageUrl,
     game,
-    can_edit: row.status !== "published" && row.status !== "processing",
+    can_edit: (row.status !== "published" || access.isLigaAdmin) && row.status !== "processing",
     is_liga_admin: access.isLigaAdmin,
   };
 }
