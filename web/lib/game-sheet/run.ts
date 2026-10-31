@@ -1,4 +1,5 @@
 import { analyzeSheet } from "./engine";
+import { callOpencvService, sniffImageMime } from "./image";
 import { emptySheetData, PROCESSING_VERSION, SHEET_SCHEMA_VERSION } from "./schema";
 import { BUCKET, enrichWithRoster, type Access, type GameInfo, type ImportRow } from "./service";
 import { analyzeGameSheet, visionConfig } from "./vision";
@@ -16,10 +17,22 @@ export async function runAndStore(
   adminInstructions?: string,
 ): Promise<{ ok: boolean; error?: string; kind?: string }> {
   const cfg = visionConfig();
+
+  const mime = sniffImageMime(image);
+  const opencvResult = mime ? await callOpencvService(image, mime) : null;
+  if (opencvResult) {
+    const q = opencvResult.quality;
+    console.info(
+      `[opencv] import=${importId} perspective=${opencvResult.perspectiveApplied} ` +
+      `sharpness=${q.sharpness.toFixed(0)} legibility=${q.legibility.toFixed(2)} blurry=${q.isBlurry}`,
+    );
+  }
+
   const result = await analyzeGameSheet({
-    image,
+    image: opencvResult?.buffer ?? image,
     game: { home: game.home, away: game.away, date: game.date },
     adminInstructions,
+    opencvZones: opencvResult?.zones,
   });
 
   if (!result.ok) {
@@ -33,6 +46,9 @@ export async function runAndStore(
       analysis_count: previousCount + 1,
       sheet_data: emptySheetData({ home: game.home, away: game.away }),
       validation: null,
+      cv_data: opencvResult
+        ? { perspective_applied: opencvResult.perspectiveApplied, quality: opencvResult.quality, zones: opencvResult.zones }
+        : null,
       updated_at: new Date().toISOString(),
     }).eq("id", importId);
     return { ok: false, error: result.error, kind: result.kind };
@@ -60,6 +76,9 @@ export async function runAndStore(
     validation: analysis,
     ai_usage: result.usage,
     analysis_count: previousCount + 1,
+    cv_data: opencvResult
+      ? { perspective_applied: opencvResult.perspectiveApplied, quality: opencvResult.quality, zones: opencvResult.zones }
+      : null,
     updated_at: new Date().toISOString(),
   }).eq("id", importId);
   if (error) return { ok: false, error: `Erro ao gravar a análise: ${error.message}` };

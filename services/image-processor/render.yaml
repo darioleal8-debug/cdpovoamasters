@@ -1,0 +1,17 @@
+# Configuração para deploy no Render.com (plano gratuito)
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: hoophub-image-processor
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    region: frankfurt  # mais perto de Portugal
+    plan: free         # gratuito (750h/mês, dorme ao fim de 15 min sem pedidos)
+    healthCheckPath: /health
+    envVars:
+      - key: SERVICE_SECRET
+        generateValue: true   # Render gera um token aleatório
+      - key: PORT
+        value: "10000"        # Render usa a porta 10000 por omissão

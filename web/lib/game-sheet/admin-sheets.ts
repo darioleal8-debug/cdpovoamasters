@@ -68,15 +68,15 @@ export async function listGameSheets(access: Access, admin: AdminClient, game: G
       .order("submitted_at", { ascending: true }),
     access.supabase
       .from("game_sheet_imports")
-      .select("id, team_id, status, image_path, sheet_data, extraction_raw, analysis_count, error, source_submission_id, created_at, updated_at")
+      .select("id, team_id, status, image_path, image_mime, sheet_data, extraction_raw, analysis_count, error, source_submission_id, created_at, updated_at")
       .eq("event_id", game.id)
       .order("created_at", { ascending: true }),
   ]);
 
   const imports = (imps ?? []) as {
-    id: string; team_id: string | null; status: ImportStatus; image_path: string | null; sheet_data: unknown;
-    extraction_raw: unknown; analysis_count: number; error: string | null; source_submission_id: string | null;
-    created_at: string; updated_at: string;
+    id: string; team_id: string | null; status: ImportStatus; image_path: string | null; image_mime: string | null;
+    sheet_data: unknown; extraction_raw: unknown; analysis_count: number; error: string | null;
+    source_submission_id: string | null; created_at: string; updated_at: string;
   }[];
   const importedPaths = new Set(imports.map((i) => i.image_path).filter(Boolean));
   const importedSubs = new Set(imports.map((i) => i.source_submission_id).filter(Boolean));
@@ -113,7 +113,7 @@ export async function listGameSheets(access: Access, admin: AdminClient, game: G
       created_at: imp.created_at,
       status: impMissing ? "ficheiro_em_falta" : imp.status,
       image_url: impUrl,
-      is_pdf: false,
+      is_pdf: imp.image_mime === "application/pdf",
       quality: impMissing ? null : quality,
       analyzed_at: quality && !impMissing ? imp.updated_at : null,
       analysis_count: imp.analysis_count,
@@ -196,7 +196,7 @@ export async function createAndAnalyze(
 
   await releaseStale(access, game.id);
 
-  const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
+  const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : mime === "application/pdf" ? "pdf" : "jpg";
   const imagePath = opts.existingPath ?? `admin/${game.id}/${hash}.${ext}`;
 
   // Upload ANTES do insert: se falhar não fica linha órfã na BD
@@ -288,13 +288,12 @@ export async function analyzeSheetCandidate(
   if (!sub || sub.event_id !== game.id) return { ok: false, status: 404, error: "Submissão não encontrada" };
   const loc = resolveSheetLocation(sub.photo_url as string | null);
   if (!loc) return { ok: false, status: 404, error: "Esta submissão não tem folha de jogo" };
-  if (loc.kind === "pdf") return { ok: false, status: 415, error: "PDF: a análise automática só aceita imagens (JPEG, PNG, WebP)." };
 
   const { data: blob, error: dlErr } = await admin.storage.from(loc.bucket).download(loc.path);
   if (dlErr || !blob) return { ok: false, status: 404, error: "Folha de jogo indisponível no armazenamento" };
   const buffer = Buffer.from(await blob.arrayBuffer());
   const mime = sniffImageMime(buffer);
-  if (!mime) return { ok: false, status: 415, error: "O ficheiro da folha não é uma imagem suportada." };
+  if (!mime) return { ok: false, status: 415, error: "O ficheiro da folha não é suportado (use JPEG, PNG, WebP ou PDF)." };
 
   return createAndAnalyze(access, admin, game, buffer, mime, {
     existingPath: loc.bucket === BUCKET ? loc.path : undefined,

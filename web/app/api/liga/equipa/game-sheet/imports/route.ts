@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeGameSheet, BUCKET, importView, isUuid, jsonError, loadGameForAccess, loadImport } from "@/lib/game-sheet/service";
-import { MAX_REQUEST_BYTES, sha256, sniffImageMime } from "@/lib/game-sheet/image";
+import { isPdf, MAX_PDF_BYTES, MAX_REQUEST_BYTES, sha256, sniffImageMime } from "@/lib/game-sheet/image";
 import { runAndStore } from "@/lib/game-sheet/run";
 import { visionConfig } from "@/lib/game-sheet/vision";
 
@@ -27,13 +27,16 @@ export async function POST(req: Request) {
   const gameId = form.get("game_id");
   if (!(file instanceof File)) return jsonError("Campo 'photo' em falta", 400);
   if (!isUuid(gameId)) return jsonError("Jogo inválido", 400);
-  if (file.size === 0 || file.size > MAX_REQUEST_BYTES) {
-    return jsonError(`Ficheiro vazio ou demasiado grande (máx. ${MAX_REQUEST_BYTES / 1024 / 1024} MB após compressão)`, 400);
+  if (file.size === 0 || file.size > MAX_PDF_BYTES) {
+    return jsonError(`Ficheiro vazio ou demasiado grande (máx. ${MAX_PDF_BYTES / 1024 / 1024} MB)`, 400);
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const mime = sniffImageMime(buffer); // tipo real, não o declarado pelo cliente
-  if (!mime) return jsonError("Formato não suportado. Use JPEG, PNG ou WebP.", 400);
+  if (!mime) return jsonError("Formato não suportado. Use JPEG, PNG, WebP ou PDF.", 400);
+  if (!isPdf(mime) && buffer.length > MAX_REQUEST_BYTES) {
+    return jsonError(`Imagem demasiado grande (máx. ${MAX_REQUEST_BYTES / 1024 / 1024} MB após compressão). Use o botão de câmara para reduzir automaticamente.`, 400);
+  }
 
   const game = await loadGameForAccess(access, gameId);
   if (!game) return jsonError("Jogo não encontrado ou não pertence à sua equipa", 404);
@@ -73,7 +76,7 @@ export async function POST(req: Request) {
     .eq("status", "processing")
     .lt("updated_at", new Date(Date.now() - STALE_PROCESSING_MS).toISOString());
 
-  const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
+  const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : mime === "application/pdf" ? "pdf" : "jpg";
   const imagePath = `${user.id}/${new Date().getFullYear()}/${game.id}/${hash}.${ext}`;
 
   const { data: created, error: insErr } = await supabase

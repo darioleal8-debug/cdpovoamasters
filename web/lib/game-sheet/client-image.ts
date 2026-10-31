@@ -45,12 +45,19 @@ export async function normalizeImage(file: File, maxPx = 3200, quality = 0.92): 
 }
 
 const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // 4 MB — margem abaixo do limite 4,5 MB da Vercel
+const MAX_PDF_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB para PDFs (convertidos pelo microserviço OpenCV)
+
+export function isPdfFile(file: File): boolean {
+  return file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+}
 
 /**
  * Prepara uma folha de jogo para upload:
- *  1. HEIC/HEIF → JPEG
- *  2. normalizeImage (3200 px, JPEG 0.92)
- *  3. Se > 4 MB: reduz qualidade (0.85 → 0.78 → 0.7) e, se necessário, 2560 px
+ *  - PDF: valida tamanho (máx. 10 MB) e envia diretamente (conversão feita pelo microserviço OpenCV).
+ *  - Imagem:
+ *    1. HEIC/HEIF → JPEG
+ *    2. normalizeImage (3200 px, JPEG 0.92)
+ *    3. Se > 4 MB: reduz qualidade (0.85 → 0.78 → 0.7) e, se necessário, 2560 px
  *
  * Não comprime abaixo de 2560 px nem qualidade 0.7 (texto manuscrito pequeno).
  * Devolve null se mesmo assim não couber.
@@ -58,6 +65,14 @@ const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // 4 MB — margem abaixo do limite 4,
 export async function prepareSheetForUpload(
   raw: File,
 ): Promise<{ file: File; warning?: string } | { error: string }> {
+  if (isPdfFile(raw)) {
+    if (raw.size === 0) return { error: "O PDF está vazio." };
+    if (raw.size > MAX_PDF_UPLOAD_BYTES) {
+      return { error: `PDF demasiado grande (máx. ${MAX_PDF_UPLOAD_BYTES / 1024 / 1024} MB). Reduza o tamanho antes de enviar.` };
+    }
+    return { file: raw };
+  }
+
   let file: File = raw;
 
   if (isHeic(file)) {

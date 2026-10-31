@@ -9,7 +9,7 @@ import { deepseekJSONDetailed, type DeepSeekCallMeta, type DeepSeekErrorKind } f
 import { AiRecheckSchema, AiSheetSchema, aiToSheetData, type AiSheet, type SheetData } from "./schema";
 import { analyzeSheet, doubtfulEvents } from "./engine";
 import { buildRecheckPrompt, buildSystemPrompt, buildUserPrompt, DEFAULT_LAYOUT } from "./prompt";
-import { cropRegions, prepareForVision } from "./image";
+import { cropRegions, prepareForVision, type ZoneMap } from "./image";
 
 export function visionConfig() {
   const num = (v: string | undefined, d: number) => (v && Number.isFinite(Number(v)) ? Number(v) : d);
@@ -51,6 +51,8 @@ export async function analyzeGameSheet(input: {
   game: { home: string; away: string; date?: string | null };
   /** Instruções livres do admin da liga (releitura dirigida). */
   adminInstructions?: string;
+  /** Zonas detetadas pelo microserviço OpenCV (injetadas no prompt). */
+  opencvZones?: ZoneMap;
 }): Promise<VisionResult> {
   const cfg = visionConfig();
   const started = Date.now();
@@ -68,7 +70,7 @@ export async function analyzeGameSheet(input: {
   // ── 1. Leitura completa ──
   const full = await deepseekJSONDetailed<unknown>({
     model: cfg.model,
-    system: buildSystemPrompt(DEFAULT_LAYOUT, input.adminInstructions),
+    system: buildSystemPrompt(DEFAULT_LAYOUT, input.adminInstructions, input.opencvZones),
     user: [
       { type: "image_url", image_url: { url: dataUrl(prepared.buffer) } },
       { type: "text", text: buildUserPrompt(input.game) },
