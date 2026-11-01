@@ -49,6 +49,8 @@ interface OverlayData {
   homeTeamName: string;
   awayTeamName: string;
   score: string | null;
+  homeScore: number | null;
+  awayScore: number | null;
   jornadaInfo: string | null;
   homeLogoB64: string | null;
   awayLogoB64: string | null;
@@ -384,9 +386,10 @@ async function buildFinalImage(
   ctx: NewsImageContext,
   gameData: GameImageData | null
 ): Promise<Buffer> {
-  // 1. Resize para 1600×900 (crop se necessário para manter proporção)
+  // 1. Resize + blur subtil para foco visual no scoreboard central
   const resized = await sharp(rawBuffer)
     .resize(1600, 900, { fit: "cover", position: "centre" })
+    .blur(3)
     .toBuffer();
 
   // 2. Construir overlay SVG com logos, nomes, resultado
@@ -437,6 +440,8 @@ async function buildOverlayData(
     homeTeamName,
     awayTeamName,
     score,
+    homeScore: gameData?.homeScore ?? null,
+    awayScore: gameData?.awayScore ?? null,
     jornadaInfo,
     homeLogoB64,
     awayLogoB64,
@@ -503,9 +508,23 @@ function buildOverlaySvg(d: OverlayData): Buffer {
     : `<circle cx="${AWAY_CX}" cy="${LOGO_CY}" r="${LOGO_SZ / 2 - 3}" fill="${escXml(d.awayPrimaryColor)}" opacity="0.85"/>
        <text x="${AWAY_CX}" y="${LOGO_CY + 14}" font-family="${FONT}" font-size="38" font-weight="900" fill="white" text-anchor="middle">${escXml(d.awayTeamName.slice(0, 1))}</text>`;
 
-  const scoreEl = hasResult
-    ? `<text x="${SCORE_CX}" y="${SCORE_Y}" font-family="${FONT}" font-size="80" font-weight="900" fill="white" text-anchor="middle">${escXml(d.score!)}</text>`
-    : `<text x="${SCORE_CX}" y="${SCORE_Y}" font-family="${FONT}" font-size="64" font-weight="900" fill="${GOLD}" text-anchor="middle" opacity="0.95">VS</text>`;
+  const scoreEl = (() => {
+    if (!hasResult) {
+      return `<text x="${SCORE_CX}" y="${SCORE_Y}" font-family="${FONT}" font-size="64" font-weight="900" fill="${GOLD}" text-anchor="middle" opacity="0.95">VS</text>`;
+    }
+    // Com scores brutos: vencedor em dourado
+    if (d.homeScore != null && d.awayScore != null) {
+      const homeWins = d.homeScore > d.awayScore;
+      const awayWins = d.awayScore > d.homeScore;
+      const hc = homeWins ? GOLD : "white";
+      const ac = awayWins ? GOLD : "white";
+      return `<text x="775" y="${SCORE_Y}" font-family="${FONT}" font-size="80" font-weight="900" fill="${hc}" text-anchor="end">${d.homeScore}</text>
+    <text x="${SCORE_CX}" y="${SCORE_Y}" font-family="${FONT}" font-size="80" font-weight="900" fill="white" text-anchor="middle">–</text>
+    <text x="825" y="${SCORE_Y}" font-family="${FONT}" font-size="80" font-weight="900" fill="${ac}" text-anchor="start">${d.awayScore}</text>`;
+    }
+    // Fallback: string composta, sem highlight de vencedor
+    return `<text x="${SCORE_CX}" y="${SCORE_Y}" font-family="${FONT}" font-size="80" font-weight="900" fill="white" text-anchor="middle">${escXml(d.score!)}</text>`;
+  })();
 
   const jornadaEl = d.jornadaInfo
     ? `<text x="${SCORE_CX}" y="${JORNADA_Y}" font-family="${FONT}" font-size="13" font-weight="600" fill="${GOLD}" text-anchor="middle" letter-spacing="2.2" opacity="0.82">${escXml(d.jornadaInfo.toUpperCase())}</text>`
@@ -564,6 +583,11 @@ function buildOverlaySvg(d: OverlayData): Buffer {
   <rect x="${PX + 16}" y="${PY + 11}" width="130" height="30" rx="3" fill="${GOLD}" opacity="0.14"/>
   <rect x="${PX + 16}" y="${PY + 11}" width="130" height="30" rx="3" fill="none" stroke="${GOLD}" stroke-width="1" opacity="0.72"/>
   <text x="${PX + 81}" y="${PY + 31}" font-family="${FONT}" font-size="11" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="2.5">LIGA INATEL</text>
+
+  <!-- HEADER: Modalidade badge (right) -->
+  <rect x="${PX + PW - 16 - 224}" y="${PY + 11}" width="224" height="30" rx="3" fill="${GOLD}" opacity="0.14"/>
+  <rect x="${PX + PW - 16 - 224}" y="${PY + 11}" width="224" height="30" rx="3" fill="none" stroke="${GOLD}" stroke-width="1" opacity="0.72"/>
+  <text x="${PX + PW - 16 - 112}" y="${PY + 31}" font-family="${FONT}" font-size="11" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="2.0">BASQUETEBOL VETERANOS</text>
 
   <!-- HEADER: Status badge (centred) -->
   <rect x="${statusBadgeX}" y="${PY + 11}" width="${statusBadgeW}" height="30" rx="3" fill="${GOLD}" opacity="0.14"/>
