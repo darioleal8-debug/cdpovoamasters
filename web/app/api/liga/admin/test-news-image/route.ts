@@ -98,36 +98,49 @@ function buildTestOverlay(d: TestOverlayParams): Buffer {
   const FONT = "sans-serif";
   const GOLD = "#C8A852";
   const NAVY = "#0B1626";
-  const PX = 80, PY = 200, PW = 1440, PH = 450;
-  const HEADER_H = 52, FOOTER_H = 52;
-  const CONTENT_TOP = PY + HEADER_H;
-  const FOOTER_TOP = PY + PH - FOOTER_H;
-  const HOME_CX = 320, SCORE_CX = 800, AWAY_CX = 1280;
-  const LOGO_SZ = 120;
-  const LOGO_TOP = 266;
-  const LOGO_CY = LOGO_TOP + LOGO_SZ / 2;
-  const NAME_Y = LOGO_TOP + LOGO_SZ + 38;
-  const SCORE_Y = 392;
-  const JORNADA_Y = FOOTER_TOP + Math.round(FOOTER_H / 2) + 6;
+
+  const PX = 80, PY = 185, PW = 1440;
+  const HEADER_H = 52, ROW_H = 213, SEP_H = 2, FOOTER_H = 50;
+  const PH = HEADER_H + ROW_H + SEP_H + ROW_H + FOOTER_H; // 530
+  const PANEL_CX = PX + PW / 2; // 800
+
+  const CONTENT_TOP = PY + HEADER_H; // 237
+  const HOME_ROW_TOP = CONTENT_TOP;  // 237
+  const SEP_Y = HOME_ROW_TOP + ROW_H; // 450
+  const AWAY_ROW_TOP = SEP_Y + SEP_H; // 452
+  const FOOTER_TOP = AWAY_ROW_TOP + ROW_H; // 665
+  const FOOTER_MID_Y = FOOTER_TOP + Math.round(FOOTER_H / 2) + 8; // 698
+
+  const LOGO_SZ = 110, LOGO_X = 115;
+  const LOGO_CX = LOGO_X + LOGO_SZ / 2; // 170
+  const HOME_LOGO_Y = HOME_ROW_TOP + Math.round((ROW_H - LOGO_SZ) / 2); // 288
+  const HOME_LOGO_CY = HOME_LOGO_Y + LOGO_SZ / 2; // 343
+  const AWAY_LOGO_Y = AWAY_ROW_TOP + Math.round((ROW_H - LOGO_SZ) / 2); // 503
+  const AWAY_LOGO_CY = AWAY_LOGO_Y + LOGO_SZ / 2; // 558
+
+  const NAME_X = LOGO_X + LOGO_SZ + 20; // 245
+  const HOME_NAME_Y = HOME_ROW_TOP + Math.round(ROW_H * 0.5) + 14; // ~359
+  const AWAY_NAME_Y = AWAY_ROW_TOP + Math.round(ROW_H * 0.5) + 14; // ~574
+
+  const SCORE_X = PX + PW - 20; // 1500
+  const HOME_SCORE_Y = HOME_ROW_TOP + Math.round(ROW_H * 0.62) + 18; // ~385
+  const AWAY_SCORE_Y = AWAY_ROW_TOP + Math.round(ROW_H * 0.62) + 18; // ~600
 
   const homeWins = d.homeScore > d.awayScore;
   const awayWins = d.awayScore > d.homeScore;
+  const hc = homeWins ? GOLD : "white";
+  const ac = awayWins ? GOLD : "white";
 
   const escXml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   const truncate = (s: string, n: number) => s.length > n ? s.slice(0, n - 1) + "…" : s;
 
   const homeLogoEl = d.homeLogoB64
-    ? `<image x="${HOME_CX - LOGO_SZ / 2}" y="${LOGO_TOP}" width="${LOGO_SZ}" height="${LOGO_SZ}" xlink:href="${d.homeLogoB64}" href="${d.homeLogoB64}" preserveAspectRatio="xMidYMid meet"/>`
-    : `<circle cx="${HOME_CX}" cy="${LOGO_CY}" r="${LOGO_SZ / 2 - 3}" fill="${escXml(d.homePrimaryColor)}" opacity="0.85"/><text x="${HOME_CX}" y="${LOGO_CY + 14}" font-family="${FONT}" font-size="38" font-weight="900" fill="white" text-anchor="middle">${escXml(d.homeTeamName.slice(0, 1))}</text>`;
+    ? `<image x="${LOGO_X}" y="${HOME_LOGO_Y}" width="${LOGO_SZ}" height="${LOGO_SZ}" xlink:href="${d.homeLogoB64}" href="${d.homeLogoB64}" preserveAspectRatio="xMidYMid meet"/>`
+    : `<circle cx="${LOGO_CX}" cy="${HOME_LOGO_CY}" r="${LOGO_SZ / 2 - 3}" fill="${escXml(d.homePrimaryColor)}" opacity="0.85"/><text x="${LOGO_CX}" y="${HOME_LOGO_CY + 14}" font-family="${FONT}" font-size="38" font-weight="900" fill="white" text-anchor="middle">${escXml(d.homeTeamName.slice(0, 1))}</text>`;
 
   const awayLogoEl = d.awayLogoB64
-    ? `<image x="${AWAY_CX - LOGO_SZ / 2}" y="${LOGO_TOP}" width="${LOGO_SZ}" height="${LOGO_SZ}" xlink:href="${d.awayLogoB64}" href="${d.awayLogoB64}" preserveAspectRatio="xMidYMid meet"/>`
-    : `<circle cx="${AWAY_CX}" cy="${LOGO_CY}" r="${LOGO_SZ / 2 - 3}" fill="${escXml(d.awayPrimaryColor)}" opacity="0.85"/><text x="${AWAY_CX}" y="${LOGO_CY + 14}" font-family="${FONT}" font-size="38" font-weight="900" fill="white" text-anchor="middle">${escXml(d.awayTeamName.slice(0, 1))}</text>`;
-
-  const hc = homeWins ? GOLD : "white";
-  const ac = awayWins ? GOLD : "white";
-
-  const statusBadgeW = 196;
+    ? `<image x="${LOGO_X}" y="${AWAY_LOGO_Y}" width="${LOGO_SZ}" height="${LOGO_SZ}" xlink:href="${d.awayLogoB64}" href="${d.awayLogoB64}" preserveAspectRatio="xMidYMid meet"/>`
+    : `<circle cx="${LOGO_CX}" cy="${AWAY_LOGO_CY}" r="${LOGO_SZ / 2 - 3}" fill="${escXml(d.awayPrimaryColor)}" opacity="0.85"/><text x="${LOGO_CX}" y="${AWAY_LOGO_CY + 14}" font-family="${FONT}" font-size="38" font-weight="900" fill="white" text-anchor="middle">${escXml(d.awayTeamName.slice(0, 1))}</text>`;
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}" height="${H}">
   <defs>
@@ -148,26 +161,24 @@ function buildTestOverlay(d: TestOverlayParams): Buffer {
   <rect x="${PX + 2}" y="${PY + 2}" width="${PW - 4}" height="2" fill="url(#goldShine)"/>
   <rect x="${PX}" y="${PY}" width="${PW}" height="${PH}" rx="6" fill="none" stroke="${GOLD}" stroke-width="2" opacity="0.88"/>
   <line x1="${PX + 24}" y1="${CONTENT_TOP}" x2="${PX + PW - 24}" y2="${CONTENT_TOP}" stroke="${GOLD}" stroke-width="1" opacity="0.40"/>
+  <rect x="${PX + 24}" y="${SEP_Y}" width="${PW - 48}" height="${SEP_H}" fill="${GOLD}" opacity="0.30"/>
   <line x1="${PX + 24}" y1="${FOOTER_TOP}" x2="${PX + PW - 24}" y2="${FOOTER_TOP}" stroke="${GOLD}" stroke-width="1" opacity="0.40"/>
-  <line x1="560" y1="${CONTENT_TOP + 12}" x2="560" y2="${FOOTER_TOP - 12}" stroke="${GOLD}" stroke-width="1" opacity="0.18"/>
-  <line x1="1040" y1="${CONTENT_TOP + 12}" x2="1040" y2="${FOOTER_TOP - 12}" stroke="${GOLD}" stroke-width="1" opacity="0.18"/>
   <rect x="${PX + 16}" y="${PY + 11}" width="130" height="30" rx="3" fill="${GOLD}" opacity="0.14"/>
   <rect x="${PX + 16}" y="${PY + 11}" width="130" height="30" rx="3" fill="none" stroke="${GOLD}" stroke-width="1" opacity="0.72"/>
   <text x="${PX + 81}" y="${PY + 31}" font-family="${FONT}" font-size="11" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="2.5">LIGA INATEL</text>
-  <rect x="${SCORE_CX - statusBadgeW / 2}" y="${PY + 11}" width="${statusBadgeW}" height="30" rx="3" fill="${GOLD}" opacity="0.14"/>
-  <rect x="${SCORE_CX - statusBadgeW / 2}" y="${PY + 11}" width="${statusBadgeW}" height="30" rx="3" fill="none" stroke="${GOLD}" stroke-width="1" opacity="0.85"/>
-  <text x="${SCORE_CX}" y="${PY + 31}" font-family="${FONT}" font-size="11" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="2.5">RESULTADO FINAL</text>
+  <rect x="${PANEL_CX - 98}" y="${PY + 11}" width="196" height="30" rx="3" fill="${GOLD}" opacity="0.14"/>
+  <rect x="${PANEL_CX - 98}" y="${PY + 11}" width="196" height="30" rx="3" fill="none" stroke="${GOLD}" stroke-width="1" opacity="0.85"/>
+  <text x="${PANEL_CX}" y="${PY + 31}" font-family="${FONT}" font-size="11" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="2.5">RESULTADO FINAL</text>
   <rect x="${PX + PW - 16 - 224}" y="${PY + 11}" width="224" height="30" rx="3" fill="${GOLD}" opacity="0.14"/>
   <rect x="${PX + PW - 16 - 224}" y="${PY + 11}" width="224" height="30" rx="3" fill="none" stroke="${GOLD}" stroke-width="1" opacity="0.72"/>
   <text x="${PX + PW - 16 - 112}" y="${PY + 31}" font-family="${FONT}" font-size="11" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="2.0">BASQUETEBOL VETERANOS</text>
   ${homeLogoEl}
-  <text x="${HOME_CX}" y="${NAME_Y}" font-family="${FONT}" font-size="26" font-weight="700" fill="white" text-anchor="middle">${escXml(truncate(d.homeTeamName, 20))}</text>
-  <text x="775" y="${SCORE_Y}" font-family="${FONT}" font-size="80" font-weight="900" fill="${hc}" text-anchor="end">${d.homeScore}</text>
-  <text x="${SCORE_CX}" y="${SCORE_Y}" font-family="${FONT}" font-size="80" font-weight="900" fill="white" text-anchor="middle">-</text>
-  <text x="825" y="${SCORE_Y}" font-family="${FONT}" font-size="80" font-weight="900" fill="${ac}" text-anchor="start">${d.awayScore}</text>
+  <text x="${NAME_X}" y="${HOME_NAME_Y}" font-family="${FONT}" font-size="36" font-weight="700" fill="white">${escXml(truncate(d.homeTeamName, 26))}</text>
+  <text x="${SCORE_X}" y="${HOME_SCORE_Y}" font-family="${FONT}" font-size="90" font-weight="900" fill="${hc}" text-anchor="end">${d.homeScore}</text>
   ${awayLogoEl}
-  <text x="${AWAY_CX}" y="${NAME_Y}" font-family="${FONT}" font-size="26" font-weight="700" fill="white" text-anchor="middle">${escXml(truncate(d.awayTeamName, 20))}</text>
-  ${d.jornadaInfo ? `<text x="${SCORE_CX}" y="${JORNADA_Y}" font-family="${FONT}" font-size="13" font-weight="600" fill="${GOLD}" text-anchor="middle" letter-spacing="2.2" opacity="0.82">${escXml(d.jornadaInfo.toUpperCase())}</text>` : ""}
+  <text x="${NAME_X}" y="${AWAY_NAME_Y}" font-family="${FONT}" font-size="36" font-weight="700" fill="white">${escXml(truncate(d.awayTeamName, 26))}</text>
+  <text x="${SCORE_X}" y="${AWAY_SCORE_Y}" font-family="${FONT}" font-size="90" font-weight="900" fill="${ac}" text-anchor="end">${d.awayScore}</text>
+  ${d.jornadaInfo ? `<text x="${PANEL_CX}" y="${FOOTER_MID_Y}" font-family="${FONT}" font-size="13" font-weight="600" fill="${GOLD}" text-anchor="middle" letter-spacing="2.2" opacity="0.82">${escXml(d.jornadaInfo.toUpperCase())}</text>` : ""}
 </svg>`;
 
   return Buffer.from(svg);
