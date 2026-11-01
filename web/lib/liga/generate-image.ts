@@ -448,14 +448,41 @@ async function buildOverlayData(
 function buildOverlaySvg(d: OverlayData): Buffer {
   const W = 1600;
   const H = 900;
-  const BAR_Y = 790;     // início da barra sólida
-  const GRAD_Y = 620;    // início do gradiente
-  const LOGO_Y = 802;    // topo dos logos
-  const LOGO_W = 80;     // largura/altura dos logos
-  const NAME_Y = 863;    // baseline do texto dos nomes
-  const SCORE_Y = 872;   // baseline do score
-  const JORNADA_Y = 893; // baseline da jornada
   const FONT = "'Noto Sans','DejaVu Sans',Arial,sans-serif";
+
+  const GOLD = "#C8A852";
+  const NAVY = "#0B1626";
+
+  // Panel geometry
+  const PX = 80, PY = 200, PW = 1440, PH = 450;
+  const HEADER_H = 52;
+  const FOOTER_H = 52;
+  const CONTENT_TOP = PY + HEADER_H;          // 252
+  const FOOTER_TOP = PY + PH - FOOTER_H;      // 598
+
+  // Horizontal zones (symmetric about x=800)
+  const HOME_CX = 320;
+  const SCORE_CX = 800;
+  const AWAY_CX = 1280;
+
+  // Logo
+  const LOGO_SZ = 100;
+  const LOGO_TOP = 276;                        // top of logo
+  const LOGO_CY = LOGO_TOP + LOGO_SZ / 2;     // 326
+
+  // Team name baseline (below logo)
+  const NAME_Y = LOGO_TOP + LOGO_SZ + 36;     // 412
+
+  // Score baseline (visually aligned with logos)
+  const SCORE_Y = 392;
+
+  // Jornada (center of footer strip)
+  const JORNADA_Y = FOOTER_TOP + Math.round(FOOTER_H / 2) + 6; // 627
+
+  const hasResult = d.score != null && d.score.trim() !== "";
+  const statusLabel = hasResult ? "RESULTADO FINAL" : "PRÓXIMO JOGO";
+  const statusBadgeW = hasResult ? 196 : 168;
+  const statusBadgeX = SCORE_CX - statusBadgeW / 2;
 
   const truncate = (s: string, n: number) =>
     s.length > n ? s.slice(0, n - 1) + "…" : s;
@@ -463,62 +490,98 @@ function buildOverlaySvg(d: OverlayData): Buffer {
   const escXml = (s: string) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-  const homeName = escXml(truncate(d.homeTeamName, 22));
-  const awayName = escXml(truncate(d.awayTeamName, 22));
-
-  // Home: logo a x=24, nome a x=116 (ou x=24 sem logo)
-  const homeLogoX = 24;
-  const homeNameX = d.homeLogoB64 ? 116 : 28;
-
-  // Away: logo a x=1496, nome a x=1472 right-aligned (ou x=1572 sem logo)
-  const awayLogoX = 1496;
-  const awayNameX = d.awayLogoB64 ? 1472 : 1572;
+  const homeName = escXml(truncate(d.homeTeamName, 20));
+  const awayName = escXml(truncate(d.awayTeamName, 20));
 
   const homeLogoEl = d.homeLogoB64
-    ? `<image x="${homeLogoX}" y="${LOGO_Y}" width="${LOGO_W}" height="${LOGO_W}" href="${d.homeLogoB64}" preserveAspectRatio="xMidYMid meet"/>`
-    : `<circle cx="${homeLogoX + LOGO_W / 2}" cy="${LOGO_Y + LOGO_W / 2}" r="${LOGO_W / 2 - 2}" fill="${escXml(d.homePrimaryColor)}" opacity="0.9"/>
-       <text x="${homeLogoX + LOGO_W / 2}" y="${LOGO_Y + LOGO_W / 2 + 12}" font-family="${FONT}" font-size="30" font-weight="900" fill="white" text-anchor="middle">${escXml(d.homeTeamName.slice(0, 1))}</text>`;
+    ? `<image x="${HOME_CX - LOGO_SZ / 2}" y="${LOGO_TOP}" width="${LOGO_SZ}" height="${LOGO_SZ}" href="${d.homeLogoB64}" preserveAspectRatio="xMidYMid meet"/>`
+    : `<circle cx="${HOME_CX}" cy="${LOGO_CY}" r="${LOGO_SZ / 2 - 3}" fill="${escXml(d.homePrimaryColor)}" opacity="0.85"/>
+       <text x="${HOME_CX}" y="${LOGO_CY + 14}" font-family="${FONT}" font-size="38" font-weight="900" fill="white" text-anchor="middle">${escXml(d.homeTeamName.slice(0, 1))}</text>`;
 
   const awayLogoEl = d.awayLogoB64
-    ? `<image x="${awayLogoX}" y="${LOGO_Y}" width="${LOGO_W}" height="${LOGO_W}" href="${d.awayLogoB64}" preserveAspectRatio="xMidYMid meet"/>`
-    : `<circle cx="${awayLogoX + LOGO_W / 2}" cy="${LOGO_Y + LOGO_W / 2}" r="${LOGO_W / 2 - 2}" fill="${escXml(d.awayPrimaryColor)}" opacity="0.9"/>
-       <text x="${awayLogoX + LOGO_W / 2}" y="${LOGO_Y + LOGO_W / 2 + 12}" font-family="${FONT}" font-size="30" font-weight="900" fill="white" text-anchor="middle">${escXml(d.awayTeamName.slice(0, 1))}</text>`;
+    ? `<image x="${AWAY_CX - LOGO_SZ / 2}" y="${LOGO_TOP}" width="${LOGO_SZ}" height="${LOGO_SZ}" href="${d.awayLogoB64}" preserveAspectRatio="xMidYMid meet"/>`
+    : `<circle cx="${AWAY_CX}" cy="${LOGO_CY}" r="${LOGO_SZ / 2 - 3}" fill="${escXml(d.awayPrimaryColor)}" opacity="0.85"/>
+       <text x="${AWAY_CX}" y="${LOGO_CY + 14}" font-family="${FONT}" font-size="38" font-weight="900" fill="white" text-anchor="middle">${escXml(d.awayTeamName.slice(0, 1))}</text>`;
 
-  const scoreEl = d.score
-    ? `<text x="${W / 2}" y="${SCORE_Y}" font-family="${FONT}" font-size="56" font-weight="900" fill="white" text-anchor="middle">${escXml(d.score)}</text>`
-    : "";
+  const scoreEl = hasResult
+    ? `<text x="${SCORE_CX}" y="${SCORE_Y}" font-family="${FONT}" font-size="80" font-weight="900" fill="white" text-anchor="middle">${escXml(d.score!)}</text>`
+    : `<text x="${SCORE_CX}" y="${SCORE_Y}" font-family="${FONT}" font-size="64" font-weight="900" fill="${GOLD}" text-anchor="middle" opacity="0.95">VS</text>`;
 
   const jornadaEl = d.jornadaInfo
-    ? `<text x="${W / 2}" y="${JORNADA_Y}" font-family="${FONT}" font-size="13" fill="rgba(255,255,255,0.65)" text-anchor="middle" letter-spacing="1.2">${escXml(d.jornadaInfo.toUpperCase())}</text>`
+    ? `<text x="${SCORE_CX}" y="${JORNADA_Y}" font-family="${FONT}" font-size="13" font-weight="600" fill="${GOLD}" text-anchor="middle" letter-spacing="2.2" opacity="0.82">${escXml(d.jornadaInfo.toUpperCase())}</text>`
     : "";
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}" height="${H}">
   <defs>
-    <linearGradient id="bfade" x1="0" y1="${GRAD_Y}" x2="0" y2="${H}" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#000" stop-opacity="0"/>
-      <stop offset="100%" stop-color="#000" stop-opacity="0.86"/>
+    <clipPath id="panelClip">
+      <rect x="${PX}" y="${PY}" width="${PW}" height="${PH}" rx="6"/>
+    </clipPath>
+    <filter id="panelGlow" x="-6%" y="-6%" width="112%" height="112%">
+      <feDropShadow dx="0" dy="6" stdDeviation="18" flood-color="#000" flood-opacity="0.60"/>
+    </filter>
+    <linearGradient id="goldShine" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="${GOLD}" stop-opacity="0"/>
+      <stop offset="25%"  stop-color="${GOLD}" stop-opacity="0.7"/>
+      <stop offset="75%"  stop-color="${GOLD}" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="${GOLD}" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="navyFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="${NAVY}" stop-opacity="0.0"/>
+      <stop offset="100%" stop-color="${NAVY}" stop-opacity="0.55"/>
     </linearGradient>
   </defs>
 
-  <!-- Gradient fade -->
-  <rect x="0" y="${GRAD_Y}" width="${W}" height="${H - GRAD_Y}" fill="url(#bfade)"/>
+  <!-- Cinematic dark vignette overlay on background photo -->
+  <rect x="0" y="0" width="${W}" height="${H}" fill="${NAVY}" opacity="0.38"/>
+  <rect x="0" y="0" width="${W}" height="${H}" fill="url(#navyFade)"/>
 
-  <!-- Liga INATEL badge -->
-  <rect x="${W - 238}" y="22" width="214" height="38" rx="7" fill="rgba(249,115,22,0.92)"/>
-  <text x="${W - 131}" y="47" font-family="${FONT}" font-size="15" font-weight="700" fill="white" text-anchor="middle" letter-spacing="2.5">LIGA INATEL</text>
+  <!-- Panel shadow -->
+  <rect x="${PX}" y="${PY}" width="${PW}" height="${PH}" rx="6" fill="#000" opacity="0.35" filter="url(#panelGlow)"/>
 
-  <!-- Home team -->
+  <!-- Panel background (dark navy, near-opaque) -->
+  <rect x="${PX}" y="${PY}" width="${PW}" height="${PH}" rx="6" fill="${NAVY}" opacity="0.93"/>
+
+  <!-- Header strip (subtle gold tint, clipped to panel) -->
+  <rect x="${PX}" y="${PY}" width="${PW}" height="${HEADER_H}" clip-path="url(#panelClip)" fill="${GOLD}" opacity="0.09"/>
+
+  <!-- Gold accent shimmer on top edge -->
+  <rect x="${PX + 2}" y="${PY + 2}" width="${PW - 4}" height="2" fill="url(#goldShine)"/>
+
+  <!-- Gold border around full panel -->
+  <rect x="${PX}" y="${PY}" width="${PW}" height="${PH}" rx="6" fill="none" stroke="${GOLD}" stroke-width="2" opacity="0.88"/>
+
+  <!-- Gold separator: header / content -->
+  <line x1="${PX + 24}" y1="${CONTENT_TOP}" x2="${PX + PW - 24}" y2="${CONTENT_TOP}" stroke="${GOLD}" stroke-width="1" opacity="0.40"/>
+
+  <!-- Gold separator: content / footer -->
+  <line x1="${PX + 24}" y1="${FOOTER_TOP}" x2="${PX + PW - 24}" y2="${FOOTER_TOP}" stroke="${GOLD}" stroke-width="1" opacity="0.40"/>
+
+  <!-- Subtle vertical zone dividers -->
+  <line x1="560" y1="${CONTENT_TOP + 12}" x2="560" y2="${FOOTER_TOP - 12}" stroke="${GOLD}" stroke-width="1" opacity="0.18"/>
+  <line x1="1040" y1="${CONTENT_TOP + 12}" x2="1040" y2="${FOOTER_TOP - 12}" stroke="${GOLD}" stroke-width="1" opacity="0.18"/>
+
+  <!-- HEADER: Liga INATEL badge (left) -->
+  <rect x="${PX + 16}" y="${PY + 11}" width="130" height="30" rx="3" fill="${GOLD}" opacity="0.14"/>
+  <rect x="${PX + 16}" y="${PY + 11}" width="130" height="30" rx="3" fill="none" stroke="${GOLD}" stroke-width="1" opacity="0.72"/>
+  <text x="${PX + 81}" y="${PY + 31}" font-family="${FONT}" font-size="11" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="2.5">LIGA INATEL</text>
+
+  <!-- HEADER: Status badge (centred) -->
+  <rect x="${statusBadgeX}" y="${PY + 11}" width="${statusBadgeW}" height="30" rx="3" fill="${GOLD}" opacity="0.14"/>
+  <rect x="${statusBadgeX}" y="${PY + 11}" width="${statusBadgeW}" height="30" rx="3" fill="none" stroke="${GOLD}" stroke-width="1" opacity="0.85"/>
+  <text x="${SCORE_CX}" y="${PY + 31}" font-family="${FONT}" font-size="11" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="2.5">${escXml(statusLabel)}</text>
+
+  <!-- HOME TEAM -->
   ${homeLogoEl}
-  <text x="${homeNameX}" y="${NAME_Y}" font-family="${FONT}" font-size="28" font-weight="700" fill="white">${homeName}</text>
+  <text x="${HOME_CX}" y="${NAME_Y}" font-family="${FONT}" font-size="22" font-weight="700" fill="white" text-anchor="middle">${homeName}</text>
 
-  <!-- Score -->
+  <!-- SCORE / VS -->
   ${scoreEl}
 
-  <!-- Away team -->
+  <!-- AWAY TEAM -->
   ${awayLogoEl}
-  <text x="${awayNameX}" y="${NAME_Y}" font-family="${FONT}" font-size="28" font-weight="700" fill="white" text-anchor="end">${awayName}</text>
+  <text x="${AWAY_CX}" y="${NAME_Y}" font-family="${FONT}" font-size="22" font-weight="700" fill="white" text-anchor="middle">${awayName}</text>
 
-  <!-- Jornada -->
+  <!-- FOOTER: jornada info -->
   ${jornadaEl}
 </svg>`;
 
