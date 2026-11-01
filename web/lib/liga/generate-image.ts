@@ -37,6 +37,8 @@ interface TeamKit {
 
 interface GameImageData {
   location: string | null;
+  homeTeamName: string | null;
+  awayTeamName: string | null;
   homeScore: number | null;
   awayScore: number | null;
   jornada: number | null;
@@ -366,6 +368,8 @@ async function fetchGameImageData(newsId: string, admin: SupabaseClient): Promis
 
     return {
       location: eventRes.data?.location ?? null,
+      homeTeamName: (news.home_team_name as string | null) ?? null,
+      awayTeamName: (news.away_team_name as string | null) ?? null,
       homeScore: resultRes.data?.home_score ?? null,
       awayScore: resultRes.data?.away_score ?? null,
       jornada: resultRes.data?.jornada ?? null,
@@ -386,25 +390,29 @@ async function buildFinalImage(
   ctx: NewsImageContext,
   gameData: GameImageData | null
 ): Promise<Buffer> {
-  // 1. Resize + blur subtil para foco visual no scoreboard central
+  // 1. Resize + blur ligeiro (1.5σ) para foco no scoreboard sem destruir o fundo
   const resized = await sharp(rawBuffer)
     .resize(1600, 900, { fit: "cover", position: "centre" })
-    .blur(3)
+    .blur(1.5)
     .toBuffer();
+  const meta = await sharp(resized).metadata();
+  console.log(`[buildFinalImage] resized ${meta.width}x${meta.height}`);
 
   // 2. Construir overlay SVG com logos, nomes, resultado
   const overlayData = await buildOverlayData(ctx, gameData);
   const svgBuffer = buildOverlaySvg(overlayData);
 
   // 3. Compor SVG sobre a imagem e converter para webp
+  console.log(`[buildFinalImage] svgBuffer size=${svgBuffer.length} bytes`);
   try {
-    return await sharp(resized)
+    const result = await sharp(resized)
       .composite([{ input: svgBuffer, blend: "over" }])
       .webp({ quality: 85 })
       .toBuffer();
+    console.log(`[buildFinalImage] composite ok outputSize=${result.length} bytes`);
+    return result;
   } catch (overlayErr) {
-    // Se o overlay falhar (SVG parse error, etc.), usa só a imagem base
-    console.warn(`[generateNewsImage] overlay falhou, usando imagem base: ${(overlayErr as Error).message}`);
+    console.error(`[buildFinalImage] overlay falhou — usando imagem base: ${(overlayErr as Error).message}`);
     return await sharp(resized).webp({ quality: 85 }).toBuffer();
   }
 }
@@ -413,8 +421,10 @@ async function buildOverlayData(
   ctx: NewsImageContext,
   gameData: GameImageData | null
 ): Promise<OverlayData> {
-  const homeTeamName = ctx.homeTeamName ?? "";
-  const awayTeamName = ctx.awayTeamName ?? "";
+  // Fallback: se o caller não passar nomes, usar o que está na BD via gameData
+  const homeTeamName = (ctx.homeTeamName || gameData?.homeTeamName || "").trim();
+  const awayTeamName = (ctx.awayTeamName || gameData?.awayTeamName || "").trim();
+  console.log(`[overlay] home="${homeTeamName}" away="${awayTeamName}" homeScore=${gameData?.homeScore ?? "null"} awayScore=${gameData?.awayScore ?? "null"}`);
 
   let score: string | null = null;
   if (gameData?.homeScore != null && gameData?.awayScore != null) {
@@ -435,6 +445,7 @@ async function buildOverlayData(
     gameData?.homeKit?.logo_url ? fetchImageAsBase64(gameData.homeKit.logo_url) : Promise.resolve(null),
     gameData?.awayKit?.logo_url ? fetchImageAsBase64(gameData.awayKit.logo_url) : Promise.resolve(null),
   ]);
+  console.log(`[overlay] homeLogo=${homeLogoB64 ? "ok" : "null"} awayLogo=${awayLogoB64 ? "ok" : "null"} homeLogoUrl=${gameData?.homeKit?.logo_url ?? "null"}`);
 
   return {
     homeTeamName,
@@ -453,7 +464,9 @@ async function buildOverlayData(
 function buildOverlaySvg(d: OverlayData): Buffer {
   const W = 1600;
   const H = 900;
-  const FONT = "'Noto Sans','DejaVu Sans',Arial,sans-serif";
+  // sans-serif é um generic font family garantido em qualquer pango/librsvg;
+  // evita dependência de fontes específicas não instaladas no Lambda da Vercel.
+  const FONT = "sans-serif";
 
   const GOLD = "#C8A852";
   const NAVY = "#0B1626";
@@ -470,9 +483,9 @@ function buildOverlaySvg(d: OverlayData): Buffer {
   const SCORE_CX = 800;
   const AWAY_CX = 1280;
 
-  // Logo
-  const LOGO_SZ = 100;
-  const LOGO_TOP = 276;                        // top of logo
+  // Logo (aumentado para 120px para melhor visibilidade)
+  const LOGO_SZ = 120;
+  const LOGO_TOP = 266;                        // top of logo (centrado verticalmente)
   const LOGO_CY = LOGO_TOP + LOGO_SZ / 2;     // 326
 
   // Team name baseline (below logo)
@@ -498,13 +511,14 @@ function buildOverlaySvg(d: OverlayData): Buffer {
   const homeName = escXml(truncate(d.homeTeamName, 20));
   const awayName = escXml(truncate(d.awayTeamName, 20));
 
+  // xlink:href mantém compatibilidade com librsvg <2.52; href é para SVG2/librsvg >=2.52
   const homeLogoEl = d.homeLogoB64
-    ? `<image x="${HOME_CX - LOGO_SZ / 2}" y="${LOGO_TOP}" width="${LOGO_SZ}" height="${LOGO_SZ}" href="${d.homeLogoB64}" preserveAspectRatio="xMidYMid meet"/>`
+    ? `<image x="${HOME_CX - LOGO_SZ / 2}" y="${LOGO_TOP}" width="${LOGO_SZ}" height="${LOGO_SZ}" xlink:href="${d.homeLogoB64}" href="${d.homeLogoB64}" preserveAspectRatio="xMidYMid meet"/>`
     : `<circle cx="${HOME_CX}" cy="${LOGO_CY}" r="${LOGO_SZ / 2 - 3}" fill="${escXml(d.homePrimaryColor)}" opacity="0.85"/>
        <text x="${HOME_CX}" y="${LOGO_CY + 14}" font-family="${FONT}" font-size="38" font-weight="900" fill="white" text-anchor="middle">${escXml(d.homeTeamName.slice(0, 1))}</text>`;
 
   const awayLogoEl = d.awayLogoB64
-    ? `<image x="${AWAY_CX - LOGO_SZ / 2}" y="${LOGO_TOP}" width="${LOGO_SZ}" height="${LOGO_SZ}" href="${d.awayLogoB64}" preserveAspectRatio="xMidYMid meet"/>`
+    ? `<image x="${AWAY_CX - LOGO_SZ / 2}" y="${LOGO_TOP}" width="${LOGO_SZ}" height="${LOGO_SZ}" xlink:href="${d.awayLogoB64}" href="${d.awayLogoB64}" preserveAspectRatio="xMidYMid meet"/>`
     : `<circle cx="${AWAY_CX}" cy="${LOGO_CY}" r="${LOGO_SZ / 2 - 3}" fill="${escXml(d.awayPrimaryColor)}" opacity="0.85"/>
        <text x="${AWAY_CX}" y="${LOGO_CY + 14}" font-family="${FONT}" font-size="38" font-weight="900" fill="white" text-anchor="middle">${escXml(d.awayTeamName.slice(0, 1))}</text>`;
 
@@ -546,12 +560,12 @@ function buildOverlaySvg(d: OverlayData): Buffer {
     </linearGradient>
     <linearGradient id="navyFade" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%"   stop-color="${NAVY}" stop-opacity="0.0"/>
-      <stop offset="100%" stop-color="${NAVY}" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="${NAVY}" stop-opacity="0.35"/>
     </linearGradient>
   </defs>
 
-  <!-- Cinematic dark vignette overlay on background photo -->
-  <rect x="0" y="0" width="${W}" height="${H}" fill="${NAVY}" opacity="0.38"/>
+  <!-- Overlay ligeiro sobre a foto — preserva visibilidade do fundo -->
+  <rect x="0" y="0" width="${W}" height="${H}" fill="${NAVY}" opacity="0.22"/>
   <rect x="0" y="0" width="${W}" height="${H}" fill="url(#navyFade)"/>
 
   <!-- Panel shadow -->
@@ -596,14 +610,14 @@ function buildOverlaySvg(d: OverlayData): Buffer {
 
   <!-- HOME TEAM -->
   ${homeLogoEl}
-  <text x="${HOME_CX}" y="${NAME_Y}" font-family="${FONT}" font-size="22" font-weight="700" fill="white" text-anchor="middle">${homeName}</text>
+  <text x="${HOME_CX}" y="${NAME_Y}" font-family="${FONT}" font-size="26" font-weight="700" fill="white" text-anchor="middle">${homeName}</text>
 
   <!-- SCORE / VS -->
   ${scoreEl}
 
   <!-- AWAY TEAM -->
   ${awayLogoEl}
-  <text x="${AWAY_CX}" y="${NAME_Y}" font-family="${FONT}" font-size="22" font-weight="700" fill="white" text-anchor="middle">${awayName}</text>
+  <text x="${AWAY_CX}" y="${NAME_Y}" font-family="${FONT}" font-size="26" font-weight="700" fill="white" text-anchor="middle">${awayName}</text>
 
   <!-- FOOTER: jornada info -->
   ${jornadaEl}
