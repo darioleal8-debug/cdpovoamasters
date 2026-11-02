@@ -52,14 +52,22 @@ interface TeamKit {
   logo_url: string | null;
 }
 
+interface GamePeriod {
+  period: number;
+  home: number;
+  away: number;
+}
+
 interface GameImageData {
   location: string | null;
+  eventDate: string | null;
   homeTeamName: string | null;
   awayTeamName: string | null;
   homeScore: number | null;
   awayScore: number | null;
   jornada: number | null;
   volta: number | null;
+  periods: GamePeriod[] | null;
   homeKit: TeamKit | null;
   awayKit: TeamKit | null;
 }
@@ -71,6 +79,8 @@ interface OverlayData {
   homeScore: number | null;
   awayScore: number | null;
   jornadaInfo: string | null;
+  eventDate: string | null;
+  periods: GamePeriod[] | null;
   homeLogoB64: string | null;
   awayLogoB64: string | null;
   homePrimaryColor: string;
@@ -363,8 +373,8 @@ async function fetchGameImageData(newsId: string, admin: SupabaseClient): Promis
 
     if (!news?.game_id) return null;
 
-    const [eventRes, resultRes, homeTeamRes, awayTeamRes] = await Promise.all([
-      admin.from("events").select("location").eq("id", news.game_id).single(),
+    const [eventRes, resultRes, homeTeamRes, awayTeamRes, sheetRes] = await Promise.all([
+      admin.from("events").select("location, event_date").eq("id", news.game_id).single(),
       admin.from("league_game_results")
         .select("home_score, away_score, jornada, volta")
         .eq("event_id", news.game_id)
@@ -381,16 +391,34 @@ async function fetchGameImageData(newsId: string, admin: SupabaseClient): Promis
             .ilike("name", news.away_team_name)
             .maybeSingle()
         : Promise.resolve({ data: null }),
+      admin.from("game_sheet_imports")
+        .select("sheet_data")
+        .eq("event_id", news.game_id)
+        .eq("status", "published")
+        .order("confirmed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
+
+    // Extrair parciais do boletim confirmado (se existir)
+    const sheetData = sheetRes.data?.sheet_data as { periods?: unknown[] } | null;
+    const rawPeriods = Array.isArray(sheetData?.periods) ? sheetData!.periods : null;
+    const periods: GamePeriod[] | null = rawPeriods
+      ? (rawPeriods as GamePeriod[]).filter(
+          (p) => typeof p?.period === "number" && typeof p?.home === "number" && typeof p?.away === "number"
+        )
+      : null;
 
     return {
       location: eventRes.data?.location ?? null,
+      eventDate: (eventRes.data?.event_date as string | null) ?? null,
       homeTeamName: (news.home_team_name as string | null) ?? null,
       awayTeamName: (news.away_team_name as string | null) ?? null,
       homeScore: resultRes.data?.home_score ?? null,
       awayScore: resultRes.data?.away_score ?? null,
       jornada: resultRes.data?.jornada ?? null,
       volta: resultRes.data?.volta ?? null,
+      periods: periods?.length ? periods : null,
       homeKit: homeTeamRes.data ?? null,
       awayKit: awayTeamRes.data ?? null,
     };
@@ -471,6 +499,8 @@ async function buildOverlayData(
     homeScore: gameData?.homeScore ?? null,
     awayScore: gameData?.awayScore ?? null,
     jornadaInfo,
+    eventDate: gameData?.eventDate ?? null,
+    periods: gameData?.periods ?? null,
     homeLogoB64,
     awayLogoB64,
     homePrimaryColor: gameData?.homeKit?.primary_color ?? "#F97316",
@@ -565,9 +595,32 @@ function buildOverlaySvg(d: OverlayData): Buffer {
     ? `<text x="${SCORE_X}" y="${AWAY_SCORE_Y}" font-family="${FONT}" font-size="90" font-weight="900" fill="${awayScoreColor}" text-anchor="end">${d.awayScore}</text>`
     : "";
 
-  const jornadaEl = d.jornadaInfo
-    ? `<text x="${PANEL_CX}" y="${FOOTER_MID_Y}" font-family="${FONT}" font-size="13" font-weight="600" fill="${GOLD}" text-anchor="middle" letter-spacing="2.2" opacity="0.82">${escXml(d.jornadaInfo.toUpperCase())}</text>`
-    : "";
+  // Rodapé: linha 1 = jornada (ou data), linha 2 = parciais (se disponíveis)
+  const FOOTER_LINE1_Y = FOOTER_TOP + 18;
+  const FOOTER_LINE2_Y = FOOTER_TOP + 38;
+
+  const periodsStr = d.periods?.length
+    ? d.periods.map((p) => `P${p.period}: ${p.home}-${p.away}`).join("  ·  ")
+    : null;
+
+  const dateStr = d.eventDate
+    ? (() => {
+        try {
+          return new Date(d.eventDate).toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" });
+        } catch { return null; }
+      })()
+    : null;
+
+  const footerLine1 = [d.jornadaInfo?.toUpperCase(), dateStr].filter(Boolean).join("  ·  ");
+
+  const jornadaEl = [
+    footerLine1
+      ? `<text x="${PANEL_CX}" y="${FOOTER_LINE1_Y}" font-family="${FONT}" font-size="12" font-weight="600" fill="${GOLD}" text-anchor="middle" letter-spacing="2.0" opacity="0.82">${escXml(footerLine1)}</text>`
+      : "",
+    periodsStr
+      ? `<text x="${PANEL_CX}" y="${FOOTER_LINE2_Y}" font-family="${FONT}" font-size="11" font-weight="600" fill="white" text-anchor="middle" letter-spacing="1.5" opacity="0.65">${escXml(periodsStr)}</text>`
+      : "",
+  ].join("");
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}" height="${H}">
   ${fontStyleEl}

@@ -7,22 +7,32 @@ import { generateNewsImage } from "@/lib/liga/generate-image";
 export const maxDuration = 300;
 
 // POST /api/liga/admin/news/generate-images-batch
-// Gera imagens para todas as notícias publicadas sem imagem.
+// Body opcional: { force: true } — regenera TODAS (incluindo as que já têm imagem).
+// Sem force: só as que não têm imagem ou falharam.
 // Para imediatamente em erro BILLING/AUTH; marca restantes como failed.
-export async function POST() {
+export async function POST(req: Request) {
   const auth = await authorizeAsLigaAdmin();
   if (!auth.ok) return auth.response;
 
+  const body = await req.json().catch(() => ({})) as { force?: boolean };
+  const force = body.force === true;
+
   const admin = await createAdminClient();
-  const { data: articles } = await admin
+  let query = admin
     .from("news")
     .select("id, title, excerpt, home_team_name, away_team_name")
     .eq("category", "Liga INATEL")
     .eq("is_published", true)
-    .is("cover_image_url", null)
     .not("image_status", "eq", "pending")
     .order("published_at", { ascending: true })
-    .limit(15);
+    .limit(force ? 50 : 15);
+
+  if (!force) {
+    // Sem force: apenas artigos sem imagem ou com erro
+    query = query.or("cover_image_url.is.null,image_status.eq.failed");
+  }
+
+  const { data: articles } = await query;
 
   if (!articles?.length) {
     return NextResponse.json({ ok: true, count: 0 });
