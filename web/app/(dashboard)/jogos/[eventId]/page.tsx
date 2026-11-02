@@ -17,6 +17,7 @@ import {
   Users, BarChart2, Video, CheckCircle2, XCircle, HelpCircle, Loader2,
 } from "lucide-react";
 import type { Event } from "@/types/database";
+import type { AvailabilityRosterRow } from "@/types/availability";
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -87,6 +88,8 @@ export default function GameDetailPage() {
   const [own,          setOwn]          = useState<OwnAvailability | null>(null);
   const [ownLoading,   setOwnLoading]   = useState(true);
   const [saving,       setSaving]       = useState(false);
+  // Plantel com disponibilidades — a API só o preenche para treinador/seccionista/admin
+  const [roster,       setRoster]       = useState<AvailabilityRosterRow[]>([]);
 
   const { callups, loading: callupsLoading } = useGameCallups(gameId);
 
@@ -105,7 +108,7 @@ export default function GameDetailPage() {
     setOwnLoading(true);
     fetch(`/api/games/${gameId}/availability`)
       .then((r) => r.json())
-      .then((json) => { setOwn(json.own ?? null); })
+      .then((json) => { setOwn(json.own ?? null); setRoster(json.players ?? []); })
       .catch(() => {})
       .finally(() => setOwnLoading(false));
   }, [gameId]);
@@ -124,6 +127,11 @@ export default function GameDetailPage() {
         toast({ title: "Erro", description: j.error, variant: "destructive" });
         return;
       }
+      // Atualiza também a linha do próprio no plantel (se for treinador+ e jogador)
+      fetch(`/api/games/${gameId}/availability`)
+        .then((r) => r.json())
+        .then((json) => setRoster(json.players ?? []))
+        .catch(() => {});
       setOwn({
         status,
         reason_code: null,
@@ -146,6 +154,10 @@ export default function GameDetailPage() {
   const mapsUrl  = buildMapsUrl(pavilion, locality);
   const jornada  = meta?.jornada;
   const volta    = meta?.volta;
+
+  const rosterAvailable   = roster.filter((r) => r.status === "available");
+  const rosterUnavailable = roster.filter((r) => r.status === "unavailable");
+  const rosterPending     = roster.filter((r) => !r.status);
 
   const isPast = event ? event.event_date < new Date().toISOString().slice(0, 10) : false;
 
@@ -304,6 +316,59 @@ export default function GameDetailPage() {
               Indisponível
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* ── Disponibilidades do plantel ── (treinador+) */}
+      {roster.length > 0 && (
+        <div className="rounded-xl border bg-card p-5 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-semibold text-sm">Disponibilidades do plantel</h2>
+            <Link href={`/jogos/${gameId}/convocatoria`}>
+              <Button size="sm" variant="outline" className="gap-1.5 h-7 text-xs">
+                <Users className="h-3.5 w-3.5" /> Convocar
+              </Button>
+            </Link>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-lg bg-muted/50 py-2">
+              <p className="text-lg font-bold text-green-600">{rosterAvailable.length}</p>
+              <p className="text-[11px] text-muted-foreground">Disponíveis</p>
+            </div>
+            <div className="rounded-lg bg-muted/50 py-2">
+              <p className="text-lg font-bold text-red-500">{rosterUnavailable.length}</p>
+              <p className="text-[11px] text-muted-foreground">Indisponíveis</p>
+            </div>
+            <div className="rounded-lg bg-muted/50 py-2">
+              <p className="text-lg font-bold text-muted-foreground">{rosterPending.length}</p>
+              <p className="text-[11px] text-muted-foreground">Sem resposta</p>
+            </div>
+          </div>
+          {([
+            ["Disponíveis",   rosterAvailable,   "text-green-600"],
+            ["Indisponíveis", rosterUnavailable, "text-red-500"],
+            ["Sem resposta",  rosterPending,     "text-muted-foreground"],
+          ] as const).map(([label, rows, color]) =>
+            rows.length > 0 ? (
+              <div key={label} className="space-y-1.5">
+                <p className={cn("text-xs font-semibold", color)}>{label} ({rows.length})</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {rows.map((r) => (
+                    <span
+                      key={r.player_id}
+                      title={r.reason_text ?? undefined}
+                      className="rounded-full bg-muted px-2.5 py-0.5 text-xs"
+                    >
+                      {r.jersey_number != null && (
+                        <span className="font-mono text-muted-foreground mr-1">{r.jersey_number}</span>
+                      )}
+                      {r.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null
+          )}
         </div>
       )}
 

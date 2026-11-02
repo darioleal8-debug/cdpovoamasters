@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import type { AvailabilityRosterRow } from "@/types/availability";
 import { AvailabilityPrompt } from "@/components/player/availability-prompt";
 import { lisbonDateTime } from "@/lib/event-time";
+import { hasAnyRole, MANAGERS } from "@/lib/auth/roles";
+import type { UserRole } from "@/types/database";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -67,10 +69,15 @@ export default async function GameDetailPage({ params }: Props) {
   // Fetch user role
   const { data: profile } = await supabase
     .from("users")
-    .select("role")
+    .select("role, roles_extra")
     .eq("id", user.id)
     .maybeSingle();
-  const isTrainerOrAbove = ["admin", "trainer"].includes(profile?.role ?? "");
+  // Papéis reais da conta (primário ou secundário) — treinador/seccionista/admin
+  // veem as disponibilidades do plantel. A RPC volta a validar do lado da BD.
+  const isTrainerOrAbove = !!profile && hasAnyRole(
+    { role: profile.role as UserRole, roles_extra: (profile.roles_extra as string[] | null) ?? [] },
+    MANAGERS,
+  );
 
   // Fetch game event
   const { data: event } = await supabase
@@ -349,9 +356,18 @@ export default async function GameDetailPage({ params }: Props) {
       {/* Disponibilidades — visível apenas a treinadores+ */}
       {isTrainerOrAbove && availRoster.length > 0 && (
         <>
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-widest">
-            Disponibilidades
-          </h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-widest">
+              Disponibilidades
+            </h2>
+            <Link
+              href={`/jogos/${id}/convocatoria`}
+              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold hover:bg-muted transition-colors"
+            >
+              <Users className="h-3.5 w-3.5" />
+              Fazer convocatória
+            </Link>
+          </div>
 
           {/* Resumo */}
           <div className="grid grid-cols-3 gap-3">
