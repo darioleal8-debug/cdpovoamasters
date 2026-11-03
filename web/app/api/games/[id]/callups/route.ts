@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { authorize } from "@/lib/auth/guards";
 import { MANAGERS } from "@/lib/auth/roles";
+import { getMaxCallups } from "@/lib/games/callup-limits";
 
 export const runtime = "nodejs";
 
@@ -89,7 +90,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { data: game } = await supabase
     .from("events")
-    .select("id, type, season_id")
+    .select("id, type, season_id, game_type, competition")
     .eq("id", game_id)
     .maybeSingle();
   if (!game) return fail("Jogo não encontrado", 404);
@@ -105,6 +106,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return fail("Este jogador não pertence ao plantel da temporada deste jogo", 400);
   }
 
+  // Jogos oficiais: máximo de convocados (sem mínimo).
+  const maxCallups = getMaxCallups(game);
+  if (maxCallups !== null) {
+    const { count } = await supabase
+      .from("game_callups")
+      .select("id", { count: "exact", head: true })
+      .eq("game_id", game_id);
+    if ((count ?? 0) >= maxCallups) {
+      return fail(`Máximo de ${maxCallups} convocados atingido para jogos oficiais`, 409);
+    }
+  }
+
   const { data: inserted, error } = await supabase
     .from("game_callups")
     .insert({ game_id, player_id: body.player_id, created_by: user.id })
@@ -113,6 +126,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   if (error) {
     if (error.code === "23505") return fail("Este jogador já está convocado", 409);
+    if (error.message?.includes("MAX_CALLUPS")) {
+      return fail("Máximo de 12 convocados atingido para jogos oficiais", 409);
+    }
     console.error("[callups POST] insert:", error.message);
     return fail("Não foi possível convocar o jogador. Tenta novamente.", 500);
   }
