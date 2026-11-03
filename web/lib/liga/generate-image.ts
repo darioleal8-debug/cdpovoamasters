@@ -24,6 +24,9 @@ function getInterBoldB64(): string | null {
 const FAL_API = "https://fal.run/fal-ai/flux/dev";
 const BUCKET = "noticias";
 
+// Placard sobreposto desativado: a imagem da notícia é só a foto do jogo.
+const ENABLE_SCOREBOARD_OVERLAY = false;
+
 // ─── Public types ─────────────────────────────────────────────────────────────
 
 export interface NewsImageContext {
@@ -435,6 +438,14 @@ async function buildFinalImage(
   ctx: NewsImageContext,
   gameData: GameImageData | null
 ): Promise<Buffer> {
+  // Imagem limpa: só a fotografia do jogo, sem placard/overlay
+  if (!ENABLE_SCOREBOARD_OVERLAY) {
+    return await sharp(rawBuffer)
+      .resize(1600, 900, { fit: "cover", position: "attention" })
+      .webp({ quality: 88 })
+      .toBuffer();
+  }
+
   // 1. Resize + blur ligeiro (1.5σ) para foco no scoreboard sem destruir o fundo
   const resized = await sharp(rawBuffer)
     .resize(1600, 900, { fit: "cover", position: "centre" })
@@ -764,21 +775,53 @@ async function setImageFailed(newsId: string, errorType: FalErrorType, errorMsg:
 // ─── Negative prompt padrão ──────────────────────────────────────────────────
 
 const STANDARD_NEGATIVE =
-  "text, letters, words, numbers, jersey numbers, logos, team names, scoreboards, " +
-  "NBA, NCAA, american arena, english signage, professional basketball, stadium, " +
-  "watermark, brand names, readable text, banners with words, advertisements";
+  "text, letters, words, numbers, jersey numbers, logos, team names, scoreboard, score display, " +
+  "NBA, NCAA, american arena, english signage, professional stadium, crowd of thousands, " +
+  "watermark, brand names, readable text, advertisements, " +
+  "extra limbs, extra fingers, deformed hands, two balls, distorted faces, plastic skin, " +
+  "3D render, cartoon, illustration, CGI, oversaturated, empty court, static posed group photo";
+
+// ─── Cores: hex → nome em inglês (o Flux não percebe "#F97316") ───────────────
+
+const NAMED_COLORS: [string, [number, number, number]][] = [
+  ["white", [245, 245, 245]], ["black", [20, 20, 20]], ["grey", [128, 128, 128]],
+  ["red", [200, 30, 30]], ["dark red / maroon", [120, 20, 30]], ["orange", [245, 120, 20]],
+  ["yellow", [240, 210, 30]], ["gold", [200, 160, 60]], ["green", [30, 150, 60]],
+  ["dark green", [20, 80, 40]], ["light blue / sky blue", [100, 170, 230]],
+  ["royal blue", [30, 70, 200]], ["navy blue", [15, 30, 80]], ["purple", [110, 50, 160]],
+  ["pink", [230, 100, 160]], ["brown", [110, 70, 40]],
+];
+
+function colorName(hex: string | null | undefined): string | null {
+  if (!hex) return null;
+  const m = hex.trim().match(/^#?([0-9a-f]{6})$/i);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const rgb = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  let best = NAMED_COLORS[0][0], bestD = Infinity;
+  for (const [name, c] of NAMED_COLORS) {
+    const d = (rgb[0] - c[0]) ** 2 + (rgb[1] - c[1]) ** 2 + (rgb[2] - c[2]) ** 2;
+    if (d < bestD) { bestD = d; best = name; }
+  }
+  return best;
+}
+
+function kitPhrase(kit: TeamKit | null, fallback: string): string {
+  if (kit?.kit_description) return kit.kit_description;
+  const p = colorName(kit?.primary_color);
+  const s = colorName(kit?.secondary_color);
+  if (p && s && p !== s) return `${p} jerseys with ${s} trim`;
+  if (p) return `${p} jerseys`;
+  return fallback;
+}
 
 // ─── DeepSeek: prompt editorial a partir de dados reais ──────────────────────
 
 function buildKitLine(teamName: string, kit: TeamKit | null): string {
-  if (!kit) return `Team: ${teamName} (no kit data)`;
-  const parts = [`Team: ${teamName}`];
-  if (kit.kit_description) parts.push(`Kit: ${kit.kit_description}`);
-  else if (kit.primary_color) parts.push(`Primary color: ${kit.primary_color}${kit.secondary_color ? `, secondary: ${kit.secondary_color}` : ""}`);
-  return parts.join(" | ");
+  return `${teamName}: ${kitPhrase(kit, "no kit data — choose a plain solid colour")}`;
 }
 
-// System prompt fixo e rigoroso para geração editorial
+// System prompt: foto de AÇÃO de um jogo de basquetebol amador
 function buildEditorialSystemPrompt(
   homeTeamName: string,
   awayTeamName: string,
@@ -786,31 +829,30 @@ function buildEditorialSystemPrompt(
   awayKit: TeamKit | null,
   location: string | null
 ): string {
-  return `You are generating a Flux AI image prompt for a Portuguese amateur basketball news photo.
+  return `You write prompts for the Flux image model. Output ONE photorealistic action photo of a basketball game in progress, for a news article about an amateur veterans game in Portugal (Liga INATEL).
 
-MANDATORY CONTEXT — do not deviate:
-- League: Liga INATEL (amateur/masters basketball, Porto region, Portugal)
-- Setting: ${location ? `"${location}" — ` : ""}Portuguese municipal or school sports hall with small bleachers (50–200 seats), wooden or synthetic parquet floor, fluorescent tube ceiling lighting, walls with Portuguese signage only
-- Players: adult amateur males aged 35–60, regular build, NOT professional or semi-professional athletes
-- Photography style: photorealistic sports photo, telephoto lens, shallow depth of field, motion blur, no 3D-render appearance
+THE PICTURE MUST SHOW A BASKETBALL GAME — players actively competing for the ball, never an empty court, a scoreboard, a poster or a posed group.
 
-TEAMS PLAYING TODAY:
-${buildKitLine(homeTeamName, homeKit)}
-${buildKitLine(awayTeamName, awayKit)}
+Build the prompt in this order:
+1. Shot type + moment: pick ONE peak-action moment that fits the article (layup in traffic, jump shot over a defender, rebound fight under the rim, fast break, block attempt, drive past a defender). Name the camera position (courtside low angle / baseline behind the basket / elevated from bleachers).
+2. Players: 3–6 adult amateur men aged 35–55, ordinary athletic builds, some grey hair, sweat, real effort. One team in the HOME kit, the other in the AWAY kit (below) — both kits clearly visible and distinct. Plain jerseys and shorts, no numbers, no lettering.
+3. Ball + hoop: exactly one orange basketball, clearly in the air or in hand; the orange hoop with white net visible in frame.
+4. Venue: ${location ? `"${location}", a ` : "a "}Portuguese municipal sports hall — light wooden parquet with painted court lines, a few rows of bleachers with a small crowd, tiled or painted walls, high ceiling with industrial lights.
+5. Camera + light: Canon EOS R3, 70–200mm f/2.8, 1/1000s freezing the action, shallow depth of field, background softly blurred, natural gym lighting, slight grain, editorial newspaper sports photography.
 
-STRICT PROHIBITIONS (any violation → your response is rejected):
-- NEVER write team names, jersey numbers, logos or text in the image description
-- NEVER reference NBA, NCAA, American basketball, famous players or professional leagues
-- NEVER invent sponsors, city names not provided, or league names other than Liga INATEL
-- Players must NOT have recognizable faces — behind, motion-blurred, or silhouette only
-- NO scoreboards, banners, advertising boards with readable text
+KITS:
+HOME — ${buildKitLine(homeTeamName, homeKit)}
+AWAY — ${buildKitLine(awayTeamName, awayKit)}
 
-REQUIRED: describe players' jerseys ONLY using the colors above; no other color schemes.
+RULES:
+- Describe kits by COLOUR only. Never write team names, numbers, logos, sponsors or any text into the prompt.
+- No NBA/NCAA/famous players/big arenas. No scoreboards.
+- Faces may be visible but natural and unposed; no close-up portraits.
 
-Respond with valid JSON only (no markdown):
+Respond with JSON only (no markdown):
 {"prompt": "...", "negative_prompt": "..."}
-prompt: 80–200 words, English, specific, photorealistic sports documentary photography
-negative_prompt: 20–50 words (always include: text, letters, numbers, NBA, american arena, english signage)`;
+prompt: 90–160 words, English, comma-separated concrete visual details, starting with "Photorealistic sports action photo,"
+negative_prompt: 20–40 words (always include: text, numbers, logos, scoreboard, extra limbs, two balls, NBA, 3D render)`;
 }
 
 async function buildImagePrompt(
@@ -909,30 +951,58 @@ async function callDeepSeekForPrompt(
 }
 
 // Fallback determinístico com dados reais quando DeepSeek falha
+const ACTION_MOMENTS = [
+  "a player in the home kit rising for a layup between two defenders in the away kit, ball leaving his fingertips toward the rim",
+  "a player in the away kit releasing a jump shot while a home defender leaps with an outstretched arm",
+  "players from both teams battling for a rebound under the basket, the ball just above their reaching hands",
+  "a home player driving hard to the basket past an away defender, ball dribbled low, bodies leaning",
+  "an away player attempting a block as a home player goes up for a shot close to the rim",
+];
+
 function buildFallbackPrompt(
   ctx: NewsImageContext,
   gameData: GameImageData | null
 ): { prompt: string; negativePrompt: string } {
-  const home = ctx.homeTeamName ?? "";
-  const away = ctx.awayTeamName ?? "";
-  const homeColor = gameData?.homeKit?.kit_description ?? gameData?.homeKit?.primary_color ?? "colored";
-  const awayColor = gameData?.awayKit?.kit_description ?? gameData?.awayKit?.primary_color ?? "contrasting";
-  const venue = gameData?.location ?? "Portuguese municipal sports hall";
-  const score = gameData?.homeScore != null ? `${gameData.homeScore}–${gameData.awayScore}` : ctx.scoreStr ?? "";
+  const homeKit = kitPhrase(gameData?.homeKit ?? null, "white jerseys");
+  const awayKit = kitPhrase(gameData?.awayKit ?? null, "dark blue jerseys");
+  const venue = gameData?.location ? `${gameData.location}, a Portuguese municipal sports hall` : "a Portuguese municipal sports hall";
+  const seedStr = ctx.newsId || `${ctx.homeTeamName}${ctx.awayTeamName}`;
+  const idx = [...seedStr].reduce((a, c) => a + c.charCodeAt(0), 0) % ACTION_MOMENTS.length;
 
-  const fragments = [
-    "Photorealistic sports documentary photograph of an amateur basketball game in Portugal.",
-    `Indoor sports hall: ${venue}. Small bleachers, parquet floor, fluorescent overhead lighting.`,
-    `Two teams of adult amateur men (35-60 years old). Home team in ${homeColor} jerseys. Away team in ${awayColor} jerseys.`,
-    "Dynamic moment: player driving to the basket, ball in play, defenders in motion, arms outstretched.",
-    score && `Final score context: ${home} ${score} ${away}.`,
-    "Telephoto lens, shallow depth of field, motion blur on hands and ball. No faces visible — players from behind or in silhouette.",
-  ].filter(Boolean);
+  return { prompt: buildGamePhotoPrompt({ homeKit, awayKit, venue, moment: ACTION_MOMENTS[idx] }), negativePrompt: STANDARD_NEGATIVE };
+}
 
-  return {
-    prompt: fragments.join(" ").slice(0, 500),
-    negativePrompt: STANDARD_NEGATIVE,
-  };
+/** Prompt base "jogo de basquetebol" — usado no fallback e na rota de teste. */
+export function buildGamePhotoPrompt(o: { homeKit: string; awayKit: string; venue?: string; moment?: string }): string {
+  return [
+    "Photorealistic sports action photo, amateur veterans basketball game in progress,",
+    `${o.moment ?? ACTION_MOMENTS[0]},`,
+    `home team wearing ${o.homeKit}, away team wearing ${o.awayKit}, plain jerseys and shorts without numbers or lettering,`,
+    "adult men aged 35 to 55 with ordinary athletic builds, some grey hair, sweat and real effort,",
+    "exactly one orange basketball in the air, orange hoop with white net visible in frame,",
+    `indoor ${o.venue ?? "Portuguese municipal sports hall"}, light wooden parquet with painted court lines, a few rows of bleachers with a small crowd, high ceiling with industrial lights,`,
+    "courtside low angle, Canon EOS R3, 70-200mm f/2.8, 1/1000s freezing the action, shallow depth of field, softly blurred background, natural gym lighting, slight film grain, editorial newspaper sports photography",
+  ].join(" ");
+}
+
+/** Rota de teste: gera só a foto (sem overlay) para validação visual. */
+export async function generateTestGamePhoto(o: {
+  homePrimary?: string | null; homeSecondary?: string | null;
+  awayPrimary?: string | null; awaySecondary?: string | null;
+  venue?: string | null; momentIndex?: number;
+}): Promise<{ webp: Buffer; prompt: string; seed: number }> {
+  const falKey = process.env.FAL_KEY;
+  if (!falKey) throw new Error("FAL_KEY não configurada");
+  const kit = (p?: string | null, s?: string | null): TeamKit => ({ primary_color: p ?? null, secondary_color: s ?? null, kit_description: null, logo_url: null });
+  const prompt = buildGamePhotoPrompt({
+    homeKit: kitPhrase(kit(o.homePrimary, o.homeSecondary), "white jerseys"),
+    awayKit: kitPhrase(kit(o.awayPrimary, o.awaySecondary), "dark blue jerseys"),
+    venue: o.venue ? `${o.venue}, a Portuguese municipal sports hall` : undefined,
+    moment: ACTION_MOMENTS[Math.abs(o.momentIndex ?? 0) % ACTION_MOMENTS.length],
+  });
+  const { buffer, seed } = await callFalApi(prompt, STANDARD_NEGATIVE, falKey);
+  const webp = await sharp(buffer).resize(1600, 900, { fit: "cover", position: "attention" }).webp({ quality: 88 }).toBuffer();
+  return { webp, prompt, seed };
 }
 
 // ─── fal.ai ───────────────────────────────────────────────────────────────────
