@@ -14,6 +14,7 @@ import {
 import { useGameCallups } from "@/hooks/use-game-callups";
 import { useRoster } from "@/hooks/use-roster";
 import { formatDateShort } from "@/lib/utils";
+import { getMaxCallups } from "@/lib/games/callup-limits";
 import { RSVP_REASON_LABELS } from "@/types/database";
 import type { Event } from "@/types/database";
 import type { AvailabilityRosterRow } from "@/types/availability";
@@ -35,6 +36,10 @@ export function CallupsModal({ game, open, onClose }: Props) {
     () => new Set(callups.map((c) => c.player_id)),
     [callups]
   );
+
+  // Jogos oficiais: máximo de 12 convocados (sem mínimo).
+  const maxCallups = getMaxCallups(game);
+  const isFull = maxCallups !== null && callups.length >= maxCallups;
 
   // ── Disponibilidade ──────────────────────────────────────
   const gameId = game?.id ?? null;
@@ -124,7 +129,7 @@ export function CallupsModal({ game, open, onClose }: Props) {
               Convocados
               {callups.length > 0 && (
                 <span className="ml-1 rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground leading-4">
-                  {callups.length}
+                  {callups.length}{maxCallups !== null ? `/${maxCallups}` : ""}
                 </span>
               )}
             </TabsTrigger>
@@ -200,7 +205,8 @@ export function CallupsModal({ game, open, onClose }: Props) {
                               size="sm"
                               variant="outline"
                               className="shrink-0 h-7 gap-1 border-green-400 text-green-700 hover:bg-green-100 text-[12px] dark:text-green-400 dark:hover:bg-green-950/40"
-                              disabled={isLoading}
+                              disabled={isLoading || isFull}
+                              title={isFull ? `Máximo de ${maxCallups} convocados atingido` : undefined}
                               onClick={() => quickConvoke(row.player_id)}
                             >
                               {isLoading
@@ -319,11 +325,13 @@ export function CallupsModal({ game, open, onClose }: Props) {
                 <Select
                   value={selectedPlayerId}
                   onValueChange={setSelectedPlayerId}
-                  disabled={rosterLoading}
+                  disabled={rosterLoading || isFull}
                 >
                   <SelectTrigger className="flex-1">
                     <SelectValue placeholder={
-                      dropdownPlayers.length === 0
+                      isFull
+                        ? `Máximo de ${maxCallups} convocados atingido`
+                        : dropdownPlayers.length === 0
                         ? "Todos os jogadores estão convocados"
                         : "Selecionar jogador..."
                     } />
@@ -346,14 +354,19 @@ export function CallupsModal({ game, open, onClose }: Props) {
                 <Button
                   size="sm"
                   onClick={handleAdd}
-                  disabled={saving || !selectedPlayerId}
+                  disabled={saving || !selectedPlayerId || isFull}
                   className="gap-1.5 shrink-0"
                 >
                   <UserPlus className="h-3.5 w-3.5" />
                   {saving ? "A convocar..." : "Adicionar"}
                 </Button>
               </div>
-              <div className="flex justify-end">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {maxCallups !== null
+                    ? `Jogo oficial: até ${maxCallups} convocados (pode ter menos).`
+                    : ""}
+                </span>
                 <Button variant="outline" size="sm" onClick={onClose}>Fechar</Button>
               </div>
             </div>
