@@ -283,36 +283,64 @@ export function useLiveGame(
 
   // ── Clock controls ──────────────────────────────────────
 
+  // As ações do relógio atualizam o estado local de imediato (otimista) e
+  // depois com a linha devolvida pela base de dados — não dependem do eco do
+  // Realtime, que pode falhar/atrasar (rede fraca no pavilhão, websocket em
+  // baixo). Usam sessionRef para nunca agir sobre um estado desatualizado.
+  async function writeClock(
+    patch: Partial<GameSession>,
+    rollback: GameSession
+  ): Promise<void> {
+    setSession((s) => (s ? { ...s, ...patch } : s));
+    const { data, error } = await supabase
+      .from("game_sessions")
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq("id", rollback.id)
+      .select("*")
+      .single();
+    if (error || !data) {
+      setSession(rollback);
+      toast({ title: "Relógio não atualizado", description: error?.message ?? "Tenta novamente.", variant: "destructive" });
+      // repõe o estado real a partir da BD
+      loadSession();
+      return;
+    }
+    setSession(data as GameSession);
+  }
+
   async function startClock(): Promise<void> {
-    if (!session || session.clock_running) return;
-    await supabase.from("game_sessions").update({
-      clock_running: true,
-      clock_started_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }).eq("id", session.id);
+    const cur = sessionRef.current;
+    if (!cur || cur.clock_running) return;
+    await writeClock(
+      { clock_running: true, clock_started_at: new Date().toISOString() },
+      cur
+    );
   }
 
   async function stopClock(): Promise<void> {
-    if (!session || !session.clock_running) return;
-    const elapsed = session.clock_elapsed_secs +
-      (Date.now() - new Date(session.clock_started_at!).getTime()) / 1000;
-    await supabase.from("game_sessions").update({
-      clock_running: false,
-      clock_elapsed_secs: Math.floor(elapsed),
-      clock_started_at: null,
-      updated_at: new Date().toISOString(),
-    }).eq("id", session.id);
+    const cur = sessionRef.current;
+    if (!cur || !cur.clock_running) return;
+    const started = cur.clock_started_at ? new Date(cur.clock_started_at).getTime() : Date.now();
+    const elapsed = (cur.clock_elapsed_secs ?? 0) + (Date.now() - started) / 1000;
+    const maxSecs = cur.period_duration_secs ?? 600;
+    await writeClock(
+      {
+        clock_running: false,
+        clock_elapsed_secs: Math.min(maxSecs, Math.floor(elapsed)),
+        clock_started_at: null,
+      },
+      cur
+    );
   }
 
   async function resetClock(): Promise<void> {
-    if (!session) return;
-    await supabase.from("game_sessions").update({
-      clock_running: false,
-      clock_elapsed_secs: 0,
-      clock_started_at: null,
-      updated_at: new Date().toISOString(),
-    }).eq("id", session.id);
-    setClockSecs(session.period_duration_secs ?? 600);
+    const cur = sessionRef.current;
+    if (!cur) return;
+    await writeClock(
+      { clock_running: false, clock_elapsed_secs: 0, clock_started_at: null },
+      cur
+    );
+    setClockSecs(cur.period_duration_secs ?? 600);
   }
 
   // ── Start game ──────────────────────────────────────────
