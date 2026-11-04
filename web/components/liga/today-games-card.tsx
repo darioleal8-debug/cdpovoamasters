@@ -91,7 +91,7 @@ export function TodayGamesCard({ games }: { games: TodayGame[] }) {
       .subscribe();
 
     // Rede de segurança caso o websocket caia (ex.: telemóvel em segundo plano)
-    const poll = window.setInterval(load, 30_000);
+    const poll = window.setInterval(load, 8_000);
     const onVisible = () => { if (document.visibilityState === "visible") load(); };
     document.addEventListener("visibilitychange", onVisible);
 
