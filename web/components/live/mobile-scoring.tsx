@@ -3,7 +3,8 @@
 import { useState, useMemo } from "react";
 import type { PlayEventType, PlayByPlay, GameSession } from "@/types/database";
 import type { PlayerWithUser } from "@/types/database";
-import { deriveStats } from "@/lib/live/derive-stats";
+import { deriveStats, withSecondsPlayed } from "@/lib/live/derive-stats";
+import { computeSecondsPlayed, formatMinutes, type CourtStint } from "@/lib/live/minutes";
 import { formatClock } from "@/hooks/use-live-game";
 import { MONO, SANS } from "./tokens";
 
@@ -18,6 +19,7 @@ interface LiveGameHandle {
   onCourt: PlayerWithUser[];
   bench: PlayerWithUser[];
   plays: PlayByPlay[];
+  stints: CourtStint[];
   clockSecs: number;
   recording: boolean;
   recordPlay: (args: { event_type: PlayEventType; player_id: string }) => Promise<boolean>;
@@ -86,13 +88,14 @@ interface PlayerRowProps {
   player: PlayerWithUser;
   pts: number;
   fouls: number;
+  secs: number;
   isSelected: boolean;
   isSubTarget: boolean;
   isPendingIn: boolean;
   onClick: () => void;
 }
 
-function PlayerRow({ player, pts, fouls, isSelected, isSubTarget, isPendingIn, onClick }: PlayerRowProps) {
+function PlayerRow({ player, pts, fouls, secs, isSelected, isSubTarget, isPendingIn, onClick }: PlayerRowProps) {
   return (
     <button
       onClick={onClick}
@@ -117,6 +120,7 @@ function PlayerRow({ player, pts, fouls, isSelected, isSubTarget, isPendingIn, o
         {player.user.name.split(" ")[0]}
       </span>
       <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 600, color: "var(--muted)" }} title="Tempo jogado">{formatMinutes(secs)}</span>
         <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{pts}P</span>
         {fouls > 0 && (
           <span style={{
@@ -178,7 +182,7 @@ function ActionButton({ event: _event, label, sub, actionStyle, enabled, onClick
 
 export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScreenProps) {
   const {
-    session, roster, onCourt, bench, plays, clockSecs, recording,
+    session, roster, onCourt, bench, plays, stints, clockSecs, recording,
     recordPlay, recordOpponentPoints, recordOpponentFoul, recordOpponentReb,
     startClock, stopClock, substitutePlayer, setLineup, undoPlay,
   } = game;
@@ -189,9 +193,17 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
   const [bottomTab, setBottomTab] = useState<"banco" | "feed" | null>(null);
   const [showOpp, setShowOpp] = useState(false);
 
-  const { playerMap, homeFouls, awayFouls } = useMemo(
+  const { playerMap: basePlayerMap, homeFouls, awayFouls } = useMemo(
     () => deriveStats(plays, session?.current_period ?? 1),
     [plays, session?.current_period]
+  );
+  const clockWhole = Math.floor(clockSecs);
+  const playerMap = useMemo(
+    () => withSecondsPlayed(
+      basePlayerMap,
+      computeSecondsPlayed(stints, session?.current_period ?? 1, clockWhole, session?.status === "live")
+    ),
+    [basePlayerMap, stints, session?.current_period, session?.status, clockWhole]
   );
 
   const running = session?.clock_running ?? false;
@@ -375,6 +387,7 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
                 player={p}
                 pts={st?.pts ?? 0}
                 fouls={st?.fouls_total ?? 0}
+                secs={st?.secs_played ?? 0}
                 isSelected={selectedPlayer?.user_id === p.user_id}
                 isSubTarget={!!pendingIn}
                 isPendingIn={false}
@@ -400,6 +413,7 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
                     player={p}
                     pts={st?.pts ?? 0}
                     fouls={st?.fouls_total ?? 0}
+                    secs={st?.secs_played ?? 0}
                     isSelected={false}
                     isSubTarget={false}
                     isPendingIn={pendingIn === p.user_id}

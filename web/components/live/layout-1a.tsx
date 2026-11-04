@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatMinutes } from "@/lib/live/minutes";
 import type { GameSession, PlayByPlay, PlayEventType } from "@/types/database";
 import type { PlayerWithUser } from "@/types/database";
 import type { DerivedPlayerStats } from "@/lib/live/derive-stats";
@@ -544,7 +545,7 @@ export function Layout1a({
                       </span>
                     </div>
                     <div style={{ display: "flex", gap: 16 }}>
-                      {[["PTS", pts], ["RES", reb], ["AST", ast], ["FALT", fouls]].map(([lbl, val]) => (
+                      {[["MIN", formatMinutes(stats?.secs_played)], ["PTS", pts], ["RES", reb], ["AST", ast], ["FALT", fouls]].map(([lbl, val]) => (
                         <div key={lbl as string} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
                           <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)" }}>{lbl}</span>
                           <span style={{ fontFamily: MONO, fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{val}</span>
@@ -591,7 +592,7 @@ export function Layout1a({
                         }}
                       >
                         #{player.jersey_number} {player.user.name.split(" ")[0]}{" "}
-                        {stats?.pts ?? 0} pts · {stats?.fouls_total ?? 0} F ↑
+                        {stats?.pts ?? 0} pts · {stats?.fouls_total ?? 0} F · {formatMinutes(stats?.secs_played)} ↑
                       </button>
                     );
                   })}
