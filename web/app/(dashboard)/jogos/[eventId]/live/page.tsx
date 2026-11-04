@@ -210,7 +210,7 @@ export default function LiveGamePage() {
   }, [summaryOpen, shareOpen]);
 
   // ── Derived stats from events ─────────────────────────────
-  const { playerMap, homeFouls } = useMemo(
+  const { playerMap, homeFouls, awayFouls, awayRebOff, awayRebDef } = useMemo(
     () => deriveStats(plays, session?.current_period ?? 1),
     [plays, session?.current_period]
   );
@@ -231,9 +231,11 @@ export default function LiveGamePage() {
     clockSecs,
     recording,
     homeFouls,
-    awayFouls: session.away_fouls ?? 0,
-    awayRebOff: session.away_reb_off ?? 0,
-    awayRebDef: session.away_reb_def ?? 0,
+    // Derivados das jogadas (sempre recarregadas após cada registo) — não
+    // dependem do eco do Realtime em game_sessions.
+    awayFouls,
+    awayRebOff,
+    awayRebDef,
     onRecordPlay: (eventType: import("@/types/database").PlayEventType, playerId: string) =>
       recordPlay({ event_type: eventType, player_id: playerId }),
     onRecordOpponentPoints: recordOpponentPoints,

@@ -61,6 +61,7 @@ const FOUL_ACTIONS: Array<{ event: PlayEventType; label: string; style: ActionSt
   { event: "foul_of",   label: "F.OF",   style: "danger" },
   { event: "foul_tec",  label: "F.TEC",  style: "danger" },
   { event: "foul_anti", label: "ANTID.", style: "danger" },
+  { event: "foul_drawn", label: "F.SOFR", style: "neutral" },
 ];
 
 const PLAY_LABELS: Record<string, string> = {
@@ -72,6 +73,7 @@ const PLAY_LABELS: Record<string, string> = {
   "block": "Bloco",          "turnover": "Perda",
   "foul_def": "F. Def.",     "foul_of": "F. Of.",
   "foul_tec": "F. Téc.",     "foul_anti": "Antid.",
+  "foul_drawn": "F. Sofrida",
   "substitution_in": "Entrou", "substitution_out": "Saiu",
   "period_end": "Fim período", "game_start": "Início",
 };
@@ -447,8 +449,8 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
             ))}
           </div>
 
-          {/* Fouls: 4 cols */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 4 }}>
+          {/* Fouls: 5 cols (inclui falta sofrida) */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 4 }}>
             {FOUL_ACTIONS.map((a) => (
               <ActionButton
                 key={a.event} event={a.event} label={a.label}

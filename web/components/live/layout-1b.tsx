@@ -54,6 +54,7 @@ const ACTIONS: ActionDef[] = [
   { event: "foul_of",     label: "F. OF.",       sub: "FALTA",              style: "danger"  },
   { event: "foul_tec",    label: "TÉCNICA",      sub: "FALTA",              style: "danger"  },
   { event: "foul_anti",   label: "ANTIDESP.",    sub: "FALTA",              style: "danger"  },
+  { event: "foul_drawn",  label: "SOFRIDA",      sub: "FALTA",              style: "neutral" },
 ];
 
 function Pips({ count, max = 5 }: { count: number; max?: number }) {
@@ -236,11 +237,11 @@ export function Layout1b({
         <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 8 }}>
           1 · QUE ACONTECEU?{" "}
           <span style={{ fontWeight: 600, textTransform: "none", letterSpacing: 0, fontSize: 11 }}>
-            (faltas: def., of., técnica, antidesportiva)
+            (faltas: def., of., técnica, antidesportiva, sofrida)
           </span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6 }}>
-          {ACTIONS.filter(a => a.style !== "danger").map((a) => (
+          {ACTIONS.filter(a => !a.event.startsWith("foul")).map((a) => (
             <button key={a.event}
               onClick={() => setSelectedAction(prev => prev === a.event ? null : a.event)}
               style={actionBtnStyle(a)}>
@@ -249,8 +250,8 @@ export function Layout1b({
             </button>
           ))}
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginTop: 6 }}>
-          {ACTIONS.filter(a => a.style === "danger").map((a) => (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6, marginTop: 6 }}>
+          {ACTIONS.filter(a => a.event.startsWith("foul")).map((a) => (
             <button key={a.event}
               onClick={() => setSelectedAction(prev => prev === a.event ? null : a.event)}
               style={actionBtnStyle(a)}>

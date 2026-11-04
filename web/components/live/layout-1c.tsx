@@ -9,7 +9,8 @@ import { EVENT_LABELS } from "./layout-1a";
 import { MONO, SANS } from "./tokens";
 
 type FoulType = "foul_def" | "foul_of" | "foul_tec" | "foul_anti";
-type FoulSel = "Def" | "Of" | "Tec" | "Anti";
+type FoulSel = "Def" | "Of" | "Tec" | "Anti" | "Sofr";
+type PlayerFoulEvent = FoulType | "foul_drawn";
 
 export interface Layout1cProps {
   session: GameSession;
@@ -36,11 +37,12 @@ export interface Layout1cProps {
   onUndoPlay: (id: string) => Promise<boolean>;
 }
 
-const FOUL_SEL_OPTIONS: { id: FoulSel; label: string; event: FoulType }[] = [
+const FOUL_SEL_OPTIONS: { id: FoulSel; label: string; event: PlayerFoulEvent }[] = [
   { id: "Def",  label: "DEFENSIVA", event: "foul_def"  },
   { id: "Of",   label: "OFENSIVA",  event: "foul_of"   },
   { id: "Tec",  label: "TÉCNICA",   event: "foul_tec"  },
   { id: "Anti", label: "ANTIDESP.", event: "foul_anti" },
+  { id: "Sofr", label: "SOFRIDA",   event: "foul_drawn" },
 ];
 
 function Pips({ count, max = 5 }: { count: number; max?: number }) {
@@ -69,7 +71,7 @@ export function Layout1c({
 
   function getStats(pid: string) { return derivedStats.get(pid); }
 
-  function currentFoulEvent(): FoulType {
+  function currentFoulEvent(): PlayerFoulEvent {
     return FOUL_SEL_OPTIONS.find((f) => f.id === foulSel)!.event;
   }
 
@@ -332,7 +334,7 @@ export function Layout1c({
                 <button disabled={recording}
                   onClick={() => onRecordPlay(currentFoulEvent(), player.user_id)}
                   style={dangerCellBtn}>
-                  F {fouls}
+                  {foulSel === "Sofr" ? `FS ${getStats(player.user_id)?.fouls_drawn ?? 0}` : `F ${fouls}`}
                 </button>
 
                 {/* Total */}

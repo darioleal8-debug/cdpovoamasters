@@ -183,6 +183,8 @@ export default function SpectatorPage() {
                   <th className="px-2 py-2 text-center text-white/60 font-medium">STL</th>
                   <th className="px-2 py-2 text-center text-white/60 font-medium">BLK</th>
                   <th className="px-2 py-2 text-center text-white/60 font-medium">TOV</th>
+                  <th className="px-2 py-2 text-center text-white/60 font-medium">F</th>
+                  <th className="px-2 py-2 text-center text-white/60 font-medium">FS</th>
                   <th className="px-2 py-2 text-center text-white/60 font-medium">2P%</th>
                   <th className="px-2 py-2 text-center text-white/60 font-medium">3P%</th>
                   <th className="px-2 py-2 text-center text-white/60 font-medium">EFF</th>
@@ -203,6 +205,8 @@ export default function SpectatorPage() {
                     <td className="px-2 py-2 text-center text-white/80 tabular-nums">{p.stl}</td>
                     <td className="px-2 py-2 text-center text-white/80 tabular-nums">{p.blk}</td>
                     <td className="px-2 py-2 text-center text-white/80 tabular-nums">{p.tov}</td>
+                    <td className="px-2 py-2 text-center text-white/80 tabular-nums">{p.fouls_committed ?? 0}</td>
+                    <td className="px-2 py-2 text-center text-white/80 tabular-nums">{p.fouls_drawn ?? 0}</td>
                     <td className="px-2 py-2 text-center text-white/60 tabular-nums">{pct(p.fg2_made, p.fg2_att)}</td>
                     <td className="px-2 py-2 text-center text-white/60 tabular-nums">{pct(p.fg3_made, p.fg3_att)}</td>
                     <td className="px-2 py-2 text-center font-bold text-yellow-400 tabular-nums">{Number(p.efficiency).toFixed(0)}</td>

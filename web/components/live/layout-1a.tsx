@@ -74,6 +74,7 @@ const ACTIONS: ActionDef[] = [
   { event: "foul_of",     label: "F. OF.",       sub: "FALTA",              style: "danger"  },
   { event: "foul_tec",    label: "TÉCNICA",      sub: "FALTA",              style: "danger"  },
   { event: "foul_anti",   label: "ANTIDESP.",    sub: "FALTA",              style: "danger"  },
+  { event: "foul_drawn",  label: "F. SOFRIDA",   sub: "FALTA",              style: "neutral" },
 ];
 
 // ── Sub-components ────────────────────────────────────────────────────────────
