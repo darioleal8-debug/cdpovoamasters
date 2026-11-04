@@ -1,6 +1,8 @@
 import { todayInClubTz } from "@/lib/time/club-time";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { authorize } from "@/lib/auth/guards";
+import { getCallupsByGame } from "@/lib/callups/club-callups";
 import { MeusJogosView, type ProcessedGame } from "./meus-jogos-view";
 
 export const metadata = { title: "Os Meus Jogos" };
@@ -39,9 +41,10 @@ export default async function MeusJogosPage({
   const params = await searchParams;
   const vista = params.vista === "liga" ? "liga" : "agenda";
 
+  const authz = await authorize();
+  if (!authz.ok) redirect(authz.response.status === 401 ? "/login" : "/login?reason=inactive");
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const user = authz.user;
 
   const today = todayInClubTz();
 
@@ -147,12 +150,21 @@ export default async function MeusJogosPage({
     }
   }
 
+  // Convocados dos jogos do clube (visíveis a todo o plantel)
+  const callupsByGame = await getCallupsByGame(
+    enriched.filter((g) => g.is_club_game).map((g) => g.id),
+  );
+  const { data: myPlayers } = await supabase
+    .from("players").select("id").eq("user_id", user.id);
+  const myPlayerIds = (myPlayers ?? []).map((p) => p.id as string);
+
   // Montar objeto final
   const games: ProcessedGame[] = enriched.map((g) => ({
     ...g,
     syntheticJornada: g.jornada ? (offsets.get(g.volta) ?? 0) + g.jornada : null,
     result:           resultsByGame.get(g.id) ?? null,
-    isCalledUp:       false, // not used in current view
+    isCalledUp:       (callupsByGame.get(g.id) ?? []).some((c) => myPlayerIds.includes(c.player_id)),
+    callups:          callupsByGame.get(g.id) ?? [],
     myAvailability:   availabilityByGame.get(g.id) ?? null,
     isPast:           g.event_date < today,
   }));
@@ -162,6 +174,7 @@ export default async function MeusJogosPage({
       games={games}
       initialVista={vista}
       playerId={playerId}
+      myPlayerIds={myPlayerIds}
       today={today}
     />
   );
