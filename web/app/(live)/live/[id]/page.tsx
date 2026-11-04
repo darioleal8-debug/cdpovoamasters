@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { computeClockSecs, formatClock } from "@/hooks/use-live-game";
 import { Badge } from "@/components/ui/badge";
@@ -125,6 +126,9 @@ export default function SpectatorPage() {
       {/* ── Scoreboard ─────────────────────────────────── */}
       <div className="sticky top-0 z-10 border-b border-white/10 px-4 py-4"
         style={{ background: "var(--cdpovoa-primary, #0A1220)" }}>
+        <Link href="/liga-inatel" className="block text-center text-[0.65rem] uppercase tracking-widest text-white/40 mb-2 no-underline">
+          ← Liga INATEL
+        </Link>
         <div className="flex items-center justify-center gap-2 mb-2">
           <Badge className={isLive ? "bg-green-500 animate-pulse" : "bg-white/20"}>
             {isLive ? "● AO VIVO" : session.status === "finished" ? "FINAL" : "Por iniciar"}
@@ -141,7 +145,7 @@ export default function SpectatorPage() {
 
         <div className="flex items-center justify-between">
           <div className="text-center flex-1">
-            <p className="text-xs text-white/40 uppercase tracking-widest mb-1">CD Póvoa Masters</p>
+            <p className="text-xs text-white/40 uppercase tracking-widest mb-1">CD Póvoa</p>
             <p className="text-6xl font-black tabular-nums leading-none">{session.home_score}</p>
           </div>
           <div className="text-3xl font-bold text-white/30 px-4">–</div>
@@ -230,7 +234,7 @@ export default function SpectatorPage() {
       )}
 
       <div className="text-center mt-8 text-white/20 text-xs">
-        CD Póvoa Masters · Atualização em tempo real
+        CD Póvoa · Atualização em tempo real
       </div>
     </div>
   );

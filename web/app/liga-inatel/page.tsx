@@ -13,6 +13,7 @@ import type { PublicGame } from "@/types/competitions";
 import { NoticiasSection } from "@/components/liga/noticias-section";
 import { LiveBadge } from "@/components/competitions/live-badge";
 import { InstallBanner } from "@/components/liga/pwa/install-entry";
+import { TodayGamesCard, type TodayGame } from "@/components/liga/today-games-card";
 
 export const metadata: Metadata = {
   title: "Liga INATEL",
@@ -79,6 +80,28 @@ export default async function LigaInatelHomePage() {
     .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime());
 
   const nextGame = futureGames[0] ?? null;
+
+  // Todos os jogos de hoje (ordenados pela hora) — destacados no topo
+  const todayGames: TodayGame[] = games
+    .filter((g) => g.event_date === todayStr && !g.is_test)
+    .sort((a, b) => (a.event_time ?? "99").localeCompare(b.event_time ?? "99"))
+    .map((g) => {
+      const homeIsOurs = g.is_our_game && g.home_team.toLowerCase().includes("póvoa");
+      const awayIsOurs = g.is_our_game && g.away_team.toLowerCase().includes("póvoa");
+      return {
+        id: g.id,
+        event_date: g.event_date,
+        event_time: g.event_time,
+        location: g.location,
+        home_team: g.home_team,
+        away_team: g.away_team,
+        homeLogo: logoMap.get(g.home_team) ?? null,
+        awayLogo: logoMap.get(g.away_team) ?? null,
+        jornada: g.syntheticJornada || null,
+        result: g.result_status === "approved" ? g.result : null,
+        ourSide: homeIsOurs ? "home" : awayIsOurs ? "away" : g.is_our_game ? "home" : null,
+      };
+    });
 
   const maxResultJornada = approvedGames.length > 0
     ? Math.max(...approvedGames.map((g) => g.syntheticJornada))
@@ -175,8 +198,10 @@ export default async function LigaInatelHomePage() {
               </div>
             </div>
 
-            {/* Próximo jogo card */}
-            {nextGame && (
+            {/* Jogos de hoje (todos) ou, se não houver, o próximo jogo */}
+            {todayGames.length > 0 ? (
+              <TodayGamesCard games={todayGames} />
+            ) : nextGame && (
               <div className="liga-next-card">
                 <div
                   style={{

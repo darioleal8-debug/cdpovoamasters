@@ -188,6 +188,8 @@ export default function LigaInatelLayout({ children }: { children: React.ReactNo
           border-radius: 8px; overflow: hidden;
           min-width: 220px; max-width: 280px; flex-shrink: 0;
         }
+        /* ── Jogos de hoje: cartão um pouco mais largo (vários jogos) ── */
+        .liga-today-card { min-width: 280px; max-width: 340px; }
         /* ── Nome de equipa no card (truncado por defeito) ── */
         .liga-next-team-name {
           font-family: var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif));
