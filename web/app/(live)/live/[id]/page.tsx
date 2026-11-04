@@ -88,6 +88,16 @@ export default function SpectatorPage() {
     return () => { supabase.removeChannel(channel); };
   }, [params.id]);
 
+  // Rede de segurança caso o Realtime não entregue: relê tudo a cada 5s
+  // enquanto o jogo não terminou e a página está visível.
+  useEffect(() => {
+    if (session?.status === "finished") return;
+    const tick = () => { if (document.visibilityState === "visible") loadAll(); };
+    const id = window.setInterval(tick, 5000);
+    document.addEventListener("visibilitychange", tick);
+    return () => { window.clearInterval(id); document.removeEventListener("visibilitychange", tick); };
+  }, [session?.status, loadAll]);
+
   useEffect(() => {
     if (!session?.clock_running) return;
     const interval = setInterval(() => setClockSecs(computeClockSecs(session)), 500);

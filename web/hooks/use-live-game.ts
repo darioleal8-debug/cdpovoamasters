@@ -281,6 +281,16 @@ export function useLiveGame(
     return () => { supabase.removeChannel(channel); };
   }, [session?.id]);
 
+  // ── Rede de segurança: o Realtime nem sempre entrega (rede do pavilhão).
+  // Enquanto o jogo está ao vivo, relê a sessão (marcador/relógio) a cada 4s.
+  useEffect(() => {
+    if (!session?.id || session.status !== "live") return;
+    const tick = () => { if (document.visibilityState === "visible") loadSession(); };
+    const id = window.setInterval(tick, 4000);
+    document.addEventListener("visibilitychange", tick);
+    return () => { window.clearInterval(id); document.removeEventListener("visibilitychange", tick); };
+  }, [session?.id, session?.status, loadSession]);
+
   // ── Clock controls ──────────────────────────────────────
 
   // As ações do relógio atualizam o estado local de imediato (otimista) e
@@ -458,7 +468,7 @@ export function useLiveGame(
         return false;
       }
 
-      await Promise.all([loadPlays(session.id), loadPlayerStats(session.id)]);
+      await Promise.all([loadPlays(session.id), loadPlayerStats(session.id), loadSession()]);
       return true;
     } finally {
       setRecording(false);
@@ -481,7 +491,7 @@ export function useLiveGame(
         p_game_clock:      formatClock(clockSecs),
         p_description:     `Adversário +${pts}`,
       });
-      await loadPlays(session.id);
+      await Promise.all([loadPlays(session.id), loadSession()]);
     } finally {
       setRecording(false);
     }
@@ -506,7 +516,7 @@ export function useLiveGame(
         p_game_clock:      formatClock(clockSecs),
         p_description:     `Adversário · ${foulDesc}`,
       });
-      await loadPlays(session.id);
+      await Promise.all([loadPlays(session.id), loadSession()]);
     } finally {
       setRecording(false);
     }
@@ -528,7 +538,7 @@ export function useLiveGame(
         p_game_clock:      formatClock(clockSecs),
         p_description:     `Adversário · ${type === "reb_off" ? "Ressalto ofensivo" : "Ressalto defensivo"}`,
       });
-      await loadPlays(session.id);
+      await Promise.all([loadPlays(session.id), loadSession()]);
     } finally {
       setRecording(false);
     }
@@ -584,7 +594,7 @@ export function useLiveGame(
     });
 
     setOnCourtIds(newLineup);
-    await loadPlays(session.id);
+    await Promise.all([loadPlays(session.id), loadSession()]);
   }
 
   // ── Set lineup (replaces on-court, managing stints) ─────
@@ -655,7 +665,7 @@ export function useLiveGame(
         p_description:     `Timeout ${team === "home" ? "CD Póvoa" : "Adversário"}`,
       });
       if (!error) {
-        await loadPlays(session.id);
+        await Promise.all([loadPlays(session.id), loadSession()]);
         toast({ title: `Timeout ${team === "home" ? "CD Póvoa" : "Adversário"}` });
       }
     } finally {
