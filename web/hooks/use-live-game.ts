@@ -17,13 +17,16 @@ export function formatClock(secs: number): string {
 }
 
 export function computeClockSecs(session: GameSession | null): number {
-  if (!session) return 600;
+  if (!session) return DEFAULT_PERIOD_SECS;
   let elapsed = session.clock_elapsed_secs ?? 0;
   if (session.clock_running && session.clock_started_at) {
     elapsed += (Date.now() - new Date(session.clock_started_at).getTime()) / 1000;
   }
-  return Math.max(0, (session.period_duration_secs ?? 600) - elapsed);
+  return Math.max(0, (session.period_duration_secs ?? DEFAULT_PERIOD_SECS) - elapsed);
 }
+
+/** Duração por defeito de cada período: 8 minutos (Liga INATEL). */
+export const DEFAULT_PERIOD_SECS = 8 * 60;
 
 const POINTS_MAP: Partial<Record<PlayEventType, number>> = {
   "2pt_made": 2, "3pt_made": 3, "ft_made": 1,
@@ -47,7 +50,7 @@ export function useLiveGame(
   const [plays, setPlays] = useState<PlayByPlay[]>([]);
   const [playerStats, setPlayerStats] = useState<PlayerGameStatsWithUser[]>([]);
   const [periodScores, setPeriodScores] = useState<GamePeriodScore[]>([]);
-  const [clockSecs, setClockSecs] = useState(600);
+  const [clockSecs, setClockSecs] = useState(DEFAULT_PERIOD_SECS);
   const [loading, setLoading] = useState(true);
   const [recording, setRecording] = useState(false);
   const sessionRef = useRef<GameSession | null>(null);
@@ -332,7 +335,7 @@ export function useLiveGame(
     if (!cur || !cur.clock_running) return;
     const started = cur.clock_started_at ? new Date(cur.clock_started_at).getTime() : Date.now();
     const elapsed = (cur.clock_elapsed_secs ?? 0) + (Date.now() - started) / 1000;
-    const maxSecs = cur.period_duration_secs ?? 600;
+    const maxSecs = cur.period_duration_secs ?? DEFAULT_PERIOD_SECS;
     await writeClock(
       {
         clock_running: false,
@@ -350,7 +353,7 @@ export function useLiveGame(
       { clock_running: false, clock_elapsed_secs: 0, clock_started_at: null },
       cur
     );
-    setClockSecs(cur.period_duration_secs ?? 600);
+    setClockSecs(cur.period_duration_secs ?? DEFAULT_PERIOD_SECS);
   }
 
   // ── Start game ──────────────────────────────────────────
@@ -358,7 +361,8 @@ export function useLiveGame(
   async function startGame(
     opponentName: string,
     startingFiveIds: string[],
-    callupPlayerIds?: string[]
+    callupPlayerIds?: string[],
+    periodDurationSecs: number = DEFAULT_PERIOD_SECS
   ): Promise<boolean> {
     if (!seasonId) return false;
     setRecording(true);
@@ -378,6 +382,7 @@ export function useLiveGame(
           opponent_name: opponentName || "Adversário",
           status: "live",
           started_at: new Date().toISOString(),
+          period_duration_secs: Math.round(periodDurationSecs),
         })
         .select()
         .single();
@@ -421,7 +426,7 @@ export function useLiveGame(
             game_session_id: data.id,
             player_id: pid,
             period: 1,
-            entry_clock_secs: data.period_duration_secs ?? 600,
+            entry_clock_secs: data.period_duration_secs ?? DEFAULT_PERIOD_SECS,
             entry_home_score: 0,
             entry_away_score: 0,
           }))
@@ -753,7 +758,7 @@ export function useLiveGame(
           game_session_id: session.id,
           player_id: pid,
           period: nextP,
-          entry_clock_secs: session.period_duration_secs ?? 600,
+          entry_clock_secs: session.period_duration_secs ?? DEFAULT_PERIOD_SECS,
           entry_home_score: session.home_score,
           entry_away_score: session.away_score,
         }))
@@ -761,7 +766,7 @@ export function useLiveGame(
     }
 
     setSession((s) => s ? { ...s, current_period: nextP, clock_running: false, clock_elapsed_secs: 0, clock_started_at: null, away_fouls: 0 } : s);
-    setClockSecs(session.period_duration_secs ?? 600);
+    setClockSecs(session.period_duration_secs ?? DEFAULT_PERIOD_SECS);
     await Promise.all([loadPeriodScores(session.id), loadPlays(session.id)]);
   }
 

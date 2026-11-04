@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useLiveGame } from "@/hooks/use-live-game";
+import { useLiveGame, DEFAULT_PERIOD_SECS } from "@/hooks/use-live-game";
 import { useLivePrefs } from "@/hooks/use-live-prefs";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { createClient } from "@/lib/supabase/client";
@@ -134,6 +134,8 @@ export default function LiveGamePage() {
   // ── Dialog state ─────────────────────────────────────────
   const [startDialog, setStartDialog] = useState(false);
   const [opponentName, setOpponentName] = useState("");
+  // Duração de cada período (minutos) — 8 por defeito, ajustável no início do jogo
+  const [periodMinutes, setPeriodMinutes] = useState<string>("8");
   const [startingFive, setStartingFive] = useState<string[]>([]);
   const [periodDialog, setPeriodDialog] = useState(false);
   const [finishDialog, setFinishDialog] = useState(false);
@@ -477,6 +479,37 @@ export default function LiveGamePage() {
                 />
               )}
             </div>
+            {/* Tempo de jogo por período */}
+            <div className="space-y-1.5">
+              <Label htmlFor="period-minutes">Tempo de cada período (minutos)</Label>
+              <div className="flex items-center gap-1.5">
+                {[8, 10, 12].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setPeriodMinutes(String(m))}
+                    className={`text-xs rounded-md px-3 py-1.5 border transition-all ${
+                      Number(periodMinutes) === m
+                        ? "bg-cdpovoa-primary text-white border-cdpovoa-primary font-bold"
+                        : "border-border hover:border-cdpovoa-primary"
+                    }`}
+                  >
+                    {m} min
+                  </button>
+                ))}
+                <Input
+                  id="period-minutes"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={20}
+                  step={1}
+                  value={periodMinutes}
+                  onChange={(e) => setPeriodMinutes(e.target.value)}
+                  className="w-20 h-8"
+                />
+              </div>
+            </div>
             {/* Seleção de jogadores */}
             {roster.length === 0 ? (
               <div className="space-y-2">
@@ -562,10 +595,15 @@ export default function LiveGamePage() {
               onClick={async () => {
                 const nameToUse = opponentName || resolvedOpponent || "Adversário";
                 const didEditOpponent = editingOpponent && opponentName && opponentName !== resolvedOpponent;
+                const mins = Number(periodMinutes);
+                const periodSecs = Number.isFinite(mins) && mins >= 1 && mins <= 20
+                  ? Math.round(mins * 60)
+                  : DEFAULT_PERIOD_SECS;
                 const ok = await startGame(
                   nameToUse,
                   startingFive,
-                  useActivePlayers ? activePlayers.map((p) => p.player_id) : undefined
+                  useActivePlayers ? activePlayers.map((p) => p.player_id) : undefined,
+                  periodSecs
                 );
                 if (ok) {
                   if (didEditOpponent) {

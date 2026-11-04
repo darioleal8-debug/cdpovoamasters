@@ -162,7 +162,7 @@ export async function POST(
         finished_at:          now,
         clock_running:        false,
         clock_elapsed_secs:   0,
-        period_duration_secs: 600,
+        period_duration_secs: 480,
         home_timeouts_left:   0,
         away_timeouts_left:   0,
         away_reb_off:         0,
