@@ -9,6 +9,7 @@ export interface DerivedPlayerStats {
   ast: number; stl: number; blk: number; tov: number;
   fouls_def: number; fouls_of: number; fouls_tec: number; fouls_anti: number;
   fouls_total: number;
+  fouls_drawn: number;
 }
 
 function empty(): DerivedPlayerStats {
@@ -16,7 +17,7 @@ function empty(): DerivedPlayerStats {
     pts: 0, fg2_made: 0, fg2_att: 0, fg3_made: 0, fg3_att: 0,
     ft_made: 0, ft_att: 0, reb_off: 0, reb_def: 0,
     ast: 0, stl: 0, blk: 0, tov: 0,
-    fouls_def: 0, fouls_of: 0, fouls_tec: 0, fouls_anti: 0, fouls_total: 0,
+    fouls_def: 0, fouls_of: 0, fouls_tec: 0, fouls_anti: 0, fouls_total: 0, fouls_drawn: 0,
   };
 }
 
@@ -64,6 +65,7 @@ export function deriveStats(plays: PlayByPlay[], currentPeriod: number): DeriveR
           case "foul_tec":      s.fouls_tec++; s.fouls_total++; break;
           case "foul_anti":     s.fouls_anti++; s.fouls_total++; break;
           case "foul_committed":s.fouls_total++; break; // legacy event type
+          case "foul_drawn":    s.fouls_drawn++; break;  // falta sofrida (não conta como cometida)
         }
         // Assistência registada no próprio cesto (secondary_player_id), tal como recordPlay grava (STA-16)
         const assistId = (play as { secondary_player_id?: string | null }).secondary_player_id;
