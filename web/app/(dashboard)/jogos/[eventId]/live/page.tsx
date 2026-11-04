@@ -6,7 +6,8 @@ import { useLiveGame, DEFAULT_PERIOD_SECS } from "@/hooks/use-live-game";
 import { useLivePrefs } from "@/hooks/use-live-prefs";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { createClient } from "@/lib/supabase/client";
-import { deriveStats } from "@/lib/live/derive-stats";
+import { deriveStats, withSecondsPlayed } from "@/lib/live/derive-stats";
+import { computeSecondsPlayed } from "@/lib/live/minutes";
 import { LIGHT_TOKENS, DARK_TOKENS, SANS, MONO } from "@/components/live/tokens";
 import { LivePrefsBar } from "@/components/live/live-prefs-bar";
 import { SummaryOverlay } from "@/components/live/summary-overlay";
@@ -212,9 +213,18 @@ export default function LiveGamePage() {
   }, [summaryOpen, shareOpen]);
 
   // ── Derived stats from events ─────────────────────────────
-  const { playerMap, homeFouls, awayFouls, awayRebOff, awayRebDef } = useMemo(
+  const { playerMap: basePlayerMap, homeFouls, awayFouls, awayRebOff, awayRebDef } = useMemo(
     () => deriveStats(plays, session?.current_period ?? 1),
     [plays, session?.current_period]
+  );
+  // Tempo jogado por jogador (stints em campo + relógio atual)
+  const clockWhole = Math.floor(clockSecs);
+  const playerMap = useMemo(
+    () => withSecondsPlayed(
+      basePlayerMap,
+      computeSecondsPlayed(game.stints, session?.current_period ?? 1, clockWhole, session?.status === "live")
+    ),
+    [basePlayerMap, game.stints, session?.current_period, session?.status, clockWhole]
   );
 
   const tokens = prefs.dark ? DARK_TOKENS : LIGHT_TOKENS;

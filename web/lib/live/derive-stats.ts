@@ -10,6 +10,8 @@ export interface DerivedPlayerStats {
   fouls_def: number; fouls_of: number; fouls_tec: number; fouls_anti: number;
   fouls_total: number;
   fouls_drawn: number;
+  /** tempo jogado (segundos) — preenchido por withSecondsPlayed */
+  secs_played: number;
 }
 
 function empty(): DerivedPlayerStats {
@@ -17,7 +19,7 @@ function empty(): DerivedPlayerStats {
     pts: 0, fg2_made: 0, fg2_att: 0, fg3_made: 0, fg3_att: 0,
     ft_made: 0, ft_att: 0, reb_off: 0, reb_def: 0,
     ast: 0, stl: 0, blk: 0, tov: 0,
-    fouls_def: 0, fouls_of: 0, fouls_tec: 0, fouls_anti: 0, fouls_total: 0, fouls_drawn: 0,
+    fouls_def: 0, fouls_of: 0, fouls_tec: 0, fouls_anti: 0, fouls_total: 0, fouls_drawn: 0, secs_played: 0,
   };
 }
 
@@ -95,4 +97,15 @@ export function deriveStats(plays: PlayByPlay[], currentPeriod: number): DeriveR
   }
 
   return { playerMap, homeFouls, awayFouls, awayRebOff, awayRebDef, awayPts };
+}
+
+/** Junta o tempo jogado (segundos por jogador) ao mapa de estatísticas. */
+export function withSecondsPlayed(
+  playerMap: Map<string, DerivedPlayerStats>,
+  secsById: Map<string, number>
+): Map<string, DerivedPlayerStats> {
+  const out = new Map<string, DerivedPlayerStats>();
+  for (const [pid, s] of playerMap) out.set(pid, { ...s, secs_played: secsById.get(pid) ?? 0 });
+  for (const [pid, secs] of secsById) if (!out.has(pid)) out.set(pid, { ...empty(), secs_played: secs });
+  return out;
 }

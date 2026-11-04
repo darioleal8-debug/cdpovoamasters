@@ -8,6 +8,7 @@ import type {
   PlayerGameStatsWithUser, GamePeriodScore, PlayEventType,
 } from "@/types/database";
 import type { PlayerWithUser } from "@/types/database";
+import type { CourtStint } from "@/lib/live/minutes";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,7 @@ export function useLiveGame(
   const [plays, setPlays] = useState<PlayByPlay[]>([]);
   const [playerStats, setPlayerStats] = useState<PlayerGameStatsWithUser[]>([]);
   const [periodScores, setPeriodScores] = useState<GamePeriodScore[]>([]);
+  const [stints, setStints] = useState<CourtStint[]>([]);
   const [clockSecs, setClockSecs] = useState(DEFAULT_PERIOD_SECS);
   const [loading, setLoading] = useState(true);
   const [recording, setRecording] = useState(false);
@@ -203,6 +205,14 @@ export function useLiveGame(
     setPeriodScores(data ?? []);
   }, []);
 
+  const loadStints = useCallback(async (sessionId: string) => {
+    const { data } = await supabase
+      .from("player_court_stints")
+      .select("player_id, period, entry_clock_secs, exit_clock_secs")
+      .eq("game_session_id", sessionId);
+    if (data) setStints(data as CourtStint[]);
+  }, []);
+
   const loadLineup = useCallback(async (sessionId: string) => {
     const { data } = await supabase
       .from("game_current_lineup")
@@ -235,10 +245,11 @@ export function useLiveGame(
         loadPlayerStats(sess.id),
         loadPeriodScores(sess.id),
         loadLineup(sess.id),
+        loadStints(sess.id),
       ]);
     }
     setLoading(false);
-  }, [loadSession, loadRoster, loadPlays, loadPlayerStats, loadPeriodScores, loadLineup]);
+  }, [loadSession, loadRoster, loadPlays, loadPlayerStats, loadPeriodScores, loadLineup, loadStints]);
 
   useEffect(() => {
     if (seasonId) loadAll(seasonId);
@@ -276,7 +287,7 @@ export function useLiveGame(
         () => { loadPeriodScores(session.id); })
       .on("postgres_changes",
         { event: "*", schema: "public", table: "player_court_stints", filter: `game_session_id=eq.${session.id}` },
-        () => { loadPlayerStats(session.id); })
+        () => { loadPlayerStats(session.id); loadStints(session.id); })
       .on("postgres_changes",
         { event: "*", schema: "public", table: "game_current_lineup", filter: `game_session_id=eq.${session.id}` },
         (payload) => { setOnCourtIds((payload.new as { on_court_ids: string[] }).on_court_ids ?? []); })
@@ -288,11 +299,17 @@ export function useLiveGame(
   // Enquanto o jogo está ao vivo, relê a sessão (marcador/relógio) a cada 4s.
   useEffect(() => {
     if (!session?.id || session.status !== "live") return;
-    const tick = () => { if (document.visibilityState === "visible") loadSession(); };
+    const sid = session.id;
+    let n = 0;
+    const tick = () => {
+      if (document.visibilityState !== "visible") return;
+      loadSession();
+      if (n++ % 2 === 0) loadStints(sid); // tempo jogado (substituições)
+    };
     const id = window.setInterval(tick, 4000);
     document.addEventListener("visibilitychange", tick);
     return () => { window.clearInterval(id); document.removeEventListener("visibilitychange", tick); };
-  }, [session?.id, session?.status, loadSession]);
+  }, [session?.id, session?.status, loadSession, loadStints]);
 
   // ── Clock controls ──────────────────────────────────────
 
@@ -599,7 +616,7 @@ export function useLiveGame(
     });
 
     setOnCourtIds(newLineup);
-    await Promise.all([loadPlays(session.id), loadSession()]);
+    await Promise.all([loadPlays(session.id), loadSession(), loadStints(session.id)]);
   }
 
   // ── Set lineup (replaces on-court, managing stints) ─────
@@ -649,6 +666,7 @@ export function useLiveGame(
     }
 
     setOnCourtIds(newIds);
+    loadStints(session.id);
     toast({ title: "5 em campo atualizado!" });
     return true;
   }
@@ -767,7 +785,7 @@ export function useLiveGame(
 
     setSession((s) => s ? { ...s, current_period: nextP, clock_running: false, clock_elapsed_secs: 0, clock_started_at: null, away_fouls: 0 } : s);
     setClockSecs(session.period_duration_secs ?? DEFAULT_PERIOD_SECS);
-    await Promise.all([loadPeriodScores(session.id), loadPlays(session.id)]);
+    await Promise.all([loadPeriodScores(session.id), loadPlays(session.id), loadStints(session.id)]);
   }
 
   // ── Finish game ─────────────────────────────────────────
@@ -849,7 +867,7 @@ export function useLiveGame(
 
   return {
     seasonId, session, roster, onCourt, bench, onCourtIds,
-    plays, playerStats, periodScores, clockSecs,
+    plays, playerStats, periodScores, clockSecs, stints,
     loading, recording,
     startGame, startClock, stopClock, resetClock,
     recordPlay, recordOpponentPoints,

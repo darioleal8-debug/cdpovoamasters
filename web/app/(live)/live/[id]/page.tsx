@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { computeClockSecs, formatClock } from "@/hooks/use-live-game";
+import { computeSecondsPlayed, formatMinutes, type CourtStint } from "@/lib/live/minutes";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { GameSession, PlayerGameStatsWithUser, PlayByPlay } from "@/types/database";
@@ -36,17 +37,22 @@ export default function SpectatorPage() {
   const [session,    setSession]    = useState<GameSession | null>(null);
   const [stats,      setStats]      = useState<PlayerRow[]>([]);
   const [plays,      setPlays]      = useState<PlayByPlay[]>([]);
+  const [stints,     setStints]     = useState<CourtStint[]>([]);
   const [clockSecs,  setClockSecs]  = useState(480);
   const [loading,    setLoading]    = useState(true);
 
   const loadAll = useCallback(async () => {
     // players.name foi removido na migration 041 — enriquecer via v_roster
-    const [sessRes, statsRes, playsRes] = await Promise.all([
+    const [sessRes, statsRes, playsRes, stintsRes] = await Promise.all([
       supabase.from("game_sessions").select("*").eq("id", params.id).single(),
       supabase.from("player_game_stats").select("*").eq("game_session_id", params.id),
       supabase.from("play_by_play").select("*").eq("game_session_id", params.id)
         .order("created_at", { ascending: false }).limit(20),
+      supabase.from("player_court_stints")
+        .select("player_id, period, entry_clock_secs, exit_clock_secs")
+        .eq("game_session_id", params.id),
     ]);
+    if (stintsRes.data) setStints(stintsRes.data as CourtStint[]);
 
     if (sessRes.data) {
       const sess = sessRes.data as GameSession;
@@ -110,6 +116,7 @@ export default function SpectatorPage() {
 
   const isLive = session?.status === "live";
   const sorted = [...stats].sort((a, b) => b.pts - a.pts);
+  const secsById = computeSecondsPlayed(stints, session?.current_period ?? 1, Math.floor(clockSecs), isLive);
 
   if (loading) {
     return (
@@ -177,6 +184,7 @@ export default function SpectatorPage() {
               <thead>
                 <tr className="border-b border-white/10">
                   <th className="text-left px-3 py-2 text-white/60 font-medium">Jogador</th>
+                  {stints.length > 0 && <th className="px-2 py-2 text-center text-white/60 font-medium">MIN</th>}
                   <th className="px-2 py-2 text-center text-white/60 font-medium">PTS</th>
                   <th className="px-2 py-2 text-center text-white/60 font-medium">REB</th>
                   <th className="px-2 py-2 text-center text-white/60 font-medium">AST</th>
@@ -199,6 +207,7 @@ export default function SpectatorPage() {
                       )}
                       {(p.user?.name ?? "—").split(" ").slice(0, 2).join(" ")}
                     </td>
+                    {stints.length > 0 && <td className="px-2 py-2 text-center text-white/80 tabular-nums">{formatMinutes(secsById.get(p.player_id))}</td>}
                     <td className={`px-2 py-2 text-center tabular-nums font-bold ${p.pts >= 10 ? "text-green-400" : "text-white"}`}>{p.pts}</td>
                     <td className="px-2 py-2 text-center text-white/80 tabular-nums">{p.reb_off + p.reb_def}</td>
                     <td className="px-2 py-2 text-center text-white/80 tabular-nums">{p.ast}</td>

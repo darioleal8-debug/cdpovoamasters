@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatMinutes } from "@/lib/live/minutes";
 import type { GameSession, PlayByPlay, PlayEventType } from "@/types/database";
 import type { PlayerWithUser } from "@/types/database";
 import type { DerivedPlayerStats } from "@/lib/live/derive-stats";
@@ -278,6 +279,9 @@ export function Layout1c({
                     </span>
                     <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>
                       {player.user.name}
+                    </span>
+                    <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "var(--muted)", marginLeft: "auto" }} title="Tempo jogado">
+                      ⏱ {formatMinutes(stats?.secs_played)}
                     </span>
                   </div>
                   <button
