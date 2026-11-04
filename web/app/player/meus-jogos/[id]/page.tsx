@@ -1,10 +1,13 @@
-import { createClient } from "@/lib/supabase/server";
+import { todayInClubTz } from "@/lib/time/club-time";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
+import { authorize } from "@/lib/auth/guards";
 import { ArrowLeft, Calendar, Check, Clock, HelpCircle, MapPin, Shield, Users, X, Trophy } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import type { AvailabilityRosterRow } from "@/types/availability";
 import { AvailabilityPrompt } from "@/components/player/availability-prompt";
+import { CallupNotice } from "@/components/player/callup-notice";
 import { lisbonDateTime } from "@/lib/event-time";
 import { hasAnyRole, MANAGERS } from "@/lib/auth/roles";
 import type { UserRole } from "@/types/database";
@@ -62,9 +65,10 @@ function AvailRow({ row }: { row: AvailabilityRosterRow }) {
 
 export default async function GameDetailPage({ params }: Props) {
   const { id } = await params;
+  const authz = await authorize();
+  if (!authz.ok) redirect(authz.response.status === 401 ? "/login" : "/login?reason=inactive");
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const user = authz.user;
 
   // Fetch user role
   const { data: profile } = await supabase
@@ -82,14 +86,14 @@ export default async function GameDetailPage({ params }: Props) {
   // Fetch game event
   const { data: event } = await supabase
     .from("events")
-    .select("id, title, event_date, event_time, location, opponent, description")
+    .select("id, title, event_date, event_time, location, opponent, description, season_id")
     .eq("id", id)
     .eq("type", "jogo")
     .maybeSingle();
 
   if (!event) notFound();
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInClubTz(new Date());
   const isPast = (event.event_date as string) < today;
 
   // Fetch game result if past
@@ -101,28 +105,59 @@ export default async function GameDetailPage({ params }: Props) {
         .maybeSingle()
     : { data: null };
 
-  // Fetch player's own linked profile
-  const { data: linkedPlayer } = await supabase
+  // Perfis de jogador do utilizador — há um por época, por isso escolhemos o
+  // da época do jogo (senão o mais recente). Antes usava-se sempre o mais
+  // recente, o que fazia jogadores convocados verem "Não estás convocado".
+  const { data: myPlayersRaw } = await supabase
     .from("players")
-    .select("id")
+    .select("id, season_id")
     .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order("created_at", { ascending: false });
+  const myPlayers = (myPlayersRaw ?? []) as { id: string; season_id: string | null }[];
+  const myPlayerIds = myPlayers.map((p) => p.id);
+  const linkedPlayer =
+    myPlayers.find((p) => p.season_id && p.season_id === (event.season_id as string | null)) ??
+    myPlayers[0] ??
+    null;
 
-  // Fetch callups
-  const { data: callupsRaw } = await supabase
-    .from("game_callups")
-    .select("player_id")
-    .eq("game_id", id);
+  // Convocados — a lista é visível a todo o plantel. A RLS de game_callups só
+  // devolve ao jogador a sua própria convocatória, por isso lemos a lista
+  // completa com o cliente de serviço (apenas player_id deste jogo).
+  let callupsRaw: { player_id: string }[] | null = null;
+  try {
+    const admin = await createAdminClient();
+    const { data, error } = await admin
+      .from("game_callups")
+      .select("player_id")
+      .eq("game_id", id)
+      .order("created_at", { ascending: true });
+    if (!error) callupsRaw = data as { player_id: string }[];
+  } catch { /* fallback abaixo */ }
+  if (callupsRaw === null) {
+    const { data } = await supabase
+      .from("game_callups")
+      .select("player_id")
+      .eq("game_id", id);
+    callupsRaw = (data ?? []) as { player_id: string }[];
+  }
 
-  const callupIds = (callupsRaw ?? []).map((c) => c.player_id as string);
-  const { data: rosterRows } = callupIds.length > 0
-    ? await supabase.from("v_roster").select("player_id, name, number, position").in("player_id", callupIds)
-    : { data: [] };
+  const callupIds = callupsRaw.map((c) => c.player_id);
+  let rosterRows: unknown[] | null = [];
+  if (callupIds.length > 0) {
+    const { data } = await supabase.from("v_roster").select("player_id, name, number, position").in("player_id", callupIds);
+    rosterRows = data;
+    // Se a view filtrar por RLS e vier incompleta, completa com o cliente de serviço
+    if ((data?.length ?? 0) < callupIds.length) {
+      try {
+        const admin = await createAdminClient();
+        const { data: full } = await admin.from("v_roster").select("player_id, name, number, position").in("player_id", callupIds);
+        if (full && full.length > (data?.length ?? 0)) rosterRows = full;
+      } catch { /* mantém o que houver */ }
+    }
+  }
 
   type RosterRow = { player_id: string; name: string; number: number | null; position: string | null };
-  const rosterMap = new Map((rosterRows ?? []).map((r) => [r.player_id as string, r as RosterRow]));
+  const rosterMap = new Map(((rosterRows ?? []) as RosterRow[]).map((r) => [r.player_id, r]));
   const callups = callupIds
     .map((pid) => rosterMap.get(pid))
     .filter((r): r is RosterRow => r !== null && r !== undefined);
@@ -152,7 +187,7 @@ export default async function GameDetailPage({ params }: Props) {
   const unavailable = availRoster.filter((r) => r.status === "unavailable");
   const pending     = availRoster.filter((r) => !r.status);
 
-  const myIsConvocado = linkedPlayer?.id && callupIds.includes(linkedPlayer.id);
+  const myIsConvocado = myPlayerIds.some((pid) => callupIds.includes(pid));
 
   // Parse meta from description JSON
   let gameMeta: { home_team: string; away_team: string; is_home: boolean } | null = null;
@@ -181,6 +216,22 @@ export default async function GameDetailPage({ params }: Props) {
           Minha Área
         </Link>
       </div>
+
+      {/* Aviso de convocatória */}
+      {myIsConvocado && !isPast && (
+        <CallupNotice
+          gameTitle={
+            gameMeta
+              ? `vs ${gameMeta.is_home ? gameMeta.away_team : gameMeta.home_team}`
+              : (event.opponent as string | null)
+                ? `vs ${event.opponent as string}`
+                : (event.title as string)
+          }
+          eventDate={event.event_date as string}
+          eventTime={event.event_time as string | null}
+          location={event.location as string | null}
+        />
+      )}
 
       {/* Info do jogo */}
       <div
@@ -329,7 +380,7 @@ export default async function GameDetailPage({ params }: Props) {
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
                   style={{
                     backgroundColor:
-                      linkedPlayer?.id === p.player_id
+                      myPlayerIds.includes(p.player_id)
                         ? "var(--club-secondary, #F28C28)"
                         : "var(--club-primary, #111111)",
                   }}

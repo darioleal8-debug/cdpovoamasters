@@ -230,6 +230,26 @@ export default async function MinhaAreaPage() {
     if (av?.status === "unavailable") gameAnswer = "no";
   }
 
+  // ── Convocatória do próximo jogo ──────────────────────────
+  // Um utilizador pode ter vários perfis de jogador (um por época), por isso
+  // verificamos contra todos — a RLS só devolve as convocatórias do próprio.
+  let gameCalledUp = false;
+  if (nextGame) {
+    const { data: myPlayers } = await supabase
+      .from("players").select("id").eq("user_id", user.id);
+    const myPlayerIds = (myPlayers ?? []).map((p) => p.id as string);
+    if (myPlayerIds.length > 0) {
+      const { data: myCallup } = await supabase
+        .from("game_callups")
+        .select("id")
+        .eq("game_id", nextGame.id)
+        .in("player_id", myPlayerIds)
+        .limit(1)
+        .maybeSingle();
+      gameCalledUp = myCallup !== null;
+    }
+  }
+
   // Confirmados no jogo (respostas "available")
   const { count: gameConfirmedCount } = nextGame
     ? await supabase
@@ -339,6 +359,7 @@ export default async function MinhaAreaPage() {
         gameAnswer={gameAnswer}
         gameConfirmedCount={gameConfirmedCount ?? 0}
         gameDeadlineIso={gameDeadlineIso}
+        gameCalledUp={gameCalledUp}
         noPlayerProfile={linkedPlayer === null}
       />
 

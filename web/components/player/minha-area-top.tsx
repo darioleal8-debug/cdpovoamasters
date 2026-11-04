@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { toast } from "@/components/ui/toaster";
 import { usePlayerPending } from "./player-pending-context";
+import { CallupNotice } from "./callup-notice";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -38,6 +39,8 @@ interface Props {
   gameAnswer: Answer | null;
   gameConfirmedCount: number;
   gameDeadlineIso: string | null;
+  /** true quando o jogador está convocado para o próximo jogo */
+  gameCalledUp?: boolean;
   /** true quando o jogador não tem perfil ligado (não mostra botões de RSVP) */
   noPlayerProfile: boolean;
 }
@@ -182,6 +185,7 @@ function EventCard({
   noPlayerProfile,
   detailHref,
   onAnswer,
+  calledUp = false,
 }: {
   kind: "training" | "game";
   eventId: string;
@@ -195,6 +199,7 @@ function EventCard({
   noPlayerProfile: boolean;
   detailHref: string;
   onAnswer: (v: Answer | null) => void;
+  calledUp?: boolean;
 }) {
   const [localAnswer, setLocalAnswer] = useState<Answer | null>(answer);
   const [saving, setSaving]           = useState<Answer | null>(null);
@@ -257,8 +262,22 @@ function EventCard({
           gap: "8px",
         }}
       >
-        <span style={{ ...MONO, fontSize: "10px", color: topText }}>
+        <span style={{ ...MONO, fontSize: "10px", color: topText, display: "inline-flex", alignItems: "center", gap: "8px" }}>
           {label}
+          {calledUp && (
+            <span
+              style={{
+                ...MONO,
+                fontSize: "9px",
+                color: "#1A1612",
+                background: "#F97316",
+                borderRadius: "4px",
+                padding: "2px 6px",
+              }}
+            >
+              Convocado
+            </span>
+          )}
         </span>
         {confirmedCount > 0 && (
           <span style={{ ...MONO, fontSize: "10px", color: "#B9AFA4" }}>
@@ -349,6 +368,7 @@ export function MinhaAreaTop({
   gameAnswer,
   gameConfirmedCount,
   gameDeadlineIso,
+  gameCalledUp = false,
   noPlayerProfile,
 }: Props) {
   const [tAnswer, setTAnswer] = useState<Answer | null>(trainingAnswer);
@@ -409,6 +429,19 @@ export function MinhaAreaTop({
         </span>
       </h1>
 
+      {/* Aviso de convocatória para o próximo jogo */}
+      {gameCalledUp && gameData && gTitle && (
+        <div style={{ marginBottom: "20px" }}>
+          <CallupNotice
+            gameTitle={gTitle}
+            eventDate={gameData.event_date}
+            eventTime={gameData.event_time}
+            location={gameData.location}
+            href={`/player/meus-jogos/${gameData.id}`}
+          />
+        </div>
+      )}
+
       {/* Grelha de cartões */}
       <div
         style={{
@@ -461,6 +494,7 @@ export function MinhaAreaTop({
             noPlayerProfile={noPlayerProfile}
             detailHref={`/player/meus-jogos/${gameData.id}`}
             onAnswer={setGAnswer}
+            calledUp={gameCalledUp}
           />
         ) : (
           <div style={{ ...CARD_STYLE }}>
