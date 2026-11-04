@@ -12,6 +12,8 @@ import { isAttendanceOpen, attendanceCloseHHMM } from "@/lib/time/attendance-win
 import { pickNextTraining } from "@/lib/time/pick-next-training";
 import { GpsCheckinButton } from "@/components/trainings/gps-checkin-button";
 import type { AvailabilityRosterRow } from "@/types/availability";
+import { getCallupsByGame } from "@/lib/callups/club-callups";
+import { CallupsList } from "@/components/player/callups-list";
 import { BirthdayBanner } from "@/components/birthday/birthday-banner";
 import Link from "next/link";
 import { MinhaAreaTop, type TrainingData, type GameData } from "@/components/player/minha-area-top";
@@ -231,24 +233,15 @@ export default async function MinhaAreaPage() {
   }
 
   // ── Convocatória do próximo jogo ──────────────────────────
-  // Um utilizador pode ter vários perfis de jogador (um por época), por isso
-  // verificamos contra todos — a RLS só devolve as convocatórias do próprio.
-  let gameCalledUp = false;
-  if (nextGame) {
-    const { data: myPlayers } = await supabase
-      .from("players").select("id").eq("user_id", user.id);
-    const myPlayerIds = (myPlayers ?? []).map((p) => p.id as string);
-    if (myPlayerIds.length > 0) {
-      const { data: myCallup } = await supabase
-        .from("game_callups")
-        .select("id")
-        .eq("game_id", nextGame.id)
-        .in("player_id", myPlayerIds)
-        .limit(1)
-        .maybeSingle();
-      gameCalledUp = myCallup !== null;
-    }
-  }
+  // Lista completa (visível a todo o plantel). Um utilizador pode ter vários
+  // perfis de jogador (um por época), por isso comparamos com todos.
+  const { data: myPlayers } = await supabase
+    .from("players").select("id").eq("user_id", user.id);
+  const myPlayerIds = (myPlayers ?? []).map((p) => p.id as string);
+  const nextGameCallups = nextGame
+    ? (await getCallupsByGame([nextGame.id])).get(nextGame.id) ?? []
+    : [];
+  const gameCalledUp = nextGameCallups.some((c) => myPlayerIds.includes(c.player_id));
 
   // Confirmados no jogo (respostas "available")
   const { count: gameConfirmedCount } = nextGame
@@ -362,6 +355,41 @@ export default async function MinhaAreaPage() {
         gameCalledUp={gameCalledUp}
         noPlayerProfile={linkedPlayer === null}
       />
+
+      {/* ── Convocados do próximo jogo ── */}
+      {nextGame && (
+        <div
+          style={{
+            background: "#FFFDFA",
+            borderRadius: "8px",
+            boxShadow: "0 1px 0 rgba(26,22,18,.08), 0 8px 24px -12px rgba(26,22,18,.25)",
+            padding: "16px",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px", marginBottom: "10px" }}>
+            <p
+              style={{
+                fontFamily: "var(--font-ibm-mono, monospace)",
+                fontSize: "10px",
+                fontWeight: 500,
+                letterSpacing: ".1em",
+                textTransform: "uppercase",
+                color: "#8C837A",
+                margin: 0,
+              }}
+            >
+              Convocados{nextGameCallups.length > 0 ? ` (${nextGameCallups.length})` : ""} · próximo jogo
+            </p>
+            <Link
+              href={`/player/meus-jogos/${nextGame.id}`}
+              style={{ fontFamily: "var(--font-barlow, sans-serif)", fontSize: "12px", fontWeight: 600, color: "#C2530A", textDecoration: "none", whiteSpace: "nowrap" }}
+            >
+              Ver jogo →
+            </Link>
+          </div>
+          <CallupsList players={nextGameCallups} highlightIds={myPlayerIds} />
+        </div>
+      )}
 
       {/* ── Aviso de quotas em atraso ── */}
       {isPaymentLate && (

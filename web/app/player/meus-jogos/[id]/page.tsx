@@ -1,5 +1,6 @@
 import { todayInClubTz } from "@/lib/time/club-time";
-import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import { getCallupsByGame } from "@/lib/callups/club-callups";
 import { redirect, notFound } from "next/navigation";
 import { authorize } from "@/lib/auth/guards";
 import { ArrowLeft, Calendar, Check, Clock, HelpCircle, MapPin, Shield, Users, X, Trophy } from "lucide-react";
@@ -120,47 +121,9 @@ export default async function GameDetailPage({ params }: Props) {
     myPlayers[0] ??
     null;
 
-  // Convocados — a lista é visível a todo o plantel. A RLS de game_callups só
-  // devolve ao jogador a sua própria convocatória, por isso lemos a lista
-  // completa com o cliente de serviço (apenas player_id deste jogo).
-  let callupsRaw: { player_id: string }[] | null = null;
-  try {
-    const admin = await createAdminClient();
-    const { data, error } = await admin
-      .from("game_callups")
-      .select("player_id")
-      .eq("game_id", id)
-      .order("created_at", { ascending: true });
-    if (!error) callupsRaw = data as { player_id: string }[];
-  } catch { /* fallback abaixo */ }
-  if (callupsRaw === null) {
-    const { data } = await supabase
-      .from("game_callups")
-      .select("player_id")
-      .eq("game_id", id);
-    callupsRaw = (data ?? []) as { player_id: string }[];
-  }
-
-  const callupIds = callupsRaw.map((c) => c.player_id);
-  let rosterRows: unknown[] | null = [];
-  if (callupIds.length > 0) {
-    const { data } = await supabase.from("v_roster").select("player_id, name, number, position").in("player_id", callupIds);
-    rosterRows = data;
-    // Se a view filtrar por RLS e vier incompleta, completa com o cliente de serviço
-    if ((data?.length ?? 0) < callupIds.length) {
-      try {
-        const admin = await createAdminClient();
-        const { data: full } = await admin.from("v_roster").select("player_id, name, number, position").in("player_id", callupIds);
-        if (full && full.length > (data?.length ?? 0)) rosterRows = full;
-      } catch { /* mantém o que houver */ }
-    }
-  }
-
-  type RosterRow = { player_id: string; name: string; number: number | null; position: string | null };
-  const rosterMap = new Map(((rosterRows ?? []) as RosterRow[]).map((r) => [r.player_id, r]));
-  const callups = callupIds
-    .map((pid) => rosterMap.get(pid))
-    .filter((r): r is RosterRow => r !== null && r !== undefined);
+  // Convocados — visíveis a todo o plantel (helper lê com service role).
+  const callups = (await getCallupsByGame([id])).get(id) ?? [];
+  const callupIds = callups.map((c) => c.player_id);
 
   // Own availability
   let myAvailability: "available" | "unavailable" | null = null;

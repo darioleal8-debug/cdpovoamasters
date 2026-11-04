@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 import { AvailabilityPrompt } from "@/components/player/availability-prompt";
 import { lisbonDateTime } from "@/lib/event-time";
 import { cn, buildMapsUrl } from "@/lib/utils";
+import Link from "next/link";
+import { CallupsList } from "@/components/player/callups-list";
+import type { CalledUpPlayer } from "@/types/callups";
 
 // ─── Tipos ────────────────────────────────────────────────
 
@@ -29,6 +32,7 @@ export type ProcessedGame = {
   locality: string | null;
   result: { home: number; away: number } | null;
   isCalledUp: boolean;
+  callups: CalledUpPlayer[];
   myAvailability: "yes" | "no" | null;
   isPast: boolean;
 };
@@ -84,11 +88,13 @@ function GameCard({
   game,
   isNext,
   playerId,
+  myPlayerIds,
   compact = false,
 }: {
   game: ProcessedGame;
   isNext?: boolean;
   playerId: string | null;
+  myPlayerIds: string[];
   compact?: boolean;
 }) {
   const { result } = game;
@@ -206,6 +212,30 @@ function GameCard({
         </div>
       </div>
 
+      {/* Convocados — jogos do clube */}
+      {game.is_club_game && !compact && (game.callups.length > 0 || !game.isPast) && (
+        <details className="mt-3 pt-3 border-t group" open={isNext && game.callups.length > 0}>
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-semibold text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              Convocados{game.callups.length > 0 ? ` (${game.callups.length})` : ""}
+              {game.isCalledUp && (
+                <Badge className="bg-orange-500 hover:bg-orange-500 text-white text-[10px]">Estás convocado</Badge>
+              )}
+            </span>
+            <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="mt-2.5">
+            <CallupsList players={game.callups} highlightIds={myPlayerIds} />
+          </div>
+          <Link
+            href={`/player/meus-jogos/${game.id}`}
+            className="mt-2.5 inline-block text-xs font-semibold text-orange-600 hover:text-orange-700"
+          >
+            Ver jogo →
+          </Link>
+        </details>
+      )}
+
       {/* Disponibilidade — só para jogos do clube, futuros, com playerId */}
       {game.is_club_game && !game.isPast && playerId && (
         <div className="mt-3 pt-3 border-t">
@@ -229,6 +259,7 @@ function JornadaSection({
   onToggle,
   showAll,
   playerId,
+  myPlayerIds,
   nextGameId,
 }: {
   group: JornadaGroup;
@@ -236,6 +267,7 @@ function JornadaSection({
   onToggle: () => void;
   showAll: boolean;     // true = liga view, false = agenda view
   playerId: string | null;
+  myPlayerIds: string[];
   nextGameId: string | null;
 }) {
   const { jornada, volta, games, ourGame } = group;
@@ -285,6 +317,7 @@ function JornadaSection({
                 game={g}
                 isNext={g.id === nextGameId}
                 playerId={playerId}
+                myPlayerIds={myPlayerIds}
                 compact={!g.is_club_game}
               />
             ))
@@ -308,6 +341,7 @@ function JornadaSection({
                 game={ourGame!}
                 isNext={ourGame!.id === nextGameId}
                 playerId={playerId}
+                myPlayerIds={myPlayerIds}
               />
             )
           )}
@@ -323,11 +357,13 @@ export function MeusJogosView({
   games,
   initialVista,
   playerId,
+  myPlayerIds,
   today,
 }: {
   games: ProcessedGame[];
   initialVista: "liga" | "agenda";
   playerId: string | null;
+  myPlayerIds: string[];
   today: string;
 }) {
   const [vista, setVista] = useState<"liga" | "agenda">(initialVista);
@@ -415,6 +451,7 @@ export function MeusJogosView({
               onToggle={() => toggle(group.syntheticJornada)}
               showAll={vista === "liga"}
               playerId={playerId}
+                myPlayerIds={myPlayerIds}
               nextGameId={nextGameId}
             />
           ))}
