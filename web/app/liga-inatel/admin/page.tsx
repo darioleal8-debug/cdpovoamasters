@@ -88,6 +88,8 @@ type AdminGamePhoto = {
   created_at: string; is_cover: boolean;
 };
 
+type AdminGameSheet = { submission_id: string; photo_url: string };
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmtDate(d: string, t: string | null) {
@@ -225,8 +227,13 @@ export default function LigaAdminPage() {
 
   // Game photos tab (within expanded game panel)
   const [gamePhotosMap, setGamePhotosMap]     = useState<Record<string, AdminGamePhoto[]>>({});
+  const [gameSheetMap, setGameSheetMap]       = useState<Record<string, AdminGameSheet | null>>({});
   const [photosLoading, setPhotosLoading]     = useState<string | null>(null);
   const [photoActing, setPhotoActing]         = useState<string | null>(null);
+  const [lightboxGame, setLightboxGame]       = useState<string | null>(null);
+  const [lightboxIdx, setLightboxIdx]         = useState<number>(0);
+  const [zippingGame, setZippingGame]         = useState<string | null>(null);
+  const [downloadingPhoto, setDownloadingPhoto] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -261,7 +268,90 @@ export default function LigaAdminPage() {
       const res = await fetch(`/api/liga/admin/games/${eventId}/photos`);
       const json = await res.json();
       setGamePhotosMap((m) => ({ ...m, [eventId]: json.photos ?? [] }));
+      setGameSheetMap((m) => ({ ...m, [eventId]: json.sheet ?? null }));
     } finally { setPhotosLoading(null); }
+  }
+
+  function fileSlug(s: string): string {
+    return s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "");
+  }
+
+  function isSheetPdf(photoUrl: string): boolean {
+    return /\.pdf$/i.test(photoUrl);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async function loadJSZip(): Promise<any> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((window as any).JSZip) return (window as any).JSZip;
+    return new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+      s.onload = () => resolve((window as unknown as Record<string, unknown>).JSZip);
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  async function downloadGamePhoto(photo: AdminGamePhoto, idx: number, game: AdminGame) {
+    setDownloadingPhoto(photo.id);
+    try {
+      const res = await fetch(photo.public_url);
+      if (!res.ok) throw new Error("Erro no download");
+      const blob = await res.blob();
+      const ext = photo.storage_path.split(".").pop() ?? "jpg";
+      const filename = `${game.event_date}_${fileSlug(game.home_team)}_vs_${fileSlug(game.away_team)}_foto-${idx + 1}.${ext}`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename; a.click();
+      URL.revokeObjectURL(url);
+    } catch { alert("Erro ao descarregar a foto."); }
+    finally { setDownloadingPhoto(null); }
+  }
+
+  async function downloadGameSheet(game: AdminGame, sheet: AdminGameSheet) {
+    try {
+      const res = await fetch(`/api/liga/admin/submissions/${sheet.submission_id}/sheet`);
+      if (!res.ok) throw new Error("Erro");
+      const blob = await res.blob();
+      const ext = isSheetPdf(sheet.photo_url) ? "pdf" : "jpg";
+      const filename = `${game.event_date}_${fileSlug(game.home_team)}_vs_${fileSlug(game.away_team)}_folha-de-jogo.${ext}`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename; a.click();
+      URL.revokeObjectURL(url);
+    } catch { alert("Erro ao descarregar a folha de jogo."); }
+  }
+
+  async function downloadAllAsZip(game: AdminGame) {
+    const photos = gamePhotosMap[game.id] ?? [];
+    const sheet = gameSheetMap[game.id] ?? null;
+    if (photos.length === 0 && !sheet) return;
+    setZippingGame(game.id);
+    try {
+      const JSZip = await loadJSZip();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const zip = new (JSZip as any)();
+      const prefix = `${game.event_date}_${fileSlug(game.home_team)}_vs_${fileSlug(game.away_team)}`;
+      for (let i = 0; i < photos.length; i++) {
+        try {
+          const r = await fetch(photos[i].public_url);
+          if (r.ok) { const ab = await r.arrayBuffer(); const ext = photos[i].storage_path.split(".").pop() ?? "jpg"; zip.file(`${prefix}_foto-${i + 1}.${ext}`, ab); }
+        } catch { /* skip */ }
+      }
+      if (sheet) {
+        try {
+          const r = await fetch(`/api/liga/admin/submissions/${sheet.submission_id}/sheet`);
+          if (r.ok) { const ab = await r.arrayBuffer(); zip.file(`${prefix}_folha-de-jogo.${isSheetPdf(sheet.photo_url) ? "pdf" : "jpg"}`, ab); }
+        } catch { /* skip */ }
+      }
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `${prefix}_fotos.zip`; a.click();
+      URL.revokeObjectURL(url);
+    } catch { alert("Erro ao criar ZIP."); }
+    finally { setZippingGame(null); }
   }
 
   async function handlePhotoAction(eventId: string, photoId: string, action: "hide" | "unhide" | "set_cover") {
@@ -1074,20 +1164,67 @@ export default function LigaAdminPage() {
 
                   {/* Fotografias */}
                   <div style={{ marginTop: "16px" }}>
-                    <h3 style={sectionTitle}>Fotografias do jogo</h3>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                      <h3 style={sectionTitle}>Fotografias do jogo</h3>
+                      {((gamePhotosMap[game.id]?.length ?? 0) > 0 || gameSheetMap[game.id]) && (
+                        <button
+                          onClick={() => downloadAllAsZip(game)}
+                          disabled={zippingGame === game.id}
+                          style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "5px", border: "1px solid #E8E0D6", background: "#fff", cursor: "pointer", color: "#1A1612" }}
+                        >
+                          {zippingGame === game.id ? "A criar ZIP…" : "⬇ Descarregar todas"}
+                        </button>
+                      )}
+                    </div>
                     {photosLoading === game.id ? (
                       <p style={{ fontSize: "12px", color: "#8C837A" }}>A carregar…</p>
-                    ) : !gamePhotosMap[game.id] || gamePhotosMap[game.id].length === 0 ? (
+                    ) : (!gamePhotosMap[game.id] || gamePhotosMap[game.id].length === 0) && !gameSheetMap[game.id] ? (
                       <p style={{ fontSize: "12px", color: "#8C837A" }}>Sem fotografias.</p>
                     ) : (
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
-                        {gamePhotosMap[game.id].map((photo) => (
+                        {/* Folha de jogo */}
+                        {gameSheetMap[game.id] && (() => {
+                          const sheet = gameSheetMap[game.id]!;
+                          const isPdf = isSheetPdf(sheet.photo_url);
+                          return (
+                            <div key="sheet" style={{ width: "140px", background: "#F6F2EC", borderRadius: "8px", overflow: "hidden", border: "1px solid #D1FAE5" }}>
+                              {isPdf ? (
+                                <div style={{ width: "100%", aspectRatio: "4/3", background: "#E8F4FE", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                                </div>
+                              ) : (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={`/api/liga/admin/submissions/${sheet.submission_id}/sheet`} alt="Folha de jogo" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }} />
+                              )}
+                              <div style={{ padding: "6px 8px" }}>
+                                <p style={{ fontSize: "10px", color: "#065F46", fontWeight: 700, margin: "0 0 5px", textTransform: "uppercase" }}>Folha de jogo</p>
+                                <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                                  <a href={`/api/liga/admin/submissions/${sheet.submission_id}/sheet`} target="_blank" rel="noopener noreferrer"
+                                    style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", border: "1px solid #E8E0D6", background: "#fff", cursor: "pointer", color: "#1A1612", textDecoration: "none" }}>
+                                    Abrir
+                                  </a>
+                                  <button onClick={() => downloadGameSheet(game, sheet)} style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", border: "1px solid #E8E0D6", background: "#fff", cursor: "pointer", color: "#6B7280" }}>
+                                    Descarregar
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Fotos do jogo */}
+                        {(gamePhotosMap[game.id] ?? []).map((photo, photoIdx) => (
                           <div key={photo.id} style={{
                             width: "140px", background: "#F6F2EC", borderRadius: "8px",
                             overflow: "hidden", border: photo.hidden ? "2px solid #FCA5A5" : photo.is_cover ? "2px solid #F97316" : "1px solid #E8E0D6",
                           }}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={photo.public_url} alt={photo.caption ?? "foto"} style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }} />
+                            <img
+                              src={photo.public_url}
+                              alt={photo.caption ?? "foto"}
+                              style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block", cursor: "pointer" }}
+                              onClick={() => { setLightboxGame(game.id); setLightboxIdx(photoIdx); }}
+                            />
                             <div style={{ padding: "6px 8px" }}>
                               {photo.is_cover && (
                                 <p style={{ fontSize: "10px", color: "#C2530A", fontWeight: 700, margin: "0 0 3px", textTransform: "uppercase" }}>Capa</p>
@@ -1116,6 +1253,13 @@ export default function LigaAdminPage() {
                                 >
                                   {photo.hidden ? "Mostrar" : "Ocultar"}
                                 </button>
+                                <button
+                                  onClick={() => downloadGamePhoto(photo, photoIdx, game)}
+                                  disabled={downloadingPhoto === photo.id}
+                                  style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", border: "1px solid #E8E0D6", background: "#fff", cursor: "pointer", color: "#6B7280" }}
+                                >
+                                  {downloadingPhoto === photo.id ? "…" : "Descarregar"}
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -1123,6 +1267,63 @@ export default function LigaAdminPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Lightbox de fotos do jogo */}
+                  {lightboxGame === game.id && (() => {
+                    const photos = gamePhotosMap[game.id] ?? [];
+                    const photo = photos[lightboxIdx];
+                    if (!photo) return null;
+                    return (
+                      <div
+                        style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.90)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}
+                        onClick={() => setLightboxGame(null)}
+                      >
+                        {/* Fechar */}
+                        <button
+                          onClick={() => setLightboxGame(null)}
+                          style={{ position: "absolute", top: "16px", right: "16px", background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", fontSize: "22px", width: "40px", height: "40px", borderRadius: "50%", cursor: "pointer" }}
+                          aria-label="Fechar"
+                        >×</button>
+                        {/* Anterior */}
+                        {lightboxIdx > 0 && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setLightboxIdx(lightboxIdx - 1); }}
+                            style={{ position: "absolute", left: "16px", background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", fontSize: "28px", width: "48px", height: "48px", borderRadius: "50%", cursor: "pointer" }}
+                            aria-label="Anterior"
+                          >‹</button>
+                        )}
+                        {/* Próximo */}
+                        {lightboxIdx < photos.length - 1 && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setLightboxIdx(lightboxIdx + 1); }}
+                            style={{ position: "absolute", right: "16px", background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", fontSize: "28px", width: "48px", height: "48px", borderRadius: "50%", cursor: "pointer" }}
+                            aria-label="Próximo"
+                          >›</button>
+                        )}
+                        {/* Imagem */}
+                        <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: "90vw", maxHeight: "85vh", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={photo.public_url}
+                            alt={photo.caption ?? "foto"}
+                            style={{ maxWidth: "90vw", maxHeight: "75vh", objectFit: "contain", imageOrientation: "from-image", borderRadius: "6px" }}
+                          />
+                          <div style={{ display: "flex", alignItems: "center", gap: "12px", color: "#ccc", fontSize: "13px" }}>
+                            <span>{lightboxIdx + 1} / {photos.length}</span>
+                            {photo.caption && <span>· {photo.caption}</span>}
+                            {photo.team_name && <span>· {photo.team_name}</span>}
+                            <button
+                              onClick={() => downloadGamePhoto(photo, lightboxIdx, game)}
+                              disabled={downloadingPhoto === photo.id}
+                              style={{ fontSize: "12px", padding: "5px 14px", borderRadius: "5px", border: "1px solid rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.1)", cursor: "pointer", color: "#fff" }}
+                            >
+                              {downloadingPhoto === photo.id ? "…" : "Descarregar"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Audit */}
                   <div style={{ marginTop: "16px" }}>

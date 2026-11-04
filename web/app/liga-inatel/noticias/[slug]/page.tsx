@@ -19,7 +19,7 @@ async function getArticle(slug: string) {
   const supabase = createPublicClient();
   const { data } = await supabase
     .from("news")
-    .select("id, slug, title, excerpt, body, category, published_at, cover_image_url, game_id, cover_photo_id, home_team_name, away_team_name")
+    .select("id, slug, title, excerpt, body, category, published_at, cover_image_url, game_id, cover_photo_id, home_team_name, away_team_name, image_source")
     .eq("slug", slug)
     .eq("is_published", true)
     .eq("category", "Liga INATEL")
@@ -248,45 +248,59 @@ export default async function LigaNoticiaDetailPage({ params }: Props) {
         </header>
 
         {/* Imagem de capa */}
-        <div
-          style={{
-            position: "relative",
-            width: "100%",
-            aspectRatio: "16/9",
-            borderRadius: "10px",
-            overflow: "hidden",
-            marginBottom: "32px",
-          }}
-        >
-          {article.cover_image_url ? (
-            <Image
+        {(article as { cover_photo_id?: string | null }).cover_photo_id && article.cover_image_url ? (
+          // Foto real enviada pela equipa: preservar aspect ratio original e orientação EXIF
+          <div style={{ marginBottom: "32px", borderRadius: "10px", overflow: "hidden" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
               src={article.cover_image_url}
               alt={article.title}
-              fill
-              style={{ objectFit: "cover" }}
-              sizes="(max-width: 720px) 100vw, 720px"
-              priority
+              style={{ width: "100%", height: "auto", display: "block", imageOrientation: "from-image" }}
+              loading="eager"
             />
-          ) : (
-            <div style={{
-              position: "absolute", inset: 0,
-              background: "linear-gradient(135deg, #F97316 0%, #C2530A 100%)",
-              display: "flex", flexDirection: "column",
-              alignItems: "center", justifyContent: "center", gap: "8px",
-            }}>
-              <span style={{
-                fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))",
-                fontWeight: 900, fontSize: "clamp(28px, 6vw, 48px)",
-                letterSpacing: "0.06em", color: "#fff", textTransform: "uppercase",
-              }}>hoophub</span>
-              <span style={{
-                fontFamily: "var(--font-ibm-mono, monospace)",
-                fontSize: "11px", fontWeight: 600,
-                letterSpacing: "0.14em", color: "rgba(255,255,255,.75)", textTransform: "uppercase",
-              }}>Liga INATEL</span>
-            </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          // Imagem IA ou placeholder: forçar rácio 16/9
+          <div
+            style={{
+              position: "relative",
+              width: "100%",
+              aspectRatio: "16/9",
+              borderRadius: "10px",
+              overflow: "hidden",
+              marginBottom: "32px",
+            }}
+          >
+            {article.cover_image_url ? (
+              <Image
+                src={article.cover_image_url}
+                alt={article.title}
+                fill
+                style={{ objectFit: "cover" }}
+                sizes="(max-width: 720px) 100vw, 720px"
+                priority
+              />
+            ) : (
+              <div style={{
+                position: "absolute", inset: 0,
+                background: "linear-gradient(135deg, #F97316 0%, #C2530A 100%)",
+                display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center", gap: "8px",
+              }}>
+                <span style={{
+                  fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))",
+                  fontWeight: 900, fontSize: "clamp(28px, 6vw, 48px)",
+                  letterSpacing: "0.06em", color: "#fff", textTransform: "uppercase",
+                }}>hoophub</span>
+                <span style={{
+                  fontFamily: "var(--font-ibm-mono, monospace)",
+                  fontSize: "11px", fontWeight: 600,
+                  letterSpacing: "0.14em", color: "rgba(255,255,255,.75)", textTransform: "uppercase",
+                }}>Liga INATEL</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Corpo do artigo */}
         <div

@@ -17,13 +17,21 @@ export async function GET(
   const { eventId } = await params;
   const admin = await createAdminClient();
 
-  const [photosRes, newsRes] = await Promise.all([
+  const [photosRes, newsRes, sheetRes] = await Promise.all([
     admin
       .from("game_photos")
       .select("id, storage_path, caption, sort_order, created_at, hidden, team_id")
       .eq("game_id", eventId)
       .order("created_at", { ascending: true }),
     admin.from("news").select("id, cover_photo_id").eq("game_id", eventId).maybeSingle(),
+    admin
+      .from("result_submissions")
+      .select("id, photo_url")
+      .eq("event_id", eventId)
+      .eq("status", "approved")
+      .order("reviewed_at", { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const teamIds = [...new Set((photosRes.data ?? []).map((p) => p.team_id))];
@@ -43,7 +51,13 @@ export async function GET(
     };
   });
 
-  return NextResponse.json({ photos, news_id: newsRes.data?.id ?? null });
+  return NextResponse.json({
+    photos,
+    news_id: newsRes.data?.id ?? null,
+    sheet: sheetRes.data?.photo_url
+      ? { submission_id: sheetRes.data.id, photo_url: sheetRes.data.photo_url }
+      : null,
+  });
 }
 
 // PATCH /api/liga/admin/games/[eventId]/photos
@@ -88,7 +102,7 @@ export async function PATCH(
 
     const { error } = await admin
       .from("news")
-      .update({ cover_image_url: pub.publicUrl, cover_photo_id: photo.id, image_status: "ready" })
+      .update({ cover_image_url: pub.publicUrl, cover_photo_id: photo.id, image_source: "upload", image_status: "ready" })
       .eq("game_id", eventId);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
