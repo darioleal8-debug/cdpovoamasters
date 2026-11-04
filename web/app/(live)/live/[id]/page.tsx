@@ -36,7 +36,7 @@ export default function SpectatorPage() {
   const [session,    setSession]    = useState<GameSession | null>(null);
   const [stats,      setStats]      = useState<PlayerRow[]>([]);
   const [plays,      setPlays]      = useState<PlayByPlay[]>([]);
-  const [clockSecs,  setClockSecs]  = useState(600);
+  const [clockSecs,  setClockSecs]  = useState(480);
   const [loading,    setLoading]    = useState(true);
 
   const loadAll = useCallback(async () => {
