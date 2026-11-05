@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Calendar, Clock, MapPin, Radio, Trophy, Download, Eye, Upload, Users, Dumbbell } from "lucide-react";
-import type { PlayerGameStatsWithUser, PlayEventType } from "@/types/database";
+import type { PlayerGameStatsWithUser } from "@/types/database";
 import { EventPhotoGallery } from "@/components/shared/event-photo-gallery";
 import { ImportStatsModal } from "@/components/games/import-stats-modal";
 
@@ -36,17 +36,6 @@ function getMvp(stats: PlayerGameStatsWithUser[]): PlayerGameStatsWithUser | nul
   if (!stats.length) return null;
   return [...stats].sort((a, b) => Number(b.efficiency) - Number(a.efficiency))[0];
 }
-
-const EVENT_LABELS: Partial<Record<PlayEventType | string, string>> = {
-  "2pt_made": "2P ✓", "2pt_miss": "2P ✗",
-  "3pt_made": "3P ✓", "3pt_miss": "3P ✗",
-  "ft_made": "LL ✓", "ft_miss": "LL ✗",
-  "rebound_off": "Res.Of.", "rebound_def": "Res.Def.",
-  "assist": "Assist.", "steal": "Roubo", "block": "Desarme",
-  "turnover": "Turnover", "foul_committed": "F.Cometida", "foul_drawn": "F.Sofrida",
-  "substitution_in": "Substituição", "timeout": "Timeout",
-  "game_start": "🏀 Início", "period_end": "Fim Período", "game_end": "🏁 Fim Jogo",
-};
 
 interface GameDetail {
   id: string;
@@ -254,7 +243,7 @@ export default function GameStatsPage() {
   const [importOpen,   setImportOpen]   = useState(false);
   const [isFriendly,   setIsFriendly]   = useState(false);
 
-  const { session, plays, playerStats, periodScores, roster, loading } =
+  const { session, playerStats, periodScores, roster, loading } =
     useLiveGame(params.eventId);
   // game_period_scores guarda acumulados; a tabela mostra parciais (STA-08)
   const periodPartials = useMemo(() => toPeriodPartials(periodScores), [periodScores]);
@@ -588,43 +577,6 @@ export default function GameStatsPage() {
           </div>
         </CardContent>
       </Card>
-
-      {/* ── Play-by-Play ────────────────────────────────── */}
-      {plays.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-base">Play-by-Play</CardTitle></CardHeader>
-          <CardContent className="space-y-0.5 max-h-80 overflow-y-auto p-3">
-            {[...plays].reverse().map((p) => {
-              const rosterEntry = roster.find((r) => r.user_id === p.player_id);
-              const playerName = (rosterEntry?.user.name ?? undefined)?.split(" ")[0];
-              const jersey = rosterEntry?.jersey_number;
-              return (
-                <div key={p.id} className="flex items-center gap-2 text-xs py-0.5 border-b last:border-0">
-                  <span className="shrink-0 w-5 text-muted-foreground font-mono">{p.period}P</span>
-                  {p.game_clock && (
-                    <span className="shrink-0 text-muted-foreground font-mono text-[0.6rem]">{p.game_clock}</span>
-                  )}
-                  {jersey !== undefined && (
-                    <span className="shrink-0 font-bold text-cdpovoa-primary">#{jersey}</span>
-                  )}
-                  {playerName && <span className="shrink-0 font-medium">{playerName}</span>}
-                  <span className={`flex-1 truncate ${p.is_home_team ? "" : "text-muted-foreground italic"}`}>
-                    {p.description ?? (EVENT_LABELS[p.event_type] ?? p.event_type)}
-                  </span>
-                  {p.points_delta > 0 && (
-                    <span className={`font-bold shrink-0 ${p.is_home_team ? "text-green-600" : "text-red-500"}`}>
-                      +{p.points_delta}
-                    </span>
-                  )}
-                  <span className="text-muted-foreground shrink-0 tabular-nums font-mono text-[0.6rem]">
-                    {p.home_score_after}–{p.away_score_after}
-                  </span>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
 
       {/* ── Fotografias ─────────────────────────────────── */}
       <Card>
