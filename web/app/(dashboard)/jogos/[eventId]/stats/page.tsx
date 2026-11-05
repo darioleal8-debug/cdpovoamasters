@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useLiveGame } from "@/hooks/use-live-game";
 import { createClient } from "@/lib/supabase/client";
-import { generateGamePDF } from "@/lib/pdf-export";
+import { generateGamePDF, type PdfGameContext } from "@/lib/pdf-export";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -248,14 +248,31 @@ export default function GameStatsPage() {
   // game_period_scores guarda acumulados; a tabela mostra parciais (STA-08)
   const periodPartials = useMemo(() => toPeriodPartials(periodScores), [periodScores]);
 
+  // Contexto do jogo para o PDF (competição, jornada, série, data, local)
+  const [pdfCtx, setPdfCtx] = useState<PdfGameContext>({});
   useEffect(() => {
     const supabase = createClient();
     supabase
       .from("events")
-      .select("game_type")
+      .select("game_type, competition, event_date, event_time, location, description")
       .eq("id", params.eventId)
       .single()
-      .then(({ data }) => { if (data?.game_type === "friendly") setIsFriendly(true); });
+      .then(({ data }) => {
+        if (!data) return;
+        if (data.game_type === "friendly") setIsFriendly(true);
+        let meta: { jornada?: number; serie?: string; is_home?: boolean; pavilion?: string; locality?: string } = {};
+        try { meta = JSON.parse((data.description as string | null) ?? "{}"); } catch { /* sem meta */ }
+        const place = meta.pavilion ? [meta.pavilion, meta.locality].filter(Boolean).join(", ") : (data.location as string | null);
+        setPdfCtx({
+          competition: data.competition === "Liga" ? "Liga INATEL" : (data.competition as string | null),
+          jornada: meta.jornada ?? null,
+          serie: meta.serie ?? null,
+          eventDate: data.event_date as string | null,
+          eventTime: data.event_time as string | null,
+          location: place ?? null,
+          isHome: typeof meta.is_home === "boolean" ? meta.is_home : null,
+        });
+      });
   }, [params.eventId]);
 
   if (loading) {
@@ -313,7 +330,7 @@ export default function GameStatsPage() {
           user: { id: s.player_id, name: profile?.user.name ?? "—" },
         };
       });
-      await generateGamePDF(session!, statsWithExtras, periodScores);
+      await generateGamePDF(session!, statsWithExtras, periodScores, pdfCtx);
     } finally {
       setPdfLoading(false);
     }
