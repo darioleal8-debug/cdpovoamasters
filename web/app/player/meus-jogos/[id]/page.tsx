@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import type { AvailabilityRosterRow } from "@/types/availability";
 import { AvailabilityPrompt } from "@/components/player/availability-prompt";
 import { CallupNotice } from "@/components/player/callup-notice";
+import { PlayerBoxScore } from "@/components/player/player-box-score";
 import { lisbonDateTime } from "@/lib/event-time";
 import { hasAnyRole, MANAGERS } from "@/lib/auth/roles";
 import type { UserRole } from "@/types/database";
@@ -97,14 +98,12 @@ export default async function GameDetailPage({ params }: Props) {
   const today = todayInClubTz(new Date());
   const isPast = (event.event_date as string) < today;
 
-  // Fetch game result if past
-  const { data: session } = isPast
-    ? await supabase.from("game_sessions")
-        .select("home_score, away_score, status")
-        .eq("event_id", id)
-        .eq("status", "finished")
-        .maybeSingle()
-    : { data: null };
+  // Resultado + box score: qualquer jogo já finalizado (incluindo o próprio dia)
+  const { data: session } = await supabase.from("game_sessions")
+    .select("id, home_score, away_score, status, opponent_name")
+    .eq("event_id", id)
+    .eq("status", "finished")
+    .maybeSingle();
 
   // Perfis de jogador do utilizador — há um por época, por isso escolhemos o
   // da época do jogo (senão o mais recente). Antes usava-se sempre o mais
@@ -283,6 +282,17 @@ export default async function GameDetailPage({ params }: Props) {
             </div>
           );
         })()
+      )}
+
+      {/* Box score do jogo terminado (sem play-by-play) */}
+      {session && (
+        <PlayerBoxScore
+          sessionId={session.id as string}
+          opponentName={(session.opponent_name as string | null) ?? (event.opponent as string | null) ?? "Adversário"}
+          homeScore={session.home_score as number}
+          awayScore={session.away_score as number}
+          highlightPlayerIds={myPlayerIds}
+        />
       )}
 
       {/* A minha situação (se for jogador) */}
