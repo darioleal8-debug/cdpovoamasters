@@ -159,10 +159,27 @@ describe("POST carregar folha melhorada", () => {
 });
 
 describe("POST analisar uma folha submetida", () => {
-  it("PDF não é analisável", async () => {
-    setup(() => undefined, { adminHandler: (q) => (q.table === "result_submissions" ? { data: { id: SUB, event_id: GAME, photo_url: "u/a.pdf" } } : undefined) });
+  it("ficheiro que não é imagem nem PDF não é analisável", async () => {
+    setup(() => undefined, {
+      adminHandler: (q) => (q.table === "result_submissions" ? { data: { id: SUB, event_id: GAME, photo_url: "u/a.jpg" } } : undefined),
+      download: Buffer.from("<script>alert(1)</script>"),
+    });
     const req = new Request("http://x", { method: "POST", body: JSON.stringify({ kind: "submission", id: SUB }) });
     expect((await analyzeRoute.POST(req, p({ eventId: GAME }))).status).toBe(415);
+    expect(runAndStore).not.toHaveBeenCalled();
+  });
+
+  it("PDF submetido é analisado", async () => {
+    setup(
+      (q) => (q.table === "game_sheet_imports" && q.op === "insert" ? { data: { id: IMP } } : undefined),
+      {
+        adminHandler: (q) => (q.table === "result_submissions" ? { data: { id: SUB, event_id: GAME, photo_url: "u/2026/g/del.pdf" } } : undefined),
+        download: Buffer.from("%PDF-1.7 aaaaaaaaaa"),
+      },
+    );
+    const req = new Request("http://x", { method: "POST", body: JSON.stringify({ kind: "submission", id: SUB }) });
+    expect((await analyzeRoute.POST(req, p({ eventId: GAME }))).status).toBe(200);
+    expect(runAndStore).toHaveBeenCalledOnce();
   });
 
   it("reutiliza o ficheiro da submissão e liga a importação à submissão", async () => {
