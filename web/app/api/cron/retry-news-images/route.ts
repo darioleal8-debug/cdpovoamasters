@@ -1,7 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { isAuthorizedCron } from "@/lib/cron-auth";
 import { createAdminClient } from "@/lib/supabase/server";
 import { generateNewsImage } from "@/lib/liga/generate-image";
+import { ligaCatchUp, type CatchUpReport } from "@/lib/liga/catch-up";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -11,6 +13,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
+  // 1. Jogos da liga a meio do circuito: live por publicar / resultado sem notícia
+  let catchUp: CatchUpReport | null = null;
+  try {
+    catchUp = await ligaCatchUp({ limit: 2, schedule: (fn) => after(fn) });
+    if (catchUp.published.length || catchUp.news.length) {
+      revalidatePath("/liga-inatel", "layout");
+      revalidatePath("/noticias", "layout");
+    }
+    if (catchUp.errors.length) console.error("[cron/retry-news-images] catch-up:", catchUp.errors);
+  } catch (e) {
+    console.error("[cron/retry-news-images] catch-up falhou", e);
+  }
+
+  // 2. Imagens de notícias que falharam
   const admin = await createAdminClient();
 
   const { data: articles } = await admin
@@ -24,7 +40,7 @@ export async function GET(req: NextRequest) {
     .limit(3);
 
   if (!articles?.length) {
-    return NextResponse.json({ ok: true, retried: 0 });
+    return NextResponse.json({ ok: true, retried: 0, catchUp });
   }
 
   let retried = 0;
@@ -53,5 +69,5 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, retried, stopped });
+  return NextResponse.json({ ok: true, retried, stopped, catchUp });
 }

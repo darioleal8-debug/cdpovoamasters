@@ -6,6 +6,7 @@ import { parseGameMeta } from "@/types/competitions";
 import { CourtBg } from "@/components/competitions/court-bg";
 import { TeamMono } from "@/components/competitions/team-mono";
 import { PlayerStatsTabs } from "@/components/competitions/player-stats-tabs";
+import { PlayerBoxScore } from "@/components/player/player-box-score";
 
 export const revalidate = 60;
 
@@ -31,7 +32,7 @@ async function getGamePageData(eventId: string) {
 
   const [eventRes, resultRes, periodsRes, playerStatsRes] = await Promise.all([
     supabase.from("events")
-      .select("id, event_date, event_time, location, description, season_id, competition")
+      .select("id, event_date, event_time, location, description, season_id, competition, is_test, opponent")
       .eq("id", eventId).eq("type", "jogo").is("deleted_at", null).single(),
     supabase.from("league_game_results")
       .select("*") // inclui pontos por atribuir (migração 111), quando existirem
@@ -47,7 +48,13 @@ async function getGamePageData(eventId: string) {
   if (!event) return null;
 
   const meta = parseGameMeta(event.description ?? null);
-  if (meta?.is_test === true) return null;
+  if (meta?.is_test === true || event.is_test === true) return null;
+
+  // Estatística registada ao vivo no HoopHub (jogo finalizado) → box score completo
+  const { data: liveSession } = await supabase.from("game_sessions")
+    .select("id, home_score, away_score")
+    .eq("event_id", eventId).eq("status", "finished")
+    .order("created_at", { ascending: false }).limit(1).maybeSingle();
 
   const result = resultRes.data ?? null;
 
@@ -116,6 +123,7 @@ async function getGamePageData(eventId: string) {
     photos,
     prevGame,
     nextGame,
+    liveSession: liveSession ?? null,
   };
 }
 
@@ -144,7 +152,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ eve
   const data = await getGamePageData(eventId);
   if (!data) notFound();
 
-  const { event, meta, result, periods, playerStats, homeLogoUrl, awayLogoUrl, news, photos, prevGame, nextGame } = data;
+  const { event, meta, result, periods, playerStats, homeLogoUrl, awayLogoUrl, news, photos, prevGame, nextGame, liveSession } = data;
 
   const homeTeam = meta?.home_team ?? result?.home_team_name ?? "—";
   const awayTeam = meta?.away_team ?? result?.away_team_name ?? "—";
@@ -153,6 +161,10 @@ export default async function GameDetailPage({ params }: { params: Promise<{ eve
   const awayWon = hasResult && result!.away_score > result!.home_score;
   // Boletins importados guardam o prolongamento como período 5+; os antigos só têm a flag
   const overtime = result?.overtime === true && !periods.some((p) => p.periodo > 4);
+
+  // Equipa que fez o registo ao vivo (CD Póvoa): o lado "povoa" da liga
+  const isPovoa = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes("povoa");
+  const ourTeamLive = isPovoa(awayTeam) && !isPovoa(homeTeam) ? awayTeam : homeTeam;
 
   const jornada = meta?.jornada;
   const serie = meta?.serie;
@@ -380,6 +392,21 @@ export default async function GameDetailPage({ params }: { params: Promise<{ eve
               </p>
             ) : null;
           })()}
+        </section>
+      )}
+
+      {/* ── BOX SCORE DO REGISTO AO VIVO ── */}
+      {hasResult && liveSession && (
+        <section style={SECTION}>
+          <PlayerBoxScore
+            publicView
+            title={`Box Score · ${ourTeamLive} (registo ao vivo)`}
+            sessionId={liveSession.id}
+            ourTeamName={ourTeamLive}
+            opponentName={(event.opponent as string | null) ?? (ourTeamLive === homeTeam ? awayTeam : homeTeam)}
+            homeScore={liveSession.home_score}
+            awayScore={liveSession.away_score}
+          />
         </section>
       )}
 

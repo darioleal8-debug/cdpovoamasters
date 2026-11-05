@@ -1,10 +1,12 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { toPeriodPartials } from "@/lib/live/period-scores";
 import { formatMinutes } from "@/lib/live/minutes";
 
 /**
  * Box score de um jogo terminado para a área do jogador (sem play-by-play).
  * Server component — lê com a sessão do utilizador (RLS: leitura autenticada).
+ * Com `publicView` (página pública do jogo na Liga INATEL) lê com service role,
+ * só para jogos já finalizados — o chamador garante que não é jogo de teste.
  * Em game_sessions/player_game_stats o CD Póvoa é sempre o lado "home".
  */
 
@@ -38,14 +40,20 @@ export async function PlayerBoxScore({
   homeScore,
   awayScore,
   highlightPlayerIds = [],
+  publicView = false,
+  title = "Box Score",
+  ourTeamName = "CD Póvoa",
 }: {
   sessionId: string;
   opponentName: string;
   homeScore: number;
   awayScore: number;
   highlightPlayerIds?: string[];
+  publicView?: boolean;
+  title?: string;
+  ourTeamName?: string;
 }) {
-  const supabase = await createClient();
+  const supabase = publicView ? await createAdminClient() : await createClient();
 
   const [statsRes, periodsRes, sessRes] = await Promise.all([
     supabase.from("player_game_stats")
@@ -96,7 +104,7 @@ export async function PlayerBoxScore({
 
   return (
     <section id="box-score" className="space-y-3 scroll-mt-20">
-      <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Box Score</h2>
+      <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">{title}</h2>
 
       {/* Parciais por período */}
       {partials.length > 0 && (
@@ -113,7 +121,7 @@ export async function PlayerBoxScore({
             </thead>
             <tbody className="divide-y">
               <tr>
-                <td className="px-3 py-2 font-semibold text-cdpovoa-primary">CD Póvoa</td>
+                <td className="px-3 py-2 font-semibold text-cdpovoa-primary">{ourTeamName}</td>
                 {partials.map((p) => <Cell key={p.period}>{p.home_score}</Cell>)}
                 <Cell bold>{homeScore}</Cell>
               </tr>
@@ -140,7 +148,7 @@ export async function PlayerBoxScore({
           </thead>
           <tbody className="divide-y">
             <tr>
-              <td className="px-3 py-2 font-semibold text-cdpovoa-primary">CD Póvoa</td>
+              <td className="px-3 py-2 font-semibold text-cdpovoa-primary">{ourTeamName}</td>
               <Cell bold>{homeScore}</Cell>
               <Cell bold>{t.reb}</Cell>
               <Cell bold>{t.ast}</Cell>
