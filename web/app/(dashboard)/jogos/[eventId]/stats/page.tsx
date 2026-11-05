@@ -445,7 +445,7 @@ export default function GameStatsPage() {
                   <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Equipa</th>
                   <th className="text-center px-3 py-2 text-xs font-semibold">Pontos</th>
                   <th className="text-center px-3 py-2 text-xs font-semibold">Reb.</th>
-                  <th className="text-center px-3 py-2 text-xs font-semibold">F. Dadas</th>
+                  <th className="text-center px-3 py-2 text-xs font-semibold">Assist.</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -453,7 +453,7 @@ export default function GameStatsPage() {
                   <td className="px-3 py-2.5 font-semibold text-cdpovoa-primary">CD Póvoa</td>
                   <td className="text-center px-3 py-2.5 font-black text-lg tabular-nums">{totPts}</td>
                   <td className="text-center px-3 py-2.5 font-bold tabular-nums">{totReb}</td>
-                  <td className="text-center px-3 py-2.5 font-bold tabular-nums">{totFC}</td>
+                  <td className="text-center px-3 py-2.5 font-bold tabular-nums">{totAst}</td>
                 </tr>
                 <tr className="bg-muted/20">
                   <td className="px-3 py-2.5 font-semibold text-muted-foreground truncate max-w-[110px]">
@@ -463,7 +463,8 @@ export default function GameStatsPage() {
                   <td className="text-center px-3 py-2.5 font-bold tabular-nums">
                     {(session.away_reb_off ?? 0) + (session.away_reb_def ?? 0)}
                   </td>
-                  <td className="text-center px-3 py-2.5 font-bold tabular-nums">{session.away_fouls ?? 0}</td>
+                  {/* assistências do adversário não são registadas no live */}
+                  <td className="text-center px-3 py-2.5 font-bold tabular-nums text-muted-foreground">—</td>
                 </tr>
               </tbody>
             </table>
@@ -479,8 +480,11 @@ export default function GameStatsPage() {
                 { label: "Desarmes",  value: totBlk },
                 { label: "Turnovers", value: totTov },
                 { label: "F.Sof.",    value: totFD  },
+                { label: "2P C/T", value: `${tot2M}/${tot2A}` },
                 { label: "2P %",  value: pct(tot2M, tot2A) },
+                { label: "3P C/T", value: `${tot3M}/${tot3A}` },
                 { label: "3P %",  value: pct(tot3M, tot3A) },
+                { label: "LL C/T", value: `${totFtM}/${totFtA}` },
                 { label: "LL %",  value: pct(totFtM, totFtA) },
                 { label: "FG %",  value: pct(tot2M + tot3M, tot2A + tot3A) },
               ].map((stat) => (
@@ -513,8 +517,11 @@ export default function GameStatsPage() {
                   <th className="px-2 py-2 text-center font-semibold">TOV</th>
                   <th className="px-2 py-2 text-center font-semibold">FD</th>
                   <th className="px-2 py-2 text-center font-semibold">FS</th>
+                  <th className="px-2 py-2 text-center font-semibold" title="Lançamentos de 2 pontos convertidos/tentados">2P C/T</th>
                   <th className="px-2 py-2 text-center font-semibold">2P%</th>
+                  <th className="px-2 py-2 text-center font-semibold" title="Lançamentos de 3 pontos convertidos/tentados">3P C/T</th>
                   <th className="px-2 py-2 text-center font-semibold">3P%</th>
+                  <th className="px-2 py-2 text-center font-semibold" title="Lances livres convertidos/tentados">LL C/T</th>
                   <th className="px-2 py-2 text-center font-semibold">LL%</th>
                   <th className="px-2 py-2 text-center font-semibold text-cdpovoa-primary">EFF</th>
                   <th className="px-2 py-2 text-center font-semibold">+/-</th>
@@ -541,8 +548,11 @@ export default function GameStatsPage() {
                       <StatCell value={p.tov} />
                       <StatCell value={p.fouls_committed} />
                       <StatCell value={p.fouls_drawn} />
+                      <StatCell value={`${p.fg2_made}/${p.fg2_att}`} />
                       <StatCell value={pct(p.fg2_made, p.fg2_att)} />
+                      <StatCell value={`${p.fg3_made}/${p.fg3_att}`} />
                       <StatCell value={pct(p.fg3_made, p.fg3_att)} />
+                      <StatCell value={`${p.ft_made}/${p.ft_att}`} />
                       <StatCell value={pct(p.ft_made, p.ft_att)} />
                       <td className="px-2 py-2 text-center font-bold text-cdpovoa-primary tabular-nums">
                         {Number(p.efficiency).toFixed(0)}
@@ -566,8 +576,11 @@ export default function GameStatsPage() {
                   <StatCell value={totTov} bold />
                   <StatCell value={totFC} bold />
                   <StatCell value={totFD} bold />
+                  <StatCell value={`${tot2M}/${tot2A}`} bold />
                   <StatCell value={pct(tot2M, tot2A)} bold />
+                  <StatCell value={`${tot3M}/${tot3A}`} bold />
                   <StatCell value={pct(tot3M, tot3A)} bold />
+                  <StatCell value={`${totFtM}/${totFtA}`} bold />
                   <StatCell value={pct(totFtM, totFtA)} bold />
                   <td className="px-2 py-2 text-center font-bold text-cdpovoa-primary">{totEff.toFixed(0)}</td>
                   <td className="px-2 py-2 text-center">–</td>
