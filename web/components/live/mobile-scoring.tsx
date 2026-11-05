@@ -633,7 +633,7 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, color: "var(--muted)" }}>ADV</div>
+                  <div style={{ fontSize: 10, color: "var(--muted)", maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session?.opponent_name || "ADV"}</div>
                   <div style={{
                     fontFamily: MONO, fontSize: 24, fontWeight: 700,
                     color: awayFouls >= 4 ? "var(--danger)" : "var(--text)",

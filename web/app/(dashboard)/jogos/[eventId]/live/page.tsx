@@ -219,13 +219,28 @@ export default function LiveGamePage() {
   );
   // Tempo jogado por jogador (stints em campo + relógio atual)
   const clockWhole = Math.floor(clockSecs);
-  const playerMap = useMemo(
-    () => withSecondsPlayed(
-      basePlayerMap,
-      computeSecondsPlayed(game.stints, session?.current_period ?? 1, clockWhole, session?.status === "live")
-    ),
-    [basePlayerMap, game.stints, session?.current_period, session?.status, clockWhole]
+  const secsById = useMemo(
+    () => computeSecondsPlayed(game.stints, session?.current_period ?? 1, clockWhole, session?.status === "live"),
+    [game.stints, session?.current_period, session?.status, clockWhole]
   );
+  const playerMap = useMemo(
+    () => withSecondsPlayed(basePlayerMap, secsById),
+    [basePlayerMap, secsById]
+  );
+
+  // ── Fim do tempo regulamentar ─────────────────────────────
+  // A partir do 4.º período: se não houver empate, o próximo passo é
+  // finalizar o jogo; em caso de empate, segue para prolongamento.
+  const REGULATION_PERIODS = 4;
+  const atOrPastRegulation = (session?.current_period ?? 0) >= REGULATION_PERIODS;
+  const isTied = (session?.home_score ?? 0) === (session?.away_score ?? 0);
+  const periodClockDone = !!session && !session.clock_running && clockWhole <= 0;
+  const canFinish = session?.status === "live" && atOrPastRegulation && !isTied;
+  const showEndBanner = session?.status === "live" && atOrPastRegulation && periodClockDone;
+  const handleNextPeriod = () => {
+    if (canFinish) setFinishDialog(true);
+    else setPeriodDialog(true);
+  };
 
   const tokens = prefs.dark ? DARK_TOKENS : LIGHT_TOKENS;
   const isLive = session?.status === "live";
@@ -255,7 +270,7 @@ export default function LiveGamePage() {
     onRecordOpponentReb: recordOpponentReb,
     onStartClock: startClock,
     onStopClock: stopClock,
-    onNextPeriod: () => setPeriodDialog(true),
+    onNextPeriod: handleNextPeriod,
     onSubstitute: substitutePlayer,
     onSetLineup: setLineup,
     onUndoPlay: undoPlay,
@@ -350,6 +365,35 @@ export default function LiveGamePage() {
         </div>
       )}
 
+      {/* ── Fim do 4.º período / prolongamento: finalizar o jogo ─── */}
+      {showEndBanner && session && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+          padding: "10px 16px", flexShrink: 0, fontFamily: SANS,
+          background: isTied ? "oklch(0.97 0.04 80)" : "var(--accentSoft)",
+          borderBottom: `1px solid ${isTied ? "oklch(0.85 0.08 80)" : "var(--accent)"}`,
+        }}>
+          <span style={{ fontSize: 13, fontWeight: 800, color: "var(--text)", flex: 1, minWidth: 200 }}>
+            {isTied
+              ? `Empate ${session.home_score}–${session.away_score} no fim do ${session.current_period}º período — segue para prolongamento.`
+              : `Fim do ${session.current_period > REGULATION_PERIODS ? "prolongamento" : "4º período"} · CD Póvoa ${session.home_score}–${session.away_score} ${session.opponent_name}`}
+          </span>
+          {isTied ? (
+            <button onClick={() => setPeriodDialog(true)} disabled={recording}
+              style={{ height: 44, padding: "0 18px", borderRadius: 10, border: "none", cursor: "pointer",
+                background: "var(--accent)", color: "var(--accentInk)", fontSize: 14, fontWeight: 800 }}>
+              ⏱ Prolongamento
+            </button>
+          ) : (
+            <button onClick={() => setFinishDialog(true)} disabled={recording}
+              style={{ height: 44, padding: "0 18px", borderRadius: 10, border: "none", cursor: "pointer",
+                background: "oklch(0.55 0.2 25)", color: "white", fontSize: 14, fontWeight: 800 }}>
+              🏁 Finalizar jogo
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── Ecrã de marcação mobile (landscape + fullscreen) ─── */}
       {isMobileScoring && isLive && session && user && (
         <MobileScoringScreen game={game} userId={user.id} />
@@ -437,6 +481,7 @@ export default function LiveGamePage() {
           onCourtIds={onCourtIds}
           plays={plays}
           clockSecs={clockSecs}
+          secsById={secsById}
           tokens={tokens}
           onClose={() => setSummaryOpen(false)}
           onExport={() => setShareOpen(true)}
@@ -633,9 +678,11 @@ export default function LiveGamePage() {
       {/* ── DIALOG: Próximo Período ──────────────────────── */}
       <Dialog open={periodDialog} onOpenChange={setPeriodDialog}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Próximo Período</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{atOrPastRegulation ? "Prolongamento" : "Próximo Período"}</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Terminar o {session?.current_period}º período e avançar para o {(session?.current_period ?? 0) + 1}º?
+            {atOrPastRegulation
+              ? <>Jogo empatado {session?.home_score}–{session?.away_score}. Terminar o {session?.current_period}º período e avançar para o prolongamento?</>
+              : <>Terminar o {session?.current_period}º período e avançar para o {(session?.current_period ?? 0) + 1}º?</>}
           </p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPeriodDialog(false)}>Cancelar</Button>
@@ -651,7 +698,7 @@ export default function LiveGamePage() {
           <p className="text-sm text-muted-foreground">
             CD Póvoa <strong>{session?.home_score}</strong> –{" "}
             <strong>{session?.away_score}</strong> {session?.opponent_name}
-            <br />Confirmas o resultado final?
+            <br />Confirmas o resultado final? Depois de finalizado, nenhuma estatística pode ser alterada.
           </p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setFinishDialog(false)}>Cancelar</Button>
