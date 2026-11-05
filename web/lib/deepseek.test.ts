@@ -129,11 +129,26 @@ describe("deepseekJSON — retry em finish_reason=length", () => {
     if (!r.ok) expect(r.error).toMatch(/incompleta/i);
   });
 
-  test("não retenta em erro de parse JSON (sem shouldRetry)", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(makeResponse("isto não é json", "stop"));
-    const r = await deepseekJSON({ user: "prompt" });
+  test("em JSON irreparável, repete uma vez com outra temperatura (sem duplicar tokens)", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(makeResponse("isto não é json", "stop"))
+      .mockResolvedValueOnce(makeResponse("continua a não ser json", "stop"));
+    const r = await deepseekJSON({ user: "prompt", temperature: 0, maxTokens: 1000 });
     expect(r.ok).toBe(false);
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
+    const second = JSON.parse(vi.mocked(fetch).mock.calls[1][1]!.body as string);
+    expect(second.temperature).toBeGreaterThan(0);
+    expect(second.max_tokens).toBe(1000);
+  });
+
+  test("repara JSON com aspa solta sem nova chamada", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      makeResponse('{"teams":{"A":{"name":"X"},"B":{"name":"Y"},"},"players":[]}', "stop"),
+    );
+    const r = await deepseekJSON({ user: "prompt" });
+    expect(r.ok).toBe(true);
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+    if (r.ok) expect(r.data).toEqual({ teams: { A: { name: "X" }, B: { name: "Y" } }, players: [] });
   });
 });
 
