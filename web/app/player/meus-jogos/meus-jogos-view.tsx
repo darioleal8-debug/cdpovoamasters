@@ -236,6 +236,16 @@ function GameCard({
         </details>
       )}
 
+      {/* Jogo terminado: acesso à box score */}
+      {game.is_club_game && result && (
+        <Link
+          href={`/player/meus-jogos/${game.id}#box-score`}
+          className="mt-2.5 inline-flex items-center gap-1 text-xs font-semibold text-cdpovoa-primary hover:underline"
+        >
+          📊 Ver box score →
+        </Link>
+      )}
+
       {/* Disponibilidade — só para jogos do clube, futuros, com playerId */}
       {game.is_club_game && !game.isPast && playerId && (
         <div className="mt-3 pt-3 border-t">
