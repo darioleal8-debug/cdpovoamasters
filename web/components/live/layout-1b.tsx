@@ -148,7 +148,7 @@ export function Layout1b({
             </div>
             <span style={{ fontFamily: MONO, fontSize: 24, color: "var(--muted)", alignSelf: "flex-end", paddingBottom: 4 }}>:</span>
             <div style={{ display: "flex", flexDirection: "column" }}>
-              <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase" }}>PT</span>
+              <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={session.opponent_name}>{session.opponent_name || "ADVERSÁRIO"}</span>
               <span style={{ fontFamily: MONO, fontSize: 42, fontWeight: 700, lineHeight: 1, color: "var(--text)" }}>{session.away_score}</span>
             </div>
           </div>

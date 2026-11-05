@@ -57,6 +57,12 @@ export function useLiveGame(
   const [recording, setRecording] = useState(false);
   const sessionRef = useRef<GameSession | null>(null);
   sessionRef.current = session;
+  /** Jogo terminado → nenhuma estatística pode ser alterada. */
+  const locked = () => {
+    if (sessionRef.current?.status === "live") return false;
+    toast({ title: "Jogo terminado", description: "As estatísticas já não podem ser alteradas.", variant: "destructive" });
+    return true;
+  };
 
   // ── Season — derivada do evento, não da temporada activa ─
   useEffect(() => {
@@ -339,6 +345,7 @@ export function useLiveGame(
   }
 
   async function startClock(): Promise<void> {
+    if (sessionRef.current && sessionRef.current.status !== "live") return;
     const cur = sessionRef.current;
     if (!cur || cur.clock_running) return;
     await writeClock(
@@ -348,6 +355,7 @@ export function useLiveGame(
   }
 
   async function stopClock(): Promise<void> {
+    if (sessionRef.current && sessionRef.current.status !== "live") return;
     const cur = sessionRef.current;
     if (!cur || !cur.clock_running) return;
     const started = cur.clock_started_at ? new Date(cur.clock_started_at).getTime() : Date.now();
@@ -364,6 +372,7 @@ export function useLiveGame(
   }
 
   async function resetClock(): Promise<void> {
+    if (sessionRef.current && sessionRef.current.status !== "live") return;
     const cur = sessionRef.current;
     if (!cur) return;
     await writeClock(
@@ -469,6 +478,7 @@ export function useLiveGame(
     game_clock?: string;
     description?: string;
   }): Promise<boolean> {
+    if (locked()) return false;
     if (!session || recording) return false;
     setRecording(true);
     try {
@@ -500,6 +510,7 @@ export function useLiveGame(
   // ── Opponent points ─────────────────────────────────────
 
   async function recordOpponentPoints(pts: number): Promise<void> {
+    if (locked()) return;
     if (!session || recording) return;
     setRecording(true);
     try {
@@ -524,6 +535,7 @@ export function useLiveGame(
   async function recordOpponentFoul(
     type: "foul_def" | "foul_of" | "foul_tec" | "foul_anti"
   ): Promise<void> {
+    if (locked()) return;
     if (!session || recording) return;
     setRecording(true);
     try {
@@ -547,6 +559,7 @@ export function useLiveGame(
   // ── Opponent rebounds (typed) ───────────────────────────
 
   async function recordOpponentReb(type: "reb_off" | "reb_def"): Promise<void> {
+    if (locked()) return;
     if (!session || recording) return;
     setRecording(true);
     try {
@@ -569,6 +582,7 @@ export function useLiveGame(
   // ── Substitution ────────────────────────────────────────
 
   async function substitutePlayer(inId: string, outId: string): Promise<void> {
+    if (locked()) return;
     if (!session) return;
     const newLineup = onCourtIds.filter((id) => id !== outId).concat(inId);
 
@@ -622,6 +636,7 @@ export function useLiveGame(
   // ── Set lineup (replaces on-court, managing stints) ─────
 
   async function setLineup(userIds: string[]): Promise<boolean> {
+    if (locked()) return false;
     if (!session) {
       toast({ title: "Erro", description: "Sessão de jogo não encontrada.", variant: "destructive" });
       return false;
@@ -674,6 +689,7 @@ export function useLiveGame(
   // ── Timeout ─────────────────────────────────────────────
 
   async function callTimeout(team: "home" | "away"): Promise<void> {
+    if (locked()) return;
     if (!session || recording) return;
     setRecording(true);
     try {
@@ -699,6 +715,7 @@ export function useLiveGame(
   // ── Undo specific play ──────────────────────────────────
 
   async function undoPlay(playId: string): Promise<boolean> {
+    if (locked()) return false;
     if (!session || recording) return false;
     const play = plays.find((p) => p.id === playId);
     if (!play) return false;
@@ -731,6 +748,7 @@ export function useLiveGame(
   // ── Next period ─────────────────────────────────────────
 
   async function nextPeriod(): Promise<void> {
+    if (locked()) return;
     if (!session) return;
     const nextP = session.current_period + 1;
 
@@ -791,7 +809,7 @@ export function useLiveGame(
   // ── Finish game ─────────────────────────────────────────
 
   async function finishGame(): Promise<boolean> {
-    if (!session) return false;
+    if (!session || session.status !== "live") return false;
 
     if (session.clock_running) await stopClock();
 
@@ -850,11 +868,17 @@ export function useLiveGame(
       description: `Fim — CD Póvoa ${session.home_score} vs ${session.away_score} ${session.opponent_name}`,
     });
 
-    await supabase.from("game_sessions").update({
+    const { error: finishErr } = await supabase.from("game_sessions").update({
       status: "finished",
+      clock_running: false,
+      clock_started_at: null,
       finished_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq("id", session.id);
+    if (finishErr) {
+      toast({ title: "Erro ao terminar o jogo", description: finishErr.message, variant: "destructive" });
+      return false;
+    }
 
     setSession((s) => s ? { ...s, status: "finished" } : s);
     toast({ title: "🏁 Jogo terminado!", description: "Estatísticas guardadas." });

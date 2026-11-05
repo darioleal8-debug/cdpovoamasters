@@ -109,3 +109,18 @@ export function withSecondsPlayed(
   for (const [pid, secs] of secsById) if (!out.has(pid)) out.set(pid, { ...empty(), secs_played: secs });
   return out;
 }
+
+/** Eficiência (mesma fórmula da BD, recalc_player_efficiency):
+ *  PTS + RES + AST + ROU + BLO − PER − lançamentos de campo falhados − LL falhados */
+export function efficiency(s: DerivedPlayerStats | undefined | null): number {
+  if (!s) return 0;
+  return s.pts + s.reb_off + s.reb_def + s.ast + s.stl + s.blk - s.tov
+    - ((s.fg2_att - s.fg2_made) + (s.fg3_att - s.fg3_made))
+    - (s.ft_att - s.ft_made);
+}
+
+/** Faltas do adversário no jogo todo (exclui técnicas, como nas faltas de equipa). */
+export function totalAwayFouls(plays: { is_home_team: boolean; event_type: string; deleted_at?: string | null }[]): number {
+  return plays.filter((p) => !p.deleted_at && !p.is_home_team &&
+    ["foul_def", "foul_of", "foul_anti", "foul_tec"].includes(p.event_type)).length;
+}
