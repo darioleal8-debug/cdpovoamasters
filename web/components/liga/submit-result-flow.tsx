@@ -35,26 +35,7 @@ const s = {
 
 import { heicToJpeg, isHeic, normalizeImage } from "@/lib/game-sheet/client-image";
 
-// Comprime fotos de jogo: lado maior ≤ 1920 px, JPEG 0.8, remove EXIF via canvas
-async function compressGamePhoto(file: File): Promise<File> {
-  const MAX_PX = 1920;
-  return new Promise<File>((resolve, reject) => {
-    createImageBitmap(file, { imageOrientation: "from-image" }).then((bitmap) => {
-      let { width, height } = bitmap;
-      const scale = Math.min(1, MAX_PX / Math.max(width, height));
-      width  = Math.round(width  * scale);
-      height = Math.round(height * scale);
-      const canvas = document.createElement("canvas");
-      canvas.width = width; canvas.height = height;
-      canvas.getContext("2d")!.drawImage(bitmap, 0, 0, width, height);
-      bitmap.close();
-      canvas.toBlob((blob) => {
-        if (!blob) { resolve(file); return; }
-        resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }));
-      }, "image/jpeg", 0.8);
-    }).catch(reject);
-  });
-}
+import { compressGamePhoto } from "@/lib/liga/game-photo-client";
 
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
 const PDF_TYPE = "application/pdf";

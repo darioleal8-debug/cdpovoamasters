@@ -74,10 +74,11 @@ async function getGamePageData(eventId: string) {
     .eq("game_id", eventId).eq("is_published", true)
     .order("published_at", { ascending: false }).limit(2);
 
-  // Fotos (hidden=false via RLS, máx. 6)
+  // Fotos visíveis (cliente admin ignora RLS → filtrar hidden explicitamente)
   const { data: photosRaw } = await supabase.from("game_photos")
     .select("id, storage_path, caption, sort_order")
-    .eq("game_id", eventId).order("sort_order").limit(6);
+    .eq("game_id", eventId).eq("hidden", false)
+    .order("sort_order").order("created_at").limit(40);
 
   const photos = (photosRaw ?? []).map((p) => ({
     id: p.id,

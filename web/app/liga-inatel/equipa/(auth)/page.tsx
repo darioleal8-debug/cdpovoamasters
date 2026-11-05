@@ -8,6 +8,7 @@ import { TeamAvatar } from "@/components/liga/team-avatar";
 import { TeamLogoUpload } from "@/components/liga/team-logo-upload";
 import { DelegateKitEditor } from "@/components/liga/delegate-kit-editor";
 import { SubmitResultFlow } from "@/components/liga/submit-result-flow";
+import { DelegateGamePhotos } from "@/components/liga/delegate-game-photos";
 import { todayInClubTz } from "@/lib/time/club-time";
 
 export const dynamic = "force-dynamic";
@@ -69,7 +70,16 @@ function GameRow({ game, teamName, today }: { game: PublicGame; teamName: string
       </div>
 
       {hasResult ? (
-        <div style={{ textAlign: "right", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
+        <Link
+          href={`/liga-inatel/equipa?fotos=${game.id}#fotos`}
+          scroll={false}
+          aria-label="Adicionar fotos ao jogo"
+          style={{ fontSize: "12px", padding: "6px 9px", borderRadius: "8px", border: "1px solid var(--border, #E8E0D4)", color: "#F97316", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}
+        >
+          📷 Fotos
+        </Link>
+        <div style={{ textAlign: "right" }}>
           <p style={{ fontFamily: "var(--font-ibm-mono, monospace)", fontWeight: 700, fontSize: "15px", margin: 0, color: "var(--fg, #15110E)" }}>
             {isHome
               ? `${game.result!.home_score}–${game.result!.away_score}`
@@ -80,6 +90,7 @@ function GameRow({ game, teamName, today }: { game: PublicGame; teamName: string
               ? (game.result!.home_score > game.result!.away_score ? "Vitória" : "Derrota")
               : (game.result!.away_score > game.result!.home_score ? "Vitória" : "Derrota")}
           </p>
+        </div>
         </div>
       ) : isPending ? (
         <span
@@ -151,9 +162,9 @@ function GameRow({ game, teamName, today }: { game: PublicGame; teamName: string
 export default async function DelegateDashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ jogo?: string }>;
+  searchParams: Promise<{ jogo?: string; fotos?: string }>;
 }) {
-  const { jogo } = await searchParams;
+  const { jogo, fotos } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -341,6 +352,17 @@ export default async function DelegateDashboardPage({
             </div>
           )}
           <SubmitResultFlow games={submittable} teamName={team.name} preselectedGameId={jogo ?? null} />
+        </section>
+
+        {/* Fotografias — sempre possível adicionar, mesmo com resultado confirmado */}
+        <section id="fotos" style={{ marginBottom: "32px", scrollMarginTop: "16px" }}>
+          <h2 style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted, #6F675F)", margin: "0 0 4px" }}>
+            Fotografias dos jogos
+          </h2>
+          <p style={{ fontSize: "12px", color: "var(--muted, #6F675F)", margin: "0 0 12px" }}>
+            Podes adicionar fotos a qualquer jogo já realizado, mesmo depois de o resultado estar confirmado.
+          </p>
+          <DelegateGamePhotos key={fotos ?? "none"} games={submittable} teamName={team.name} preselectedGameId={fotos ?? null} />
         </section>
 
         <p style={{ marginTop: "24px", textAlign: "center" }}>
