@@ -80,3 +80,19 @@ describe("18. factos para a notícia (sem inventar)", () => {
     expect(unknownScores("Jogo de 2026-10-20 às 21:30.", f.allowedScores)).toEqual([]);
   });
 });
+
+describe("buildNewsFacts com estatística live", () => {
+  it("usa a estatística live da equipa e proíbe jogadores do adversário", async () => {
+    const { buildNewsFacts } = await import("./news-facts");
+    const p = (nome: string, pts: number, reb = 0) => ({ nome, pts, reb, ast: 0, stl: 0, blk: 0, tov: 0, eff: pts + reb, fg2m: 0, fg2a: 0, fg3m: 0, fg3a: 0, ftm: 0, fta: 0, secs: 0 });
+    const f = buildNewsFacts({
+      home: "CD Póvoa", away: "Leça", homeScore: 10, awayScore: 6, periods: [],
+      players: [{ nome: "Fulano Leça", side: "away", pontos: 6 }],
+      live: { side: "home", players: [p("Ana Silva", 6, 5), p("Bruno Costa", 4)] },
+    });
+    expect(f.playerPointsReliable).toBe(true);
+    expect(f.lines.join("\n")).toContain("Ana Silva 6 pts");
+    expect(f.lines.join("\n")).toContain("Mais ressaltos: Ana Silva (5)");
+    expect(f.forbiddenPlayerNames).toContain("Fulano Leça");
+  });
+});

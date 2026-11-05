@@ -12,6 +12,20 @@ export interface NewsFactsInput {
   periods: { periodo: number; home_points: number; away_points: number }[];
   players: { nome: string; side: "home" | "away"; pontos: number; triplos?: number | null; lances_livres?: number | null }[];
   unattributed?: { home: number | null; away: number | null } | null;
+  /** Estatística completa registada ao vivo no HoopHub por uma das equipas (fonte exata) */
+  live?: LiveTeamStats | null;
+}
+
+export interface LivePlayerLine {
+  nome: string;
+  pts: number; reb: number; ast: number; stl: number; blk: number; tov: number; eff: number;
+  fg2m: number; fg2a: number; fg3m: number; fg3a: number; ftm: number; fta: number;
+  secs: number;
+}
+
+export interface LiveTeamStats {
+  side: "home" | "away";
+  players: LivePlayerLine[];
 }
 
 export interface NewsFacts {
@@ -101,8 +115,26 @@ export function buildNewsFacts(i: NewsFactsInput): NewsFacts {
     lines.push("Sem parciais por período — não descrevas a evolução do marcador.");
   }
 
-  const reliable = playerPointsReliable(i);
   const forbiddenPlayerNames: string[] = [];
+
+  // Estatística live (exata) de uma equipa: usa-a para os destaques dessa equipa
+  if (i.live && i.live.players.length > 0) {
+    const side = i.live.side;
+    const team = side === "home" ? i.home : i.away;
+    const other = side === "home" ? i.away : i.home;
+    const teamScore = side === "home" ? i.homeScore : i.awayScore;
+    const ps = i.live.players;
+    const sum = ps.reduce((s, p) => s + p.pts, 0);
+    if (sum === teamScore) {
+      lines.push(...liveFactLines(team, ps));
+      lines.push(`Não há estatísticas individuais confirmadas do ${other} — não menciones jogadores do ${other}.`);
+      const otherNames = i.players.filter((p) => p.side !== side).map((p) => p.nome.trim()).filter((n) => n.length >= 4);
+      forbiddenPlayerNames.push(...otherNames);
+      return { lines, allowedScores: allowed, periodsConsistent, playerPointsReliable: true, forbiddenPlayerNames };
+    }
+  }
+
+  const reliable = playerPointsReliable(i);
 
   if (reliable) {
     const scorers = (side: "home" | "away") =>
@@ -143,4 +175,34 @@ export function unknownScores(text: string, allowed: Set<string>): string[] {
   return found
     .map((f) => f.replace(/\s*[-–—]\s*/, "-"))
     .filter((f) => !allowed.has(f));
+}
+
+const pctStr = (m: number, a: number) => (a > 0 ? `${Math.round((m / a) * 100)}%` : "—");
+
+/** Linhas de factos a partir da estatística live completa de uma equipa. */
+export function liveFactLines(team: string, ps: LivePlayerLine[]): string[] {
+  const out: string[] = [];
+  out.push(`Estatística oficial do ${team}, registada ao vivo durante o jogo (dados exatos):`);
+  const top = [...ps].filter((p) => p.pts > 0).sort((a, b) => b.pts - a.pts).slice(0, 3);
+  if (top.length) {
+    out.push(`- Melhores marcadores do ${team}: ${top.map((p) => `${p.nome} ${p.pts} pts${p.fg3m ? ` (${p.fg3m} triplo${p.fg3m > 1 ? "s" : ""})` : ""}`).join(", ")}.`);
+  }
+  const best = (k: keyof LivePlayerLine, label: string, min = 1) => {
+    const b = [...ps].sort((a, c) => (c[k] as number) - (a[k] as number))[0];
+    if (b && (b[k] as number) >= min) out.push(`- Mais ${label}: ${b.nome} (${b[k]}).`);
+  };
+  best("reb", "ressaltos", 3);
+  best("ast", "assistências", 2);
+  best("stl", "roubos de bola", 2);
+  best("blk", "desarmes de lançamento", 2);
+  const mvp = [...ps].sort((a, b) => b.eff - a.eff)[0];
+  if (mvp && mvp.eff > 0) out.push(`- Maior eficiência (EFF): ${mvp.nome} (${mvp.eff}).`);
+  const t = ps.reduce((a, p) => ({
+    fg2m: a.fg2m + p.fg2m, fg2a: a.fg2a + p.fg2a, fg3m: a.fg3m + p.fg3m, fg3a: a.fg3a + p.fg3a,
+    ftm: a.ftm + p.ftm, fta: a.fta + p.fta, reb: a.reb + p.reb, ast: a.ast + p.ast, stl: a.stl + p.stl, tov: a.tov + p.tov,
+  }), { fg2m: 0, fg2a: 0, fg3m: 0, fg3a: 0, ftm: 0, fta: 0, reb: 0, ast: 0, stl: 0, tov: 0 });
+  out.push(`- Totais do ${team}: lançamentos de campo ${t.fg2m + t.fg3m}/${t.fg2a + t.fg3a} (${pctStr(t.fg2m + t.fg3m, t.fg2a + t.fg3a)}), triplos ${t.fg3m}/${t.fg3a}, lances livres ${t.ftm}/${t.fta} (${pctStr(t.ftm, t.fta)}), ${t.reb} ressaltos, ${t.ast} assistências, ${t.stl} roubos de bola, ${t.tov} perdas de bola.`);
+  const scorers = ps.filter((p) => p.pts > 0).length;
+  if (scorers >= 2) out.push(`- ${scorers} jogadores do ${team} pontuaram.`);
+  return out;
 }

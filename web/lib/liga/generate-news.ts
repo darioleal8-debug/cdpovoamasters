@@ -1,7 +1,9 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { computeStandings, groupStandingsBySeries, normalizeName } from "@/types/competitions";
 import { deepseekJSON } from "@/lib/deepseek";
-import { buildNewsFacts, mentionedPlayers, unknownScores } from "@/lib/game-sheet/news-facts";
+import { buildNewsFacts, mentionedPlayers, unknownScores, type LiveTeamStats } from "@/lib/game-sheet/news-facts";
+import { parseGameMeta } from "@/types/competitions";
+import { resolveOurSide } from "@/lib/liga/live-build";
 
 function slugify(text: string): string {
   return text
@@ -136,7 +138,9 @@ async function prepareNews(gameId: string) {
   // Factos determinísticos a partir dos dados aprovados (fonte de verdade)
   const periods = (periodsRes.data ?? []) as { periodo: number; home_points: number; away_points: number }[];
   const dbPlayers = (playerStatsRes.data ?? []) as { nome: string; side: "home" | "away"; pontos: number; triplos: number | null; lances_livres: number | null }[];
+  const live = await loadLiveTeamStats(adminClient, gameId, event.description ?? null);
   const facts = buildNewsFacts({
+    live,
     home: result.home_team_name,
     away: result.away_team_name,
     homeScore: result.home_score,
@@ -337,4 +341,42 @@ export async function generateLigaNews(
       jornadaInfo,
     },
   };
+}
+
+/**
+ * Estatística registada ao vivo no HoopHub (jogo finalizado) para a notícia:
+ * linhas por jogador da equipa que fez o live, orientadas ao lado da liga.
+ */
+async function loadLiveTeamStats(
+  db: Awaited<ReturnType<typeof createAdminClient>>,
+  gameId: string,
+  description: string | null
+): Promise<LiveTeamStats | null> {
+  try {
+    const { data: sess } = await db.from("game_sessions")
+      .select("id, status").eq("event_id", gameId).eq("status", "finished").maybeSingle();
+    if (!sess) return null;
+    const { data: stats } = await db.from("player_game_stats")
+      .select("player_id, pts, reb_off, reb_def, ast, stl, blk, tov, efficiency, fg2_made, fg2_att, fg3_made, fg3_att, ft_made, ft_att, seconds_played")
+      .eq("game_session_id", sess.id);
+    if (!stats?.length) return null;
+    const ids = stats.map((s) => s.player_id as string);
+    const { data: roster } = await db.from("v_roster_public").select("player_id, name").in("player_id", ids);
+    const nameById = new Map((roster ?? []).map((r) => [r.player_id as string, r.name as string]));
+    const { data: ourTeam } = await db.from("league_teams").select("name").eq("is_our_team", true).maybeSingle();
+    const side = resolveOurSide(parseGameMeta(description), ourTeam?.name ?? "CD Póvoa");
+    const players = stats
+      .filter((s) => nameById.get(s.player_id as string))
+      .map((s) => ({
+        nome: nameById.get(s.player_id as string)!,
+        pts: s.pts ?? 0, reb: (s.reb_off ?? 0) + (s.reb_def ?? 0), ast: s.ast ?? 0, stl: s.stl ?? 0,
+        blk: s.blk ?? 0, tov: s.tov ?? 0, eff: Math.round(Number(s.efficiency ?? 0)),
+        fg2m: s.fg2_made ?? 0, fg2a: s.fg2_att ?? 0, fg3m: s.fg3_made ?? 0, fg3a: s.fg3_att ?? 0,
+        ftm: s.ft_made ?? 0, fta: s.ft_att ?? 0, secs: s.seconds_played ?? 0,
+      }));
+    return players.length ? { side, players } : null;
+  } catch (e) {
+    console.error("[generateLigaNews] estatística live indisponível", e);
+    return null;
+  }
 }
