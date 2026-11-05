@@ -4,6 +4,7 @@ import { deepseekJSON } from "@/lib/deepseek";
 import { buildNewsFacts, mentionedPlayers, unknownScores, type LiveTeamStats } from "@/lib/game-sheet/news-facts";
 import { parseGameMeta } from "@/types/competitions";
 import { resolveOurSide } from "@/lib/liga/live-build";
+import { aggressiveTerms, NEWS_TONE_RULES } from "@/lib/liga/news-tone";
 
 function slugify(text: string): string {
   return text
@@ -28,7 +29,8 @@ export type NewsContext = {
 /** Parte editável pelo admin: tom, estrutura e restrições editoriais. */
 export const NEWS_STYLE = `Escreves notícias de jornalismo desportivo local em português de Portugal sobre basquetebol da Liga INATEL Masters.
 Usa APENAS os factos fornecidos — nunca inventes dados.
-Tom entusiasta mas sóbrio. Português europeu (não do Brasil).
+Tom entusiasta mas sóbrio, amistoso e respeitador de todas as equipas. Português europeu (não do Brasil).
+Nunca uses linguagem agressiva ou ofensiva (ex.: "atropela", "esmaga", "arrasa", "humilha") — uma vantagem dilatada descreve-se como "vitória folgada", "triunfo claro" ou "vence com autoridade".
 
 Estrutura do corpo (proporcional aos dados disponíveis — omite secções sem factos):
 1. Introdução: equipas, competição, data e local.
@@ -45,7 +47,7 @@ não constem dos factos.`;
 /** Formato de resposta: fixo (a aplicação precisa de JSON), acrescentado a qualquer prompt. */
 export const NEWS_FORMAT = `Responde APENAS com JSON válido (sem markdown) com este esquema:
 {
-  "titulo": "título apelativo mas factual (máx. 80 caracteres)",
+  "titulo": "título apelativo mas factual e amistoso, sem termos agressivos (máx. 80 caracteres)",
   "entrada": "1-2 frases de entrada/lide com o resultado (máx. 200 caracteres; serve também de descrição SEO)",
   "corpo": "corpo da notícia, 120-400 palavras, em parágrafos separados por linha em branco"
 }`;
@@ -202,7 +204,7 @@ export async function getDefaultNewsPrompts(
 ): Promise<{ ok: true; system: string; user: string; format: string } | { ok: false; error: string }> {
   const prep = await prepareNews(gameId);
   if (!prep.ok) return prep;
-  return { ok: true, system: NEWS_STYLE, user: prep.userPrompt, format: NEWS_FORMAT };
+  return { ok: true, system: NEWS_STYLE, user: prep.userPrompt, format: `${NEWS_TONE_RULES}\n\n${NEWS_FORMAT}` };
 }
 
 export async function generateLigaNews(
@@ -215,7 +217,7 @@ export async function generateLigaNews(
 
   const customSystem = overrides.systemPrompt?.trim() ?? "";
   const customUser = overrides.userPrompt?.trim() ?? "";
-  const system = `${customSystem || NEWS_STYLE}\n\n${NEWS_FORMAT}`;
+  const system = `${customSystem || NEWS_STYLE}\n\n${NEWS_TONE_RULES}\n\n${NEWS_FORMAT}`;
   const userPrompt = customUser || defaultUserPrompt;
 
   // Pontuações escritas pelo próprio admin no prompt contam como factos permitidos
@@ -232,7 +234,7 @@ export async function generateLigaNews(
   type NewsJSON = { titulo?: string; entrada?: string; corpo?: string };
   let newsData: NewsJSON | null = null;
   let feedback = "";
-  for (let attempt = 0; attempt < 2 && !newsData; attempt++) {
+  for (let attempt = 0; attempt < 3 && !newsData; attempt++) {
     const aiResult = await deepseekJSON<NewsJSON>({
       system,
       user: userPrompt + feedback,
@@ -248,18 +250,21 @@ export async function generateLigaNews(
     const bad = unknownScores(text, allowedScores);
     // Leitura individual não fiável: a notícia não pode referir jogadores (salvo se o admin os escreveu no prompt)
     const badPlayers = mentionedPlayers(text, forbiddenNames);
-    if (bad.length === 0 && badPlayers.length === 0) {
+    // Tom amistoso: sem termos agressivos/ofensivos (ex.: "atropela")
+    const badTone = aggressiveTerms(text);
+    if (bad.length === 0 && badPlayers.length === 0 && badTone.length === 0) {
       newsData = aiResult.data;
     } else {
-      console.warn(`[generateLigaNews] dados não verificados no texto (pontuações: ${bad.join(", ") || "-"}; jogadores: ${badPlayers.join(", ") || "-"}) — nova tentativa`);
+      console.warn(`[generateLigaNews] texto rejeitado (pontuações: ${bad.join(", ") || "-"}; jogadores: ${badPlayers.join(", ") || "-"}; tom: ${badTone.join(", ") || "-"}) — nova tentativa`);
       const issues: string[] = [];
       if (bad.length) issues.push(`citou pontuações que não constam dos factos (${bad.join(", ")})`);
       if (badPlayers.length) issues.push(`mencionou jogadores (${badPlayers.join(", ")}) quando os pontos individuais não são fiáveis — não menciones nenhum jogador nem pontuações individuais`);
+      if (badTone.length) issues.push(`usou linguagem agressiva/ofensiva (${badTone.join(", ")}) — reescreve com tom amistoso, ex.: "vitória folgada", "triunfo claro", "vence com autoridade"`);
       feedback = `\n\nATENÇÃO: a versão anterior ${issues.join(" e ")}. Corrige.`;
     }
   }
   if (!newsData) {
-    return { ok: false, error: "A notícia gerada citava dados não verificados (pontuações ou jogadores) — gere novamente ou escreva manualmente." };
+    return { ok: false, error: "A notícia gerada citava dados não verificados ou usava linguagem agressiva — gere novamente ou escreva manualmente." };
   }
 
   let titulo = (newsData.titulo ?? "").trim();
