@@ -28,9 +28,7 @@ $$;
 
 -- Inserção directa (defensiva — a API usa service_role): membro da equipa,
 -- sem restrição de o resultado já estar aprovado; admin sempre.
-DROP POLICY IF EXISTS "gp_team_insert" ON public.game_photos;
-CREATE POLICY "gp_team_insert" ON public.game_photos
-  FOR INSERT TO authenticated
+ALTER POLICY "gp_team_insert" ON public.game_photos
   WITH CHECK (
     public.is_liga_admin() OR public.is_admin()
     OR (
