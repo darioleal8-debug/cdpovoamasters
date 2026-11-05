@@ -882,7 +882,38 @@ export function useLiveGame(
 
     setSession((s) => s ? { ...s, status: "finished" } : s);
     toast({ title: "🏁 Jogo terminado!", description: "Estatísticas guardadas." });
+    // Jogos da Liga INATEL: o resultado e as estatísticas live passam a ser os oficiais
+    void publishToLeague(session.id, { silentIfNotLeague: true });
     return true;
+  }
+
+  // ── Publicar na Liga INATEL ─────────────────────────────
+  const [publishing, setPublishing] = useState(false);
+  async function publishToLeague(sessionId?: string, opts: { silentIfNotLeague?: boolean } = {}): Promise<boolean> {
+    const sid = sessionId ?? sessionRef.current?.id;
+    if (!sid) return false;
+    setPublishing(true);
+    try {
+      const res = await fetch(`/api/live/${sid}/publicar-liga`, { method: "POST" });
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; homeScore?: number; awayScore?: number; isTest?: boolean };
+      if (!res.ok || !j.ok) {
+        if (opts.silentIfNotLeague && res.status === 422) return false;
+        toast({ title: "Resultado não publicado na Liga", description: j.error ?? "Tenta novamente.", variant: "destructive" });
+        return false;
+      }
+      toast({
+        title: "🏆 Liga INATEL atualizada",
+        description: j.isTest
+          ? `Jogo de teste ${j.homeScore}–${j.awayScore}: resultado gravado (não conta para a classificação).`
+          : `Resultado ${j.homeScore}–${j.awayScore} e estatísticas publicados. A notícia está a ser gerada.`,
+      });
+      return true;
+    } catch {
+      toast({ title: "Resultado não publicado na Liga", description: "Sem ligação — tenta novamente.", variant: "destructive" });
+      return false;
+    } finally {
+      setPublishing(false);
+    }
   }
 
   // ── Derived ─────────────────────────────────────────────
@@ -897,6 +928,6 @@ export function useLiveGame(
     recordPlay, recordOpponentPoints,
     recordOpponentFoul, recordOpponentReb,
     substitutePlayer, setLineup, callTimeout, undoPlay,
-    nextPeriod, finishGame,
+    nextPeriod, finishGame, publishToLeague, publishing,
   };
 }

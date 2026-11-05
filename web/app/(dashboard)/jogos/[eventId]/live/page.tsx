@@ -470,6 +470,16 @@ export default function LiveGamePage() {
           >
             Ver Box Score Completo
           </Button>
+          {eventData?.competition === "Liga" && eventData?.game_type !== "friendly" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "center" }}>
+              <Button variant="outline" disabled={game.publishing} onClick={() => game.publishToLeague()}>
+                {game.publishing ? "A publicar…" : "🏆 Publicar resultado e estatísticas na Liga INATEL"}
+              </Button>
+              <span style={{ fontSize: 11, color: "var(--muted)", fontFamily: SANS, textAlign: "center" }}>
+                Feito automaticamente ao finalizar o jogo. Usa este botão só para voltar a publicar.
+              </span>
+            </div>
+          )}
         </div>
       )}
 
