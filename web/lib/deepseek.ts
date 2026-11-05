@@ -1,3 +1,5 @@
+import { parseLooseJSON } from "./json-repair";
+
 const DEEPSEEK_API = "https://api.deepseek.com/chat/completions";
 
 export type MessagePart = { type: string; [key: string]: unknown };
@@ -50,7 +52,7 @@ export type DeepSeekDetailedResult<T> =
 
 type AttemptResult<T> =
   | { ok: true; data: T }
-  | { ok: false; error: string; kind: DeepSeekErrorKind; shouldRetry?: boolean; transient?: boolean };
+  | { ok: false; error: string; kind: DeepSeekErrorKind; shouldRetry?: boolean; transient?: boolean; resample?: boolean };
 
 /** Erro HTTP 400/422 a indicar que o modelo não aceita imagens. */
 export function isVisionUnsupportedError(status: number, body: string): boolean {
@@ -99,7 +101,7 @@ export async function deepseekJSONDetailed<T = Record<string, unknown>>(
   if (opts.system) messages.push({ role: "system", content: opts.system });
   messages.push({ role: "user", content: opts.user });
 
-  async function attempt(maxTok: number): Promise<AttemptResult<T>> {
+  async function attempt(maxTok: number, temperature = opts.temperature ?? 0.4): Promise<AttemptResult<T>> {
     meta.attempts++;
     const controller = new AbortController();
     const timerId = setTimeout(() => controller.abort(), timeoutMs);
@@ -113,7 +115,7 @@ export async function deepseekJSONDetailed<T = Record<string, unknown>>(
           messages,
           response_format: { type: "json_object" },
           thinking: { type: "disabled" },
-          temperature: opts.temperature ?? 0.4,
+          temperature,
           max_tokens: maxTok,
         }),
         signal: controller.signal,
@@ -169,17 +171,22 @@ export async function deepseekJSONDetailed<T = Record<string, unknown>>(
         .replace(/\s*```\s*$/m, "")
         .trim();
 
-      try {
-        const data = JSON.parse(cleaned) as T;
-        return { ok: true, data };
-      } catch {
-        console.error(
-          `[deepseekJSON] JSON parse failed | model=${model} | finish=${finishReason} | ` +
-          `tokens=${json.usage?.prompt_tokens ?? "?"}p/${json.usage?.completion_tokens ?? "?"}c | ` +
-          `content_len=${content.length} | preview=${content.slice(0, 500)}`
-        );
-        return { ok: false, kind: "invalid_json", error: `DeepSeek devolveu JSON inválido (finish_reason=${finishReason})` };
-      }
+      const data = parseLooseJSON<T>(cleaned);
+      if (data !== undefined) return { ok: true, data };
+      let errPos = "";
+      try { JSON.parse(cleaned); } catch (e) { errPos = e instanceof Error ? e.message : String(e); }
+      const m = /position (\d+)/.exec(errPos);
+      const pos = m ? Number(m[1]) : -1;
+      console.error(
+        `[deepseekJSON] JSON parse failed | model=${model} | finish=${finishReason} | ` +
+        `tokens=${json.usage?.prompt_tokens ?? "?"}p/${json.usage?.completion_tokens ?? "?"}c | ` +
+        `content_len=${content.length} | err=${errPos.slice(0, 120)} | ` +
+        (pos >= 0 ? `around=${cleaned.slice(Math.max(0, pos - 150), pos + 150)}` : `preview=${content.slice(0, 500)}`)
+      );
+      return {
+        ok: false, kind: "invalid_json", resample: true,
+        error: `DeepSeek devolveu JSON inválido (finish_reason=${finishReason})`,
+      };
     } catch (err) {
       if ((err as { name?: string }).name === "AbortError") {
         return { ok: false, kind: "timeout", error: `DeepSeek timeout (${Math.round(timeoutMs / 1000)}s)` };
@@ -209,6 +216,15 @@ export async function deepseekJSONDetailed<T = Record<string, unknown>>(
     if (retryTok <= maxTokens) return done(first);
     console.warn(`[deepseekJSON] retry with maxTokens=${retryTok} (reason: ${first.error})`);
     return done(await attempt(retryTok));
+  }
+
+  // Só repete se ainda houver margem de tempo (evita ultrapassar o maxDuration da função).
+  if (first.resample && Date.now() - started < timeoutMs * 0.5) {
+    // JSON malformado mesmo após reparação: nova amostra com temperatura ligeiramente maior
+    // (com temperature=0 o modelo tende a repetir o mesmo erro).
+    const t = Math.max(0.3, (opts.temperature ?? 0.4) + 0.2);
+    console.warn(`[deepseekJSON] retry with temperature=${t} (reason: ${first.error})`);
+    return done(await attempt(maxTokens, t));
   }
 
   return done(first);
