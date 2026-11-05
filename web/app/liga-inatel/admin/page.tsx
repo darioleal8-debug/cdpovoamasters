@@ -7,6 +7,7 @@ import { TeamKitEditor } from "@/components/liga/team-kit-editor";
 import { AdminGameSheets } from "@/components/liga/admin-game-sheets";
 import { NewsPromptDialog } from "@/components/liga/news-prompt-dialog";
 import { LigaAnalyticsPanel } from "@/components/liga/liga-analytics-panel";
+import { AdminGamePhotoUpload } from "@/components/liga/admin-game-photo-upload";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -228,6 +229,7 @@ export default function LigaAdminPage() {
   // Game photos tab (within expanded game panel)
   const [gamePhotosMap, setGamePhotosMap]     = useState<Record<string, AdminGamePhoto[]>>({});
   const [gameSheetMap, setGameSheetMap]       = useState<Record<string, AdminGameSheet | null>>({});
+  const [gameTeamsMap, setGameTeamsMap]       = useState<Record<string, { id: string; name: string }[]>>({});
   const [photosLoading, setPhotosLoading]     = useState<string | null>(null);
   const [photoActing, setPhotoActing]         = useState<string | null>(null);
   const [lightboxGame, setLightboxGame]       = useState<string | null>(null);
@@ -269,6 +271,7 @@ export default function LigaAdminPage() {
       const json = await res.json();
       setGamePhotosMap((m) => ({ ...m, [eventId]: json.photos ?? [] }));
       setGameSheetMap((m) => ({ ...m, [eventId]: json.sheet ?? null }));
+      setGameTeamsMap((m) => ({ ...m, [eventId]: json.teams ?? [] }));
     } finally { setPhotosLoading(null); }
   }
 
@@ -354,7 +357,8 @@ export default function LigaAdminPage() {
     finally { setZippingGame(null); }
   }
 
-  async function handlePhotoAction(eventId: string, photoId: string, action: "hide" | "unhide" | "set_cover") {
+  async function handlePhotoAction(eventId: string, photoId: string, action: "hide" | "unhide" | "set_cover" | "delete") {
+    if (action === "delete" && !confirm("Apagar esta foto definitivamente?")) return;
     setPhotoActing(photoId);
     try {
       const res = await fetch(`/api/liga/admin/games/${eventId}/photos`, {
@@ -365,7 +369,7 @@ export default function LigaAdminPage() {
       const json = await res.json();
       if (!res.ok) { alert(json.error ?? "Erro"); return; }
       await loadGamePhotos(eventId);
-      if (action === "set_cover") await load();
+      if (action === "set_cover" || action === "delete") await load();
     } finally { setPhotoActing(null); }
   }
 
@@ -1176,6 +1180,11 @@ export default function LigaAdminPage() {
                         </button>
                       )}
                     </div>
+                    <AdminGamePhotoUpload
+                      eventId={game.id}
+                      teams={gameTeamsMap[game.id] ?? []}
+                      onUploaded={async () => { await loadGamePhotos(game.id); await load(); }}
+                    />
                     {photosLoading === game.id ? (
                       <p style={{ fontSize: "12px", color: "#8C837A" }}>A carregar…</p>
                     ) : (!gamePhotosMap[game.id] || gamePhotosMap[game.id].length === 0) && !gameSheetMap[game.id] ? (
@@ -1259,6 +1268,13 @@ export default function LigaAdminPage() {
                                   style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", border: "1px solid #E8E0D6", background: "#fff", cursor: "pointer", color: "#6B7280" }}
                                 >
                                   {downloadingPhoto === photo.id ? "…" : "Descarregar"}
+                                </button>
+                                <button
+                                  onClick={() => handlePhotoAction(game.id, photo.id, "delete")}
+                                  disabled={photoActing === photo.id}
+                                  style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", border: "1px solid #FCA5A5", background: "#fff", cursor: "pointer", color: "#DC2626" }}
+                                >
+                                  Apagar
                                 </button>
                               </div>
                             </div>

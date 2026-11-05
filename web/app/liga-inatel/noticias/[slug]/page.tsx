@@ -39,7 +39,7 @@ async function getGalleryPhotos(gameId: string, coverPhotoId: string | null): Pr
 
   if (!photos || photos.length === 0) return [];
 
-  const teamIds = [...new Set(photos.map((p) => p.team_id))];
+  const teamIds = [...new Set(photos.map((p) => p.team_id).filter(Boolean))] as string[];
   const { data: teams } = await supabase.from("league_teams").select("id, name").in("id", teamIds);
   const teamMap: Record<string, string> = {};
   for (const t of teams ?? []) teamMap[t.id] = t.name;
@@ -50,7 +50,7 @@ async function getGalleryPhotos(gameId: string, coverPhotoId: string | null): Pr
       id: p.id,
       public_url: pub.publicUrl,
       caption: p.caption ?? null,
-      team_name: teamMap[p.team_id] ?? "Equipa",
+      team_name: p.team_id ? (teamMap[p.team_id] ?? "Equipa") : "Liga INATEL",
     };
   });
 }

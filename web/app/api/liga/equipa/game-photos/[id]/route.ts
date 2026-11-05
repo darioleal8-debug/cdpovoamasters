@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { authorizeLeagueDelegate } from "@/lib/auth/liga-delegate-guard";
+import { deleteGamePhoto } from "@/lib/liga/game-photos";
 
 // DELETE /api/liga/equipa/game-photos/[id]
 // Apaga uma foto de jogo. Só o uploader pode apagar.
@@ -17,7 +18,7 @@ export async function DELETE(
 
   const { data: photo } = await admin
     .from("game_photos")
-    .select("id, storage_path, uploaded_by")
+    .select("id, game_id, storage_path, uploaded_by")
     .eq("id", id)
     .maybeSingle();
 
@@ -27,8 +28,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
   }
 
-  await admin.storage.from("game-photos").remove([photo.storage_path]);
-  await admin.from("game_photos").delete().eq("id", id);
+  await deleteGamePhoto(admin, photo as { id: string; game_id: string; storage_path: string });
 
   return NextResponse.json({ ok: true });
 }
