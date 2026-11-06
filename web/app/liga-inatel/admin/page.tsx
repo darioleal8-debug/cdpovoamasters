@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { TeamKitEditor } from "@/components/liga/team-kit-editor";
 import { AdminGameSheets } from "@/components/liga/admin-game-sheets";
 import { NewsPromptDialog } from "@/components/liga/news-prompt-dialog";
+import { ManualNewsDialog } from "@/components/liga/manual-news-dialog";
 import { LigaAnalyticsPanel } from "@/components/liga/liga-analytics-panel";
 import { AdminGamePhotoUpload } from "@/components/liga/admin-game-photo-upload";
 
@@ -164,6 +165,7 @@ export default function LigaAdminPage() {
   const [regenerating, setRegenerating] = useState<string | null>(null);
   const [regenMsg, setRegenMsg]       = useState<Record<string, string>>({});
   const [promptGameId, setPromptGameId] = useState<string | null>(null);
+  const [manualNews, setManualNews] = useState<{ gameId?: string; newsId?: string } | null>(null);
 
   // Edit game modal
   const [editingGame, setEditingGame]         = useState<AdminGame | null>(null);
@@ -795,6 +797,20 @@ export default function LigaAdminPage() {
           }}
         />
       )}
+      {manualNews && (
+        <ManualNewsDialog
+          gameId={manualNews.gameId ?? null}
+          newsId={manualNews.newsId ?? null}
+          onClose={() => setManualNews(null)}
+          onDone={(msg) => {
+            const key = manualNews.gameId ?? manualNews.newsId ?? "_batch";
+            if (manualNews.gameId) setRegenMsg((m) => ({ ...m, [key]: msg }));
+            else setNoticiaMsg((m) => ({ ...m, [key]: msg }));
+            setManualNews(null);
+            void loadNoticias();
+          }}
+        />
+      )}
       {/* ── Header ── */}
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "24px" }}>
         <div>
@@ -1077,6 +1093,18 @@ export default function LigaAdminPage() {
                             }}
                           >
                             ✎ Com prompt personalizado
+                          </button>
+                          <button
+                            onClick={() => setManualNews({ gameId: selectedGame.id })}
+                            disabled={regenerating === selectedGame.id}
+                            title="Escrever e publicar a notícia à mão, sem DeepSeek."
+                            style={{
+                              marginLeft: "6px", padding: "7px 14px", background: "#FFFDFA", color: "#1A1612",
+                              fontWeight: 600, fontSize: "12px", border: "1.5px solid #E8E0D6", borderRadius: "6px",
+                              cursor: regenerating === selectedGame.id ? "not-allowed" : "pointer",
+                            }}
+                          >
+                            ✍ Escrever manualmente
                           </button>
                           {regenMsg[selectedGame.id] && (
                             <p style={{
@@ -1479,7 +1507,17 @@ export default function LigaAdminPage() {
 
           {/* Header com acções globais */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
-            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+              <button
+                onClick={() => setManualNews({})}
+                style={{
+                  padding: "6px 14px", fontSize: "12px", fontWeight: 700,
+                  border: "none", borderRadius: "6px",
+                  background: "#F97316", color: "#fff", cursor: "pointer",
+                }}
+              >
+                ✍ Nova notícia manual
+              </button>
               <button
                 onClick={handleBatchGen}
                 disabled={batchLoading}
@@ -1610,6 +1648,17 @@ export default function LigaAdminPage() {
 
                   {/* Actions */}
                   <div style={{ display: "flex", gap: "6px", flexShrink: 0, flexWrap: "wrap" }}>
+                    {/* Editar texto manualmente (sem DeepSeek) */}
+                    <button
+                      onClick={() => setManualNews({ newsId: n.id })}
+                      style={{
+                        padding: "5px 12px", fontSize: "11px", fontWeight: 700,
+                        border: "1.5px solid #1A1612", borderRadius: "6px",
+                        background: "transparent", color: "#1A1612", cursor: "pointer",
+                      }}
+                    >
+                      ✎ Editar texto
+                    </button>
                     {/* Gerar / Regenerar com IA */}
                     {!isPending && (
                       <button

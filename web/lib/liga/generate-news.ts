@@ -234,6 +234,7 @@ export async function generateLigaNews(
   type NewsJSON = { titulo?: string; entrada?: string; corpo?: string };
   let newsData: NewsJSON | null = null;
   let feedback = "";
+  let lastIssues: string[] = [];
   for (let attempt = 0; attempt < 3 && !newsData; attempt++) {
     const aiResult = await deepseekJSON<NewsJSON>({
       system,
@@ -259,12 +260,17 @@ export async function generateLigaNews(
       const issues: string[] = [];
       if (bad.length) issues.push(`citou pontuações que não constam dos factos (${bad.join(", ")})`);
       if (badPlayers.length) issues.push(`mencionou jogadores (${badPlayers.join(", ")}) quando os pontos individuais não são fiáveis — não menciones nenhum jogador nem pontuações individuais`);
+      lastIssues = [
+        ...(bad.length ? [`pontuações não verificadas: ${bad.join(", ")}`] : []),
+        ...(badPlayers.length ? [`jogadores com pontos não fiáveis: ${badPlayers.join(", ")}`] : []),
+        ...(badTone.length ? [`linguagem agressiva: ${badTone.join(", ")}`] : []),
+      ];
       if (badTone.length) issues.push(`usou linguagem agressiva/ofensiva (${badTone.join(", ")}) — reescreve com tom amistoso, ex.: "vitória folgada", "triunfo claro", "vence com autoridade"`);
       feedback = `\n\nATENÇÃO: a versão anterior ${issues.join(" e ")}. Corrige.`;
     }
   }
   if (!newsData) {
-    return { ok: false, error: "A notícia gerada citava dados não verificados ou usava linguagem agressiva — gere novamente ou escreva manualmente." };
+    return { ok: false, error: `A notícia gerada foi rejeitada (${lastIssues.join("; ")}). Gere novamente, ajuste o prompt ou use "✍ Escrever manualmente".` };
   }
 
   let titulo = (newsData.titulo ?? "").trim();
