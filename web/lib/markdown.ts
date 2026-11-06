@@ -119,12 +119,15 @@ export function markdownToHtml(md: string): string {
       continue;
     }
 
-    // Paragraph — consume consecutive non-special lines
-    const pLines: string[] = [];
+    // Paragraph — consume consecutive non-special lines.
+    // A primeira linha é sempre consumida: linhas como "#LigaINATEL #HoopHub" (hashtags)
+    // começam por "#" mas não são títulos — sem isto o ciclo nunca avançava (timeout).
+    const pLines: string[] = [inline(t)];
+    i++;
     while (
       i < lines.length &&
       lines[i].trim() !== "" &&
-      !lines[i].trim().startsWith("#") &&
+      !/^#{2,3} /.test(lines[i].trim()) &&
       !lines[i].trim().startsWith("|") &&
       !lines[i].trim().startsWith("- ") &&
       !lines[i].trim().startsWith("* ")
