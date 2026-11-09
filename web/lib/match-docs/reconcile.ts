@@ -376,7 +376,12 @@ export function reconcile(input: ReconcileInput): ReconciliationResult {
             });
           }
         }
-        for (const c of onlyA) {
+        // Folha oficial com poucos jogadores lidos (incompleta/ilegível): um aviso único em vez de um por jogador
+        const officialPartial = offList.length < Math.ceil(mine.length / 2);
+        if (officialPartial && onlyA.length) {
+          notes.push(`${teamName}: a folha oficial só tem ${offList.length} jogador(es) lido(s) — ${onlyA.length} jogador(es) da estatística profissional não foram confirmados na folha.`);
+        }
+        for (const c of officialPartial ? [] : onlyA) {
           discrepancies.push({
             id: `player:${c.key}:not_official`, field: `players.${c.key}.name`, label: `Jogador não identificado na folha oficial — ${c.name} (${teamName})`,
             severity: "low", side, playerKey: c.key, teamA: side === "home" ? c.name : null, teamB: side === "away" ? c.name : null,

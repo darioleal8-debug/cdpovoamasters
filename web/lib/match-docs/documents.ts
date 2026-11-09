@@ -12,6 +12,8 @@ import sharp from "sharp";
 export const MAX_PDF_PAGES = 6;
 /** Lado maior de cada imagem enviada (detail=high preserva a resolução de origem). */
 const MAX_SIDE = 2400;
+/** Fotografias pequenas são ampliadas até esta largura (texto mais legível para o modelo). */
+const MIN_WIDTH = 1800;
 /** Proporção a partir da qual uma imagem é dividida em secções verticais. */
 const TALL_RATIO = 1.45;
 const MAX_TILES = 4;
@@ -36,8 +38,17 @@ export interface PreparedDocument {
 }
 
 async function toJpeg(input: Buffer, opts: { digital?: boolean } = {}): Promise<{ buffer: Buffer; width: number; height: number }> {
-  let img = sharp(input, { failOn: "error", limitInputPixels: 80_000_000 }).rotate()
-    .resize({ width: MAX_SIDE, height: MAX_SIDE, fit: "inside", withoutEnlargement: true });
+  const meta = await sharp(input, { failOn: "error", limitInputPixels: 80_000_000 }).rotate().metadata();
+  const rotated = meta.orientation && meta.orientation >= 5;
+  const w = (rotated ? meta.height : meta.width) ?? 0;
+  const h = (rotated ? meta.width : meta.height) ?? 0;
+  let img = sharp(input, { failOn: "error", limitInputPixels: 80_000_000 }).rotate();
+  if (w > 0 && w < MIN_WIDTH && Math.max(w, h) * (MIN_WIDTH / w) <= MAX_SIDE * 1.5) {
+    // Ampliação de imagens pequenas (lanczos + nitidez ligeira): melhora a leitura de tabelas fotografadas
+    img = img.resize({ width: MIN_WIDTH, kernel: "lanczos3" }).sharpen({ sigma: 0.7 });
+  } else {
+    img = img.resize({ width: MAX_SIDE, height: MAX_SIDE, fit: "inside", withoutEnlargement: true });
+  }
   // Documento digital (tabelas): sem nitidez artificial; fotografia: contraste moderado
   if (!opts.digital) img = img.normalise({ lower: 1, upper: 99 });
   const { data, info } = await img.jpeg({ quality: 92, mozjpeg: true }).toBuffer({ resolveWithObject: true });
@@ -130,4 +141,23 @@ export function imagePart(buf: Buffer, detail: "high" | "low" | "auto" = imageDe
 export function imageDetail(): "high" | "low" | "auto" {
   const v = (process.env.DEEPSEEK_IMAGE_DETAIL ?? "high").toLowerCase();
   return v === "low" || v === "auto" ? v : "high";
+}
+
+/**
+ * Ampliações para a 2.ª leitura: metade esquerda e metade direita (com sobreposição de 20 %)
+ * de cada página, ampliadas — as colunas da direita de uma tabela fotografada ficam legíveis.
+ */
+export async function zoomHalves(pages: VisionPage[], maxPages = 2): Promise<VisionPage[]> {
+  const out: VisionPage[] = [];
+  for (const p of pages.slice(0, maxPages)) {
+    const w = p.width, h = p.height;
+    if (!w || !h) continue;
+    for (const [label, left, width] of [["metade esquerda", 0, Math.round(w * 0.6)], ["metade direita", Math.round(w * 0.4), w - Math.round(w * 0.4)]] as const) {
+      const buf = await sharp(p.buffer).extract({ left, top: 0, width, height: h })
+        .resize({ width: Math.min(2400, Math.max(1600, width * 2)), kernel: "lanczos3" }).sharpen({ sigma: 0.8 })
+        .jpeg({ quality: 92 }).toBuffer({ resolveWithObject: true });
+      out.push({ buffer: buf.data, width: buf.info.width, height: buf.info.height, label: `${p.label} — ampliação da ${label}` });
+    }
+  }
+  return out;
 }

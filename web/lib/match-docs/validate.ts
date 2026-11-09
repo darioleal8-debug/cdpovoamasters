@@ -63,7 +63,8 @@ export function validateTeam(team: ProTeam, side: Side, opts: { docId?: string; 
       if (team.totals[k] === null || team.players.some((p) => p.stats[k] === null)) continue;
       const sum = team.players.reduce((s, p) => s + (p.stats[k] ?? 0), 0);
       if (sum !== team.totals[k]) {
-        out.push({ code: "totals_vs_players", severity: k === "pts" ? "error" : "warning", path: `${side}.totals.${k}`, side, docId: opts.docId,
+        // Qualquer coluna cujo total não bate com a soma indica uma leitura errada (linha ou coluna desalinhada)
+        out.push({ code: "totals_vs_players", severity: "error", path: `${side}.totals.${k}`, side, docId: opts.docId,
           message: `${name}: total de ${STAT_LABELS[k].toLowerCase()} (${team.totals[k]}) ≠ soma dos jogadores (${sum}).`, expected: sum, actual: team.totals[k] });
       }
     }
@@ -111,6 +112,13 @@ export function validateProStats(data: ProStatsData, opts: { docId?: string; nam
   }
   out.push(...validatePeriods(data.periods, explicitFinal, opts));
   return out;
+}
+
+/** Colunas cujo total não bate com a soma dos jogadores (para a releitura coluna a coluna). */
+export function columnsWithErrors(issues: MathIssue[]): { side: Side; key: StatKey }[] {
+  return issues
+    .filter((i) => i.code === "totals_vs_players" && i.side && i.severity === "error")
+    .map((i) => ({ side: i.side!, key: i.path.split(".").pop() as StatKey }));
 }
 
 /** Ids de jogadores com erros (para a 2.ª leitura dirigida). */
