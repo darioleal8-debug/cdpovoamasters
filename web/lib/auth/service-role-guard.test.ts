@@ -15,6 +15,7 @@ const PUBLIC_BY_DESIGN = new Set([
   "public/news/route.ts",            // notícias publicadas
   "public/news/[slug]/route.ts",     // notícia publicada
   "public/result-submissions/route.ts", // submissão pública de resultados (rate-limit por IP, aprovação do admin)
+  "public/home/route.ts",            // resumo público da página inicial (só dados públicos agregados)
 ]);
 
 function routes(dir: string): string[] {

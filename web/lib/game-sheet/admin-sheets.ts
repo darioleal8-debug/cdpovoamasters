@@ -137,7 +137,8 @@ export async function listGameSheets(access: Access, admin: AdminClient, game: G
       origin: "delegado",
       label: `Folha submetida (${(s.submitted_by_team ?? s.submitted_by_name) as string})`,
       created_at: s.submitted_at as string,
-      status: subMissing ? "ficheiro_em_falta" : loc.kind === "pdf" ? "nao_suportado" : "por_analisar",
+      // PDFs são renderizados no servidor (lib/match-docs/documents.ts): analisáveis como as imagens
+      status: subMissing ? "ficheiro_em_falta" : "por_analisar",
       image_url: subUrl,
       is_pdf: loc.kind === "pdf",
       quality: null,

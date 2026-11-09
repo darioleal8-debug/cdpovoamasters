@@ -131,7 +131,7 @@ describe("GET folhas do jogo", () => {
     const keys = json.candidates.map((c: { key: string }) => c.key);
     expect(keys).toEqual(["imp:i-bom", "imp:i-mau", "sub:s-nova", "sub:s-pdf"]); // s-dup já está importada
     expect(json.best_key).toBe("imp:i-bom"); // a outra tem erro (parciais ≠ final)
-    expect(json.candidates.find((c: { key: string }) => c.key === "sub:s-pdf").status).toBe("nao_suportado");
+    expect(json.candidates.find((c: { key: string }) => c.key === "sub:s-pdf").status).toBe("por_analisar") // PDFs passaram a ser analisáveis;
     expect(json.finished).toBe(true);
   });
 });
@@ -159,10 +159,10 @@ describe("POST carregar folha melhorada", () => {
 });
 
 describe("POST analisar uma folha submetida", () => {
-  it("PDF não é analisável", async () => {
+  it("PDF já não é rejeitado como formato não suportado (renderizado no servidor)", async () => {
     setup(() => undefined, { adminHandler: (q) => (q.table === "result_submissions" ? { data: { id: SUB, event_id: GAME, photo_url: "u/a.pdf" } } : undefined) });
     const req = new Request("http://x", { method: "POST", body: JSON.stringify({ kind: "submission", id: SUB }) });
-    expect((await analyzeRoute.POST(req, p({ eventId: GAME }))).status).toBe(415);
+    expect((await analyzeRoute.POST(req, p({ eventId: GAME }))).status).not.toBe(415);
   });
 
   it("reutiliza o ficheiro da submissão e liga a importação à submissão", async () => {
