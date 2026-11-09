@@ -9,6 +9,7 @@ import { TeamLogoUpload } from "@/components/liga/team-logo-upload";
 import { DelegateKitEditor } from "@/components/liga/delegate-kit-editor";
 import { SubmitResultFlow } from "@/components/liga/submit-result-flow";
 import { DelegateGamePhotos } from "@/components/liga/delegate-game-photos";
+import { DelegateMatchDocs } from "@/components/liga/delegate-match-docs";
 import { todayInClubTz } from "@/lib/time/club-time";
 
 export const dynamic = "force-dynamic";
@@ -93,7 +94,10 @@ function GameRow({ game, teamName, today }: { game: PublicGame; teamName: string
         </div>
         </div>
       ) : isPending ? (
-        <span
+        // Já há uma submissão (normalmente da outra equipa): cada equipa pode submeter a sua
+        <Link
+          href={`/liga-inatel/equipa?jogo=${game.id}#resultados`}
+          scroll={false}
           style={{
             fontSize: "11px",
             padding: "3px 8px",
@@ -103,10 +107,12 @@ function GameRow({ game, teamName, today }: { game: PublicGame; teamName: string
             border: "1px solid #FDE047",
             fontWeight: 600,
             flexShrink: 0,
+            textDecoration: "none",
+            whiteSpace: "nowrap",
           }}
         >
-          Em validação
-        </span>
+          Em validação · submeter
+        </Link>
       ) : canSubmit ? (
         <Link
           href={`/liga-inatel/equipa?jogo=${game.id}#resultados`}
@@ -162,9 +168,9 @@ function GameRow({ game, teamName, today }: { game: PublicGame; teamName: string
 export default async function DelegateDashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ jogo?: string; fotos?: string }>;
+  searchParams: Promise<{ jogo?: string; fotos?: string; stats?: string }>;
 }) {
-  const { jogo, fotos } = await searchParams;
+  const { jogo, fotos, stats } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -200,6 +206,7 @@ export default async function DelegateDashboardPage({
     .from("game_sheet_imports")
     .select("id, event_id, status, updated_at")
     .eq("team_id", team.id)
+    .eq("doc_type", "official_sheet")
     .in("status", ["needs_review", "ready_to_confirm", "confirmed", "failed"])
     .order("updated_at", { ascending: false })
     .limit(10);
@@ -352,6 +359,18 @@ export default async function DelegateDashboardPage({
             </div>
           )}
           <SubmitResultFlow games={submittable} teamName={team.name} preselectedGameId={jogo ?? null} />
+        </section>
+
+        {/* Estatísticas profissionais (Tipo B) e estado da validação cruzada */}
+        <section id="estatisticas" style={{ marginBottom: "32px", scrollMarginTop: "16px" }}>
+          <h2 style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted, #6F675F)", margin: "0 0 4px" }}>
+            Documentos do jogo
+          </h2>
+          <p style={{ fontSize: "12px", color: "var(--muted, #6F675F)", margin: "0 0 12px" }}>
+            <strong>A — Folha de jogo oficial</strong> (obrigatória, em “Resultados”) e <strong>B — Estatísticas profissionais</strong> (opcional:
+            Pocket Stat ou outra aplicação; imagem ou PDF, vários ficheiros). As estatísticas profissionais têm prioridade nas estatísticas individuais.
+          </p>
+          <DelegateMatchDocs key={stats ?? "none"} games={submittable} teamName={team.name} preselectedGameId={stats ?? null} />
         </section>
 
         {/* Fotografias — sempre possível adicionar, mesmo com resultado confirmado */}

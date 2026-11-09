@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { generateLigaNews } from "@/lib/liga/generate-news";
 import { generateNewsImage } from "@/lib/liga/generate-image";
 import { buildApprovalPlan } from "@/lib/game-sheet/approval";
+import { approveFromReconciliation } from "@/lib/match-docs/approve-flow";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -18,10 +19,11 @@ export async function PATCH(
   if (!auth.ok) return auth.response;
 
   const { id } = await params;
-  const { action, rejection_reason, motivo } = (await req.json()) as {
+  const { action, rejection_reason, motivo, acknowledge } = (await req.json()) as {
     action: "approve" | "reject";
     rejection_reason?: string;
     motivo: string;
+    acknowledge?: boolean;
   };
 
   if (!["approve", "reject"].includes(action)) {
@@ -46,6 +48,19 @@ export async function PATCH(
   }
 
   if (action === "approve") {
+    // Jogo com validação cruzada (documentos das equipas / estatísticas profissionais):
+    // aprova a partir dos dados consolidados, com as mesmas salvaguardas do painel de validação
+    const { data: rec } = await adminClient.from("match_reconciliations").select("consolidated").eq("event_id", sub.event_id).maybeSingle();
+    if (rec?.consolidated && sub.status === "pending") {
+      const out = await approveFromReconciliation({
+        eventId: sub.event_id, motivo, acknowledge: acknowledge === true, userId: auth.user.id,
+        userClient: auth.supabase, schedule: (fn) => after(fn),
+      });
+      if (!out.ok) return NextResponse.json({ error: out.error, code: out.code, details: out.details }, { status: out.status });
+      revalidatePath("/liga-inatel", "layout");
+      return NextResponse.json({ ok: true, consolidated: true, publishable: out.publishable, validation_status: out.status });
+    }
+
     // Boletim importado (se existir) — lido com a sessão do admin (RLS)
     let imp: { status: string; sheet_data: unknown } | null = null;
     if (sub.import_id) {

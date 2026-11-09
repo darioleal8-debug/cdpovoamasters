@@ -107,10 +107,15 @@ export interface ImportRow {
   confirmed_at: string | null;
   created_at: string;
   updated_at: string;
+  /** 'official_sheet' (folha oficial) | 'pro_stats' (estatísticas profissionais) — migração 120 */
+  doc_type?: "official_sheet" | "pro_stats";
+  stats_data?: unknown;
+  page_count?: number | null;
+  image_mime?: string | null;
 }
 
 const IMPORT_COLUMNS =
-  "id, event_id, team_id, created_by, status, image_path, image_sha256, schema_version, processing_version, model, sheet_data, validation, ai_usage, analysis_count, corrections, error, submission_id, confirmed_at, created_at, updated_at";
+  "id, event_id, team_id, created_by, status, image_path, image_sha256, image_mime, schema_version, processing_version, model, sheet_data, validation, ai_usage, analysis_count, corrections, error, submission_id, confirmed_at, created_at, updated_at, doc_type, stats_data, page_count";
 
 export async function loadImport(access: Access, id: string): Promise<ImportRow | null> {
   if (!isUuid(id)) return null;
@@ -186,6 +191,11 @@ export async function importView(access: Access, row: ImportRow, game: GameInfo 
   return {
     id: row.id,
     event_id: row.event_id,
+    doc_type: row.doc_type ?? "official_sheet",
+    stats: row.doc_type === "pro_stats" ? row.stats_data ?? null : undefined,
+    issues: row.doc_type === "pro_stats" ? ((row.validation as { issues?: unknown[] } | null)?.issues ?? []) : undefined,
+    page_count: row.page_count ?? null,
+    image_mime: row.image_mime ?? null,
     status: row.status,
     schema_version: row.schema_version,
     processing_version: row.processing_version,

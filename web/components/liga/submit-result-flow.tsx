@@ -84,10 +84,10 @@ export function SubmitResultFlow({ games, teamName, preselectedGameId = null }: 
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const gamePhotoInputRef = useRef<HTMLInputElement>(null);
 
-  // A lista já vem filtrada pelo servidor (jogos de hoje e passados, no fuso de Lisboa)
-  const eligibleGames = games.filter(
-    (g) => !g.result && g.result_status !== "pending"
-  );
+  // A lista já vem filtrada pelo servidor (jogos de hoje e passados, no fuso de Lisboa).
+  // Jogos com resultado pendente da OUTRA equipa continuam elegíveis: cada equipa submete a sua
+  // documentação de forma independente e as duas entram na validação cruzada.
+  const eligibleGames = games.filter((g) => !g.result);
 
   // Abre directamente no jogo indicado no URL (botão "Submeter resultado" de cada jogo)
   useEffect(() => {
@@ -337,6 +337,7 @@ export function SubmitResultFlow({ games, teamName, preselectedGameId = null }: 
                     </p>
                     <p style={{ fontSize: "12px", color: "var(--muted,#6F675F)", margin: 0 }}>
                       {fmt(g.event_date)} · J{g.jornada ?? "?"} {isHome ? "(Casa)" : "(Fora)"}
+                      {g.result_status === "pending" && <span style={{ marginLeft: 6, color: "#B45309" }}>· já há uma submissão — a tua entra na validação cruzada</span>}
                     </p>
                   </button>
                 );

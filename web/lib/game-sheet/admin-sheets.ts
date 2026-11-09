@@ -11,6 +11,7 @@ import { resolveSheetLocation } from "@/lib/liga/sheet-location";
 import { sha256, sniffImageMime, type AcceptedMime } from "./image";
 import { pickBest, scoreReading, type ReadingQuality } from "./quality";
 import { reanalyzeImport, runAndStore } from "./run";
+import { runProStatsAndStore } from "@/lib/match-docs/run";
 import { AiSheetSchema, SheetDataSchema, type ImportStatus } from "./schema";
 import { BUCKET, loadImport, type Access, type GameInfo } from "./service";
 import { visionConfig } from "./vision";
@@ -70,6 +71,7 @@ export async function listGameSheets(access: Access, admin: AdminClient, game: G
       .from("game_sheet_imports")
       .select("id, team_id, status, image_path, image_mime, sheet_data, extraction_raw, analysis_count, error, source_submission_id, created_at, updated_at")
       .eq("event_id", game.id)
+      .eq("doc_type", "official_sheet") // estatísticas profissionais têm o seu próprio painel (validação cruzada)
       .order("created_at", { ascending: true }),
   ]);
 
@@ -178,9 +180,10 @@ export async function createAndAnalyze(
   game: GameInfo,
   buffer: Buffer,
   mime: AcceptedMime,
-  opts: { existingPath?: string; sourceSubmissionId?: string } = {},
+  opts: { existingPath?: string; sourceSubmissionId?: string; docType?: "official_sheet" | "pro_stats" } = {},
 ): Promise<AnalyzeOutcome> {
   const hash = sha256(buffer);
+  const docType = opts.docType ?? "official_sheet";
 
   // Inclui linhas "failed" para as reutilizar em vez de criar duplicados
   const { data: same } = await access.supabase
@@ -244,6 +247,7 @@ export async function createAndAnalyze(
         image_path: imagePath,
         image_sha256: hash,
         image_mime: mime,
+        doc_type: docType,
         model: visionConfig().model,
         source_submission_id: opts.sourceSubmissionId ?? null,
       })
@@ -257,7 +261,9 @@ export async function createAndAnalyze(
     importId = created.id as string;
   }
 
-  const run = await runAndStore(access, importId, buffer, game, 0);
+  const run = docType === "pro_stats"
+    ? await runProStatsAndStore(access, importId, buffer, game, 0)
+    : await runAndStore(access, importId, buffer, game, 0);
   return { ok: true, import_id: importId, analysis_error: run.ok ? null : run.error ?? null };
 }
 

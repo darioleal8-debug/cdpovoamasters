@@ -60,6 +60,28 @@ export function isVisionUnsupportedError(status: number, body: string): boolean 
   return /image|vision|multimodal|image_url|unknown variant|content type/i.test(body);
 }
 
+/** HTTP 400/422 a recusar o campo image_url.detail. */
+export function isDetailUnsupportedError(status: number, body: string): boolean {
+  return (status === 400 || status === 422) && /\bdetail\b/i.test(body);
+}
+
+/** Remove image_url.detail de todas as partes de imagem (mantém o resto intacto). */
+export function stripImageDetail(messages: object[]): object[] {
+  return messages.map((m) => {
+    const msg = m as { content?: unknown };
+    if (!Array.isArray(msg.content)) return m;
+    return {
+      ...msg,
+      content: msg.content.map((p: MessagePart) => {
+        if (p.type !== "image_url" || !p.image_url || typeof p.image_url !== "object") return p;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { detail, ...rest } = p.image_url as Record<string, unknown>;
+        return { ...p, image_url: rest };
+      }),
+    };
+  });
+}
+
 function hasImagePart(user: string | MessagePart[]): boolean {
   return Array.isArray(user) && user.some((p) => p.type === "image_url" || p.type === "image");
 }
@@ -97,9 +119,10 @@ export async function deepseekJSONDetailed<T = Record<string, unknown>>(
   const timeoutMs = opts.timeoutMs ?? 45_000;
   const withImage = hasImagePart(opts.user);
 
-  const messages: object[] = [];
+  let messages: object[] = [];
   if (opts.system) messages.push({ role: "system", content: opts.system });
   messages.push({ role: "user", content: opts.user });
+  let detailStripped = false;
 
   async function attempt(maxTok: number, temperature = opts.temperature ?? 0.4): Promise<AttemptResult<T>> {
     meta.attempts++;
@@ -123,6 +146,13 @@ export async function deepseekJSONDetailed<T = Record<string, unknown>>(
 
       if (!res.ok) {
         const txt = await res.text();
+        // Modelo/endpoint que não aceita o parâmetro "detail" das imagens: repete sem ele (1×)
+        if (withImage && !detailStripped && isDetailUnsupportedError(res.status, txt)) {
+          detailStripped = true;
+          messages = stripImageDetail(messages);
+          console.warn(`[deepseekJSON] parâmetro detail recusado (HTTP ${res.status}) — repetir sem detail`);
+          return attempt(maxTok, temperature);
+        }
         if (withImage && isVisionUnsupportedError(res.status, txt)) {
           return {
             ok: false, kind: "vision_unsupported",

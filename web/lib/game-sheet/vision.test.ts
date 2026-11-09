@@ -50,7 +50,7 @@ describe("image helpers", () => {
     expect(sniffImageMime(await sheetImage())).toBe("image/jpeg");
     expect(sniffImageMime(await sharp({ create: { width: 4, height: 4, channels: 3, background: "#fff" } }).png().toBuffer())).toBe("image/png");
     expect(sniffImageMime(Buffer.from("<script>alert(1)</script>"))).toBeNull();
-    expect(sniffImageMime(Buffer.from("%PDF-1.7 aaaaaaaaaa"))).toBeNull();
+    expect(sniffImageMime(Buffer.from("%PDF-1.7 aaaaaaaaaa"))).toBe("application/pdf"); // PDFs aceites (renderizados no servidor)
   });
 
   it("2. fotografia rodada: corrige a orientação EXIF", async () => {

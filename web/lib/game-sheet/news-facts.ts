@@ -14,6 +14,10 @@ export interface NewsFactsInput {
   unattributed?: { home: number | null; away: number | null } | null;
   /** Estatística completa registada ao vivo no HoopHub por uma das equipas (fonte exata) */
   live?: LiveTeamStats | null;
+  /** Box scores completos validados (estatísticas profissionais consolidadas), por equipa */
+  boxScores?: LiveTeamStats[] | null;
+  /** Estado da validação cruzada (ex.: "validado") */
+  validationStatus?: string | null;
 }
 
 export interface LivePlayerLine {
@@ -26,6 +30,8 @@ export interface LivePlayerLine {
 export interface LiveTeamStats {
   side: "home" | "away";
   players: LivePlayerLine[];
+  /** live = registada ao vivo no HoopHub; pro = estatística profissional submetida e validada */
+  origin?: "live" | "pro";
 }
 
 export interface NewsFacts {
@@ -117,21 +123,35 @@ export function buildNewsFacts(i: NewsFactsInput): NewsFacts {
 
   const forbiddenPlayerNames: string[] = [];
 
-  // Estatística live (exata) de uma equipa: usa-a para os destaques dessa equipa
-  if (i.live && i.live.players.length > 0) {
-    const side = i.live.side;
-    const team = side === "home" ? i.home : i.away;
-    const other = side === "home" ? i.away : i.home;
-    const teamScore = side === "home" ? i.homeScore : i.awayScore;
-    const ps = i.live.players;
-    const sum = ps.reduce((s, p) => s + p.pts, 0);
-    if (sum === teamScore) {
-      lines.push(...liveFactLines(team, ps));
-      lines.push(`Não há estatísticas individuais confirmadas do ${other} — não menciones jogadores do ${other}.`);
-      const otherNames = i.players.filter((p) => p.side !== side).map((p) => p.nome.trim()).filter((n) => n.length >= 4);
-      forbiddenPlayerNames.push(...otherNames);
-      return { lines, allowedScores: allowed, periodsConsistent, playerPointsReliable: true, forbiddenPlayerNames };
+  if (i.validationStatus) lines.push(`Estado de validação dos dados: ${i.validationStatus}.`);
+
+  // Estatística completa (live ou profissional validada): usa-a para os destaques dessa equipa.
+  // Só conta quando a soma dos pontos individuais coincide com o resultado da equipa.
+  const full: LiveTeamStats[] = [];
+  if (i.live && i.live.players.length > 0) full.push(i.live);
+  for (const b of i.boxScores ?? []) if (b.players.length > 0 && !full.some((f) => f.side === b.side)) full.push(b);
+  const okFull = full.filter((f) => f.players.reduce((s, p) => s + p.pts, 0) === (f.side === "home" ? i.homeScore : i.awayScore));
+  if (okFull.length > 0) {
+    for (const f of okFull) lines.push(...liveFactLines(f.side === "home" ? i.home : i.away, f.players, f.origin ?? "live"));
+    if (okFull.length === 1) {
+      const side = okFull[0].side;
+      const other = side === "home" ? i.away : i.home;
+      // A outra equipa: só os pontos lidos da folha, e só se baterem certo com o resultado dela
+      const otherSide = side === "home" ? "away" : "home";
+      const otherPlayers = i.players.filter((p) => p.side === otherSide);
+      const otherScore = otherSide === "home" ? i.homeScore : i.awayScore;
+      const otherUnattr = (otherSide === "home" ? i.unattributed?.home : i.unattributed?.away) ?? 0;
+      const otherOk = otherPlayers.some((p) => p.pontos > 0) && otherUnattr === 0 && otherPlayers.reduce((s, p) => s + p.pontos, 0) === otherScore;
+      if (otherOk && okFull[0].origin === "pro") {
+        const top = otherPlayers.filter((p) => p.pontos > 0).sort((a, b) => b.pontos - a.pontos).slice(0, 3);
+        lines.push(`Marcadores confirmados ${other}: ${top.map((p) => `${p.nome} ${p.pontos} pts`).join(", ")}.`);
+      } else {
+        lines.push(`Não há estatísticas individuais confirmadas do ${other} — não menciones jogadores do ${other}.`);
+        const otherNames = otherPlayers.map((p) => p.nome.trim()).filter((n) => n.length >= 4);
+        forbiddenPlayerNames.push(...otherNames);
+      }
     }
+    return { lines, allowedScores: allowed, periodsConsistent, playerPointsReliable: true, forbiddenPlayerNames };
   }
 
   const reliable = playerPointsReliable(i);
@@ -180,9 +200,11 @@ export function unknownScores(text: string, allowed: Set<string>): string[] {
 const pctStr = (m: number, a: number) => (a > 0 ? `${Math.round((m / a) * 100)}%` : "—");
 
 /** Linhas de factos a partir da estatística live completa de uma equipa. */
-export function liveFactLines(team: string, ps: LivePlayerLine[]): string[] {
+export function liveFactLines(team: string, ps: LivePlayerLine[], origin: "live" | "pro" = "live"): string[] {
   const out: string[] = [];
-  out.push(`Estatística oficial do ${team}, registada ao vivo durante o jogo (dados exatos):`);
+  out.push(origin === "pro"
+    ? `Estatística individual do ${team}, exportada de aplicação de estatística e validada (dados confirmados):`
+    : `Estatística oficial do ${team}, registada ao vivo durante o jogo (dados exatos):`);
   const top = [...ps].filter((p) => p.pts > 0).sort((a, b) => b.pts - a.pts).slice(0, 3);
   if (top.length) {
     out.push(`- Melhores marcadores do ${team}: ${top.map((p) => `${p.nome} ${p.pts} pts${p.fg3m ? ` (${p.fg3m} triplo${p.fg3m > 1 ? "s" : ""})` : ""}`).join(", ")}.`);

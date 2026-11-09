@@ -3,6 +3,8 @@ import { authorizeGameSheet, BUCKET, importView, isUuid, jsonError, loadGameForA
 import { isPdf, MAX_PDF_BYTES, MAX_REQUEST_BYTES, sha256, sniffImageMime } from "@/lib/game-sheet/image";
 import { runAndStore } from "@/lib/game-sheet/run";
 import { visionConfig } from "@/lib/game-sheet/vision";
+import { runProStatsAndStore } from "@/lib/match-docs/run";
+import { proStatsConfig } from "@/lib/match-docs/pro-stats-extract";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -11,7 +13,12 @@ const MAX_IMPORTS_PER_HOUR = Number(process.env.GAME_SHEET_MAX_IMPORTS_PER_HOUR 
 /** Uma importação em 'processing' há mais do que isto é considerada abandonada (função terminou a meio). */
 const STALE_PROCESSING_MS = 3 * 60 * 1000;
 
-/** Importar boletim de jogo com IA: carrega a foto, interpreta-a e cria o rascunho para revisão. */
+/**
+ * Importar documento do jogo com IA: carrega o ficheiro, interpreta-o e cria o rascunho para revisão.
+ *  - doc_type=official_sheet (omissão): folha de jogo oficial preenchida pelos árbitros
+ *  - doc_type=pro_stats: folha de estatísticas exportada de aplicação profissional (Pocket Stat, …)
+ * Cada equipa submete os seus documentos de forma independente (vários ficheiros = vários pedidos).
+ */
 export async function POST(req: Request) {
   const auth = await authorizeGameSheet();
   if (!auth.ok) return auth.response;
@@ -23,8 +30,11 @@ export async function POST(req: Request) {
   let form: FormData;
   try { form = await req.formData(); } catch { return jsonError("Payload inválido", 400); }
 
-  const file = form.get("photo");
+  const file = form.get("photo") ?? form.get("file");
   const gameId = form.get("game_id");
+  const docTypeRaw = form.get("doc_type");
+  const docType = docTypeRaw === "pro_stats" ? "pro_stats" : docTypeRaw == null || docTypeRaw === "" || docTypeRaw === "official_sheet" ? "official_sheet" : null;
+  if (!docType) return jsonError("Tipo de documento inválido", 400);
   if (!(file instanceof File)) return jsonError("Campo 'photo' em falta", 400);
   if (!isUuid(gameId)) return jsonError("Jogo inválido", 400);
   if (file.size === 0 || file.size > MAX_PDF_BYTES) {
@@ -55,6 +65,8 @@ export async function POST(req: Request) {
   if (same) {
     const row = await loadImport(access, same.id as string);
     if (row) return NextResponse.json({ ...(await importView(access, row, game)), reused: true });
+    // Mesmo ficheiro já submetido pela outra equipa (RLS esconde-o): não duplica a análise
+    return jsonError("Este ficheiro já foi submetido para este jogo.", 409, { code: "duplicate_file" });
   }
 
   // Limite de pedidos por utilizador (controlo de custos)
@@ -73,6 +85,8 @@ export async function POST(req: Request) {
     .from("game_sheet_imports")
     .update({ status: "failed", error: "Processamento interrompido", updated_at: new Date().toISOString() })
     .eq("event_id", game.id)
+    .eq("team_id", access.teamId)
+    .eq("doc_type", docType)
     .eq("status", "processing")
     .lt("updated_at", new Date(Date.now() - STALE_PROCESSING_MS).toISOString());
 
@@ -89,12 +103,13 @@ export async function POST(req: Request) {
       image_path: imagePath,
       image_sha256: hash,
       image_mime: mime,
-      model: visionConfig().model,
+      doc_type: docType,
+      model: docType === "pro_stats" ? proStatsConfig().model : visionConfig().model,
     })
     .select("id")
     .single();
   if (insErr || !created) {
-    if (insErr?.code === "23505") return jsonError("Já existe uma análise em curso para este jogo. Aguarde.", 409);
+    if (insErr?.code === "23505") return jsonError("Este ficheiro já foi submetido para este jogo, ou há uma análise deste tipo de documento em curso. Aguarde.", 409);
     return jsonError(`Erro ao criar importação: ${insErr?.message ?? "desconhecido"}`, 500);
   }
 
@@ -106,7 +121,10 @@ export async function POST(req: Request) {
     return jsonError(`Erro no upload: ${upErr.message}`, 500);
   }
 
-  const run = await runAndStore(access, created.id as string, buffer, game, 0);
+  // Falha da API nunca apaga o documento: fica guardado com status 'failed' e pode ser reanalisado
+  const run = docType === "pro_stats"
+    ? await runProStatsAndStore(access, created.id as string, buffer, game, 0)
+    : await runAndStore(access, created.id as string, buffer, game, 0);
   const row = await loadImport(access, created.id as string);
   if (!row) return jsonError("Importação não encontrada após análise", 500);
 
