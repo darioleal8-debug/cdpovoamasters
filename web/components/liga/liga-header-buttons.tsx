@@ -16,6 +16,12 @@ const NAV_LINKS = [
   { href: "/liga-inatel/equipas",       label: "Equipas" },
 ];
 
+const TEAM_SCREENS = [
+  { href: "/liga-inatel/equipa", label: "Submeter resultado" },
+  { href: "/liga-inatel/equipa?ecra=plantel", label: "Plantel" },
+  { href: "/liga-inatel/equipa?ecra=identidade", label: "Identidade visual" },
+];
+
 type TeamInfo = {
   name: string;
   short_name: string | null;
@@ -145,13 +151,16 @@ export function LigaHeaderButtons() {
                 borderRadius: "6px", minWidth: "160px", zIndex: 100, overflow: "hidden",
                 boxShadow: "0 8px 24px rgba(0,0,0,.4)",
               }}>
-                <Link
-                  href="/liga-inatel/equipa#resultados"
-                  onClick={() => setDropdownOpen(false)}
-                  style={{ display: "block", padding: "11px 16px", fontSize: "13px", color: "#F6F2EC", textDecoration: "none" }}
-                >
-                  Submeter resultado
-                </Link>
+                {TEAM_SCREENS.map((l) => (
+                  <Link
+                    key={l.href}
+                    href={l.href}
+                    onClick={() => setDropdownOpen(false)}
+                    style={{ display: "block", padding: "11px 16px", fontSize: "13px", color: "#F6F2EC", textDecoration: "none" }}
+                  >
+                    {l.label}
+                  </Link>
+                ))}
                 <button
                   onClick={signOut}
                   style={{
@@ -256,6 +265,18 @@ export function LigaHeaderButtons() {
                   )}
                   {team.short_name ?? team.name}
                 </Link>
+                {TEAM_SCREENS.map((l) => (
+                  <Link
+                    key={l.href}
+                    href={l.href}
+                    style={{
+                      padding: "12px 0 12px 26px", fontSize: "13px", color: "#F6F2EC",
+                      textDecoration: "none", borderBottom: "1px solid rgba(249,115,22,.08)",
+                    }}
+                  >
+                    {l.label}
+                  </Link>
+                ))}
                 <button
                   onClick={signOut}
                   style={{
