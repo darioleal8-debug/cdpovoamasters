@@ -49,7 +49,7 @@ ESTRUTURA
 Responde APENAS com JSON:
 {"app":string|null,"date":string|null,"columnsFound":[string],"teams":[{"name":string|null,"side":"home"|"away"|null,"confidence":number,"players":[{"rowText":string,"number":number|null,"name":string,"isTeamRow":boolean,"stats":{…},"illegible":[string],"confidence":number}],"totals":{…}|null}],"periodScores":[…],"finalScore":{"home":number|null,"away":number|null},"confidence":number,"warnings":[string]}`;
 
-export function buildProStatsUserPrompt(game: { home: string; away: string; date?: string | null }, submittingTeam: string | null, doc: PreparedDocument): string {
+export function buildProStatsUserPrompt(game: { home: string; away: string; date?: string | null }, submittingTeam: string | null, doc: PreparedDocument, rosterHint?: string): string {
   const lines = [
     `Jogo: ${game.home} (home/casa) vs ${game.away} (away/fora)${game.date ? `, ${game.date}` : ""}.`,
     submittingTeam ? `Documento submetido pela equipa: ${submittingTeam}.` : "Documento carregado pelo administrador da liga.",
@@ -59,6 +59,7 @@ export function buildProStatsUserPrompt(game: { home: string; away: string; date
     lines.push("TEXTO EXTRAÍDO DO PDF (referência exata dos dígitos):");
     doc.textLayer.forEach((t, i) => lines.push(`--- página ${i + 1} ---\n${t.slice(0, 6000)}`));
   }
+  if (rosterHint) lines.push(rosterHint);
   lines.push("Extrai TODAS as tabelas de estatísticas e devolve o JSON pedido.");
   return lines.join("\n");
 }
@@ -103,6 +104,8 @@ export async function extractProStats(input: {
   game: { home: string; away: string; date?: string | null };
   submittingTeam: string | null;
   adminInstructions?: string;
+  /** Plantel registado das equipas (referência para nomes/números) */
+  rosterHint?: string;
 }): Promise<ProStatsResult> {
   const cfg = proStatsConfig();
   const started = Date.now();
@@ -125,11 +128,11 @@ export async function extractProStats(input: {
     : "");
   const user: MessagePart[] = [
     ...doc.pages.map((p) => imagePart(p.buffer)),
-    { type: "text", text: buildProStatsUserPrompt(input.game, input.submittingTeam, doc) },
+    { type: "text", text: buildProStatsUserPrompt(input.game, input.submittingTeam, doc, input.rosterHint) },
   ];
 
   const full = await deepseekJSONDetailed<unknown>({
-    model: cfg.model, system, user: doc.pages.length ? user : buildProStatsUserPrompt(input.game, input.submittingTeam, doc),
+    model: cfg.model, system, user: doc.pages.length ? user : buildProStatsUserPrompt(input.game, input.submittingTeam, doc, input.rosterHint),
     temperature: 0, maxTokens: cfg.maxOutputTokens, maxRetryTokens: cfg.maxOutputTokens * 2,
     timeoutMs: Math.max(10_000, cfg.timeBudgetMs - 8_000), transientRetries: 1,
   });
@@ -182,7 +185,7 @@ export async function extractProStats(input: {
       user: [
         ...doc.pages.map((p) => imagePart(p.buffer)),
         ...zooms.map((z) => imagePart(z.buffer)),
-        { type: "text", text: `${buildProStatsUserPrompt(input.game, input.submittingTeam, doc)}${zooms.length ? `\nImagens adicionais ampliadas (para ler células pequenas): ${zooms.map((z) => z.label).join("; ")}.` : ""}\n\nLINHAS A RELER:\n${JSON.stringify(rows)}\n\nCOLUNAS A RELER (o total do documento não bate com a soma lida):\n${JSON.stringify(cols)}` },
+        { type: "text", text: `${buildProStatsUserPrompt(input.game, input.submittingTeam, doc, input.rosterHint)}${zooms.length ? `\nImagens adicionais ampliadas (para ler células pequenas): ${zooms.map((z) => z.label).join("; ")}.` : ""}\n\nLINHAS A RELER:\n${JSON.stringify(rows)}\n\nCOLUNAS A RELER (o total do documento não bate com a soma lida):\n${JSON.stringify(cols)}` },
       ],
       temperature: 0, maxTokens: 4096, maxRetryTokens: 6144, timeoutMs: remaining - 6_000,
     });

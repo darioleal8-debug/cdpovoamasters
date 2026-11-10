@@ -114,9 +114,10 @@ Responde EXCLUSIVAMENTE com um objeto JSON válido (sem markdown) com este esque
 "seq" é a ordem visual dentro da marcha da respetiva equipa (0, 1, 2, …).${adminBlock(adminInstructions)}`;
 }
 
-export function buildUserPrompt(game: { home: string; away: string; date?: string | null }): string {
+export function buildUserPrompt(game: { home: string; away: string; date?: string | null }, rosterHint?: string): string {
   return `Jogo registado no HoopHub: ${game.home} (casa) vs ${game.away} (visitante)${game.date ? `, ${game.date}` : ""}.
-Os nomes das equipas na folha podem estar abreviados. Extrai os dados desta folha de jogo em JSON.`;
+Os nomes das equipas na folha podem estar abreviados.${rosterHint ? `\n${rosterHint}` : ""}
+Extrai os dados desta folha de jogo em JSON.`;
 }
 
 export function buildRecheckPrompt(

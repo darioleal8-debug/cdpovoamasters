@@ -52,7 +52,8 @@ async function sample(path: string, w: number, h: number) {
   return existsSync(path) ? readFileSync(path) : sharp({ create: { width: w, height: h, channels: 3, background: "#fff" } }).jpeg().toBuffer();
 }
 
-describe("extração de estatísticas profissionais (DeepSeek simulado)", () => {
+// Renderização de PDFs e ampliações com sharp podem demorar alguns segundos em CI
+describe("extração de estatísticas profissionais (DeepSeek simulado)", { timeout: 30_000 }, () => {
   it("folha Pocket Stat (imagem): envia em alta resolução e devolve dados validados", async () => {
     responses.push(fx("pocketstat-aroso-paredes.ai.json"));
     const r = await extractProStats({ buffer: await sample(POCKET_IMG, 1290, 1366), mime: "image/jpeg", game: AROSO, submittingTeam: "Aroso" });

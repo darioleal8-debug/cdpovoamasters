@@ -1,3 +1,4 @@
+import { loadTeamRoster, type RosterPlayer } from "@/lib/liga/roster";
 import { createAdminClient } from "@/lib/supabase/server";
 import { createPublicClient } from "@/lib/supabase/public";
 import { computeStandings, groupStandingsBySeries, normalizeName, parseGameMeta, type SeriesStandings, type Competition, type LeagueGameResult, type LeagueTeam, type PublicGame, type StandingRow } from "@/types/competitions";
@@ -55,6 +56,16 @@ export async function getTeamBySlug(slug: string): Promise<LeagueTeam | null> {
     .eq("slug", slug)
     .maybeSingle();
   return (data as LeagueTeam) ?? null;
+}
+
+/** Plantel público de uma equipa (jogadores ativos registados pelo delegado). */
+export async function getTeamRoster(teamId: string): Promise<RosterPlayer[]> {
+  try {
+    const supabase = await createAdminClient();
+    return await loadTeamRoster(supabase, teamId);
+  } catch {
+    return [];
+  }
 }
 
 // ─── Games (events + merged result/submission state) ─────────────────────────

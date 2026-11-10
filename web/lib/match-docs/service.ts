@@ -14,6 +14,7 @@ import { ProStatsDataSchema } from "./pro-stats-schema";
 import { validateProStats } from "./validate";
 import { reconcile, type AiReview, type KnownPlayer, type OfficialInput, type ProInput, type ReconciliationResult, type Val } from "./reconcile";
 import { crossCheckWithAI } from "./cross-check";
+import { fullName, loadGameRosters, rosterPromptBlock } from "@/lib/liga/roster";
 
 export type AdminDb = Awaited<ReturnType<typeof createAdminClient>>;
 export type DocType = "official_sheet" | "pro_stats";
@@ -115,17 +116,24 @@ export function buildInputs(game: MatchGame, docs: MatchDocRow[]): { official: O
   return { official, pro, skipped };
 }
 
-/** Jogadores conhecidos de cada equipa: plantel HoopHub (clube dono) + histórico da liga. */
+/**
+ * Jogadores conhecidos de cada equipa, por ordem de autoridade: plantel registado pelo delegado
+ * (league_team_players) → plantel HoopHub do clube dono → histórico de estatísticas da liga.
+ */
 export async function loadKnownPlayers(db: AdminDb, game: MatchGame): Promise<{ home: KnownPlayer[]; away: KnownPlayer[] }> {
   const out: { home: KnownPlayer[]; away: KnownPlayer[] } = { home: [], away: [] };
   try {
+    const rosters = await loadGameRosters(db, game);
+    for (const side of ["home", "away"] as const) {
+      out[side].push(...rosters[side].map((r) => ({ name: fullName(r), number: r.number, rosterId: r.id, source: "roster" as const })));
+    }
     const { data: ours } = await db.from("league_teams").select("id").eq("is_our_team", true).maybeSingle();
     for (const side of ["home", "away"] as const) {
       const teamId = side === "home" ? game.homeTeamId : game.awayTeamId;
       if (!teamId) continue;
       if (ours?.id === teamId) {
         const { data: roster } = await db.from("v_active_roster").select("player_id, name, number");
-        out[side].push(...(roster ?? []).map((r) => ({ name: r.name as string, number: (r.number as number | null) ?? null, hoophubPlayerId: r.player_id as string })));
+        out[side].push(...(roster ?? []).map((r) => ({ name: r.name as string, number: (r.number as number | null) ?? null, hoophubPlayerId: r.player_id as string, source: "club" as const })));
       }
       const { data: hist } = await db.from("league_game_player_stats").select("nome, numero").eq("team_id", teamId).neq("event_id", game.id).limit(400);
       const seen = new Set(out[side].map((k) => `${k.number}:${normalizeName(k.name)}`));
@@ -133,7 +141,7 @@ export async function loadKnownPlayers(db: AdminDb, game: MatchGame): Promise<{ 
         const k = `${h.numero ?? null}:${normalizeName(h.nome as string)}`;
         if (seen.has(k) || /^n\.º|^jogador$/i.test(h.nome as string)) continue;
         seen.add(k);
-        out[side].push({ name: h.nome as string, number: (h.numero as number | null) ?? null });
+        out[side].push({ name: h.nome as string, number: (h.numero as number | null) ?? null, source: "history" });
       }
     }
   } catch (e) {
@@ -271,5 +279,17 @@ export async function safeRunReconciliation(eventId: string, ai: AiMode = "auto"
     if (!r.ok) console.error(`[match-docs] reconciliação falhou event=${eventId}: ${r.error}`);
   } catch (e) {
     console.error(`[match-docs] reconciliação lançou exceção event=${eventId}`, e);
+  }
+}
+
+/** Texto do plantel registado das duas equipas para os prompts do DeepSeek ("" se não houver). */
+export async function rosterHintForEvent(eventId: string): Promise<string> {
+  try {
+    const db = await createAdminClient();
+    const game = await loadMatchGame(db, eventId);
+    if (!game) return "";
+    return rosterPromptBlock(await loadGameRosters(db, game), game);
+  } catch {
+    return "";
   }
 }

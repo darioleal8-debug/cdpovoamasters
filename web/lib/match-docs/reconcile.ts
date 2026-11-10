@@ -35,7 +35,14 @@ export interface DocRef {
 export interface OfficialInput extends DocRef { docType: "official_sheet"; sheet: SheetData; analysis: Analysis }
 export interface ProInput extends DocRef { docType: "pro_stats"; data: ProStatsData; issues: MathIssue[] }
 
-export interface KnownPlayer { name: string; number: number | null; hoophubPlayerId?: string | null }
+export interface KnownPlayer {
+  name: string;
+  number: number | null;
+  hoophubPlayerId?: string | null;
+  /** Plantel registado pelo delegado (league_team_players): referência autoritativa de nome ↔ número */
+  rosterId?: string | null;
+  source?: "roster" | "club" | "history";
+}
 
 export interface ReconcileInput {
   game: { home: string; away: string };
@@ -90,6 +97,10 @@ export interface ConsolidatedPlayer {
   inOfficialSheet: boolean | null;
   inDatabase: boolean | null;
   hoophubPlayerId: string | null;
+  /** Jogador do plantel registado a que corresponde (quando identificado) */
+  rosterId?: string | null;
+  /** Nome tal como foi lido no documento, quando substituído pelo nome do plantel */
+  readName?: string | null;
 }
 
 export interface Candidate { docId: string; label: string; docType: "official_sheet" | "pro_stats"; teamSide: Side | null; home: number | null; away: number | null }
@@ -411,16 +422,83 @@ export function reconcile(input: ReconcileInput): ReconciliationResult {
     if (teamOnly && completeness[side] === "none") notes.push(`${teamName}: a estatística profissional só tem totais de equipa (sem estatística individual).`);
   }
 
-  // ── Jogadores na base de dados ──
-  for (const p of players) {
-    const known = input.known?.[p.side];
-    if (!known || known.length === 0) continue;
-    const hit = known.find((k) => (k.number !== null && k.number === p.number && playerNameScore(k.name, p.name) >= 0.5))
-      ?? known.find((k) => playerNameScore(k.name, p.name) >= 0.85);
-    p.inDatabase = Boolean(hit);
-    if (hit?.hoophubPlayerId && !p.hoophubPlayerId) p.hoophubPlayerId = hit.hoophubPlayerId;
+  // ── Plantel registado e jogadores conhecidos ──
+  // O plantel do delegado é a referência de nome ↔ número: confirma a leitura, uniformiza o nome
+  // e assinala (sem bloquear) números/nomes que não coincidem.
+  for (const side of ["home", "away"] as const) {
+    const known = input.known?.[side] ?? [];
+    const roster = known.filter((k) => k.source === "roster");
+    const others = known.filter((k) => k.source !== "roster");
+    const teamName = sideName(side, game);
+    const usedRoster = new Set<string>();
+    for (const p of players.filter((x) => x.side === side)) {
+      if (roster.length) {
+        const byNumber = p.number !== null ? roster.find((k) => k.number === p.number) : undefined;
+        const nameScore = byNumber ? playerNameScore(byNumber.name, p.name) : 0;
+        const byName = roster
+          .map((k) => ({ k, s: playerNameScore(k.name, p.name) }))
+          .filter((x) => x.s >= 0.5 && !usedRoster.has(x.k.rosterId ?? x.k.name))
+          .sort((a, b) => b.s - a.s);
+        const uniqueByName = byName.length === 1 || (byName.length > 1 && byName[0].s > byName[1].s) ? byName[0].k : undefined;
+        const nameIsPlaceholder = !p.name || /^n\.º/i.test(p.name);
+
+        if (byNumber && (nameScore >= 0.5 || nameIsPlaceholder)) {
+          // Número e nome coincidem (ou só há número): nome completo do plantel
+          usedRoster.add(byNumber.rosterId ?? byNumber.name);
+          p.rosterId = byNumber.rosterId ?? null;
+          p.inDatabase = true;
+          if (byNumber.hoophubPlayerId && !p.hoophubPlayerId) p.hoophubPlayerId = byNumber.hoophubPlayerId;
+          if (normName(byNumber.name) !== normName(p.name)) {
+            p.readName = p.name;
+            p.name = byNumber.name;
+            p.sources.name = "roster";
+          }
+          continue;
+        }
+        if (uniqueByName && uniqueByName.number !== null && uniqueByName.number !== p.number) {
+          // Nome do plantel com outro número: número provavelmente mal lido (ou camisola trocada)
+          discrepancies.push({
+            id: `player:${p.key}:roster_number`, field: `players.${p.key}.number`, label: `Número — ${p.name} (${teamName})`, severity: "medium",
+            side, playerKey: p.key, teamA: side === "home" ? p.number : null, teamB: side === "away" ? p.number : null, official: null,
+            chosen: uniqueByName.number, prioritySource: "Plantel registado pelo delegado", confidence: p.confidence,
+            reason: `Lido #${p.number ?? "?"} "${p.name}", mas no plantel ${uniqueByName.name} tem o #${uniqueByName.number}${byNumber ? ` e o #${p.number} é ${byNumber.name}` : ""}.`,
+            suggestion: `Se for ${uniqueByName.name}, aceitar o #${uniqueByName.number} (corrige o número); se jogou com outra camisola, marcar como resolvida.`,
+            resolved: false, origin: "code",
+          });
+          p.inDatabase = true;
+          p.rosterId = uniqueByName.rosterId ?? null;
+          usedRoster.add(uniqueByName.rosterId ?? uniqueByName.name);
+          continue;
+        }
+        if (byNumber) {
+          // Número existe no plantel mas o nome lido é de outra pessoa
+          discrepancies.push({
+            id: `player:${p.key}:roster_name`, field: `players.${p.key}.name`, label: `Nome — #${p.number} (${teamName})`, severity: "medium",
+            side, playerKey: p.key, teamA: side === "home" ? p.name : null, teamB: side === "away" ? p.name : null, official: null,
+            chosen: byNumber.name, prioritySource: "Plantel registado pelo delegado", confidence: p.confidence,
+            reason: `Lido "${p.name}" com o #${p.number}, mas no plantel o #${p.number} é ${byNumber.name}.`,
+            suggestion: `Aceitar o nome do plantel (${byNumber.name}) se o número estiver certo; caso contrário corrigir o número.`,
+            resolved: false, origin: "code",
+          });
+          p.inDatabase = false;
+          continue;
+        }
+        p.inDatabase = false;
+        continue;
+      }
+      if (others.length) {
+        const hit = others.find((k) => (k.number !== null && k.number === p.number && playerNameScore(k.name, p.name) >= 0.5))
+          ?? others.find((k) => playerNameScore(k.name, p.name) >= 0.85);
+        p.inDatabase = Boolean(hit);
+        if (hit?.hoophubPlayerId && !p.hoophubPlayerId) p.hoophubPlayerId = hit.hoophubPlayerId;
+      }
+    }
+    if (roster.length) {
+      const notInRoster = players.filter((x) => x.side === side && x.inDatabase === false);
+      if (notInRoster.length) notes.push(`${teamName}: jogadores que não constam do plantel registado — ${notInRoster.map((x) => `${x.number !== null ? `#${x.number} ` : ""}${x.name}`).join(", ")}.`);
+    }
   }
-  const unknownPlayers = players.filter((p) => p.inDatabase === false);
+  const unknownPlayers = players.filter((p) => p.inDatabase === false && !(input.known?.[p.side] ?? []).some((k) => k.source === "roster"));
   if (unknownPlayers.length) notes.push(`Jogadores que não constam da base de dados: ${unknownPlayers.map((p) => `${p.name} (${sideName(p.side, game)})`).join(", ")}.`);
 
   // ── Correções do admin ──
