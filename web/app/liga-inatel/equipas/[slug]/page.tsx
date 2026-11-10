@@ -9,6 +9,7 @@ import {
 import { CourtBg } from "@/components/competitions/court-bg";
 import { GamesCalendarClient } from "@/components/competitions/games-calendar-client";
 import { TeamAvatar } from "@/components/liga/team-avatar";
+import { getTeamRoster } from "@/lib/competitions-data";
 
 export const revalidate = 60;
 
@@ -40,9 +41,10 @@ export default async function TeamPage({
 
   if (!team || !competition?.season_id) notFound();
 
-  const [allGames, standings] = await Promise.all([
+  const [allGames, standings, roster] = await Promise.all([
     getCompetitionGames(competition.competition_key ?? "Liga", competition.season_id),
     getStandingsWithForm(competition.id),
+    getTeamRoster(team.id),
   ]);
 
   const teamGames = allGames.filter(
@@ -190,6 +192,43 @@ export default async function TeamPage({
               </span>
             ))}
           </div>
+        )}
+
+        {roster.length > 0 && (
+          <section style={{ marginBottom: "32px" }}>
+            <h2 style={{
+              fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))",
+              fontWeight: 800, fontSize: "18px", letterSpacing: "0.06em",
+              textTransform: "uppercase", color: "#1A1612",
+              marginBottom: "16px",
+            }}>
+              Plantel ({roster.length})
+            </h2>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "12px" }}>
+              {roster.map((p) => (
+                <div key={p.id} style={{ background: "#fff", border: "1px solid #E8E0D6", borderRadius: "12px", overflow: "hidden", textAlign: "center" }}>
+                  <div style={{ position: "relative", aspectRatio: "1 / 1", background: "linear-gradient(160deg, #FFEDD5, #FED7AA)" }}>
+                    {p.photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.photoUrl} alt={`${p.firstName} ${p.lastName}`} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    ) : (
+                      <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))", fontWeight: 800, fontSize: "40px", color: "#C2410C" }}>
+                        {(p.firstName[0] ?? "") + (p.lastName[0] ?? "")}
+                      </span>
+                    )}
+                    {p.number !== null && (
+                      <span style={{ position: "absolute", top: "8px", left: "8px", minWidth: "32px", height: "32px", padding: "0 6px", borderRadius: "8px", background: "#F97316", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))", fontWeight: 800, fontSize: "18px" }}>
+                        {p.number}
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ margin: 0, padding: "10px 8px 12px", fontSize: "14px", fontWeight: 700, color: "#1A1612", lineHeight: 1.2 }}>
+                    {p.firstName}<br /><span style={{ fontWeight: 500, color: "#5C534A" }}>{p.lastName}</span>
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
         <h2 style={{

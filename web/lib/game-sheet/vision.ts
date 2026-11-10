@@ -52,6 +52,8 @@ export async function analyzeGameSheet(input: {
   game: { home: string; away: string; date?: string | null };
   /** Instruções livres do admin da liga (releitura dirigida). */
   adminInstructions?: string;
+  /** Plantel registado das equipas (referência para números/nomes) */
+  rosterHint?: string;
   /** Zonas detetadas pelo microserviço OpenCV (injetadas no prompt). */
   opencvZones?: ZoneMap;
 }): Promise<VisionResult> {
@@ -74,7 +76,7 @@ export async function analyzeGameSheet(input: {
     system: buildSystemPrompt(DEFAULT_LAYOUT, input.adminInstructions, input.opencvZones),
     user: [
       { type: "image_url", image_url: { url: dataUrl(prepared.buffer), detail: imageDetail() } },
-      { type: "text", text: buildUserPrompt(input.game) },
+      { type: "text", text: buildUserPrompt(input.game, input.rosterHint) },
     ],
     temperature: 0,
     maxTokens: cfg.maxOutputTokens,

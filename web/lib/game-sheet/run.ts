@@ -1,6 +1,7 @@
 import { analyzeSheet } from "./engine";
 import { callOpencvService, isPdf, sniffImageMime } from "./image";
 import { preparePdf } from "@/lib/match-docs/documents";
+import { rosterHintForEvent } from "@/lib/match-docs/service";
 import { emptySheetData, PROCESSING_VERSION, SHEET_SCHEMA_VERSION } from "./schema";
 import { BUCKET, enrichWithRoster, type Access, type GameInfo, type ImportRow } from "./service";
 import { analyzeGameSheet, visionConfig } from "./vision";
@@ -46,7 +47,9 @@ export async function runAndStore(
     }
   }
 
+  const rosterHint = await rosterHintForEvent(game.id);
   const result = await analyzeGameSheet({
+    rosterHint,
     image: visionImage,
     game: { home: game.home, away: game.away, date: game.date },
     adminInstructions,

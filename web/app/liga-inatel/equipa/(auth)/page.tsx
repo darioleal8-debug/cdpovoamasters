@@ -10,6 +10,7 @@ import { DelegateKitEditor } from "@/components/liga/delegate-kit-editor";
 import { SubmitResultFlow } from "@/components/liga/submit-result-flow";
 import { DelegateGamePhotos } from "@/components/liga/delegate-game-photos";
 import { DelegateMatchDocs } from "@/components/liga/delegate-match-docs";
+import { DelegateRoster } from "@/components/liga/delegate-roster";
 import { todayInClubTz } from "@/lib/time/club-time";
 
 export const dynamic = "force-dynamic";
@@ -359,6 +360,17 @@ export default async function DelegateDashboardPage({
             </div>
           )}
           <SubmitResultFlow games={submittable} teamName={team.name} preselectedGameId={jogo ?? null} />
+        </section>
+
+        {/* Plantel atual: público na página da equipa e referência na leitura das folhas */}
+        <section id="plantel" style={{ marginBottom: "32px", scrollMarginTop: "16px" }}>
+          <h2 style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted, #6F675F)", margin: "0 0 4px" }}>
+            Plantel
+          </h2>
+          <p style={{ fontSize: "12px", color: "var(--muted, #6F675F)", margin: "0 0 12px" }}>
+            Jogadores atuais com número, nome e fotografia. Aparecem na página pública da equipa e ajudam a confirmar os nomes e números lidos nas folhas de jogo e estatísticas.
+          </p>
+          <DelegateRoster />
         </section>
 
         {/* Estatísticas profissionais (Tipo B) e estado da validação cruzada */}

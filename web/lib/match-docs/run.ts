@@ -8,7 +8,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { sniffImageMime } from "@/lib/game-sheet/image";
 import { extractProStats, proStatsConfig, proStatsStatus } from "./pro-stats-extract";
 import { PRO_PROCESSING_VERSION, PRO_STATS_SCHEMA_VERSION, type ProStatsData } from "./pro-stats-schema";
-import { loadKnownPlayers, loadMatchGame } from "./service";
+import { loadKnownPlayers, loadMatchGame, rosterHintForEvent } from "./service";
 import { matchPlayers, playerNameScore } from "./reconcile";
 
 /** Marca os jogadores lidos que constam da base de dados (plantel HoopHub / histórico da liga). */
@@ -44,9 +44,10 @@ export async function runProStatsAndStore(
 ): Promise<{ ok: boolean; error?: string; kind?: string }> {
   const cfg = proStatsConfig();
   const mime = sniffImageMime(buffer) ?? "image/jpeg";
+  const rosterHint = await rosterHintForEvent(game.id);
   const result = await extractProStats({
     buffer, mime, game: { home: game.home, away: game.away, date: game.date },
-    submittingTeam: access.teamName, adminInstructions,
+    submittingTeam: access.teamName, adminInstructions, rosterHint,
   });
 
   if (!result.ok) {

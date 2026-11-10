@@ -256,7 +256,10 @@ export function AdminReconciliationPanel({ eventId }: { eventId: string }) {
                 <p style={{ margin: "2px 0", color: "#15803D" }}>Sugestão: {d.suggestion}</p>
                 {!d.resolved && (
                   <div style={{ display: "flex", gap: "6px", marginTop: "4px", flexWrap: "wrap" }}>
-                    <button disabled={!!busy} onClick={() => { const reason = window.prompt("Aceitar o valor proposto. Motivo (fica registado):", ""); if (reason !== null) void post({ action: "resolve", discrepancy_id: d.id, reason }, "A registar…"); }} style={small(false, "#15803D")}>Aceitar proposto</button>
+                    {/:roster_(name|number)$/.test(d.id) && d.chosen !== null ? (
+                      <button disabled={!!busy} onClick={() => void post({ action: "correct", path: d.field, value: d.chosen, reason: "Valor do plantel registado" }, "A aplicar…")} style={small(false, "#15803D")}>Aplicar valor do plantel ({String(d.chosen)})</button>
+                    ) : null}
+                    <button disabled={!!busy} onClick={() => { const reason = window.prompt("Aceitar como está / valor proposto. Motivo (fica registado):", ""); if (reason !== null) void post({ action: "resolve", discrepancy_id: d.id, reason }, "A registar…"); }} style={small(false, "#15803D")}>{/:roster_/.test(d.id) ? "Manter como lido" : "Aceitar proposto"}</button>
                     {(d.field === "final" || d.field.startsWith("periods.")) && <span style={{ color: "#8C837A" }}>Para outro valor, corrija o resultado/parcial na tabela acima.</span>}
                     {d.playerKey && /\.(pts|pf)$/.test(d.field) && (
                       <button disabled={!!busy} onClick={() => correct(d.field, d.chosen, d.label)} style={small()}>Corrigir valor…</button>
@@ -302,7 +305,8 @@ export function AdminReconciliationPanel({ eventId }: { eventId: string }) {
                             <tr key={p.key} style={{ borderTop: "1px solid #E8E0D6" }}>
                               <td style={{ padding: "3px 6px", whiteSpace: "nowrap", position: "sticky", left: 0, background: "#FFFDFA" }}>
                                 <button onClick={() => correct(`players.${p.key}.name`, p.name, "Nome do jogador", true)} style={{ all: "unset", cursor: "pointer" }}>{p.number !== null ? `#${p.number} ` : ""}{p.name}</button>
-                                {p.inDatabase === false && <span title="Não consta da base de dados" style={{ color: "#B45309", marginLeft: 3 }}>•novo</span>}
+                                {p.rosterId && <span title={p.readName ? `Plantel registado (lido: ${p.readName})` : "Confirmado no plantel registado"} style={{ color: "#15803D", marginLeft: 3 }}>✓</span>}
+                                {p.inDatabase === false && <span title="Não consta do plantel / base de dados" style={{ color: "#B45309", marginLeft: 3 }}>•novo</span>}
                                 {p.inOfficialSheet === false && <span title="Não identificado na folha oficial" style={{ color: "#6B7280", marginLeft: 3 }}>∉F</span>}
                               </td>
                               {PCOLS.map(([k]) => (
@@ -328,7 +332,7 @@ export function AdminReconciliationPanel({ eventId }: { eventId: string }) {
                 </div>
               );
             })}
-            <p style={{ margin: 0, color: "#8C837A" }}>Fonte de cada valor: P = estatística profissional · O = folha oficial · A = corrigido pelo admin. “—” = não disponível (não é zero). Toque num valor para corrigir.</p>
+            <p style={{ margin: 0, color: "#8C837A" }}>Fonte de cada valor: P = estatística profissional · O = folha oficial · A = corrigido pelo admin. ✓ = confirmado no plantel registado (nome uniformizado). “—” = não disponível (não é zero). Toque num valor para corrigir.</p>
           </div>
 
           {/* Correções */}
