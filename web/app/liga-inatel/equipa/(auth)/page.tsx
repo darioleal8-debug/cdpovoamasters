@@ -20,6 +20,47 @@ function fmt(dateStr: string, timeStr: string | null) {
   return d.toLocaleDateString("pt-PT", { weekday: "short", day: "2-digit", month: "short" });
 }
 
+type DelegateScreen = "resultados" | "plantel" | "identidade";
+
+const SCREENS: { key: DelegateScreen; label: string; href: string }[] = [
+  { key: "resultados", label: "Submeter resultado", href: "/liga-inatel/equipa" },
+  { key: "plantel", label: "Plantel", href: "/liga-inatel/equipa?ecra=plantel" },
+  { key: "identidade", label: "Identidade visual", href: "/liga-inatel/equipa?ecra=identidade" },
+];
+
+function ScreenTabs({ active }: { active: DelegateScreen }) {
+  return (
+    <nav
+      aria-label="Áreas do delegado"
+      style={{ maxWidth: "720px", margin: "0 auto", padding: "16px 16px 0", display: "flex", gap: "8px", flexWrap: "wrap" }}
+    >
+      {SCREENS.map((t) => {
+        const on = t.key === active;
+        return (
+          <Link
+            key={t.key}
+            href={t.href}
+            aria-current={on ? "page" : undefined}
+            style={{
+              fontSize: "13px",
+              fontWeight: 700,
+              padding: "8px 14px",
+              borderRadius: "999px",
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+              border: on ? "1px solid #F97316" : "1px solid var(--border, #E8E0D4)",
+              background: on ? "#F97316" : "var(--card, #fff)",
+              color: on ? "#fff" : "var(--fg, #15110E)",
+            }}
+          >
+            {t.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
 function GameRow({ game, teamName, today }: { game: PublicGame; teamName: string; today: string }) {
   const isHome = game.home_team === teamName;
   const opponent = isHome ? game.away_team : game.home_team;
@@ -169,9 +210,10 @@ function GameRow({ game, teamName, today }: { game: PublicGame; teamName: string
 export default async function DelegateDashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ jogo?: string; fotos?: string; stats?: string }>;
+  searchParams: Promise<{ jogo?: string; fotos?: string; stats?: string; ecra?: string }>;
 }) {
-  const { jogo, fotos, stats } = await searchParams;
+  const { jogo, fotos, stats, ecra } = await searchParams;
+  const screen: DelegateScreen = ecra === "plantel" || ecra === "identidade" ? ecra : "resultados";
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -288,8 +330,12 @@ export default async function DelegateDashboardPage({
         </div>
       </div>
 
+      <ScreenTabs active={screen} />
+
       {/* Content */}
       <div style={{ maxWidth: "720px", margin: "0 auto", padding: "24px 16px 0" }}>
+        {screen === "resultados" && (
+        <>
         {/* Próximos jogos */}
         <section style={{ marginBottom: "32px" }}>
           <h2 style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted, #6F675F)", margin: "0 0 12px" }}>
@@ -315,26 +361,6 @@ export default async function DelegateDashboardPage({
             </div>
           </section>
         )}
-
-        {/* Logo da equipa + Cores */}
-        <section style={{ marginBottom: "32px" }}>
-          <h2 style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted, #6F675F)", margin: "0 0 12px" }}>
-            Identidade visual
-          </h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            <TeamLogoUpload
-              teamId={team.id}
-              teamName={team.name}
-              currentLogoUrl={team.logo_url ?? null}
-            />
-            <DelegateKitEditor
-              teamName={team.name}
-              logoUrl={team.logo_url ?? null}
-              initialPrimaryColor={team.primary_color ?? null}
-              initialSecondaryColor={team.secondary_color ?? null}
-            />
-          </div>
-        </section>
 
         {/* Submissão de resultados */}
         <section id="resultados" style={{ marginBottom: "32px", scrollMarginTop: "16px" }}>
@@ -362,17 +388,6 @@ export default async function DelegateDashboardPage({
           <SubmitResultFlow games={submittable} teamName={team.name} preselectedGameId={jogo ?? null} />
         </section>
 
-        {/* Plantel atual: público na página da equipa e referência na leitura das folhas */}
-        <section id="plantel" style={{ marginBottom: "32px", scrollMarginTop: "16px" }}>
-          <h2 style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted, #6F675F)", margin: "0 0 4px" }}>
-            Plantel
-          </h2>
-          <p style={{ fontSize: "12px", color: "var(--muted, #6F675F)", margin: "0 0 12px" }}>
-            Jogadores atuais com número, nome e fotografia. Aparecem na página pública da equipa e ajudam a confirmar os nomes e números lidos nas folhas de jogo e estatísticas.
-          </p>
-          <DelegateRoster />
-        </section>
-
         {/* Estatísticas profissionais (Tipo B) e estado da validação cruzada */}
         <section id="estatisticas" style={{ marginBottom: "32px", scrollMarginTop: "16px" }}>
           <h2 style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted, #6F675F)", margin: "0 0 4px" }}>
@@ -395,6 +410,50 @@ export default async function DelegateDashboardPage({
           </p>
           <DelegateGamePhotos key={fotos ?? "none"} games={submittable} teamName={team.name} preselectedGameId={fotos ?? null} />
         </section>
+
+        </>
+        )}
+
+        {screen === "plantel" && (
+        <>
+        {/* Plantel atual: público na página da equipa e referência na leitura das folhas */}
+        <section id="plantel" style={{ marginBottom: "32px", scrollMarginTop: "16px" }}>
+          <h2 style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted, #6F675F)", margin: "0 0 4px" }}>
+            Plantel
+          </h2>
+          <p style={{ fontSize: "12px", color: "var(--muted, #6F675F)", margin: "0 0 12px" }}>
+            Jogadores atuais com número, nome e fotografia. Aparecem na página pública da equipa e ajudam a confirmar os nomes e números lidos nas folhas de jogo e estatísticas.
+          </p>
+          <DelegateRoster />
+        </section>
+
+        </>
+        )}
+
+        {screen === "identidade" && (
+        <>
+        {/* Logo da equipa + Cores */}
+        <section style={{ marginBottom: "32px" }}>
+          <h2 style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted, #6F675F)", margin: "0 0 12px" }}>
+            Identidade visual
+          </h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            <TeamLogoUpload
+              teamId={team.id}
+              teamName={team.name}
+              currentLogoUrl={team.logo_url ?? null}
+            />
+            <DelegateKitEditor
+              teamName={team.name}
+              logoUrl={team.logo_url ?? null}
+              initialPrimaryColor={team.primary_color ?? null}
+              initialSecondaryColor={team.secondary_color ?? null}
+            />
+          </div>
+        </section>
+
+        </>
+        )}
 
         <p style={{ marginTop: "24px", textAlign: "center" }}>
           <Link href="/liga-inatel" style={{ fontSize: "12px", color: "#F97316", textDecoration: "none" }}>
