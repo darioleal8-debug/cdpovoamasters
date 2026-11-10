@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { clearJustInstalled, startLigaPwa, useLigaPwa } from "@/lib/liga/pwa-store";
 import { InstallModal } from "./install-modal";
+import { PushOptIn } from "./push-opt-in";
 
 const SW_URL = "/liga-inatel-sw.js";
 const SW_SCOPE = "/liga-inatel";
@@ -74,6 +75,7 @@ export function LigaPwa() {
     <>
       <InstallModal />
       <InstalledToast />
+      <PushOptIn />
     </>
   );
 }
