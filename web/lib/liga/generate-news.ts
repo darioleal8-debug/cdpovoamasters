@@ -67,8 +67,13 @@ async function prepareNews(gameId: string) {
     adminClient.from("league_game_results").select("*").eq("event_id", gameId).maybeSingle(),
     adminClient.from("competitions").select("id, name").eq("slug", "liga-inatel").single(),
     adminClient.from("league_game_periods").select("periodo, home_points, away_points").eq("event_id", gameId).order("periodo"),
-    adminClient.from("league_game_player_stats").select("nome, side, pontos, triplos, lances_livres").eq("event_id", gameId).order("pontos", { ascending: false }),
+    adminClient.from("league_game_player_stats").select("nome, side, pontos, triplos, lances_livres, source, segundos, dois_pontos, dois_pontos_tent, triplos_tent, lances_livres_tent, ressaltos, assistencias, roubos, perdas, desarmes, eficiencia").eq("event_id", gameId).order("pontos", { ascending: false }),
   ]);
+  const { data: reconciliation } = await adminClient
+    .from("match_reconciliations")
+    .select("status, consolidated")
+    .eq("event_id", gameId)
+    .maybeSingle();
 
   const event = eventRes.data;
   const result = resultRes.data;
@@ -139,10 +144,13 @@ async function prepareNews(gameId: string) {
 
   // Factos determinísticos a partir dos dados aprovados (fonte de verdade)
   const periods = (periodsRes.data ?? []) as { periodo: number; home_points: number; away_points: number }[];
-  const dbPlayers = (playerStatsRes.data ?? []) as { nome: string; side: "home" | "away"; pontos: number; triplos: number | null; lances_livres: number | null }[];
+  const dbPlayers = (playerStatsRes.data ?? []) as DbPlayerRow[];
   const live = await loadLiveTeamStats(adminClient, gameId, event.description ?? null);
+  const validation = newsValidation(reconciliation as ReconciliationSnapshot | null);
   const facts = buildNewsFacts({
     live,
+    boxScores: boxScoresFromDb(dbPlayers),
+    validationStatus: validation.label,
     home: result.home_team_name,
     away: result.away_team_name,
     homeScore: result.home_score,
@@ -195,7 +203,54 @@ Regras:
 - Menciona o contexto da jornada e o impacto na classificação se relevante (a classificação é por série — refere a série, ex.: "na Série B", e nunca compares com equipas de outras séries)
 - Usa APENAS os dados fornecidos acima — nunca inventes pontuações, nomes ou factos`;
 
-  return { ok: true as const, adminClient, event, result, submission, facts, jornadaInfo, scoreStr, userPrompt };
+  return { ok: true as const, adminClient, event, result, submission, facts, jornadaInfo, scoreStr, userPrompt, validation };
+}
+
+type DbPlayerRow = {
+  nome: string; side: "home" | "away"; pontos: number; triplos: number | null; lances_livres: number | null;
+  source?: string | null; segundos?: number | null; dois_pontos?: number | null; dois_pontos_tent?: number | null;
+  triplos_tent?: number | null; lances_livres_tent?: number | null; ressaltos?: number | null; assistencias?: number | null;
+  roubos?: number | null; perdas?: number | null; desarmes?: number | null; eficiencia?: number | null;
+};
+
+/** Box score completo por equipa (estatística profissional consolidada), para os destaques da notícia. */
+export function boxScoresFromDb(rows: DbPlayerRow[]): LiveTeamStats[] {
+  const out: LiveTeamStats[] = [];
+  for (const side of ["home", "away"] as const) {
+    const ps = rows.filter((r) => r.side === side);
+    const full = ps.length > 0 && ps.every((r) => (r.source === "pro_stats" || r.source === "consolidated") && r.ressaltos != null && r.assistencias != null);
+    if (!full) continue;
+    out.push({
+      side, origin: "pro",
+      players: ps.map((r) => ({
+        nome: r.nome, pts: r.pontos, reb: r.ressaltos ?? 0, ast: r.assistencias ?? 0, stl: r.roubos ?? 0, blk: r.desarmes ?? 0,
+        tov: r.perdas ?? 0, eff: r.eficiencia ?? 0, fg2m: r.dois_pontos ?? 0, fg2a: r.dois_pontos_tent ?? 0,
+        fg3m: r.triplos ?? 0, fg3a: r.triplos_tent ?? 0, ftm: r.lances_livres ?? 0, fta: r.lances_livres_tent ?? 0, secs: r.segundos ?? 0,
+      })),
+    });
+  }
+  return out;
+}
+
+type ReconciliationSnapshot = { status: string; consolidated: { publishable?: boolean } | null };
+
+const VALIDATION_LABELS: Record<string, string> = {
+  validated: "validado (submissões das duas equipas coerentes)",
+  pending_submission: "validado com a documentação de uma equipa",
+  discrepancies: "com divergências por resolver",
+  manual_review: "a aguardar revisão manual",
+  analyzing: "em análise",
+};
+
+/**
+ * Regra fundamental: a notícia só é publicada automaticamente quando os dados consolidados
+ * são publicáveis (sem divergências relevantes por resolver e com confiança suficiente).
+ * Jogos sem validação cruzada (fluxo antigo / live) mantêm o comportamento anterior.
+ */
+export function newsValidation(r: ReconciliationSnapshot | null): { draft: boolean; label: string | null; status: string | null } {
+  if (!r || !r.consolidated) return { draft: false, label: null, status: null };
+  const publishable = r.consolidated.publishable === true;
+  return { draft: !publishable, label: VALIDATION_LABELS[r.status] ?? r.status, status: r.status };
 }
 
 /** Prompts por defeito de um jogo, para o admin os ver e editar antes de gerar. */
@@ -210,10 +265,11 @@ export async function getDefaultNewsPrompts(
 export async function generateLigaNews(
   gameId: string,
   overrides: NewsPromptOverrides = {}
-): Promise<{ ok: true; news_id: string; newsContext: NewsContext } | { ok: false; error: string }> {
+): Promise<{ ok: true; news_id: string; newsContext: NewsContext; draft: boolean } | { ok: false; error: string }> {
   const prep = await prepareNews(gameId);
   if (!prep.ok) return prep;
-  const { adminClient, event, result, submission, facts, jornadaInfo, scoreStr, userPrompt: defaultUserPrompt } = prep;
+  const { adminClient, event, result, submission, facts, jornadaInfo, scoreStr, userPrompt: defaultUserPrompt, validation } = prep;
+  const draft = validation.draft;
 
   const customSystem = overrides.systemPrompt?.trim() ?? "";
   const customUser = overrides.userPrompt?.trim() ?? "";
@@ -307,6 +363,8 @@ export async function generateLigaNews(
         away_team_name: result.away_team_name,
         source_submission_id: submission?.id ?? null,
         image_status: "pending",
+        // Dados com divergências por resolver: volta a rascunho até o admin validar
+        ...(draft ? { is_published: false } : {}),
       })
       .eq("id", existing.id);
     if (error) {
@@ -328,7 +386,7 @@ export async function generateLigaNews(
         home_team_name: result.home_team_name,
         away_team_name: result.away_team_name,
         image_status: "pending",
-        is_published: true,
+        is_published: !draft,
         published_at: new Date().toISOString(),
       })
       .select("id")
@@ -340,9 +398,11 @@ export async function generateLigaNews(
     news_id = inserted!.id;
   }
 
+  if (draft) console.info(`[generateLigaNews] notícia em RASCUNHO (validação: ${validation.status}) game_id=${gameId}`);
   return {
     ok: true,
     news_id,
+    draft,
     newsContext: {
       title: titulo,
       excerpt: entrada,

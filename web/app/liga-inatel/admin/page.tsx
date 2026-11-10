@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TeamKitEditor } from "@/components/liga/team-kit-editor";
 import { AdminGameSheets } from "@/components/liga/admin-game-sheets";
+import { AdminReconciliationPanel } from "@/components/liga/admin-reconciliation-panel";
 import { NewsPromptDialog } from "@/components/liga/news-prompt-dialog";
 import { ManualNewsDialog } from "@/components/liga/manual-news-dialog";
 import { LigaAnalyticsPanel } from "@/components/liga/liga-analytics-panel";
@@ -420,7 +421,7 @@ export default function LigaAdminPage() {
     } finally { setSaving(false); }
   }
 
-  async function handleSubAction(subId: string, action: "approve" | "reject", eventId: string) {
+  async function handleSubAction(subId: string, action: "approve" | "reject", eventId: string, acknowledge = false) {
     const motivo = subMotivo[subId]?.trim();
     if (!motivo) { alert("Motivo obrigatório para esta acção."); return; }
     setSubActing(subId);
@@ -428,13 +429,32 @@ export default function LigaAdminPage() {
       const res = await fetch(`/api/liga/admin/submissions/${subId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, motivo }),
+        body: JSON.stringify({ action, motivo, acknowledge }),
       });
       const json = await res.json();
+      // Validação cruzada com divergências: exige confirmação explícita (notícia fica em rascunho)
+      if (res.status === 409 && json.code === "needs_acknowledgement") {
+        const d = json.details as { discrepancies?: string[]; math?: string[] } | undefined;
+        const list = [...(d?.discrepancies ?? []), ...(d?.math ?? [])].slice(0, 8).map((x) => `• ${x}`).join("\n");
+        setSubActing(null);
+        if (confirm(`${json.error}\n\n${list}`)) await handleSubAction(subId, action, eventId, true);
+        return;
+      }
       if (!res.ok) { alert(json.error ?? "Erro"); return; }
+      if (json.consolidated && json.publishable === false) alert("Aprovado a partir da validação cruzada. A notícia ficará em RASCUNHO até a publicar no separador Notícias.");
       await load();
       await loadAudit(eventId);
     } finally { setSubActing(null); }
+  }
+
+  async function togglePublish(newsId: string, publish: boolean) {
+    if (publish && !confirm("Publicar esta notícia? Confirme que os dados (resultado e estatísticas) estão validados.")) return;
+    const res = await fetch(`/api/liga/admin/news/${newsId}/publish`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_published: publish }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) { alert(json.error ?? "Erro"); return; }
+    setNoticias(list => list.map(x => (x.id === newsId ? { ...x, is_published: publish } : x)));
   }
 
   async function handleRegenerateNews(gameId: string) {
@@ -450,7 +470,7 @@ export default function LigaAdminPage() {
       if (!res.ok) {
         setRegenMsg(m => ({ ...m, [gameId]: `Erro: ${json.error ?? "falhou"}` }));
       } else {
-        setRegenMsg(m => ({ ...m, [gameId]: "✓ Notícia gerada/actualizada." }));
+        setRegenMsg(m => ({ ...m, [gameId]: json.draft ? "✓ Notícia gerada em RASCUNHO (dados com divergências por validar) — publique no separador Notícias." : "✓ Notícia gerada/actualizada." }));
       }
     } finally {
       setRegenerating(null);
@@ -1188,6 +1208,12 @@ export default function LigaAdminPage() {
                     </div>
                   </div>
 
+                  {/* Validação cruzada: documentos das duas equipas (folha oficial + estatísticas profissionais) */}
+                  <div style={{ marginTop: "16px" }}>
+                    <h3 style={sectionTitle}>Validação cruzada e estatísticas</h3>
+                    <AdminReconciliationPanel key={`rec-${game.id}`} eventId={game.id} />
+                  </div>
+
                   {/* Folhas de jogo: carregar folha melhorada, analisar todas e escolher a melhor leitura */}
                   <div style={{ marginTop: "16px" }}>
                     <h3 style={sectionTitle}>Folhas de jogo</h3>
@@ -1596,6 +1622,18 @@ export default function LigaAdminPage() {
 
                     {/* Status + data */}
                     <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap", marginBottom: "4px" }}>
+                      {!n.is_published && (
+                        <span style={{ fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "99px", background: "#FEE2E2", color: "#991B1B", letterSpacing: "0.06em", textTransform: "uppercase" }}
+                          title="Rascunho: dados com divergências por resolver ou confiança insuficiente — reveja e publique">
+                          Rascunho
+                        </span>
+                      )}
+                      <button
+                        onClick={() => togglePublish(n.id, !n.is_published)}
+                        style={{ fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "99px", cursor: "pointer", border: `1px solid ${n.is_published ? "#D1C9C0" : "#16A34A"}`, background: n.is_published ? "#fff" : "#16A34A", color: n.is_published ? "#6B7280" : "#fff" }}
+                      >
+                        {n.is_published ? "Despublicar" : "✓ Publicar"}
+                      </button>
                       {isPending && (
                         <span style={{ fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "99px", background: "#FEF3C7", color: "#92400E", letterSpacing: "0.06em", textTransform: "uppercase" }}>
                           ⟳ A gerar…

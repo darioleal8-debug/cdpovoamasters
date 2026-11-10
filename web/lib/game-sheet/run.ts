@@ -1,5 +1,6 @@
 import { analyzeSheet } from "./engine";
-import { callOpencvService, sniffImageMime } from "./image";
+import { callOpencvService, isPdf, sniffImageMime } from "./image";
+import { preparePdf } from "@/lib/match-docs/documents";
 import { emptySheetData, PROCESSING_VERSION, SHEET_SCHEMA_VERSION } from "./schema";
 import { BUCKET, enrichWithRoster, type Access, type GameInfo, type ImportRow } from "./service";
 import { analyzeGameSheet, visionConfig } from "./vision";
@@ -28,8 +29,25 @@ export async function runAndStore(
     );
   }
 
+  // PDF sem conversão pelo microserviço: renderiza a 1.ª página no servidor (a folha oficial
+  // tem uma página; páginas extra ficam registadas como aviso em vez de serem ignoradas em silêncio)
+  let visionImage = opencvResult?.buffer ?? image;
+  let pdfNotes: string[] = [];
+  let pageCount: number | null = null;
+  if (isPdf(mime) && !opencvResult) {
+    try {
+      const doc = await preparePdf(image, { renderWidth: 2800, maxPages: 1, tile: false });
+      pageCount = doc.pageCount;
+      pdfNotes = doc.notes.filter((n) => !n.startsWith("PDF com"));
+      if (doc.pageCount > 1) pdfNotes.push(`O PDF tem ${doc.pageCount} páginas; a folha oficial foi lida na página 1.`);
+      if (doc.pages[0]) visionImage = doc.pages[0].buffer;
+    } catch (e) {
+      console.warn(`[game-sheet] renderização do PDF falhou import=${importId}: ${(e as Error).message}`);
+    }
+  }
+
   const result = await analyzeGameSheet({
-    image: opencvResult?.buffer ?? image,
+    image: visionImage,
     game: { home: game.home, away: game.away, date: game.date },
     adminInstructions,
     opencvZones: opencvResult?.zones,
@@ -55,6 +73,7 @@ export async function runAndStore(
   }
 
   const sheet = await enrichWithRoster(access.supabase, result.sheet);
+  if (pdfNotes.length) sheet.aiWarnings = [...pdfNotes, ...sheet.aiWarnings].slice(0, 50);
   const analysis = analyzeSheet(sheet);
   console.info(
     `[game-sheet] import=${importId} status=${analysis.status} model=${cfg.model} ms=${result.usage.totalDurationMs} ` +
@@ -75,6 +94,7 @@ export async function runAndStore(
     sheet_data: sheet,
     validation: analysis,
     ai_usage: result.usage,
+    ...(pageCount !== null ? { page_count: pageCount } : {}),
     analysis_count: previousCount + 1,
     cv_data: opencvResult
       ? { perspective_applied: opencvResult.perspectiveApplied, quality: opencvResult.quality, zones: opencvResult.zones }

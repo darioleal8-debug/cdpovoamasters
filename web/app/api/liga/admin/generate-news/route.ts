@@ -49,5 +49,5 @@ export async function POST(req: Request) {
     await generateNewsImage({ newsId: news_id, ...newsContext });
   });
 
-  return NextResponse.json({ ok: true, news_id });
+  return NextResponse.json({ ok: true, news_id, draft: result.draft });
 }

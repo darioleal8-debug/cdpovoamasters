@@ -5,7 +5,7 @@ import path from "node:path";
 // Revisão final (Crítico 1): qualquer handler de uma rota que use service role tem de passar por
 // authorize() (sessão + conta ativa [+ papel]), isAuthorizedCron(), ou — na Liga — por
 // authorizeAsLigaAdmin() (sessão + is_liga_admin) / authorizeLeagueDelegate() (sessão + membro de
-// equipa). Exceções explícitas abaixo.
+// equipa) / authorizeGameSheet() (sessão + delegado de equipa ou admin da liga). Exceções explícitas abaixo.
 const API = path.join(__dirname, "..", "..", "app", "api");
 const SERVICE_ROLE = /SERVICE_ROLE|createAdminClient|adminClient\(|makeAdminClient|requireFinanceAccess/;
 const PUBLIC_BY_DESIGN = new Set([
@@ -15,6 +15,7 @@ const PUBLIC_BY_DESIGN = new Set([
   "public/news/route.ts",            // notícias publicadas
   "public/news/[slug]/route.ts",     // notícia publicada
   "public/result-submissions/route.ts", // submissão pública de resultados (rate-limit por IP, aprovação do admin)
+  "public/home/route.ts",            // resumo público da página inicial (só dados públicos agregados)
 ]);
 
 function routes(dir: string): string[] {
@@ -34,7 +35,7 @@ describe("handlers com service role exigem authorize()/cron", () => {
       const name = h.slice(0, h.indexOf("("));
       it(`${rel} ${name}`, () => {
         const body = h.split(/\nexport /)[0];
-        expect(/authorize\(|requireFinanceAccess\(\)|isAuthorizedCron\(|authorizeAsLigaAdmin\(|authorizeLeagueDelegate\(/.test(body)).toBe(true);
+        expect(/authorize\(|requireFinanceAccess\(\)|isAuthorizedCron\(|authorizeAsLigaAdmin\(|authorizeLeagueDelegate\(|authorizeGameSheet\(/.test(body)).toBe(true);
       });
     }
   }

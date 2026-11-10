@@ -4,7 +4,11 @@ import { fakeSupabase, type Handler, type FakeQuery, type FakeResult } from "./t
 import { emptySheetData } from "./schema";
 
 let current: ReturnType<typeof fakeSupabase>;
-vi.mock("@/lib/supabase/server", () => ({ createClient: async () => current.client }));
+vi.mock("@/lib/supabase/server", () => ({ createClient: async () => current.client, createAdminClient: async () => current.client }));
+const afterCalls: (() => unknown)[] = [];
+vi.mock("next/server", async (orig) => ({ ...(await orig<typeof import("next/server")>()), after: (fn: () => unknown) => { afterCalls.push(fn); } }));
+const safeRunReconciliation = vi.fn(async () => undefined);
+vi.mock("@/lib/match-docs/service", () => ({ safeRunReconciliation: (...a: unknown[]) => safeRunReconciliation(...(a as [])) }));
 const runAndStore = vi.fn(async () => ({ ok: true }));
 vi.mock("@/lib/game-sheet/run", () => ({ runAndStore: (...a: unknown[]) => runAndStore(...(a as [])) }));
 
@@ -230,12 +234,22 @@ describe("confirmação", () => {
     expect(upd.payload).toMatchObject({ status: "confirmed", submission_id: "sub1" });
   });
 
-  it("submissão pendente de outro delegado → 409", async () => {
+  it("2.ª equipa: associa a folha à submissão pendente da outra equipa (sem a substituir) e agenda a validação cruzada", async () => {
+    afterCalls.length = 0;
     setup(baseHandler((q) => {
+      if (q.table === "result_submissions" && q.op !== "select") throw new Error("não pode alterar a submissão da outra equipa");
       if (q.table === "result_submissions") return { data: { id: "sub0", submitted_by_user_id: "outro" } };
+      if (q.table === "game_sheet_imports" && q.op === "update") return { data: null };
       if (q.table === "game_sheet_imports") return { data: importRow() };
       return undefined;
     }));
-    expect((await confirmImport(req({}), params)).status).toBe(409);
+    const res = await confirmImport(req({}), params);
+    expect(res.status).toBe(200);
+    expect((await res.json()).shared_with_other_team).toBe(true);
+    const upd = current.calls.find((c) => c.table === "game_sheet_imports" && c.op === "update")!;
+    expect(upd.payload).toMatchObject({ status: "confirmed", submission_id: "sub0" });
+    expect(afterCalls).toHaveLength(1);
+    await afterCalls[0]();
+    expect(safeRunReconciliation).toHaveBeenCalledWith(GAME);
   });
 });

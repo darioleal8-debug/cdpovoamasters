@@ -10,6 +10,7 @@ import { AiRecheckSchema, AiSheetSchema, aiToSheetData, type AiSheet, type Sheet
 import { analyzeSheet, doubtfulEvents } from "./engine";
 import { buildRecheckPrompt, buildSystemPrompt, buildUserPrompt, DEFAULT_LAYOUT } from "./prompt";
 import { cropRegions, prepareForVision, type ZoneMap } from "./image";
+import { imageDetail } from "@/lib/match-docs/documents";
 
 export function visionConfig() {
   const num = (v: string | undefined, d: number) => (v && Number.isFinite(Number(v)) ? Number(v) : d);
@@ -72,7 +73,7 @@ export async function analyzeGameSheet(input: {
     model: cfg.model,
     system: buildSystemPrompt(DEFAULT_LAYOUT, input.adminInstructions, input.opencvZones),
     user: [
-      { type: "image_url", image_url: { url: dataUrl(prepared.buffer) } },
+      { type: "image_url", image_url: { url: dataUrl(prepared.buffer), detail: imageDetail() } },
       { type: "text", text: buildUserPrompt(input.game) },
     ],
     temperature: 0,
@@ -106,7 +107,7 @@ export async function analyzeGameSheet(input: {
         model: cfg.model,
         system: buildSystemPrompt(DEFAULT_LAYOUT, input.adminInstructions),
         user: [
-          { type: "image_url", image_url: { url: dataUrl(crop) } },
+          { type: "image_url", image_url: { url: dataUrl(crop), detail: imageDetail() } },
           {
             type: "text",
             text: buildRecheckPrompt(doubtful.map((e) => ({
