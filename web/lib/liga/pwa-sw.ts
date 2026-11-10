@@ -75,5 +75,34 @@ self.addEventListener("fetch", (event) => {
   }
   // Restantes pedidos seguem diretamente para a rede (sem cache).
 });
+
+// ── Notificações push ──────────────────────────────────────────────────────
+self.addEventListener("push", (event) => {
+  let d = {};
+  try { d = event.data ? event.data.json() : {}; } catch (e) {}
+  const url = typeof d.url === "string" && d.url.startsWith("/") ? d.url : "/liga-inatel";
+  event.waitUntil(self.registration.showNotification(d.title || "Liga INATEL", {
+    body: d.body || "",
+    icon: "/pwa/liga-inatel-192.png",
+    badge: "/pwa/liga-inatel-192.png",
+    tag: d.tag || undefined,
+    renotify: false,
+    data: { url },
+  }));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL((event.notification.data && event.notification.data.url) || "/liga-inatel", self.location.origin).href;
+  event.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const c of all) {
+      if (c.url.startsWith(self.location.origin + "/liga-inatel") && "focus" in c) {
+        try { await c.focus(); if ("navigate" in c) await c.navigate(target); return; } catch (e) {}
+      }
+    }
+    await self.clients.openWindow(target);
+  })());
+});
 `;
 }
