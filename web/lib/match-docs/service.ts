@@ -131,7 +131,8 @@ export async function loadKnownPlayers(db: AdminDb, game: MatchGame): Promise<{ 
     for (const side of ["home", "away"] as const) {
       const teamId = side === "home" ? game.homeTeamId : game.awayTeamId;
       if (!teamId) continue;
-      if (ours?.id === teamId) {
+      // o plantel HoopHub já entrou como "roster" (fonte única); só recorre ao legado se não houver
+      if (ours?.id === teamId && !rosters[side].some((r) => r.source === "hoophub")) {
         const { data: roster } = await db.from("v_active_roster").select("player_id, name, number");
         out[side].push(...(roster ?? []).map((r) => ({ name: r.name as string, number: (r.number as number | null) ?? null, hoophubPlayerId: r.player_id as string, source: "club" as const })));
       }

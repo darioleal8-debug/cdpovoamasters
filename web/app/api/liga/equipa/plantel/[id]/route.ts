@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { authorizeLeagueDelegate } from "@/lib/auth/liga-delegate-guard";
-import { parsePlayerFields } from "@/lib/liga/roster";
+import { loadHoophubRoster, parsePlayerFields } from "@/lib/liga/roster";
+import { createAdminClient } from "@/lib/supabase/server";
 import { storePlayerPhoto, removePlayerPhoto } from "@/lib/liga/roster-photo";
 import { isUuid } from "@/lib/game-sheet/service";
 
 export const runtime = "nodejs";
+async function managedByHoophub(teamId: string): Promise<boolean> {
+  try { return (await loadHoophubRoster(await createAdminClient(), teamId)).length > 0; } catch { return false; }
+}
+const HOOPHUB_MANAGED = { error: "O plantel desta equipa vem da app de gestão HoopHub — altere-o lá e fica atualizado aqui." };
 type Params = { params: Promise<{ id: string }> };
 
 async function loadOwn(auth: Extract<Awaited<ReturnType<typeof authorizeLeagueDelegate>>, { ok: true }>, id: string) {
@@ -20,6 +25,7 @@ export async function PATCH(req: Request, { params }: Params) {
   if (!auth.ok) return auth.response;
   const { id } = await params;
   if (!isUuid(id)) return NextResponse.json({ error: "Jogador inválido" }, { status: 400 });
+  if (await managedByHoophub(auth.teamId)) return NextResponse.json(HOOPHUB_MANAGED, { status: 409 });
   const row = await loadOwn(auth, id);
   if (!row || !row.is_active) return NextResponse.json({ error: "Jogador não encontrado no seu plantel" }, { status: 404 });
 
@@ -61,6 +67,7 @@ export async function DELETE(_req: Request, { params }: Params) {
   if (!auth.ok) return auth.response;
   const { id } = await params;
   if (!isUuid(id)) return NextResponse.json({ error: "Jogador inválido" }, { status: 400 });
+  if (await managedByHoophub(auth.teamId)) return NextResponse.json(HOOPHUB_MANAGED, { status: 409 });
   const row = await loadOwn(auth, id);
   if (!row) return NextResponse.json({ error: "Jogador não encontrado no seu plantel" }, { status: 404 });
   const { error } = await auth.supabase.from("league_team_players")

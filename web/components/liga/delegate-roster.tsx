@@ -52,6 +52,7 @@ function Avatar({ p, size = 56 }: { p: { photoUrl: string | null; firstName: str
 
 export function DelegateRoster() {
   const [players, setPlayers] = useState<Player[] | null>(null);
+  const [managedBy, setManagedBy] = useState<"hoophub" | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -62,6 +63,7 @@ export function DelegateRoster() {
     const json = await res.json().catch(() => ({}));
     if (!res.ok) { setMsg({ ok: false, text: json.error ?? "Erro ao carregar o plantel." }); return; }
     setPlayers(json.players as Player[]);
+    setManagedBy(json.managedBy === "hoophub" ? "hoophub" : null);
   }, []);
   useEffect(() => { void load(); }, [load]);
 
@@ -108,6 +110,12 @@ export function DelegateRoster() {
     <div>
       {msg && <p style={{ fontSize: "13px", margin: "0 0 10px", padding: "8px 10px", borderRadius: "8px", background: msg.ok ? "#F0FDF4" : "#FEF2F2", color: msg.ok ? "#15803D" : "#B91C1C" }}>{msg.text}</p>}
 
+      {managedBy === "hoophub" && (
+        <p style={{ fontSize: "13px", margin: "0 0 10px", padding: "10px 12px", borderRadius: "8px", background: "#EFF6FF", color: "#1D4ED8" }}>
+          Este plantel vem da app de gestão HoopHub (época ativa) e é usado automaticamente na Liga INATEL. Para o alterar, edite-o na HoopHub.
+        </p>
+      )}
+
       {players === null ? <p style={{ fontSize: "13px", color: "var(--muted,#6F675F)" }}>A carregar…</p> : (
         <>
           {players.length === 0 && !draft && (
@@ -121,7 +129,7 @@ export function DelegateRoster() {
                 <Avatar p={p} size={48} />
                 <span style={{ fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))", fontWeight: 800, fontSize: "22px", color: "#F97316", minWidth: "34px", textAlign: "center" }}>{p.number ?? "–"}</span>
                 <span style={{ flex: 1, minWidth: 0, fontSize: "14px", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.firstName} {p.lastName}</span>
-                <button onClick={() => setDraft({ id: p.id, first_name: p.firstName, last_name: p.lastName, number: p.number === null ? "" : String(p.number), photo: null, preview: p.photoUrl, removePhoto: false })} disabled={busy} style={{ background: "none", border: "none", color: "#F97316", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>Editar</button>
+                {managedBy !== "hoophub" && <button onClick={() => setDraft({ id: p.id, first_name: p.firstName, last_name: p.lastName, number: p.number === null ? "" : String(p.number), photo: null, preview: p.photoUrl, removePhoto: false })} disabled={busy} style={{ background: "none", border: "none", color: "#F97316", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>Editar</button>}
               </div>
             ))}
           </div>
@@ -163,7 +171,7 @@ export function DelegateRoster() {
                 <button onClick={() => setDraft(null)} disabled={busy} style={btn()}>Cancelar</button>
               </div>
             </div>
-          ) : (
+          ) : managedBy === "hoophub" ? null : (
             <button onClick={() => { setMsg(null); setDraft({ ...EMPTY }); }} style={{ ...btn(true), width: "100%" }}>＋ Adicionar jogador</button>
           )}
         </>
