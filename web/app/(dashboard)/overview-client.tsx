@@ -9,6 +9,7 @@ import { NextTrainingCard }   from "@/components/dashboard/next-training-card";
 import { ClubNoticesCard }    from "@/components/dashboard/club-notices-card";
 import { PlayerSeasonCard }   from "@/components/dashboard/player-season-card";
 import { BirthdayBanner }     from "@/components/birthday/birthday-banner";
+import { NextBirthdayNotice } from "@/components/birthday/next-birthday-notice";
 import { createClient }       from "@/lib/supabase/client";
 
 // ── Types ─────────────────────────────────────────────────────
@@ -403,6 +404,7 @@ export function OverviewClient({ seasonId }: { seasonId: string | null }) {
       <DashboardHeader {...headerProps} />
       <BirthdayBanner isAdmin={!data.isPlayer} />
       {view === "jogador" && data.isPlayer ? <PlayerView data={data} /> : <TrainerView data={data} />}
+      <NextBirthdayNotice />
     </div>
   );
 }

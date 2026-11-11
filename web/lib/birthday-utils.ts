@@ -108,6 +108,26 @@ export function isWithinBirthdayWindow(birthDateStr: string | null | undefined):
   return today >= bday && today <= windowEnd;
 }
 
+/**
+ * Próximo aniversário estritamente depois de hoje (Lisboa).
+ * Se este ano já passou, devolve o do ano seguinte. Trata 29 Fev (28 Fev em anos não bissextos).
+ * Devolve a data, os dias que faltam e a idade que a pessoa vai fazer.
+ */
+export function getNextBirthday(
+  birthDateStr: string | null | undefined,
+  today: Date = getTodayLisbon(),
+): { date: Date; daysUntil: number; turningAge: number } | null {
+  if (!birthDateStr) return null;
+  const birthYear = Number(birthDateStr.split("-")[0]);
+  if (!Number.isFinite(birthYear)) return null;
+
+  let date = getBirthdayForYear(birthDateStr, today.getFullYear());
+  if (date <= today) date = getBirthdayForYear(birthDateStr, today.getFullYear() + 1);
+
+  const daysUntil = Math.round((date.getTime() - today.getTime()) / 86_400_000);
+  return { date, daysUntil, turningAge: date.getFullYear() - birthYear };
+}
+
 // ── Formatting ────────────────────────────────────────────────────────────────
 
 const PT_MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];

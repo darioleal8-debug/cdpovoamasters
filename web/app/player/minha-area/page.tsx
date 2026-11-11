@@ -15,6 +15,7 @@ import type { AvailabilityRosterRow } from "@/types/availability";
 import { getCallupsByGame } from "@/lib/callups/club-callups";
 import { CallupsList } from "@/components/player/callups-list";
 import { BirthdayBanner } from "@/components/birthday/birthday-banner";
+import { NextBirthdayNotice } from "@/components/birthday/next-birthday-notice";
 import Link from "next/link";
 import { MinhaAreaTop, type TrainingData, type GameData } from "@/components/player/minha-area-top";
 
@@ -610,6 +611,9 @@ export default async function MinhaAreaPage() {
           </Link>
         ))}
       </div>
+
+      {/* ── Próximo aniversário ── */}
+      <NextBirthdayNotice />
 
     </div>
   );

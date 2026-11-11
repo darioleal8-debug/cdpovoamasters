@@ -8,6 +8,7 @@ import {
   getTodayLisbon,
   getFirstName,
   getInitials,
+  getNextBirthday,
 } from "../birthday-utils";
 
 // ── getBirthdayForYear ───────────────────────────────────────────────────────
@@ -185,5 +186,41 @@ describe("getInitials", () => {
   });
   test("many words → first 2", () => {
     expect(getInitials("Ana Rita Costa Lopes")).toBe("AR");
+  });
+});
+
+// ── getNextBirthday ──────────────────────────────────────────────────────────
+
+describe("getNextBirthday", () => {
+  const today = new Date(2026, 10, 11); // 11 Nov 2026
+
+  test("aniversário ainda este ano", () => {
+    const n = getNextBirthday("1990-12-25", today)!;
+    expect(n.date.getFullYear()).toBe(2026);
+    expect(n.daysUntil).toBe(44);
+    expect(n.turningAge).toBe(36);
+  });
+
+  test("aniversário hoje não conta: passa para o ano seguinte", () => {
+    const n = getNextBirthday("1990-11-11", today)!;
+    expect(n.date.getFullYear()).toBe(2027);
+    expect(n.turningAge).toBe(37);
+  });
+
+  test("aniversário já passou este ano → ano seguinte", () => {
+    const n = getNextBirthday("1990-01-05", today)!;
+    expect(n.date.getFullYear()).toBe(2027);
+    expect(n.daysUntil).toBe(55);
+  });
+
+  test("29 Fev em ano não bissexto → 28 Fev", () => {
+    const n = getNextBirthday("1996-02-29", today)!;
+    expect(n.date.getFullYear()).toBe(2027);
+    expect(n.date.getMonth()).toBe(1);
+    expect(n.date.getDate()).toBe(28);
+  });
+
+  test("sem data → null", () => {
+    expect(getNextBirthday(null, today)).toBeNull();
   });
 });
