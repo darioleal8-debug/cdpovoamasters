@@ -31,11 +31,11 @@ export function BottomNav() {
     <nav
       role="navigation"
       aria-label="Navegação principal"
-      className="md:hidden fixed bottom-0 inset-x-0 z-50 flex"
+      className="md:hidden fixed bottom-0 inset-x-0 z-50 flex items-stretch"
       style={{
         background:    "#0A1220",
         borderTop:     "1px solid rgba(255,255,255,.08)",
-        height:        "var(--bottom-nav-h)",
+        // Sem height fixo: 56px de conteúdo + zona segura (como na barra do jogador)
         paddingBottom: "env(safe-area-inset-bottom)",
       }}
     >
@@ -48,13 +48,13 @@ export function BottomNav() {
             key={href}
             href={href}
             aria-current={active ? "page" : undefined}
-            className="relative flex flex-1 flex-col items-center justify-center gap-0.5 py-1"
+            className="relative flex min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-1"
             style={{ minHeight: 56, touchAction: "manipulation" }}
           >
             {/* Ícone */}
-            <div className="relative">
+            <div className="relative flex h-5 w-5 items-center justify-center">
               <Icon
-                className="h-5 w-5"
+                className="h-5 w-5 shrink-0"
                 style={{ color: active ? "#F97316" : "rgba(255,255,255,.45)" }}
               />
               {badge > 0 && (
@@ -68,8 +68,8 @@ export function BottomNav() {
             </div>
             {/* Rótulo — sempre visível */}
             <span
-              className="text-[11px] font-semibold"
-              style={{ color: active ? "#C2410C" : "rgba(255,255,255,.4)" }}
+              className="text-[11px] font-semibold leading-none"
+              style={{ color: active ? "#F97316" : "rgba(255,255,255,.4)" }}
             >
               {label}
             </span>

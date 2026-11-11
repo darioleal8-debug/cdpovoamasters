@@ -168,7 +168,7 @@ export default function UtilizacaoPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-condensed font-bold text-2xl uppercase tracking-display"
-            style={{ color: "var(--ink,#0A1220)" }}>
+            style={{ color: "var(--text,#0A1220)" }}>
             Utilização
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">

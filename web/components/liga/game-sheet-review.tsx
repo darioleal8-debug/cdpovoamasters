@@ -703,7 +703,7 @@ export function GameSheetReview({ importId, backHref }: { importId: string; back
 
       {/* Ações */}
       {showActions && (
-        <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#fff", borderTop: `1px solid ${C.border}`, padding: "10px 16px", boxShadow: "0 -6px 20px rgba(0,0,0,0.08)", zIndex: 20 }}>
+        <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "hsl(var(--card))", borderTop: `1px solid ${C.border}`, padding: "10px 16px", boxShadow: "0 -6px 20px rgba(0,0,0,0.08)", zIndex: 20 }}>
           <div style={{ maxWidth: 1280, margin: "0 auto", display: "flex", flexDirection: "column", gap: 8 }}>
             {analysis.requiresAcknowledgement && (
               <label style={{ display: "flex", gap: 8, fontSize: 12, alignItems: "flex-start" }}>
@@ -742,7 +742,7 @@ export function GameSheetReview({ importId, backHref }: { importId: string; back
 
       {/* Ações do admin da liga */}
       {showAdminActions && (
-        <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#fff", borderTop: `1px solid ${C.border}`, padding: "10px 16px", boxShadow: "0 -6px 20px rgba(0,0,0,0.08)", zIndex: 20 }}>
+        <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "hsl(var(--card))", borderTop: `1px solid ${C.border}`, padding: "10px 16px", boxShadow: "0 -6px 20px rgba(0,0,0,0.08)", zIndex: 20 }}>
           <div style={{ maxWidth: 1280, margin: "0 auto", display: "flex", flexDirection: "column", gap: 8 }}>
             {analysis.requiresAcknowledgement && (
               <label style={{ display: "flex", gap: 8, fontSize: 12, alignItems: "flex-start" }}>

@@ -1,10 +1,12 @@
 "use client";
 
+import { useLayoutEffect } from "react";
 import { Sidebar }   from "./sidebar";
 import { TabRail }   from "./tab-rail";
 import { BottomNav } from "./bottom-nav";
 import { Header }    from "./header";
 import { useActivityTracker } from "@/hooks/use-activity-tracker";
+import { applyTheme, clearDarkClass, getStoredTheme } from "@/lib/theme";
 import type { UserRole } from "@/types/database";
 
 interface Props {
@@ -18,6 +20,13 @@ interface Props {
 
 export function DashboardShell({ userName, userEmail, userRole, userRolesExtra, availableRoles, children }: Props) {
   useActivityTracker();
+
+  // O tema escuro só existe na área de gestão: aplica ao entrar, limpa ao sair
+  // (as páginas públicas e a área do jogador têm paleta própria).
+  useLayoutEffect(() => {
+    applyTheme(getStoredTheme());
+    return clearDarkClass;
+  }, []);
 
   return (
     /*

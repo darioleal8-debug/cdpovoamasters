@@ -43,7 +43,7 @@ export function AdminGamePhotoUpload({ eventId, teams, onUploaded }: Props) {
     await onUploaded();
   }
 
-  const field: React.CSSProperties = { fontSize: "12px", padding: "5px 8px", borderRadius: "5px", border: "1px solid #E8E0D6", background: "#fff", color: "#1A1612" };
+  const field: React.CSSProperties = { fontSize: "12px", padding: "5px 8px", borderRadius: "5px", border: "1px solid #E8E0D6", background: "hsl(var(--card))", color: "#1A1612" };
 
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center", marginBottom: "10px" }}>

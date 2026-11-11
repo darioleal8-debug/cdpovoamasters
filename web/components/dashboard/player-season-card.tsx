@@ -61,7 +61,7 @@ export function PlayerSeasonCard({ data, loading }: Props) {
       <div className="grid grid-cols-3 gap-3">
         {stats.map((s) => (
           <div key={s.label} className="flex flex-col gap-0.5">
-            <p className="font-condensed font-bold text-2xl leading-none" style={{ color: "var(--ink,#0A1220)" }}>
+            <p className="font-condensed font-bold text-2xl leading-none" style={{ color: "var(--text,#0A1220)" }}>
               {s.value}
             </p>
             <p className="text-[11px]" style={{ color: "var(--muted-text,#5A6478)" }}>{s.label}</p>

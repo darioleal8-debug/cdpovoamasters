@@ -84,7 +84,7 @@ export function CallupNotice({
           style={{
             flexShrink: 0,
             borderRadius: "6px",
-            background: "#fff",
+            background: "hsl(var(--card))",
             color: "#C2530A",
             fontFamily: "var(--font-barlow, sans-serif)",
             fontSize: "12px",

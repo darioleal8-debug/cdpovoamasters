@@ -143,7 +143,7 @@ export default function EstatisticasPage() {
       {/* ── Cabeçalho (1 linha mobile) ─────────────────────────── */}
       <div className="flex items-center justify-between gap-3">
         <h1 className="font-condensed font-bold text-2xl uppercase tracking-display"
-          style={{ color: "var(--ink,#0A1220)" }}>
+          style={{ color: "var(--text,#0A1220)" }}>
           Estatísticas
         </h1>
         <Select value={seasonId ?? ""} onValueChange={setSelectedSeasonId} disabled={seasonsLoading}>

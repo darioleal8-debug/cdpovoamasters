@@ -141,14 +141,14 @@ export function PaymentsPlayerList({ players, payments, summary, loading, season
             {/* Avatar */}
             <div
               className="h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-[12px] font-bold"
-              style={{ background: "rgba(10,18,32,.08)", color: "var(--ink,#0A1220)" }}
+              style={{ background: "rgba(10,18,32,.08)", color: "var(--text,#0A1220)" }}
             >
               {initials(player.name)}
             </div>
 
             {/* Nome + número */}
             <div className="shrink-0" style={{ minWidth: 100 }}>
-              <p className="text-[14px] font-semibold truncate" style={{ color: "var(--ink,#0A1220)" }}>
+              <p className="text-[14px] font-semibold truncate" style={{ color: "var(--text,#0A1220)" }}>
                 {player.name}
               </p>
               {player.number && (

@@ -192,7 +192,7 @@ export async function NextGameCard({
             <Link
               href={`/jogos/${game.id}/live`}
               className="rounded-md px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-90"
-              style={{ backgroundColor: "#ffffff", color: "var(--club-primary, #111111)" }}
+              style={{ backgroundColor: "hsl(var(--card))", color: "var(--club-primary, #111111)" }}
             >
               Estatísticas ao vivo
             </Link>
