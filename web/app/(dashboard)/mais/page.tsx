@@ -56,7 +56,7 @@ export default function MaisPage() {
   return (
     <div className="space-y-4">
       <h1 className="font-condensed font-bold text-2xl uppercase tracking-display"
-        style={{ color: "var(--ink,#0A1220)" }}>
+        style={{ color: "var(--text,#0A1220)" }}>
         Mais
       </h1>
 
@@ -76,7 +76,7 @@ export default function MaisPage() {
             <Icon className="h-5 w-5" style={{ color: "var(--action,#F97316)" }} />
             <div>
               <p className="text-[14px] font-semibold leading-tight"
-                style={{ color: "var(--ink,#0A1220)" }}>
+                style={{ color: "var(--text,#0A1220)" }}>
                 {label}
               </p>
               <p className="text-[11px] mt-0.5 leading-tight"

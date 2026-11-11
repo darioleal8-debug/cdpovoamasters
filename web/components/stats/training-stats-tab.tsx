@@ -163,7 +163,7 @@ function TrainingList({ trainings }: { trainings: TrainingEntry[] }) {
             style={{ background: "var(--paper,#F6F7F9)", border: "1px solid var(--line,#E4E7EE)" }}>
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
-                <p className="text-[13px] font-semibold" style={{ color: "var(--ink,#0A1220)" }}>
+                <p className="text-[13px] font-semibold" style={{ color: "var(--text,#0A1220)" }}>
                   {fmt(t.date)}
                 </p>
                 {hasData ? (
@@ -277,7 +277,7 @@ export function TrainingStatsTab({ seasonId }: { seasonId: string | null }) {
       {!noCompleted && summary.avg_pct !== null && (
         <div className="rounded-xl px-4 py-3 flex items-center justify-between"
           style={{ background: "var(--paper,#F6F7F9)", border: "1px solid var(--line,#E4E7EE)" }}>
-          <p className="text-sm font-semibold" style={{ color: "var(--ink,#0A1220)" }}>
+          <p className="text-sm font-semibold" style={{ color: "var(--text,#0A1220)" }}>
             Taxa média de assiduidade
           </p>
           <p className="text-2xl font-black tabular-nums" style={{ color: pctColor(summary.avg_pct) }}>

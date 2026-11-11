@@ -98,7 +98,7 @@ export function RosterCards({ players, loading, onEdit, onDelete }: Props) {
               ) : (
                 <div
                   className="h-12 w-12 rounded-full flex items-center justify-center text-[14px] font-bold"
-                  style={{ background: "rgba(10,18,32,.08)", color: "var(--ink,#0A1220)" }}
+                  style={{ background: "rgba(10,18,32,.08)", color: "var(--text,#0A1220)" }}
                 >
                   {initials(player.name)}
                 </div>
@@ -108,7 +108,7 @@ export function RosterCards({ players, loading, onEdit, onDelete }: Props) {
               <Link
                 href={`/jogadores/${player.player_id}`}
                 className="text-[14px] font-semibold leading-tight line-clamp-2"
-                style={{ color: "var(--ink,#0A1220)" }}
+                style={{ color: "var(--text,#0A1220)" }}
               >
                 {player.name}
               </Link>

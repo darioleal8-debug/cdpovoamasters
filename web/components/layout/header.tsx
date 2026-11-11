@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/components/ui/toaster";
+import { applyTheme, getStoredTheme, persistTheme, type Theme } from "@/lib/theme";
 
 interface HeaderProps {
   userName:  string;
@@ -67,16 +68,14 @@ export function Header({ userName, userEmail, userRole, availableRoles = [] }: H
   const router   = useRouter();
   const pathname = usePathname();
   const supabase = createClient();
-  const [theme, setTheme]       = useState<"light" | "dark">("light");
+  const [theme, setTheme]       = useState<Theme>("light");
   const [scrolled, setScrolled] = useState(false);
   const mainRef = useRef<Element | null>(null);
 
   useEffect(() => {
-    const stored    = localStorage.getItem("theme") as "light" | "dark" | null;
-    const prefersDk = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const initial   = stored ?? (prefersDk ? "dark" : "light");
+    const initial = getStoredTheme();
     setTheme(initial);
-    document.documentElement.setAttribute("data-theme", initial);
+    applyTheme(initial);
   }, []);
 
   // Detectar scroll do contentor principal para colapsar o header
@@ -93,10 +92,10 @@ export function Header({ userName, userEmail, userRole, availableRoles = [] }: H
   }, [pathname]);
 
   function toggleTheme() {
-    const next = theme === "light" ? "dark" : "light";
+    const next: Theme = theme === "light" ? "dark" : "light";
     setTheme(next);
-    localStorage.setItem("theme", next);
-    document.documentElement.setAttribute("data-theme", next);
+    persistTheme(next);
+    applyTheme(next);
   }
 
   async function handleLogout() {
@@ -112,7 +111,7 @@ export function Header({ userName, userEmail, userRole, availableRoles = [] }: H
     <header
       className="shrink-0 flex items-center justify-between px-4 transition-all duration-200"
       style={{
-        background:   "#ffffff",
+        background:   "hsl(var(--background))",
         borderBottom: "1px solid var(--line, #E4E7EE)",
         height:       `calc(${scrolled ? 52 : 64}px + env(safe-area-inset-top))`,
         paddingTop:   `env(safe-area-inset-top)`,
@@ -136,7 +135,7 @@ export function Header({ userName, userEmail, userRole, availableRoles = [] }: H
 
       {/* Direita: tema + utilizador */}
       <div className="flex items-center gap-1 ml-auto">
-        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={toggleTheme} aria-label="Alternar tema">
+        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={toggleTheme} aria-label={theme === "dark" ? "Mudar para tema claro" : "Mudar para tema escuro"}>
           {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
 

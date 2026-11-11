@@ -76,7 +76,7 @@ export function NewsPromptDialog({
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
-      <div style={{ background: "#fff", borderRadius: "12px", padding: "20px", maxWidth: "760px", width: "100%", maxHeight: "92vh", overflowY: "auto", boxShadow: "0 4px 24px rgba(0,0,0,.25)" }}>
+      <div style={{ background: "hsl(var(--card))", borderRadius: "12px", padding: "20px", maxWidth: "760px", width: "100%", maxHeight: "92vh", overflowY: "auto", boxShadow: "0 4px 24px rgba(0,0,0,.25)" }}>
         <p style={{ fontWeight: 800, fontSize: "15px", margin: "0 0 4px" }}>Gerar notícia com prompt personalizado</p>
         <p style={{ fontSize: "12px", color: "#6B7280", margin: 0 }}>
           Edite as instruções e/ou os factos enviados ao DeepSeek. Os dados do jogo já vêm preenchidos; corrija o que estiver errado

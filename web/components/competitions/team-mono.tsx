@@ -28,7 +28,7 @@ export function TeamMono({ name, size = 40, logoUrl, showLabel = false }: Props)
         width={size}
         height={size}
         loading="lazy"
-        style={{ borderRadius: "50%", objectFit: "contain", flexShrink: 0, background: "#fff" }}
+        style={{ borderRadius: "50%", objectFit: "contain", flexShrink: 0, background: "hsl(var(--card))" }}
         onError={() => setImgFailed(true)}
       />
     );

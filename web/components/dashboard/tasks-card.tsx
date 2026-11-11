@@ -72,7 +72,7 @@ export function TasksCard({ tasks, tasks_total, loading }: Props) {
       style={{ background: "var(--paper, #F6F7F9)", border: "1px solid var(--line, #E4E7EE)" }}>
 
       <div className="flex items-center justify-between">
-        <h2 className="font-condensed font-bold text-lg uppercase tracking-display" style={{ color: "var(--ink,#0A1220)" }}>
+        <h2 className="font-condensed font-bold text-lg uppercase tracking-display" style={{ color: "var(--text,#0A1220)" }}>
           A tratar
         </h2>
         {tasks_total > tasks.length && (

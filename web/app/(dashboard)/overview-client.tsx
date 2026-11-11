@@ -57,7 +57,7 @@ function MetricsStrip({ metrics }: { metrics: DashboardData["metrics"] }) {
     <div className="flex gap-6">
       {items.map((m) => (
         <div key={m.label}>
-          <p className="font-condensed font-bold text-2xl leading-none" style={{ color: "var(--ink,#0A1220)" }}>
+          <p className="font-condensed font-bold text-2xl leading-none" style={{ color: "var(--text,#0A1220)" }}>
             {m.value}
           </p>
           <p className="text-[11px] font-semibold uppercase tracking-label mt-0.5" style={{ color: "var(--muted-text,#5A6478)" }}>
@@ -202,7 +202,7 @@ function DashboardHeader({ seasonName, metrics, showMetrics, view, onViewChange,
         </p>
         <h1
           className="font-condensed font-bold leading-none tracking-display mt-0.5"
-          style={{ fontSize: "clamp(22px,4vw,32px)", color: "var(--ink,#0A1220)" }}
+          style={{ fontSize: "clamp(22px,4vw,32px)", color: "var(--text,#0A1220)" }}
         >
           {seasonName ? `Época ${seasonName}` : "Hoje"}
         </h1>

@@ -184,7 +184,7 @@ export function AdminGameSheets({ eventId }: { eventId: string }) {
       {/* Diálogo de confirmação de eliminação */}
       {deleting && (
         <div style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
-          <div style={{ background: "#fff", borderRadius: "12px", padding: "20px", maxWidth: "360px", width: "100%", boxShadow: "0 4px 24px rgba(0,0,0,.2)" }}>
+          <div style={{ background: "hsl(var(--card))", borderRadius: "12px", padding: "20px", maxWidth: "360px", width: "100%", boxShadow: "0 4px 24px rgba(0,0,0,.2)" }}>
             <p style={{ fontWeight: 700, fontSize: "14px", margin: "0 0 6px" }}>Apagar folha de jogo?</p>
             {isConfirmedOrPublished(deleting.candidate) && (
               <p style={{ fontSize: "12px", color: "#DC2626", fontWeight: 600, margin: "0 0 8px" }}>
@@ -248,7 +248,7 @@ export function AdminGameSheets({ eventId }: { eventId: string }) {
                 {c.image_url && !c.is_pdf ? (
                   <a href={c.image_url} target="_blank" rel="noopener noreferrer" title="Abrir em tamanho real">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={c.image_url} alt={c.label} style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block", background: "#fff" }} />
+                    <img src={c.image_url} alt={c.label} style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block", background: "hsl(var(--card))" }} />
                   </a>
                 ) : (
                   <a href={c.image_url ?? "#"} target="_blank" rel="noopener noreferrer"

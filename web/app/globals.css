@@ -60,6 +60,13 @@
   }
 
   .dark {
+    /* Paleta Balneário — versão escura (usada via var(--…) em muitos componentes) */
+    --ink:        #1A2742;   /* superfícies escuras de destaque (cartão "próximo jogo", avatar) */
+    --paper:      #0F1A2E;
+    --line:       #26324A;
+    --text:       #E8ECF4;
+    --muted-text: #9AA6BC;
+
     --background: 222 47% 8%;
     --foreground: 210 20% 96%;
 
@@ -119,6 +126,27 @@
 /* No tablet e desktop a barra inferior está escondida — padding de compensação a zero */
 @media (min-width: 768px) {
   :root { --bottom-nav-h: 0px; }
+}
+
+/* ── Tema escuro: classes utilitárias claras usadas em componentes antigos ── */
+.dark .bg-white       { background-color: hsl(var(--card)); }
+.dark .bg-gray-50,
+.dark .bg-gray-100    { background-color: hsl(var(--muted)); }
+.dark .hover\:bg-gray-100:hover { background-color: hsl(var(--accent)); }
+.dark .hover\:bg-red-50:hover   { background-color: rgba(217,45,32,.15); }
+.dark .border-gray-100,
+.dark .border-gray-200 { border-color: hsl(var(--border)); }
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-gray-700  { color: hsl(var(--foreground)); }
+.dark .text-gray-600,
+.dark .text-gray-500,
+.dark .text-gray-400  { color: hsl(var(--muted-foreground)); }
+
+/* Fundo atrás da barra inferior (telemóvel): evita faixa branca sob a barra escura.
+   Só nas páginas que têm a barra de navegação da área de gestão. */
+@media (max-width: 767px) {
+  html:has(nav[aria-label="Navegação principal"]) { background-color: #0A1220; }
 }
 
 /* Scrollbar minimalista */

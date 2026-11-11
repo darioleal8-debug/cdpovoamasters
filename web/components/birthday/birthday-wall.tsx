@@ -363,7 +363,7 @@ function MessageRow({
               onChange={(e) => onEditChange(e.target.value.slice(0, MAX_CHARS))}
               rows={2}
               className="w-full resize-none rounded-lg border px-3 py-2 text-sm focus:outline-none"
-              style={{ borderColor: "var(--line,#E4E7EE)", background: "#fff", fontSize: "max(16px,1rem)" }}
+              style={{ borderColor: "var(--line,#E4E7EE)", background: "hsl(var(--card))", fontSize: "max(16px,1rem)" }}
             />
             <div className="flex gap-2">
               <button
@@ -467,7 +467,7 @@ function OwnMessageRow({
             onChange={(e) => onEditChange(e.target.value.slice(0, MAX_CHARS))}
             rows={2}
             className="w-full resize-none rounded-lg border px-3 py-2 text-sm focus:outline-none"
-            style={{ borderColor: "var(--line,#E4E7EE)", background: "#fff", fontSize: "max(16px,1rem)" }}
+            style={{ borderColor: "var(--line,#E4E7EE)", background: "hsl(var(--card))", fontSize: "max(16px,1rem)" }}
           />
           <div className="flex gap-2 justify-end">
             <button

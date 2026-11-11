@@ -127,7 +127,7 @@ export default function JogadoresPage() {
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="font-condensed font-bold text-2xl uppercase tracking-display"
-            style={{ color: "var(--ink,#0A1220)" }}>
+            style={{ color: "var(--text,#0A1220)" }}>
             Plantel
           </h1>
           <p className="text-[12px]" style={{ color: "var(--muted-text,#5A6478)" }}>
