@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clubIdOfRow } from "@/lib/auth/club";
 import { authorize } from "@/lib/auth/guards";
 import { MANAGERS } from "@/lib/auth/roles";
 import { createClient } from "@supabase/supabase-js";
@@ -125,11 +126,13 @@ export async function POST(req: NextRequest) {
     ? await uploadPhoto(admin, photo, `${seasonId}/${Date.now()}-${photoSlug}`)
     : null;
 
-  // Inserir na tabela players
+  // Inserir na tabela players (clube herdado da época)
+  const clubId = await clubIdOfRow(admin, "seasons", seasonId);
   const { data: player, error } = await admin
     .from("players")
     .insert({
       season_id:  seasonId,
+      club_id:    clubId,
       team_id:    teamId,
       user_id:    userId,
       number:     numberRaw ? Number(numberRaw) : null,

@@ -15,7 +15,7 @@ Todo o insert com service role (que ignora RLS) numa tabela de clube tem de defi
 O teste `web/lib/auth/club-id-guard.test.ts` falha para ficheiros novos; os existentes estão numa allowlist a esvaziar.
 
 ## Pendente
-- Passar `club_id` explícito nos 17 ficheiros da allowlist (antes de existir um 2.º clube ativo, senão o trigger deixa de preencher).
+- (feito) todas as escritas service-role definem `club_id`; a allowlist do teste está vazia.
 - Storage buckets, leituras públicas de `club_settings`/`team_aliases`, `is_our_team` e referências "Póvoa" no código.
 - Jogos de outros clubes na tabela `events` do CD Póvoa (Fase 4: `league_games`).
 - Proteção de leaked passwords (dashboard Supabase); RPCs anónimas usadas pelo cliente.

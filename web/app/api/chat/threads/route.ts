@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clubIdForUser } from "@/lib/auth/club";
 import { authorize } from "@/lib/auth/guards";
 import { createServerClient } from "@supabase/ssr";
 import { createClient as createSupabase } from "@supabase/supabase-js";
@@ -430,7 +431,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { data: newChat, error } = await admin
-      .from("chats").insert({ type: "direct", created_by: caller.id }).select("id").single();
+      .from("chats").insert({ type: "direct", created_by: caller.id, club_id: await clubIdForUser(admin, caller.id) }).select("id").single();
     if (error || !newChat) return fail(error?.message ?? "Erro ao criar conversa", 500);
 
     await admin.from("chat_participants").insert([
@@ -453,7 +454,7 @@ export async function POST(req: NextRequest) {
 
   const { data: newChat, error } = await admin
     .from("chats")
-    .insert({ type: "group", name: name.trim(), created_by: caller.id, post_policy: resolvedPostPolicy })
+    .insert({ type: "group", name: name.trim(), created_by: caller.id, post_policy: resolvedPostPolicy, club_id: await clubIdForUser(admin, caller.id) })
     .select("id").single();
   if (error || !newChat) return fail(error?.message ?? "Erro ao criar grupo", 500);
 

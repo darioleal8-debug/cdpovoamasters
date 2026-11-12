@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clubIdForUser } from "@/lib/auth/club";
 import { requireFinanceAccess } from "@/lib/finance-auth";
 
 export const runtime = "nodejs";
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest) {
     .from("v_roster").select("player_id, name").in("player_id", playerIds);
   const nameById = new Map((rosterRows ?? []).map((r) => [r.player_id as string, r.name as string]));
 
+  const clubId = await clubIdForUser(admin, userId);
   const rows = toInsert.map((p) => {
     const name = nameById.get(p.player_id) ?? null;
     return {
@@ -52,6 +54,7 @@ export async function POST(req: NextRequest) {
       entry_date:        p.payment_date ?? new Date().toISOString().split("T")[0],
       season_id:         p.season_id,
       created_by:        userId,
+      club_id:           clubId,
     };
   });
 

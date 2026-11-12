@@ -57,7 +57,7 @@ export async function POST(
   // Buscar treino
   const { data: training } = await adminClient
     .from("trainings")
-    .select("id, date, start_time, end_time, season_id, location_lat, location_lng")
+    .select("id, date, start_time, end_time, season_id, club_id, location_lat, location_lng")
     .eq("id", trainingId)
     .maybeSingle();
   if (!training) return fail("Treino não encontrado", 404);
@@ -143,6 +143,7 @@ export async function POST(
     .upsert(
       {
         training_id:    trainingId,
+        club_id:        training.club_id as string | null,
         player_id:      playerId,
         status:         "auto_present",
         method:         hasGps ? "gps_checkin" : "no_gps",

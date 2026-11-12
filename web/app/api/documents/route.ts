@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clubIdForUser } from "@/lib/auth/club";
 import { authorize } from "@/lib/auth/guards";
 import { ADMIN, hasAnyRole } from "@/lib/auth/roles";
 import { createAdminClient } from "@/lib/supabase/server";
@@ -96,6 +97,7 @@ export async function POST(req: NextRequest) {
 
     const { data: { publicUrl } } = adminClient.storage.from("club-documents").getPublicUrl(storageKey);
 
+    const clubId = await clubIdForUser(adminClient, user.id);
     const { data: doc, error: dbError } = await adminClient
       .from("documents")
       .insert({
@@ -110,6 +112,7 @@ export async function POST(req: NextRequest) {
         required,
         admin_note:  adminNote?.trim() || null,
         created_by:  user.id,
+        club_id:     clubId,
       })
       .select("*")
       .single();

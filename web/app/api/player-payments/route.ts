@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clubIdOfRow } from "@/lib/auth/club";
 import { authorize } from "@/lib/auth/guards";
 import { FINANCE } from "@/lib/auth/roles";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
@@ -69,6 +70,7 @@ export async function POST(req: NextRequest) {
 
   // Resolver player_id: se não foi enviado mas user_id está disponível,
   // encontrar ou criar o registo de jogador para esta época.
+  const clubId = await clubIdOfRow(supabase, "seasons", season_id);
   let player_id = bodyPlayerId as string | null;
   if (!player_id && user_id && season_id) {
     try {
@@ -85,7 +87,7 @@ export async function POST(req: NextRequest) {
       } else {
         const { data: newPlayer, error: createErr } = await admin
           .from("players")
-          .insert({ user_id, season_id })
+          .insert({ user_id, season_id, club_id: clubId })
           .select("id")
           .single();
         if (createErr) throw new Error(createErr.message);
@@ -111,6 +113,7 @@ export async function POST(req: NextRequest) {
     .upsert(
       {
         season_id,
+        club_id: clubId,
         player_id,
         month,
         reference_year,

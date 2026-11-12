@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clubIdForUser } from "@/lib/auth/club";
 import { authorize } from "@/lib/auth/guards";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
@@ -53,6 +54,7 @@ export async function POST(req: NextRequest) {
   if (!authUser) return fail("Não autenticado", 401);
 
   const db = adminClient();
+  const clubId = await clubIdForUser(db, authUser.id);
   const profile = authz.profile; // papel ativo (authorize)
   if (!profile || !["admin", "treinador"].includes(profile.role)) return fail("Sem permissão", 403);
 
@@ -81,7 +83,7 @@ export async function POST(req: NextRequest) {
       if (!name) { errors.push("Jogador sem nome ignorado"); continue; }
       const { data: created, error: createErr } = await db
         .from("hist_players")
-        .insert({ name, canonical_name: canonicalize(name) })
+        .insert({ name, canonical_name: canonicalize(name), club_id: clubId })
         .select("id")
         .single();
       if (createErr) { errors.push(`Erro ao criar ${name}: ${createErr.message}`); continue; }
@@ -96,6 +98,7 @@ export async function POST(req: NextRequest) {
   const { data: game, error: gameErr } = await db
     .from("hist_games")
     .insert({
+      club_id:       clubId,
       hist_season_id,
       game_date:     game_meta.game_date ?? null,
       opponent_name: game_meta.opponent_name ?? null,
@@ -120,6 +123,7 @@ export async function POST(req: NextRequest) {
     const efficiency = calcEfficiency(s);
 
     const { error } = await db.from("hist_player_stats").upsert({
+      club_id:         clubId,
       hist_game_id:    game.id,
       hist_player_id:  ra.hist_player_id,
       hist_season_id,

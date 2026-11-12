@@ -79,7 +79,7 @@ export async function sendAndLogPaymentReceipt(opts: {
   // ── 2. user_id do jogador (players.name e .email removidos na migration 041) ──
   const { data: playerRow, error: playerErr } = await admin
     .from("players")
-    .select("user_id")
+    .select("user_id, club_id")
     .eq("id", playerId)
     .single();
 
@@ -233,6 +233,7 @@ export async function sendAndLogPaymentReceipt(opts: {
     await admin.from("payment_receipts").upsert(
       {
         player_id:      playerId,
+        club_id:        (playerRow as { club_id?: string | null }).club_id ?? null,
         payment_id:     paymentId,
         email,
         receipt_number: receiptNumber,

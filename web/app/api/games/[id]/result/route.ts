@@ -103,7 +103,7 @@ export async function POST(
   // Validate event
   const { data: event } = await admin
     .from("events")
-    .select("id, season_id, opponent, event_date, type")
+    .select("id, season_id, club_id, opponent, event_date, type")
     .eq("id", eventId)
     .maybeSingle();
   if (!event) return fail("Evento não encontrado", 404);
@@ -152,6 +152,7 @@ export async function POST(
       .insert({
         event_id:             eventId,
         season_id:            seasonId,
+        club_id:              (event.club_id as string | null) ?? null,
         opponent_name:        (event.opponent as string | null) ?? "Adversário",
         home_score:           homeScore,
         away_score:           awayScore,

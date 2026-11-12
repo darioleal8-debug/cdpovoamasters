@@ -75,7 +75,10 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Inserção ─────────────────────────────────────────────────────────────────
+  // Pedidos de acesso são geridos pelo clube da plataforma (CD Póvoa Masters).
+  const { data: platformClub } = await supabase.from("clubs").select("id").eq("slug", "cd-povoa-masters").maybeSingle();
   const { error } = await supabase.from("access_requests").insert({
+    club_id:      platformClub?.id ?? null,
     club_name:    String(body.club_name).trim(),
     city:         String(body.city).trim(),
     category:     String(body.category),

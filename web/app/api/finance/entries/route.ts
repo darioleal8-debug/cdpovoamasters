@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clubIdForUser } from "@/lib/auth/club";
 import { requireFinanceAccess } from "@/lib/finance-auth";
 
 export const runtime = "nodejs";
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
   const auth = await requireFinanceAccess();
   if (!auth.ok) return auth.response;
   const { admin, userId } = auth;
+  const clubId = await clubIdForUser(admin, userId);
 
   let body: Record<string, unknown>;
   try { body = await req.json(); }
@@ -57,6 +59,7 @@ export async function POST(req: NextRequest) {
       entry_date:  String(entry_date),
       season_id:   season_id ?? null,
       created_by:  userId,
+      club_id:     clubId,
       notes:       notes ? String(notes) : null,
       player_name: player_name ? String(player_name) : null,
     })

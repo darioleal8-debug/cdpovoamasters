@@ -8,25 +8,7 @@ const TABLES = "seasons|players|trainings|training_attendance|training_rsvps|tra
 const ADMIN = /SERVICE_ROLE|createAdminClient|adminClient\(|makeAdminClient|requireFinanceAccess/;
 const INSERT = new RegExp(`\\.from\\("(${TABLES})"\\)[\\s\\S]{0,160}?\\.(insert|upsert)\\(`);
 
-const PENDING = new Set([
-  "app/api/admin/users/route.ts",
-  "app/api/chat/threads/route.ts",
-  "app/api/documents/route.ts",
-  "app/api/finance/cash/route.ts",
-  "app/api/finance/entries/route.ts",
-  "app/api/finance/entries/sync-cotas/route.ts",
-  "app/api/finance/expenses/route.ts",
-  "app/api/games/[id]/result/route.ts",
-  "app/api/hist/import/confirm/route.ts",
-  "app/api/hist/seasons/route.ts",
-  "app/api/palmares/route.ts",
-  "app/api/player-payments/route.ts",
-  "app/api/players/route.ts",
-  "app/api/public/request-access/route.ts",
-  "app/api/trainings/[id]/attendance/auto/route.ts",
-  "app/api/trainings/[id]/attendance/checkin/route.ts",
-  "lib/payment-receipt.ts",
-]);
+const PENDING = new Set<string>([]);
 
 const root = path.resolve(__dirname, "../..");
 function walk(d: string): string[] {
