@@ -22,6 +22,7 @@ import {
   Newspaper,
   FolderOpen,
   ClipboardList,
+  Building2,
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -86,7 +87,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Sidebar({ role, rolesExtra = [] }: { role?: UserRole; rolesExtra?: string[] }) {
+export function Sidebar({ role, rolesExtra = [], isMaster = false }: { role?: UserRole; rolesExtra?: string[]; isMaster?: boolean }) {
   const { settings } = useClubSettings();
   const unreadChatCount = useUnreadChatCount();
 
@@ -175,6 +176,15 @@ export function Sidebar({ role, rolesExtra = [] }: { role?: UserRole; rolesExtra
                   {adminOnlyItems.map((item) => (
                     <NavLink key={item.href} {...item} />
                   ))}
+                </div>
+              </>
+            )}
+
+            {isMaster && (
+              <>
+                <SectionLabel>Plataforma</SectionLabel>
+                <div className="space-y-0.5">
+                  <NavLink href="/master-clubes" icon={Building2} label="Clubes" />
                 </div>
               </>
             )}

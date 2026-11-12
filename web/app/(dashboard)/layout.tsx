@@ -54,6 +54,9 @@ export default async function DashboardLayout({
     redirect("/player");
   }
 
+  const { data: masterRow } = await supabase
+    .from("platform_admins").select("user_id").eq("user_id", user.id).maybeSingle();
+
   return (
     <DashboardShell
       userName={userName}
@@ -61,6 +64,7 @@ export default async function DashboardLayout({
       userRole={userRole}
       userRolesExtra={userRolesExtra}
       availableRoles={roles}
+      isMaster={!!masterRow}
     >
       {children}
     </DashboardShell>
