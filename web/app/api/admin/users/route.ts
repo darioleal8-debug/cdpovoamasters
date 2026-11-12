@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { clubIdForUser, clubIdOfRow } from "@/lib/auth/club";
 import { banDurationFor } from "@/lib/auth/session-revocation";
 import { authorize } from "@/lib/auth/guards";
@@ -16,12 +17,7 @@ function stripBom(v: string | undefined): string {
 }
 
 function adminClient() {
-  const url = stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL);
-  const key = stripBom(process.env.SUPABASE_SERVICE_ROLE_KEY);
-  if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY não configurada");
-  return createClient(url, key, {
-    auth: { persistSession: false },
-  });
+  return createServiceClient(); // isolado por clube (ver lib/supabase/club-scope.ts)
 }
 
 async function getAuthUser() {

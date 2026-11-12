@@ -26,7 +26,9 @@ Todo o insert com service role (que ignora RLS) numa tabela de clube tem de defi
 O teste `web/lib/auth/club-id-guard.test.ts` falha para ficheiros novos; os existentes estão numa allowlist a esvaziar.
 
 ## Pendente
-- **BLOQUEANTE antes de ativar um 2.º clube:** as ~86 rotas com service role fazem update/delete/leitura por `id` sem verificar o clube (RLS ignorada). Um admin do clube B poderia afetar registos do clube A conhecendo o id. Falta um helper de verificação de clube nessas rotas.
+- **Isolamento nas rotas (feito, parcial):** `createServiceClient()` filtra por clube (`lib/supabase/club-scope.ts`) as tabelas com `club_id` e `users`, e força o `club_id` nos inserts. Cron/páginas públicas (sem sessão) ficam sem filtro. Jogos da Liga (`events.club_id` nulo) continuam acessíveis.
+- **Ainda sem isolamento nas rotas (tabelas filhas, acedidas por id do pai):** chat_messages/chat_participants, player_documents, player_stats, player_game_stats, play_by_play, game_* (lineup, substitutions, period_scores, audit_log), calendar_imports, payments, player_profiles, play_progress. Antes de ativar um 2.º clube: validar o pai (ou acrescentar `club_id` a estas tabelas).
+- Branding/definições por clube: `club_settings` ainda usa `id='default'` (logo já é por clube).
 - (feito) todas as escritas service-role definem `club_id`; a allowlist do teste está vazia.
 - Storage buckets, leituras públicas de `club_settings`/`team_aliases`, `is_our_team` e referências "Póvoa" no código.
 - Jogos de outros clubes na tabela `events` do CD Póvoa (Fase 4: `league_games`).

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { clubIdForUser } from "@/lib/auth/club";
 import { authorize } from "@/lib/auth/guards";
 import { createClient as createAdmin } from "@supabase/supabase-js";
@@ -9,11 +10,7 @@ import type { HistConfirmPayload, HistConfirmResult } from "@/lib/hist-importer/
 export const runtime = "nodejs";
 
 function adminClient() {
-  return createAdmin(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  return createServiceClient(); // isolado por clube (ver lib/supabase/club-scope.ts)
 }
 
 async function getAuthUser() {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { authorize } from "@/lib/auth/guards";
 import { createClient as createSupabase } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
@@ -9,11 +10,7 @@ export const runtime = "nodejs";
 const BUCKET = "event-photos";
 
 function adminClient() {
-  return createSupabase(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  );
+  return createServiceClient(); // isolado por clube (ver lib/supabase/club-scope.ts)
 }
 
 async function getAuthUser() {

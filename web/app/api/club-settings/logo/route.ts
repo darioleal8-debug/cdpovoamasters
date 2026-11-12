@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/auth/guards";
 import { ADMIN } from "@/lib/auth/roles";
-import { createClient } from "@supabase/supabase-js";
+import { createServiceClient } from "@/lib/supabase/service";
+import { clubIdForUser } from "@/lib/auth/club";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -13,11 +14,9 @@ export async function POST(req: NextRequest) {
   if (!auth.ok) return auth.response;
 
   // Cliente admin para storage (bypass RLS)
-  const admin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  const admin = createServiceClient();
+  const clubId = await clubIdForUser(admin, auth.user.id);
+  if (!clubId) return NextResponse.json({ error: "Sem clube associado" }, { status: 403 });
 
   let formData: FormData;
   try { formData = await req.formData(); }
@@ -37,7 +36,7 @@ export async function POST(req: NextRequest) {
   if (!ext) {
     return NextResponse.json({ error: "Formato não suportado (PNG, JPG, WEBP)" }, { status: 400 });
   }
-  const path = `club_default.${ext}`;
+  const path = `club_${clubId}.${ext}`; // um logo por clube
 
   // Upload para Supabase Storage (substitui automaticamente ficheiro anterior)
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -76,7 +75,7 @@ export async function POST(req: NextRequest) {
   const { error: dbErr } = await admin
     .from("club_settings")
     .update(extraFields)
-    .eq("id", "default");
+    .eq("club_id", clubId);
 
   if (dbErr) {
     console.error("[club-settings/logo] db error:", dbErr);
@@ -91,20 +90,18 @@ export async function DELETE() {
   const auth = await authorize(ADMIN);
   if (!auth.ok) return auth.response;
 
-  const admin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  const admin = createServiceClient();
+  const clubId = await clubIdForUser(admin, auth.user.id);
+  if (!clubId) return NextResponse.json({ error: "Sem clube associado" }, { status: 403 });
 
   // Remove todos os ficheiros do clube (qualquer extensão)
   const { data: files } = await admin.storage.from("club-logos").list();
-  const clubFiles = (files ?? []).filter((f) => f.name.startsWith("club_default"));
+  const clubFiles = (files ?? []).filter((f) => f.name.startsWith(`club_${clubId}`));
   if (clubFiles.length > 0) {
     await admin.storage.from("club-logos").remove(clubFiles.map((f) => f.name));
   }
 
-  await admin.from("club_settings").update({ logo_url: null, updated_at: new Date().toISOString() }).eq("id", "default");
+  await admin.from("club_settings").update({ logo_url: null, updated_at: new Date().toISOString() }).eq("club_id", clubId);
 
   return NextResponse.json({ logo_url: null });
 }

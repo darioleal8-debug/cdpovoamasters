@@ -1,10 +1,10 @@
 import "server-only";
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createRawServiceClient } from "@/lib/supabase/service-raw";
 import { authorize, type AuthOk } from "./guards";
 import { ADMIN } from "./roles";
 
-type AdminDb = Awaited<ReturnType<typeof createAdminClient>>;
+type AdminDb = ReturnType<typeof createRawServiceClient>;
 export type MasterOk = AuthOk & { admin: AdminDb };
 
 /**
@@ -19,7 +19,7 @@ export async function authorizeMaster(): Promise<MasterOk | { ok: false; respons
   if (!data) {
     return { ok: false, response: NextResponse.json({ error: "Apenas o Master Admin." }, { status: 403 }) };
   }
-  return { ...authz, admin: await createAdminClient() };
+  return { ...authz, admin: createRawServiceClient() };
 }
 
 export function slugify(input: string): string {

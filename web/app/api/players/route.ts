@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { clubIdOfRow } from "@/lib/auth/club";
 import { authorize } from "@/lib/auth/guards";
 import { MANAGERS } from "@/lib/auth/roles";
@@ -8,12 +9,7 @@ export const runtime = "nodejs";
 
 // ─── Admin client (para Storage — bypassa RLS) ───────────
 function adminClient() {
-  // Strip BOM (U+FEFF) that Windows editors/Vercel dashboard can silently prepend
-  const stripBom = (s: string) => s.replace(/^﻿/, "").trim();
-  const key = stripBom(process.env.SUPABASE_SERVICE_ROLE_KEY ?? "");
-  if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY não configurada");
-  const url = stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "");
-  return createClient(url, key, { auth: { persistSession: false } });
+  return createServiceClient(); // isolado por clube (ver lib/supabase/club-scope.ts)
 }
 
 // ─── Helpers ──────────────────────────────────────────────
