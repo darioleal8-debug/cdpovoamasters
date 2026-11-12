@@ -88,7 +88,8 @@ export async function POST(req: NextRequest) {
     }
 
     const adminClient = await createAdminClient();
-    const storageKey  = `documents/${crypto.randomUUID()}.pdf`;
+    const clubId      = await clubIdForUser(adminClient, user.id);
+    const storageKey  = `documents/${clubId ?? "sem-clube"}/${crypto.randomUUID()}.pdf`;
 
     const { error: uploadError } = await adminClient.storage
       .from("club-documents")
@@ -97,7 +98,6 @@ export async function POST(req: NextRequest) {
 
     const { data: { publicUrl } } = adminClient.storage.from("club-documents").getPublicUrl(storageKey);
 
-    const clubId = await clubIdForUser(adminClient, user.id);
     const { data: doc, error: dbError } = await adminClient
       .from("documents")
       .insert({
