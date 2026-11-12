@@ -38,65 +38,42 @@ async function insertSystemMessage(
   });
 }
 
-// ── Criar fio de jogo ────────────────────────────────────────
+// ── Fios de jogo (conversa de grupo por jogo do clube) ───────
+//
+// Regra: a conversa abre 7 dias antes do jogo e fecha 2 dias depois, com todos
+// os jogadores e staff. A lógica vive na BD (função sync_game_chats, migração
+// 115) para ser executada também pelo pg_cron, sem depender de ninguém abrir
+// a app. Aqui só a invocamos.
 
+let _lastGameSync = 0;
+const GAME_SYNC_MIN_INTERVAL_MS = 60_000;
+
+/** Cria/atualiza/fecha as conversas de jogo. Idempotente e barata. */
+export async function syncGameEventChats(
+  admin: SupabaseClient,
+  opts: { force?: boolean } = {}
+): Promise<void> {
+  if (!opts.force && Date.now() - _lastGameSync < GAME_SYNC_MIN_INTERVAL_MS) return;
+  _lastGameSync = Date.now();
+  const { error } = await admin.rpc("sync_game_chats");
+  if (error) {
+    _lastGameSync = 0; // permitir nova tentativa no próximo pedido
+    throw new Error(error.message);
+  }
+}
+
+/**
+ * Devolve o id da conversa do jogo, se estiver dentro da janela
+ * (7 dias antes → 2 dias depois). Fora da janela devolve null.
+ */
 export async function ensureGameThread(
   admin: SupabaseClient,
   eventId: string
 ): Promise<string | null> {
-  // Idempotente: se já existe, devolve o id
-  const { data: existing } = await admin
+  await syncGameEventChats(admin, { force: true });
+  const { data } = await admin
     .from("chats").select("id").eq("event_id", eventId).maybeSingle();
-  if (existing) return existing.id;
-
-  const { data: event } = await admin
-    .from("events")
-    .select("id, title, event_date, event_time, season_id, competition")
-    .eq("id", eventId).single();
-  if (!event) return null;
-
-  // Criar fio
-  const { data: chat, error } = await admin
-    .from("chats")
-    .insert({
-      type: "event",
-      name: event.title,
-      event_id: eventId,
-      season_id: event.season_id,
-      status: "active",
-    })
-    .select("id").single();
-
-  if (error) {
-    // Pode ter sido criado por pedido concorrente
-    const { data: retry } = await admin
-      .from("chats").select("id").eq("event_id", eventId).maybeSingle();
-    return retry?.id ?? null;
-  }
-
-  // Participantes: staff + jogadores convocados com conta
-  const staff = await staffUserIds(admin);
-
-  const { data: callups } = await admin
-    .from("game_callups")
-    .select("player:players(user_id)")
-    .eq("game_id", eventId);
-
-  type CallupRow = { player: Array<{ user_id: string | null }> | null };
-  const playerUserIds = ((callups ?? []) as CallupRow[])
-    .flatMap((c) => c.player ?? [])
-    .map((p) => p.user_id)
-    .filter((id): id is string => !!id);
-
-  await addParticipants(admin, chat.id, [...new Set([...staff, ...playerUserIds])]);
-
-  // Mensagem de sistema inicial
-  await insertSystemMessage(
-    admin, chat.id,
-    `Fio criado automaticamente quando o jogo foi agendado · ${staff.length + playerUserIds.length} participantes`
-  );
-
-  return chat.id;
+  return data?.id ?? null;
 }
 
 // ── Criar fio de treino ───────────────────────────────────────
@@ -177,50 +154,6 @@ export async function ensureTrainingThread(
   );
 
   return chat.id;
-}
-
-// ── Sincronizar threads para jogos próximos ──────────────────
-//
-// Chamado no GET /api/chat/threads por staff/admin. Garante que todos os
-// jogos dos próximos 60 dias (e os últimos 3 dias sem thread) têm um fio.
-// Opera em batch para minimizar round-trips.
-export async function syncGameEventChats(admin: SupabaseClient): Promise<void> {
-  // Temporada ativa
-  const { data: season } = await admin
-    .from("seasons").select("id").eq("status", "ativa").single();
-  if (!season) return;
-
-  const today = new Date().toISOString().slice(0, 10);
-  const cutoffPast   = new Date(Date.now() - 3  * 86_400_000).toISOString().slice(0, 10);
-  const cutoffFuture = new Date(Date.now() + 60 * 86_400_000).toISOString().slice(0, 10);
-
-  // Todos os jogos da janela
-  const { data: events } = await admin
-    .from("events")
-    .select("id")
-    .eq("season_id", season.id)
-    .eq("type", "jogo")
-    .gte("event_date", cutoffPast)
-    .lte("event_date", cutoffFuture);
-
-  if (!events || events.length === 0) return;
-
-  const eventIds = events.map((e: { id: string }) => e.id);
-
-  // Quais já têm thread
-  const { data: existing } = await admin
-    .from("chats")
-    .select("event_id")
-    .in("event_id", eventIds)
-    .not("event_id", "is", null);
-
-  const withThread = new Set((existing ?? []).map((c: { event_id: string }) => c.event_id));
-  const missing = eventIds.filter((id) => !withThread.has(id));
-
-  // Criar threads em falta (sequencial — idempotente)
-  for (const eventId of missing) {
-    await ensureGameThread(admin, eventId).catch(() => {/* ignora erros individuais */});
-  }
 }
 
 // ── Sincronizar threads para treinos próximos ─────────────────
@@ -310,23 +243,8 @@ export async function archiveOldEventThreads(
 ): Promise<void> {
   const cutoff = new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10);
 
-  // Fios de jogo expirados
-  const { data: gameChats } = await admin
-    .from("chats")
-    .select("id, event_id")
-    .eq("type", "event")
-    .eq("status", "active")
-    .not("event_id", "is", null);
-
-  for (const c of (gameChats ?? []) as Array<{ id: string; event_id: string }>) {
-    const { data: event } = await admin
-      .from("events").select("event_date").eq("id", c.event_id).single();
-    if (event && event.event_date <= cutoff) {
-      await admin.from("chats")
-        .update({ status: "archived", archived_at: new Date().toISOString() })
-        .eq("id", c.id);
-    }
-  }
+  // Fios de jogo: fecho (+2 dias) tratado por sync_game_chats
+  await syncGameEventChats(admin, { force: true });
 
   // Fios de treino expirados
   const { data: trainingChats } = await admin

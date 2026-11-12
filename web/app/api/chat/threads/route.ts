@@ -57,7 +57,6 @@ async function throttledSync(userId: string, isStaff: boolean, admin: ReturnType
       syncTeamChat(admin),
       syncAnnouncementChat(admin),
       isStaff ? ensureStaffChat(admin) : Promise.resolve(),
-      isStaff ? syncGameEventChats(admin) : Promise.resolve(),
       syncTrainingEventChats(admin), // cria fios de treino para todos os utilizadores
       isStaff ? Promise.resolve() : ensurePlayerInTrainingThreads(admin, userId), // retro-add player to existing threads
     ]);
@@ -82,6 +81,11 @@ export async function GET() {
 
   const isStaff = ["admin", "treinador"].includes(caller.role);
 
+  // Conversas de jogo (abrem 7 dias antes, fecham 2 dias depois): uma só chamada
+  // SQL barata, com throttle de 60s. Aguardamos para que a conversa que acabou de
+  // abrir (ou fechar) apareça já neste pedido, para qualquer papel.
+  await syncGameEventChats(admin).catch(() => {});
+
   // Sync throttled — fire and forget para não bloquear a resposta.
   // Threads novos criados pelo sync aparecem no próximo poll (60s) ou via realtime.
   throttledSync(caller.id, isStaff, admin).catch(() => {});
@@ -89,7 +93,7 @@ export async function GET() {
   // IDs de chats em que o utilizador participa
   let chatIds: string[];
   if (caller.role === "admin") {
-    const { data: allChats } = await admin.from("chats").select("id");
+    const { data: allChats } = await admin.from("chats").select("id").neq("status", "scheduled");
     chatIds = (allChats ?? []).map((c: { id: string }) => c.id);
   } else {
     const { data: myP } = await admin
@@ -106,7 +110,8 @@ export async function GET() {
   const { data: chats } = await admin
     .from("chats")
     .select("id, type, name, post_policy, updated_at, status, archived_at, event_id, training_id, season_id, last_message_at, last_message_text, last_message_sys, last_message_card")
-    .in("id", chatIds);
+    .in("id", chatIds)
+    .neq("status", "scheduled"); // conversa de jogo que ainda não abriu (>7 dias antes)
 
   // Eventos e treinos associados + participação do caller (em paralelo)
   const eventIds    = (chats ?? []).map((c: { event_id: string | null }) => c.event_id).filter(Boolean) as string[];
@@ -235,6 +240,18 @@ export async function GET() {
       const lr = lastReadByChat.get(m.chat_id);
       if (!lr || new Date(m.created_at) > new Date(lr)) {
         unreadByChat.set(m.chat_id, (unreadByChat.get(m.chat_id) ?? 0) + 1);
+      }
+    }
+  }
+
+  // Contagem exata de não lidas (migração 115). Se a função ainda não existir,
+  // mantém-se a contagem aproximada calculada acima.
+  {
+    const { data: exact, error: exactErr } = await admin.rpc("chat_unread_counts", { p_user: caller.id });
+    if (!exactErr && Array.isArray(exact)) {
+      unreadByChat.clear();
+      for (const r of exact as Array<{ chat_id: string; unread: number | string }>) {
+        unreadByChat.set(r.chat_id, Number(r.unread));
       }
     }
   }

@@ -38,7 +38,9 @@ export async function POST(req: NextRequest) {
 
   if (body.event_id) {
     const chatId = await ensureGameThread(admin, body.event_id);
-    if (!chatId) return fail("Evento não encontrado", 404);
+    // null: jogo inexistente, não é do clube, ou fora da janela
+    // (a conversa abre 7 dias antes do jogo e fecha 2 dias depois)
+    if (!chatId) return fail("Sem conversa aberta para este jogo (abre 7 dias antes e fecha 2 dias depois)", 404);
     return NextResponse.json({ chat_id: chatId });
   }
 
