@@ -13,3 +13,5 @@ BEGIN
   END LOOP;
 END
 $r$;
+DROP TRIGGER IF EXISTS sync_club_member_ins ON public.users;
+DROP TRIGGER IF EXISTS sync_club_member_upd ON public.users;
