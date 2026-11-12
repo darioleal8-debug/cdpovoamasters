@@ -15,3 +15,6 @@ END
 $r$;
 DROP TRIGGER IF EXISTS sync_club_member_ins ON public.users;
 DROP TRIGGER IF EXISTS sync_club_member_upd ON public.users;
+-- 127: voltar ao modelo anterior (admin gere clubes; clubs inativos deixam de contar)
+-- DELETE FROM public.clubs WHERE active = false AND NOT EXISTS (SELECT 1 FROM public.club_members m WHERE m.club_id = clubs.id);
+-- (repor my_club_ids/shares_club_with das migrações 124/125 e as políticas clubs_admin_write/club_members_admin_all com public.is_admin())
