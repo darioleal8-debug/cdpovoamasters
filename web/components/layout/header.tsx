@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { LogOut, Moon, Sun, User } from "lucide-react";
 import { RoleSwitcherItems } from "@/components/auth/role-switcher";
-import { createClient } from "@/lib/supabase/client";
+import { logout } from "@/lib/auth/logout";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -67,7 +67,6 @@ function getTitle(pathname: string): string {
 export function Header({ userName, userEmail, userRole, availableRoles = [] }: HeaderProps) {
   const router   = useRouter();
   const pathname = usePathname();
-  const supabase = createClient();
   const [theme, setTheme]       = useState<Theme>("light");
   const [scrolled, setScrolled] = useState(false);
   const mainRef = useRef<Element | null>(null);
@@ -98,11 +97,9 @@ export function Header({ userName, userEmail, userRole, availableRoles = [] }: H
     applyTheme(next);
   }
 
-  async function handleLogout() {
-    await supabase.auth.signOut();
+  function handleLogout() {
     toast({ title: "Sessão terminada", description: "Até breve!" });
-    router.push("/login");
-    router.refresh();
+    void logout();
   }
 
   const title = getTitle(pathname);
@@ -163,7 +160,7 @@ export function Header({ userName, userEmail, userRole, availableRoles = [] }: H
             </DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-gray-100 my-1" />
             <DropdownMenuItem
-              onClick={() => router.push("/configuracoes")}
+              onSelect={() => router.push("/configuracoes")}
               className="cursor-pointer rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
               style={{ minHeight: 44 }}
             >
@@ -173,7 +170,7 @@ export function Header({ userName, userEmail, userRole, availableRoles = [] }: H
             <RoleSwitcherItems roles={availableRoles} activeRole={userRole} />
             <DropdownMenuSeparator className="bg-gray-100 my-1" />
             <DropdownMenuItem
-              onClick={handleLogout}
+              onSelect={handleLogout}
               className="cursor-pointer rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50"
               style={{ minHeight: 44 }}
             >

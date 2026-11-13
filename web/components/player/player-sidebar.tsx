@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   BarChart2, Calendar, ClipboardList, CreditCard, Dumbbell,
   Home, LogOut, MessageSquare, Trophy, User, Users,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { logout } from "@/lib/auth/logout";
 import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
 import { usePlayerPending } from "./player-pending-context";
 import { toast } from "@/components/ui/toaster";
@@ -43,8 +43,6 @@ export function PlayerSidebar({
   playerPosition?: string | null;
 }) {
   const pathname  = usePathname();
-  const router    = useRouter();
-  const supabase  = createClient();
   const chatBadge = useUnreadChatCount();
   const pending   = usePlayerPending();
 
@@ -52,11 +50,9 @@ export function PlayerSidebar({
     return exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
   }
 
-  async function handleLogout() {
-    await supabase.auth.signOut();
+  function handleLogout() {
     toast({ title: "Sessão terminada", description: "Até breve!" });
-    router.push("/login");
-    router.refresh();
+    void logout();
   }
 
   const subLine = [
