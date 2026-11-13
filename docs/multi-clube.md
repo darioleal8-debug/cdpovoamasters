@@ -1,7 +1,7 @@
 # Modelo multi-clube (HoopHub)
 
 ## Estado
-- Fases 1, 2 e 3a aplicadas em produção (migrações 123–131). Rollback: `supabase/rollbacks/123_125_multiclube_rollback.sql`.
+- Fases 1, 2 e 3a aplicadas em produção (migrações 123–132). Rollback: `supabase/rollbacks/123_125_multiclube_rollback.sql`.
 - Backup pré-alteração: schema `backup_20261112` (mesma BD; apagar quando estável).
 - **Ainda NÃO é seguro dar contas de gestão a outros clubes** (ver "Pendente").
 
@@ -24,6 +24,9 @@ Uploads fazem-se pelas rotas (service role). Escrita direta nos buckets club-doc
 ## Regra de código
 Todo o insert com service role (que ignora RLS) numa tabela de clube tem de definir `club_id` explicitamente.
 O teste `web/lib/auth/club-id-guard.test.ts` falha para ficheiros novos; os existentes estão numa allowlist a esvaziar.
+
+## Teste de isolamento (2026-11-13)
+Simulado em transação revertida (clube de teste ativo + admin de teste, sem alterações persistentes): o admin do clube de teste vê 0 linhas em todas as tabelas com `club_id`, exceto dados públicos por design (jogos da Liga em `events`, `game_sessions` e `palmares` de leitura pública, definições de clubes públicos); update/delete em players e documents do CD Póvoa afetam 0 linhas; insert com `club_id` do CD Póvoa é recusado; users visíveis = só ele; o Master Admin vê todos os clubes.
 
 ## Pendente
 - **Isolamento nas rotas (feito, parcial):** `createServiceClient()` filtra por clube (`lib/supabase/club-scope.ts`) as tabelas com `club_id` e `users`, e força o `club_id` nos inserts. Cron/páginas públicas (sem sessão) ficam sem filtro. Jogos da Liga (`events.club_id` nulo) continuam acessíveis.
