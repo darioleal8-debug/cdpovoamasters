@@ -11,7 +11,8 @@ import { resolveSheetLocation } from "@/lib/liga/sheet-location";
 import { sha256, sniffImageMime, type AcceptedMime } from "./image";
 import { pickBest, scoreReading, type ReadingQuality } from "./quality";
 import { reanalyzeImport, runAndStore } from "./run";
-import { runProStatsAndStore } from "@/lib/match-docs/run";
+import { convertToProStatsIfNeeded, reanalyzeProStats, runProStatsAndStore } from "@/lib/match-docs/run";
+import { resolveDocKind } from "@/lib/match-docs/classify";
 import { AiSheetSchema, SheetDataSchema, type ImportStatus } from "./schema";
 import { BUCKET, loadImport, type Access, type GameInfo } from "./service";
 import { visionConfig } from "./vision";
@@ -162,7 +163,7 @@ export async function listGameSheets(access: Access, admin: AdminClient, game: G
 }
 
 export type AnalyzeOutcome =
-  | { ok: true; import_id: string; analysis_error: string | null; skipped?: boolean }
+  | { ok: true; import_id: string; analysis_error: string | null; skipped?: boolean; converted_to?: "pro_stats" }
   | { ok: false; status: number; error: string };
 
 async function releaseStale(access: Access, eventId: string) {
@@ -184,7 +185,10 @@ export async function createAndAnalyze(
   opts: { existingPath?: string; sourceSubmissionId?: string; docType?: "official_sheet" | "pro_stats" } = {},
 ): Promise<AnalyzeOutcome> {
   const hash = sha256(buffer);
-  const docType = opts.docType ?? "official_sheet";
+  // O conteúdo decide o tipo (a escolha do utilizador/omissão só vale na dúvida)
+  const detected = await resolveDocKind({ buffer, mime, declared: opts.docType ?? "official_sheet" });
+  const docType = detected.kind;
+  if (detected.changed) console.info(`[game-sheets] tipo corrigido → ${docType} (${detected.classification.method}, conf=${detected.classification.confidence}) game=${game.id}`);
 
   // Inclui linhas "failed" para as reutilizar em vez de criar duplicados
   const { data: same } = await access.supabase
@@ -265,7 +269,7 @@ export async function createAndAnalyze(
   const run = docType === "pro_stats"
     ? await runProStatsAndStore(access, importId, buffer, game, 0)
     : await runAndStore(access, importId, buffer, game, 0);
-  return { ok: true, import_id: importId, analysis_error: run.ok ? null : run.error ?? null };
+  return { ok: true, import_id: importId, analysis_error: run.ok ? null : run.error ?? null, ...(detected.changed && docType === "pro_stats" ? { converted_to: "pro_stats" as const } : {}) };
 }
 
 /** Analisa uma folha concreta do jogo (importação existente ou foto de uma submissão). */
@@ -279,6 +283,18 @@ export async function analyzeSheetCandidate(
     const row = await loadImport(access, target.id);
     if (!row || row.event_id !== game.id) return { ok: false, status: 404, error: "Importação não encontrada" };
     const analyzed = row.status !== "failed" && row.status !== "processing" && row.sheet_data != null;
+    // Leitura vazia (sem marcha nem parciais) é o sinal típico de uma tabela de estatísticas lida
+    // como folha manuscrita: confirma o tipo do documento antes de a dar como analisada.
+    const sd = SheetDataSchema.safeParse(row.sheet_data);
+    const emptyReading = sd.success && sd.data.events.length === 0 && sd.data.periods.length === 0;
+    const editable = row.status !== "published" && row.status !== "confirmed";
+    if (row.doc_type !== "pro_stats" && editable && (!analyzed || target.force || emptyReading)) {
+      const conv = await convertToProStatsIfNeeded(access, row);
+      if (conv) {
+        const pr = await reanalyzeProStats(access, { ...row, doc_type: "pro_stats", updated_at: conv.updated_at }, game, { maxAnalyses: 99 });
+        return pr.ok ? { ok: true, import_id: row.id, analysis_error: pr.error ?? null, converted_to: "pro_stats" } : pr;
+      }
+    }
     if (analyzed && !target.force) return { ok: true, import_id: row.id, analysis_error: null, skipped: true };
     if (row.status === "published" || row.status === "confirmed") {
       return { ok: false, status: 409, error: "Este boletim já foi confirmado/aplicado — carregue uma nova folha em vez de o reanalisar." };

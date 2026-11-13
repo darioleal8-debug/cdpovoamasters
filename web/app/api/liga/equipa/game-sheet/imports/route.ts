@@ -5,6 +5,7 @@ import { runAndStore } from "@/lib/game-sheet/run";
 import { visionConfig } from "@/lib/game-sheet/vision";
 import { runProStatsAndStore } from "@/lib/match-docs/run";
 import { proStatsConfig } from "@/lib/match-docs/pro-stats-extract";
+import { resolveDocKind } from "@/lib/match-docs/classify";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -33,7 +34,7 @@ export async function POST(req: Request) {
   const file = form.get("photo") ?? form.get("file");
   const gameId = form.get("game_id");
   const docTypeRaw = form.get("doc_type");
-  const docType = docTypeRaw === "pro_stats" ? "pro_stats" : docTypeRaw == null || docTypeRaw === "" || docTypeRaw === "official_sheet" ? "official_sheet" : null;
+  let docType: "pro_stats" | "official_sheet" | null = docTypeRaw === "pro_stats" ? "pro_stats" : docTypeRaw == null || docTypeRaw === "" || docTypeRaw === "official_sheet" ? "official_sheet" : null;
   if (!docType) return jsonError("Tipo de documento inválido", 400);
   if (!(file instanceof File)) return jsonError("Campo 'photo' em falta", 400);
   if (!isUuid(gameId)) return jsonError("Jogo inválido", 400);
@@ -53,6 +54,7 @@ export async function POST(req: Request) {
 
   const hash = sha256(buffer);
   const { supabase, user } = access;
+
 
   // Idempotência: mesma imagem para o mesmo jogo → devolve o rascunho existente
   const { data: same } = await supabase
@@ -78,6 +80,15 @@ export async function POST(req: Request) {
     .gte("created_at", since);
   if ((count ?? 0) >= MAX_IMPORTS_PER_HOUR) {
     return jsonError("Limite de importações por hora atingido. Tente mais tarde.", 429);
+  }
+
+  // O conteúdo decide o tipo: uma captura de ecrã de estatísticas enviada como "folha oficial"
+  // (ou o contrário) é encaminhada para o extrator certo em vez de produzir uma leitura vazia.
+  const detected = await resolveDocKind({ buffer, mime, declared: docType });
+  const docTypeCorrected = detected.changed ? { from: docType, to: detected.kind } : null;
+  if (detected.changed) {
+    console.info(`[game-sheet] tipo de documento corrigido ${docType} → ${detected.kind} (${detected.classification.method}, conf=${detected.classification.confidence}) game=${game.id}`);
+    docType = detected.kind;
   }
 
   // Liberta bloqueios abandonados antes de tentar criar o novo
@@ -129,7 +140,7 @@ export async function POST(req: Request) {
   if (!row) return jsonError("Importação não encontrada após análise", 500);
 
   return NextResponse.json(
-    { ...(await importView(access, row, game)), analysis_error: run.ok ? null : run.error, analysis_error_kind: run.kind ?? null },
+    { ...(await importView(access, row, game)), analysis_error: run.ok ? null : run.error, analysis_error_kind: run.kind ?? null, doc_type_corrected: docTypeCorrected },
     { status: 201 },
   );
 }

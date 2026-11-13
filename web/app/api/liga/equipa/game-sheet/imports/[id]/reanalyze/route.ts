@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { authorizeGameSheet, importView, jsonError, loadGameForAccess, loadImport } from "@/lib/game-sheet/service";
 import { reanalyzeImport } from "@/lib/game-sheet/run";
 import { MAX_ADMIN_INSTRUCTIONS } from "@/lib/game-sheet/prompt";
-import { reanalyzeProStats } from "@/lib/match-docs/run";
+import { convertToProStatsIfNeeded, reanalyzeProStats } from "@/lib/match-docs/run";
 import { visionConfig } from "@/lib/game-sheet/vision";
 
 export const runtime = "nodejs";
@@ -33,6 +33,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
   const game = await loadGameForAccess(access, row.event_id);
   if (!game) return jsonError("Jogo não encontrado", 404);
+
+  // Folha oficial cujo conteúdo é uma tabela de estatísticas → relê com o extrator de estatísticas
+  const converted = row.doc_type === "pro_stats" ? null : await convertToProStatsIfNeeded(access, row);
+  if (converted) row.doc_type = "pro_stats", row.updated_at = converted.updated_at;
 
   if (row.doc_type === "pro_stats") {
     const pr = await reanalyzeProStats(access, row, game, { instructions, maxAnalyses: visionConfig().maxAnalyses });

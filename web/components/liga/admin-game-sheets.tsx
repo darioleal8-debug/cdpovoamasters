@@ -69,6 +69,7 @@ export function AdminGameSheets({ eventId }: { eventId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<{ candidate: Candidate; reason: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const convertedRef = useRef(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -94,12 +95,14 @@ export function AdminGameSheets({ eventId }: { eventId: string }) {
     });
     const { ok, json } = await parseResponse(res);
     if (!ok) return (json.error as string | undefined) ?? "Erro na análise";
+    if (json.converted_to === "pro_stats") convertedRef.current += 1;
     return (json.analysis_error as string | undefined) ?? null;
   }
 
   async function analyzeAll() {
     if (!data) return;
-    const todo = data.candidates.filter((c) => c.status === "por_analisar" || (c.status === "failed" && c.analysis_count < data.max_analyses));
+    // Leituras fracas incluídas: podem ser tabelas de estatísticas lidas como folha manuscrita (o servidor reclassifica)
+    const todo = data.candidates.filter((c) => c.status === "por_analisar" || (c.status === "failed" && c.analysis_count < data.max_analyses) || (c.quality != null && c.quality.score < 50));
     if (todo.length === 0) { setProgress("Todas as folhas já estão analisadas."); return; }
     setBusy("all"); setError(null);
     const errors: string[] = [];
@@ -108,7 +111,8 @@ export function AdminGameSheets({ eventId }: { eventId: string }) {
       const err = await analyzeOne(todo[i]);
       if (err) errors.push(`${todo[i].label}: ${err}`);
     }
-    setProgress(errors.length ? null : `${todo.length} folha(s) analisada(s).`);
+    setProgress(errors.length ? null : `${todo.length} folha(s) analisada(s).${convertedRef.current ? ` ${convertedRef.current} era(m) estatística(s) profissional(is) e foi(ram) lida(s) como tal — vê em «Validação cruzada».` : ""}`);
+    convertedRef.current = 0;
     if (errors.length) setError(errors.join(" · "));
     setBusy(null);
     await load();

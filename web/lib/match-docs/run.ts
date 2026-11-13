@@ -10,6 +10,7 @@ import { extractProStats, proStatsConfig, proStatsStatus } from "./pro-stats-ext
 import { PRO_PROCESSING_VERSION, PRO_STATS_SCHEMA_VERSION, type ProStatsData } from "./pro-stats-schema";
 import { loadKnownPlayers, loadMatchGame, rosterHintForEvent } from "./service";
 import { matchPlayers, playerNameScore } from "./reconcile";
+import { classifyDocument, OVERRIDE_CONFIDENCE } from "./classify";
 
 /** Marca os jogadores lidos que constam da base de dados (plantel HoopHub / histórico da liga). */
 async function markKnownPlayers(eventId: string, data: ProStatsData): Promise<void> {
@@ -100,4 +101,32 @@ export async function reanalyzeProStats(
   }
   const run = await runProStatsAndStore(access, row.id, Buffer.from(await blob.arrayBuffer()), game, row.analysis_count, opts.instructions);
   return { ok: true, error: run.ok ? undefined : run.error };
+}
+
+/**
+ * Uma importação gravada como folha oficial cujo conteúdo é, na verdade, uma tabela de estatísticas
+ * (ex.: captura de ecrã do Pocket Stat enviada no slot errado) passa a 'pro_stats' e é relida com o
+ * extrator certo. Devolve a linha atualizada, ou null se o documento é mesmo uma folha oficial
+ * (ou se a classificação não é confiante — nunca se converte na dúvida).
+ */
+export async function convertToProStatsIfNeeded(access: Access, row: ImportRow): Promise<ImportRow | null> {
+  if (row.doc_type === "pro_stats" || !row.image_path) return null;
+  const { data: blob, error } = await access.supabase.storage.from(BUCKET).download(row.image_path);
+  if (error || !blob) return null;
+  const buffer = Buffer.from(await blob.arrayBuffer());
+  const mime = sniffImageMime(buffer);
+  if (!mime) return null;
+  const c = await classifyDocument({ buffer, mime, declared: "official_sheet" });
+  if (c.kind !== "pro_stats" || c.confidence < OVERRIDE_CONFIDENCE) return null;
+  const { error: updErr } = await access.supabase.from("game_sheet_imports")
+    .update({ doc_type: "pro_stats", updated_at: new Date().toISOString() })
+    .eq("id", row.id).eq("updated_at", row.updated_at);
+  if (updErr) {
+    // Já existe outro documento de estatísticas desta equipa em processamento (índice único): mantém o tipo
+    console.warn(`[match-docs] conversão para pro_stats falhou import=${row.id}: ${updErr.message}`);
+    return null;
+  }
+  console.info(`[match-docs] import=${row.id} reclassificado official_sheet → pro_stats (${c.method}, conf=${c.confidence}${c.app ? `, app=${c.app}` : ""})`);
+  const { data: fresh } = await access.supabase.from("game_sheet_imports").select("id, updated_at").eq("id", row.id).maybeSingle();
+  return { ...row, doc_type: "pro_stats", updated_at: (fresh?.updated_at as string) ?? row.updated_at };
 }
