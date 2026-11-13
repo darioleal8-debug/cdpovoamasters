@@ -36,7 +36,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   // Folha oficial cujo conteúdo é uma tabela de estatísticas → relê com o extrator de estatísticas
   const converted = row.doc_type === "pro_stats" ? null : await convertToProStatsIfNeeded(access, row);
-  if (converted) row.doc_type = "pro_stats", row.updated_at = converted.updated_at;
+  if (converted) { row.doc_type = "pro_stats"; row.updated_at = converted.updated_at; }
 
   if (row.doc_type === "pro_stats") {
     const pr = await reanalyzeProStats(access, row, game, { instructions, maxAnalyses: visionConfig().maxAnalyses });
