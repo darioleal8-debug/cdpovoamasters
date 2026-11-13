@@ -1,4 +1,5 @@
 import "server-only";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createClient } from "@/lib/supabase/server";
 import { createRawServiceClient } from "@/lib/supabase/service-raw";
 
@@ -36,6 +37,28 @@ export function lisbonMonth(d = new Date()): string {
   return `${y}-${m}`;
 }
 
+/** Atribuição explícita (Liga INATEL): o consumo é registado na equipa/clube que submeteu o documento. */
+export interface AiAttribution { leagueTeamId?: string | null; feature: string }
+const attribution = new AsyncLocalStorage<AiAttribution>();
+export function withAiAttribution<T>(a: AiAttribution, fn: () => Promise<T>): Promise<T> {
+  return attribution.run(a, fn);
+}
+
+/** Define a atribuição para o resto do pedido atual (útil em handlers longos). */
+export function enterAiAttribution(a: AiAttribution): void {
+  attribution.enterWith(a);
+}
+
+const teamClubCache = new Map<string, { clubId: string | null; exp: number }>();
+async function clubOfLeagueTeam(teamId: string): Promise<string | null> {
+  const hit = teamClubCache.get(teamId);
+  if (hit && hit.exp > Date.now()) return hit.clubId;
+  const { data } = await createRawServiceClient().from("clubs").select("id").eq("league_team_id", teamId).maybeSingle();
+  const clubId = (data?.id as string | undefined) ?? null;
+  teamClubCache.set(teamId, { clubId, exp: Date.now() + 5 * 60_000 });
+  return clubId;
+}
+
 export interface AiContext {
   clubId: string | null;
   userId: string | null;
@@ -68,7 +91,7 @@ export async function checkAiBudget(ctx: AiContext | null): Promise<BudgetState>
     const raw = createRawServiceClient();
     const [{ data: club }, { data: rows }] = await Promise.all([
       raw.from("clubs").select("ai_monthly_budget_eur").eq("id", ctx.clubId).maybeSingle(),
-      raw.from("ai_usage").select("cost_eur").eq("club_id", ctx.clubId).eq("month", lisbonMonth()),
+      raw.from("ai_usage").select("cost_eur").eq("club_id", ctx.clubId).eq("month", lisbonMonth()).eq("source", "app"),
     ]);
     const limitEur = Number(club?.ai_monthly_budget_eur ?? 0.1);
     const spentEur = (rows ?? []).reduce((s, r) => s + Number(r.cost_eur ?? 0), 0);
@@ -86,11 +109,16 @@ export async function recordAiUsage(
 ): Promise<void> {
   try {
     if (u.promptTokens === 0 && u.completionTokens === 0) return;
+    const attr = attribution.getStore();
+    const leagueTeamId = attr?.leagueTeamId ?? null;
+    const clubId = attr ? (leagueTeamId ? await clubOfLeagueTeam(leagueTeamId) : null) : (ctx?.clubId ?? null);
     await createRawServiceClient().from("ai_usage").insert({
-      club_id: ctx?.clubId ?? null,
+      club_id: clubId,
+      league_team_id: leagueTeamId,
+      source: attr ? "liga" : "app",
       user_id: ctx?.userId ?? null,
       month: lisbonMonth(),
-      feature: u.feature.slice(0, 60),
+      feature: (attr?.feature ?? u.feature).slice(0, 60),
       model: u.model,
       prompt_tokens: u.promptTokens,
       cache_hit_tokens: u.cacheHitTokens,

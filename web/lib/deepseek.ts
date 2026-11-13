@@ -249,11 +249,13 @@ export async function deepseekJSONDetailed<T = Record<string, unknown>>(
   const done = async (r: AttemptResult<T>): Promise<DeepSeekDetailedResult<T>> => {
     meta.durationMs = Date.now() - started;
     if (usage) {
-      await usage.recordAiUsage(aiCtx, {
-        feature: opts.feature ?? "geral", model,
-        promptTokens: meta.promptTokens ?? 0, cacheHitTokens: meta.cacheHitTokens ?? 0,
-        completionTokens: meta.completionTokens ?? 0, ok: r.ok,
-      });
+      try {
+        await usage.recordAiUsage(aiCtx, {
+          feature: opts.feature ?? "geral", model,
+          promptTokens: meta.promptTokens ?? 0, cacheHitTokens: meta.cacheHitTokens ?? 0,
+          completionTokens: meta.completionTokens ?? 0, ok: r.ok,
+        });
+      } catch { /* o registo nunca falha a chamada */ }
     }
     return r.ok ? { ok: true, data: r.data, meta } : { ok: false, error: r.error, kind: r.kind, meta };
   };

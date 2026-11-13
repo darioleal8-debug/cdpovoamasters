@@ -6,6 +6,7 @@
  * esconde a cada delegado.
  */
 import { createHash } from "node:crypto";
+import { withAiAttribution } from "@/lib/ai-usage";
 import { createAdminClient } from "@/lib/supabase/server";
 import { normalizeName, parseGameMeta } from "@/types/competitions";
 import { analyzeSheet } from "@/lib/game-sheet/engine";
@@ -228,7 +229,7 @@ export async function runReconciliation(
       event_id: eventId, status: "analyzing", overrides, updated_at: new Date().toISOString(),
     }, { onConflict: "event_id" });
     const started = Date.now();
-    const ai = await crossCheckWithAI({ game, official, pro, result });
+    const ai = await withAiAttribution({ leagueTeamId: null, feature: "liga-conciliacao" }, () => crossCheckWithAI({ game, official, pro, result }));
     aiRan = true;
     if (ai.ok) {
       aiReview = ai.review;

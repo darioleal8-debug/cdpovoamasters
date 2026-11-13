@@ -5,6 +5,7 @@
  *  - indica a melhor para rever e aplicar ao jogo
  */
 import type { User } from "@supabase/supabase-js";
+import { withAiAttribution } from "@/lib/ai-usage";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { todayInClubTz } from "@/lib/time/club-time";
 import { resolveSheetLocation } from "@/lib/liga/sheet-location";
@@ -186,7 +187,7 @@ export async function createAndAnalyze(
 ): Promise<AnalyzeOutcome> {
   const hash = sha256(buffer);
   // O conteúdo decide o tipo (a escolha do utilizador/omissão só vale na dúvida)
-  const detected = await resolveDocKind({ buffer, mime, declared: opts.docType ?? "official_sheet" });
+  const detected = await withAiAttribution({ leagueTeamId: access.teamId, feature: "liga-classificacao" }, () => resolveDocKind({ buffer, mime, declared: opts.docType ?? "official_sheet" }));
   const docType = detected.kind;
   if (detected.changed) console.info(`[game-sheets] tipo corrigido → ${docType} (${detected.classification.method}, conf=${detected.classification.confidence}) game=${game.id}`);
 

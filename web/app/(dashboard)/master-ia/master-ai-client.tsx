@@ -11,7 +11,7 @@ interface ClubUsage {
   features: Record<string, number>;
 }
 interface Data {
-  months: string[]; current_month: string; clubs: ClubUsage[];
+  months: string[]; current_month: string; clubs: ClubUsage[]; liga: ClubUsage[];
   rates: { input_usd: number; cached_usd: number; output_usd: number; usd_to_eur: number };
 }
 
@@ -26,6 +26,7 @@ export function MasterAiClient() {
   const [months, setMonths] = useState(6);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<string | null>(null);
+  const [tab, setTab] = useState<"clubes" | "liga">("clubes");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -67,6 +68,15 @@ export function MasterAiClient() {
         </select>
       </div>
 
+      <div role="tablist" className="flex gap-1 border-b">
+        {([["clubes", "Equipas (app de gestão)"], ["liga", "Liga INATEL (folhas e estatísticas)"]] as const).map(([k, label]) => (
+          <button
+            key={k} role="tab" aria-selected={tab === k} onClick={() => { setTab(k); setOpen(null); }}
+            className={`-mb-px border-b-2 px-3 py-2 text-sm ${tab === k ? "border-orange-500 font-semibold" : "border-transparent text-muted-foreground"}`}
+          >{label}</button>
+        ))}
+      </div>
+
       {loading || !data ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin" /></div>
       ) : (
@@ -76,14 +86,14 @@ export function MasterAiClient() {
               <thead className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2">Equipa</th>
-                  <th className="px-3 py-2">Limite/mês (€)</th>
+                  <th className="px-3 py-2">{tab === "clubes" ? "Limite/mês (€)" : "Limite"}</th>
                   <th className="px-3 py-2">Este mês</th>
                   {data.months.slice(1).map((m) => <th key={m} className="px-3 py-2 text-right">{monthLabel(m)}</th>)}
                   <th className="px-3 py-2 text-right">Total</th>
                 </tr>
               </thead>
               <tbody>
-                {data.clubs.map((c) => {
+                {(tab === "clubes" ? data.clubs : data.liga).map((c) => {
                   const cur = c.monthly[data.current_month]?.cost ?? 0;
                   const pct = c.limit_eur ? Math.min(100, (cur / c.limit_eur) * 100) : 0;
                   const blocked = c.limit_eur !== null && cur >= c.limit_eur;
@@ -94,7 +104,7 @@ export function MasterAiClient() {
                           {c.name}{!c.active && <span className="ml-2 text-xs text-muted-foreground">(inativo)</span>}
                         </td>
                         <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                          {c.limit_eur === null ? "—" : (
+                          {c.limit_eur === null || tab === "liga" ? "—" : (
                             <Input
                               key={`${c.id}-${c.limit_eur}`} defaultValue={c.limit_eur.toFixed(2)} inputMode="decimal"
                               className="h-8 w-20" aria-label={`Limite mensal de ${c.name}`}
@@ -137,6 +147,14 @@ export function MasterAiClient() {
               </tbody>
             </table>
           </div>
+          {tab === "liga" && data.liga.length === 0 && (
+            <p className="text-sm text-muted-foreground">Ainda não há consumo registado de folhas de jogo ou estatísticas da Liga neste período.</p>
+          )}
+          {tab === "liga" && (
+            <p className="text-xs text-muted-foreground">
+              Interpretação das folhas oficiais e das estatísticas submetidas na Liga, atribuída ao clube da equipa que submeteu. Só registo: não conta para o limite mensal nem bloqueia a Liga.
+            </p>
+          )}
           <p className="text-xs text-muted-foreground">
             Valores estimados a partir dos tokens devolvidos pela DeepSeek (tarifa usada: {data.rates.input_usd} / {data.rates.cached_usd} (cache) / {data.rates.output_usd} USD por 1M tokens de entrada/saída; 1 USD = {data.rates.usd_to_eur} €).
             O Master Admin não é bloqueado, mas o seu consumo é contabilizado no clube.

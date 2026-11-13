@@ -4,6 +4,16 @@ import { fakeSupabase, type Handler, type FakeQuery, type FakeResult } from "./t
 import { emptySheetData } from "./schema";
 
 let current: ReturnType<typeof fakeSupabase>;
+vi.mock("@/lib/supabase/service-raw", () => {
+  const chain: Record<string, unknown> = {};
+  for (const m of ["from", "select", "eq", "insert", "update"]) chain[m] = () => chain;
+  chain.maybeSingle = async () => ({ data: null });
+  return { createRawServiceClient: () => chain };
+});
+vi.mock("@/lib/ai-usage", () => ({
+  withAiAttribution: (_a: unknown, fn: () => unknown) => fn(),
+  enterAiAttribution: () => undefined,
+}));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => current.client, createAdminClient: async () => current.client, createUnscopedAdminClient: async () => current.client }));
 const afterCalls: (() => unknown)[] = [];
 vi.mock("next/server", async (orig) => ({ ...(await orig<typeof import("next/server")>()), after: (fn: () => unknown) => { afterCalls.push(fn); } }));

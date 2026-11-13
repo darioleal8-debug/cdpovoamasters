@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { enterAiAttribution } from "@/lib/ai-usage";
 import { createClient } from "@/lib/supabase/server";
 import { validateQuarters, penalizeConfidence } from "@/lib/liga/game-sheet-scan";
 import type { ScanExtraction, QuarterScore, PlayerScan } from "@/lib/liga/game-sheet-scan";
@@ -129,6 +130,7 @@ export async function POST(req: Request) {
     .eq("user_id", user.id)
     .maybeSingle();
   if (!membership) return NextResponse.json({ error: "Sem acesso de equipa" }, { status: 403 });
+  enterAiAttribution({ leagueTeamId: membership.team_id as string, feature: "liga-folha-oficial" });
 
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "DEEPSEEK_API_KEY não configurada" }, { status: 500 });

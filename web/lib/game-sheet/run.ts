@@ -1,3 +1,5 @@
+import { withAiAttribution } from "@/lib/ai-usage";
+import { createRawServiceClient } from "@/lib/supabase/service-raw";
 import { analyzeSheet } from "./engine";
 import { callOpencvService, isPdf, sniffImageMime } from "./image";
 import { preparePdf } from "@/lib/match-docs/documents";
@@ -48,13 +50,14 @@ export async function runAndStore(
   }
 
   const rosterHint = await rosterHintForEvent(game.id);
-  const result = await analyzeGameSheet({
+  const { data: impRow } = await createRawServiceClient().from("game_sheet_imports").select("team_id").eq("id", importId).maybeSingle();
+  const result = await withAiAttribution({ leagueTeamId: (impRow?.team_id as string | null) ?? access.teamId, feature: "liga-folha-oficial" }, () => analyzeGameSheet({
     rosterHint,
     image: visionImage,
     game: { home: game.home, away: game.away, date: game.date },
     adminInstructions,
     opencvZones: opencvResult?.zones,
-  });
+  }));
 
   if (!result.ok) {
     // Falha: o rascunho fica disponível para preenchimento manual (sem inventar dados)

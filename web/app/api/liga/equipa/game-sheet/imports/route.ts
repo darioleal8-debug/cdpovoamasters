@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { withAiAttribution } from "@/lib/ai-usage";
 import { authorizeGameSheet, BUCKET, importView, isUuid, jsonError, loadGameForAccess, loadImport } from "@/lib/game-sheet/service";
 import { isPdf, MAX_PDF_BYTES, MAX_REQUEST_BYTES, sha256, sniffImageMime } from "@/lib/game-sheet/image";
 import { runAndStore } from "@/lib/game-sheet/run";
@@ -84,7 +85,7 @@ export async function POST(req: Request) {
 
   // O conteúdo decide o tipo: uma captura de ecrã de estatísticas enviada como "folha oficial"
   // (ou o contrário) é encaminhada para o extrator certo em vez de produzir uma leitura vazia.
-  const detected = await resolveDocKind({ buffer, mime, declared: docType });
+  const detected = await withAiAttribution({ leagueTeamId: access.teamId, feature: "liga-classificacao" }, () => resolveDocKind({ buffer, mime, declared: docType }));
   const docTypeCorrected = detected.changed ? { from: docType, to: detected.kind } : null;
   if (detected.changed) {
     console.info(`[game-sheet] tipo de documento corrigido ${docType} → ${detected.kind} (${detected.classification.method}, conf=${detected.classification.confidence}) game=${game.id}`);

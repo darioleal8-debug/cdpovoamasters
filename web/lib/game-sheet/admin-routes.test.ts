@@ -13,6 +13,10 @@ const GAME = "00000000-0000-4000-8000-0000000000e1";
 const IMP = "00000000-0000-4000-8000-0000000000a1";
 const SUB = "00000000-0000-4000-8000-0000000000b1";
 
+vi.mock("@/lib/ai-usage", () => ({
+  withAiAttribution: (_a: unknown, fn: () => unknown) => fn(),
+  enterAiAttribution: () => undefined,
+}));
 vi.mock("@/lib/auth/liga-admin-guard", () => ({
   authorizeAsLigaAdmin: async () =>
     isAdmin

@@ -3,6 +3,8 @@
  * (status 'processing' → needs_review | ready_to_confirm | failed). Mesmo padrão do boletim:
  * a sessão do utilizador (RLS) é usada para gravar; falhas da API nunca apagam o documento.
  */
+import { withAiAttribution } from "@/lib/ai-usage";
+import { createRawServiceClient } from "@/lib/supabase/service-raw";
 import { BUCKET, type Access, type GameInfo, type ImportRow } from "@/lib/game-sheet/service";
 import { createAdminClient } from "@/lib/supabase/server";
 import { sniffImageMime } from "@/lib/game-sheet/image";
@@ -46,10 +48,11 @@ export async function runProStatsAndStore(
   const cfg = proStatsConfig();
   const mime = sniffImageMime(buffer) ?? "image/jpeg";
   const rosterHint = await rosterHintForEvent(game.id);
-  const result = await extractProStats({
+  const { data: impRow } = await createRawServiceClient().from("game_sheet_imports").select("team_id").eq("id", importId).maybeSingle();
+  const result = await withAiAttribution({ leagueTeamId: (impRow?.team_id as string | null) ?? access.teamId, feature: "liga-estatisticas" }, () => extractProStats({
     buffer, mime, game: { home: game.home, away: game.away, date: game.date },
     submittingTeam: access.teamName, adminInstructions, rosterHint,
-  });
+  }));
 
   if (!result.ok) {
     console.error(`[pro-stats] análise falhou import=${importId} kind=${result.kind} model=${cfg.model} ms=${result.usage.totalDurationMs}`);
@@ -116,7 +119,7 @@ export async function convertToProStatsIfNeeded(access: Access, row: ImportRow):
   const buffer = Buffer.from(await blob.arrayBuffer());
   const mime = sniffImageMime(buffer);
   if (!mime) return null;
-  const c = await classifyDocument({ buffer, mime, declared: "official_sheet" });
+  const c = await withAiAttribution({ leagueTeamId: (row as { team_id?: string | null }).team_id ?? access.teamId, feature: "liga-classificacao" }, () => classifyDocument({ buffer, mime, declared: "official_sheet" }));
   if (c.kind !== "pro_stats" || c.confidence < OVERRIDE_CONFIDENCE) return null;
   const { error: updErr } = await access.supabase.from("game_sheet_imports")
     .update({ doc_type: "pro_stats", updated_at: new Date().toISOString() })
