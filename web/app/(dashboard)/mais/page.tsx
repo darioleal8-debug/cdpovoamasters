@@ -12,7 +12,6 @@ import {
   Settings,
   Users,
   UserCog,
-  Shield,
   FolderOpen,
 } from "lucide-react";
 import { logout } from "@/lib/auth/logout";
@@ -34,7 +33,6 @@ const ITEMS: MenuItem[] = [
   { label: "Documentos",       href: "/documentos",    icon: FolderOpen,    desc: "Regulamentos e documentos oficiais" },
   { label: "Histórico",        href: "/historico",     icon: History,       desc: "Épocas anteriores" },
   { label: "Financeiro",       href: "/financeiro",    icon: Landmark,      desc: "Caixa e entradas" },
-  { label: "Liga INATEL",      href: "/liga-inatel",   icon: Shield,        desc: "Classificação e resultados" },
   { label: "Gestão de Contas", href: "/gestao-contas", icon: UserCog,       desc: "Contas de utilizador" },
   { label: "Configurações",    href: "/configuracoes", icon: Settings,      desc: "Preferências do clube" },
 ];

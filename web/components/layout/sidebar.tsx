@@ -45,7 +45,6 @@ const managementItems = [
   { label: "Documentos",       href: "/documentos",    icon: FolderOpen },
   { label: "Histórico",        href: "/historico",     icon: History   },
   { label: "Palmarés",         href: "/palmares",      icon: Trophy    },
-  { label: "Liga INATEL",      href: "/liga",          icon: Shield    },
   { label: "Laboratório",      href: "/laboratorio",   icon: ClipboardList },
 ];
 
@@ -65,7 +64,6 @@ const seccionistaItems = [
   { label: "Estatísticas", href: "/estatisticas", icon: BarChart3 },
   { label: "Documentos",   href: "/documentos",   icon: FolderOpen },
   { label: "Palmarés",     href: "/palmares",     icon: Trophy    },
-  { label: "Liga INATEL",  href: "/liga-inatel",  icon: Shield    },
 ];
 
 const communicationItems = [
@@ -157,6 +155,7 @@ export function Sidebar({ role, rolesExtra = [], isMaster = false }: { role?: Us
               {managementItems.map((item) => (
                 <NavLink key={item.href} {...item} />
               ))}
+              {isMaster && <NavLink href="/liga" icon={Shield} label="Liga INATEL" />}
             </div>
 
             <SectionLabel>Financeiro</SectionLabel>
