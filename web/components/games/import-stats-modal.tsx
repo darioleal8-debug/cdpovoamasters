@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { ClubName } from "@/lib/club-context";
 import {
   Upload, Loader2, Check, AlertTriangle,
   ChevronDown, ChevronUp, FileText,
@@ -162,7 +163,7 @@ export function ImportStatsModal({
           <DialogHeader>
             <DialogTitle>Importar Estatísticas via PDF</DialogTitle>
             <p className="text-sm text-muted-foreground mt-0.5">
-              CD Póvoa vs {opponentName ?? "Adversário"}
+              <ClubName /> vs {opponentName ?? "Adversário"}
             </p>
           </DialogHeader>
         </div>
@@ -251,7 +252,7 @@ export function ImportStatsModal({
               <div className="rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3 flex gap-3">
                 <AlertTriangle className="h-5 w-5 text-yellow-600 shrink-0 mt-0.5" />
                 <div className="text-sm text-yellow-800">
-                  <p className="font-semibold mb-1">Equipa CD Póvoa não identificada no PDF</p>
+                  <p className="font-semibold mb-1">Equipa <ClubName /> não identificada no PDF</p>
                   <p>O DeepSeek não reconheceu automaticamente o nome da equipa. Introduza o nome exacto como aparece no PDF (ex: <strong>*Masters_CDP</strong>, <strong>Póvoa Masters</strong>).</p>
                 </div>
               </div>
@@ -303,7 +304,7 @@ export function ImportStatsModal({
                   <Label htmlFor="update-score" className="text-sm cursor-pointer">
                     Actualizar marcador:{" "}
                     <strong>
-                      CD Póvoa {analysis.pdf_home_score} – {analysis.pdf_away_score}{" "}
+                      <ClubName /> {analysis.pdf_home_score} – {analysis.pdf_away_score}{" "}
                       {analysis.pdf_opponent ?? "Adversário"}
                     </strong>
                   </Label>

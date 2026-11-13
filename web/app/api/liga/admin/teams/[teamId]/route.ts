@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 
 // PATCH /api/liga/admin/teams/[teamId]
 // Actualiza dados do equipamento de uma equipa (primary_color, secondary_color, kit_description, logo_url)
@@ -32,7 +32,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Nenhum campo válido fornecido" }, { status: 400 });
   }
 
-  const admin = await createAdminClient();
+  const admin = await createUnscopedAdminClient();
   const { error } = await admin
     .from("league_teams")
     .update(updates)

@@ -1,7 +1,7 @@
 # Modelo multi-clube (HoopHub)
 
 ## Estado
-- Fases 1, 2 e 3a aplicadas em produção (migrações 123–130). Rollback: `supabase/rollbacks/123_125_multiclube_rollback.sql`.
+- Fases 1, 2 e 3a aplicadas em produção (migrações 123–131). Rollback: `supabase/rollbacks/123_125_multiclube_rollback.sql`.
 - Backup pré-alteração: schema `backup_20261112` (mesma BD; apagar quando estável).
 - **Ainda NÃO é seguro dar contas de gestão a outros clubes** (ver "Pendente").
 
@@ -29,7 +29,9 @@ O teste `web/lib/auth/club-id-guard.test.ts` falha para ficheiros novos; os exis
 - **Isolamento nas rotas (feito, parcial):** `createServiceClient()` filtra por clube (`lib/supabase/club-scope.ts`) as tabelas com `club_id` e `users`, e força o `club_id` nos inserts. Cron/páginas públicas (sem sessão) ficam sem filtro. Jogos da Liga (`events.club_id` nulo) continuam acessíveis.
 - **Tabelas filhas (feito, migração 129):** têm `club_id` herdado do pai por trigger e entram no isolamento das rotas; as que não são do chat têm também RLS restritiva. Fora do âmbito: tabelas da Liga (game_photos, game_sheet_imports, match_reconciliations, news, result_submissions, game_audit_log), que pertencem ao domínio da Liga.
 - **Branding por clube (feito, migração 130):** cada clube tem a sua linha em `club_settings` (criada ao criar o clube); `/api/club-settings`, logo, layout do jogador, recibos, sidebar e a equipa da Liga do clube (`clubs.league_team_id`) já seguem o clube do utilizador. Sem sessão (páginas públicas) usa-se a linha `default` (CD Póvoa).
-- Ainda por tornar por clube: ~80 textos "Póvoa" em páginas, e-mails e fluxos de importação de calendário/folhas de jogo (usam `is_our_team`).
+- **Textos do clube (feito):** nomes nos ecrãs de jogos, estatísticas, live, palmarés, importações e PDF vêm do clube do utilizador (`<ClubName />`/`useClubName`). Importação de calendário: a equipa por omissão é a da Liga do clube e só a plataforma ativa `league_teams.is_our_team` (flag global única).
+- **Código público e da Liga** (`/liga-inatel`, `/api/liga`, `/api/public`, `/equipa`) usa `createUnscopedAdminClient` (sem filtro de clube; dados partilhados, autorização própria). Épocas: leitura isolada por clube (migração 131); páginas públicas de equipa filtram a época pelo `club_id`; o cron de quotas em atraso percorre uma época ativa por clube.
+- Limitações conhecidas: os prompts de IA dos importadores de estatísticas ainda citam "CD Póvoa" como exemplo (o utilizador pode indicar o nome da equipa quando não é reconhecida); alguns textos de marketing/landing e placeholders mencionam a Póvoa.
 - (feito) todas as escritas service-role definem `club_id`; a allowlist do teste está vazia.
 - Storage buckets, leituras públicas de `club_settings`/`team_aliases`, `is_our_team` e referências "Póvoa" no código.
 - Jogos de outros clubes na tabela `events` do CD Póvoa (Fase 4: `league_games`).

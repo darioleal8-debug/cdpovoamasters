@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 
 // PATCH /api/liga/admin/games/[eventId]
 export async function PATCH(
@@ -22,7 +22,7 @@ export async function PATCH(
     away_team?: string;
   };
 
-  const adminClient = await createAdminClient();
+  const adminClient = await createUnscopedAdminClient();
 
   const { data: current, error: fetchErr } = await adminClient
     .from("events")
@@ -121,7 +121,7 @@ export async function DELETE(
 
   const { eventId } = await params;
 
-  const adminClient = await createAdminClient();
+  const adminClient = await createUnscopedAdminClient();
 
   const { data: current, error: fetchErr } = await adminClient
     .from("events")

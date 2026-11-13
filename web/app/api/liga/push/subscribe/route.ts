@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { parseSubscription } from "@/lib/liga/push/subscription";
 
 export const runtime = "nodejs";
@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   try { body = JSON.parse(raw); } catch { return NextResponse.json({ error: "Payload inválido" }, { status: 400 }); }
   const parsed = parseSubscription(body);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
-  const db = await createAdminClient();
+  const db = await createUnscopedAdminClient();
   const { error } = await db.from("liga_push_subscriptions").upsert(
     { ...parsed.value, user_agent: (req.headers.get("user-agent") ?? "").slice(0, 200), last_seen_at: new Date().toISOString() },
     { onConflict: "endpoint" },
@@ -26,7 +26,7 @@ export async function DELETE(req: Request) {
   let endpoint: unknown;
   try { endpoint = (await req.json())?.endpoint; } catch { return NextResponse.json({ error: "Payload inválido" }, { status: 400 }); }
   if (typeof endpoint !== "string" || endpoint.length > 600) return NextResponse.json({ error: "Endpoint inválido" }, { status: 400 });
-  const db = await createAdminClient();
+  const db = await createUnscopedAdminClient();
   await db.from("liga_push_subscriptions").delete().eq("endpoint", endpoint);
   return NextResponse.json({ ok: true });
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState, useCallback } from "react";
+import { ClubName } from "@/lib/club-context";
 import type { GameSession, PlayByPlay } from "@/types/database";
 import type { PlayerWithUser } from "@/types/database";
 import type { DerivedPlayerStats } from "@/lib/live/derive-stats";
@@ -214,7 +215,7 @@ export function ShareOverlay({
                 {session.home_score} — {session.away_score}
               </p>
               <p style={{ fontSize: 12, color: "#7898b8", margin: "4px 0 0" }}>
-                CD Póvoa vs {session.opponent_name ?? "Adversário"} · cartão 1080×1350
+                <ClubName /> vs {session.opponent_name ?? "Adversário"} · cartão 1080×1350
               </p>
             </div>
 

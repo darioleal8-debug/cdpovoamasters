@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { ClubName } from "@/lib/club-context";
 import { X, Plus, Trash2 } from "lucide-react";
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
@@ -397,7 +398,7 @@ export function PalmaresView({ allowAdmin = true }: { allowAdmin?: boolean }) {
         <div className="text-center mb-10">
           <div style={{ height: 1, background: "linear-gradient(to right, transparent, #c9a24b80, transparent)", maxWidth: 160, margin: "0 auto 18px" }} />
           <p className="palmares-serif" style={{ color: "#c9a24b", fontSize: 11, letterSpacing: "0.35em", textTransform: "uppercase", marginBottom: 6 }}>
-            CD Póvoa Masters · Liga Amadora INATEL Porto
+            <ClubName /> · Liga Amadora INATEL Porto
           </p>
           <h1 className="palmares-serif" style={{ color: "#f5f1e8", fontSize: "clamp(2.6rem, 7vw, 4rem)", fontWeight: 600, lineHeight: 1 }}>Palmarés</h1>
           <p className="palmares-serif" style={{ color: "#a8a296", fontSize: 18, marginTop: 6, fontStyle: "italic" }}>Sala de troféus — uma história de conquistas</p>

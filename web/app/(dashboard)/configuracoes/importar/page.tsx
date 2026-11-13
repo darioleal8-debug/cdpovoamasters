@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useClubName } from "@/lib/club-context";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -150,7 +151,8 @@ export default function ImportarCalendarioPage() {
 
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [seasonId, setSeasonId] = useState<string>("");
-  const [ourTeam, setOurTeam] = useState("CD Póvoa");
+  const clubName = useClubName();
+  const [ourTeam, setOurTeam] = useState("");
   const [importAll, setImportAll] = useState(false);
   const [useAI, setUseAI] = useState(true);
   const [file, setFile] = useState<File | null>(null);
@@ -416,7 +418,7 @@ export default function ImportarCalendarioPage() {
               <Input
                 value={ourTeam}
                 onChange={(e) => setOurTeam(e.target.value)}
-                placeholder="CD Póvoa"
+                placeholder={clubName}
               />
             </div>
           </div>

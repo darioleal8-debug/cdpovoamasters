@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { parseGameMeta } from "@/types/competitions";
 import { getOurTeamName } from "@/lib/competitions-data";
 import {
@@ -18,7 +18,7 @@ export type LivePublishResult =
  * Escreve com service role — o chamador tem de ter validado as permissões.
  */
 export async function publishLiveSessionToLeague(sessionId: string, actorUserId: string): Promise<LivePublishResult> {
-  const db = await createAdminClient();
+  const db = await createUnscopedAdminClient();
 
   const { data: session } = await db
     .from("game_sessions")

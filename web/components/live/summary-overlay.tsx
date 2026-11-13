@@ -1,6 +1,7 @@
 "use client";
 
 import type { GameSession, PlayByPlay } from "@/types/database";
+import { ClubName } from "@/lib/club-context";
 import type { PlayerWithUser } from "@/types/database";
 import { deriveStats, efficiency, totalAwayFouls } from "@/lib/live/derive-stats";
 import { formatMinutes } from "@/lib/live/minutes";
@@ -87,7 +88,7 @@ export function SummaryOverlay({
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{ fontFamily: MONO, fontSize: 34, fontWeight: 700, color: "var(--text)" }}>
-                CD Póvoa{" "}
+                <ClubName />{" "}
                 <span style={{ color: "var(--accent)" }}>{session.home_score}</span>
                 {" — "}
                 <span>{session.away_score}</span>

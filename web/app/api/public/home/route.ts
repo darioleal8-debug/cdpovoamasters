@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient as createServerClient, createAdminClient } from "@/lib/supabase/server";
+import { createClient as createServerClient, createUnscopedAdminClient } from "@/lib/supabase/server";
 import { getSeriesByTeamId, getLatestNoticias } from "@/lib/competitions-data";
 
 export const runtime = "nodejs";
@@ -32,7 +32,7 @@ type PublicLeague = {
 // Ligas públicas (competitions.is_public) — independentes de haver clubes públicos
 async function getPublicLeagues(): Promise<PublicLeague[]> {
   try {
-    const admin = await createAdminClient();
+    const admin = await createUnscopedAdminClient();
     const { data: comps } = await admin
       .from("competitions")
       .select("id, name, slug, logo_url")

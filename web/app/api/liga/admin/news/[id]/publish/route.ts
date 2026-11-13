@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/game-sheet/service";
 
 export const runtime = "nodejs";
@@ -16,7 +16,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   try { body = await req.json(); } catch { return NextResponse.json({ error: "JSON inválido" }, { status: 400 }); }
   if (typeof body.is_published !== "boolean") return NextResponse.json({ error: "is_published obrigatório" }, { status: 400 });
 
-  const admin = await createAdminClient();
+  const admin = await createUnscopedAdminClient();
   const { data, error } = await admin
     .from("news")
     .update({ is_published: body.is_published, ...(body.is_published ? { published_at: new Date().toISOString() } : {}) })

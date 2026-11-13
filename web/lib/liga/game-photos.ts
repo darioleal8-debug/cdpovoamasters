@@ -1,11 +1,11 @@
 import "server-only";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
-import type { createAdminClient } from "@/lib/supabase/server";
+import type { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { parseGameMeta } from "@/types/competitions";
 import { generateNewsImage } from "@/lib/liga/generate-image";
 
-type AdminClient = Awaited<ReturnType<typeof createAdminClient>>;
+type AdminClient = Awaited<ReturnType<typeof createUnscopedAdminClient>>;
 
 export const GAME_PHOTOS_BUCKET = "game-photos";
 export const GAME_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];

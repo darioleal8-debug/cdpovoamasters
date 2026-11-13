@@ -161,3 +161,13 @@ export function ClubProvider({ children }: { children: ReactNode }) {
 export function useClubSettings() {
   return useContext(ClubContext);
 }
+
+/** Nome do clube do utilizador (definições do clube). */
+export function useClubName(): string {
+  return useContext(ClubContext).settings.club_name;
+}
+
+/** Para usar como texto em JSX: <ClubName /> */
+export function ClubName() {
+  return <>{useClubName()}</>;
+}

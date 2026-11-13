@@ -2,7 +2,7 @@ import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { generateLigaNews } from "@/lib/liga/generate-news";
 import { generateNewsImage } from "@/lib/liga/generate-image";
 import { buildApprovalPlan } from "@/lib/game-sheet/approval";
@@ -33,7 +33,7 @@ export async function PATCH(
     return NextResponse.json({ error: "motivo obrigatório" }, { status: 400 });
   }
 
-  const adminClient = await createAdminClient();
+  const adminClient = await createUnscopedAdminClient();
 
   const { data: sub } = await adminClient
     .from("result_submissions")

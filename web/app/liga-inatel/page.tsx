@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCompetitionBySlug, getCompetitionGames, getStandingsBySeries, getLatestNoticias } from "@/lib/competitions-data";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { todayInClubTz } from "@/lib/time/club-time";
 import { CourtBg } from "@/components/competitions/court-bg";
 import { TeamMono } from "@/components/competitions/team-mono";
@@ -59,7 +59,7 @@ export default async function LigaInatelHomePage() {
   const tomorrowDate = new Date(now.getTime() + 86_400_000);
   const tomorrowStr  = todayInClubTz(tomorrowDate);
 
-  const supabase = await createAdminClient();
+  const supabase = await createUnscopedAdminClient();
 
   const [games, standingsBySeries, noticias, seasonRes, teamsRes] = await Promise.all([
     getCompetitionGames(competition.competition_key ?? "Liga", competition.season_id),

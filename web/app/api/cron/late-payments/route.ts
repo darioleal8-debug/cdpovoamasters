@@ -37,15 +37,25 @@ export async function POST(req: NextRequest) {
 async function sendLateReminders() {
   const db = adminClient();
 
-  const { data: season } = await db
+  // Uma época ativa por clube (só clubes ativos)
+  const { data: seasonsRaw } = await db
     .from("seasons")
-    .select("id, name")
+    .select("id, name, clubs!inner(active)")
     .eq("status", "ativa")
-    .maybeSingle();
-
-  if (!season) {
+    .eq("clubs.active", true);
+  const seasonList = (seasonsRaw ?? []) as { id: string; name: string }[];
+  if (seasonList.length === 0) {
     return NextResponse.json({ ok: true, message: "Nenhuma época ativa", sent: 0, failed: 0 });
   }
+  let totalSent = 0, totalFailed = 0, totalRows = 0;
+  for (const season of seasonList) {
+    const r = await remindSeason(db, season);
+    totalSent += r.sent; totalFailed += r.failed; totalRows += r.total;
+  }
+  return NextResponse.json({ ok: true, sent: totalSent, failed: totalFailed, total: totalRows });
+}
+
+async function remindSeason(db: ReturnType<typeof adminClient>, season: { id: string; name: string }): Promise<{ sent: number; failed: number; total: number }> {
 
   type SummaryRow = { player_id: string; months_late: number; total_missing: number };
   const { data: summary, error: sumError } = await db
@@ -56,12 +66,10 @@ async function sendLateReminders() {
 
   if (sumError) {
     console.error("[cron/late-payments] Erro ao obter resumo:", sumError.message);
-    return NextResponse.json({ error: sumError.message }, { status: 500 });
+    return { sent: 0, failed: 0, total: 0 };
   }
 
-  if (!summary?.length) {
-    return NextResponse.json({ ok: true, message: "Nenhum jogador em atraso", sent: 0, failed: 0 });
-  }
+  if (!summary?.length) return { sent: 0, failed: 0, total: 0 };
 
   const playerIds = (summary as SummaryRow[]).map((s) => s.player_id);
 
@@ -78,7 +86,7 @@ async function sendLateReminders() {
 
   const userIds = [...new Set(playerUserMap.values())];
   if (!userIds.length) {
-    return NextResponse.json({ ok: true, message: "Nenhum utilizador ligado", sent: 0, failed: 0 });
+    return { sent: 0, failed: 0, total: 0 };
   }
 
   const { data: users } = await db
@@ -118,5 +126,5 @@ async function sendLateReminders() {
   }
 
   console.log(`[cron/late-payments] Época=${season.name} | Total=${summary.length} | Enviados=${sent} | Falhas=${failed}`);
-  return NextResponse.json({ ok: true, sent, failed, total: summary.length });
+  return { sent, failed, total: summary.length };
 }

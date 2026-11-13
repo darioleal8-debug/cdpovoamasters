@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { isUuid, jsonError, type GameInfo } from "@/lib/game-sheet/service";
 import { adminAccess, createAndAnalyze } from "@/lib/game-sheet/admin-sheets";
 import { isPdf, MAX_PDF_BYTES, MAX_REQUEST_BYTES, sniffImageMime } from "@/lib/game-sheet/image";
@@ -27,7 +27,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ eventId
   if (!mime) return jsonError("Formato não suportado. Use JPEG, PNG, WebP ou PDF.", 400);
   if (!isPdf(mime) && buffer.length > MAX_REQUEST_BYTES) return jsonError("Imagem demasiado grande (máx. 4 MB).", 400);
 
-  const db = await createAdminClient();
+  const db = await createUnscopedAdminClient();
   const game = await loadMatchGame(db, eventId);
   if (!game) return jsonError("Jogo não encontrado", 404);
   const info: GameInfo = { id: game.id, date: game.date, home: game.home, away: game.away, isTest: game.isTest };

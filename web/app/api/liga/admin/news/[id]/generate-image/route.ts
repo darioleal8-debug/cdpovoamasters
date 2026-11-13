@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { after } from "next/server";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { generateNewsImage, generateNewsImageFromPrompt } from "@/lib/liga/generate-image";
 
 export const maxDuration = 120;
@@ -20,7 +20,7 @@ export async function POST(
   const body = await req.json().catch(() => ({})) as { custom_prompt?: string };
   const customPrompt = body.custom_prompt?.trim() || null;
 
-  const admin = await createAdminClient();
+  const admin = await createUnscopedAdminClient();
   const { data: article } = await admin
     .from("news")
     .select("id, title, excerpt, home_team_name, away_team_name")

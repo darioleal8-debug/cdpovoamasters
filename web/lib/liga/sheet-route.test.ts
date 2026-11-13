@@ -12,8 +12,7 @@ vi.mock("@/lib/auth/liga-admin-guard", () => ({
       ? { ok: true, user: { id: "admin" } }
       : { ok: false, response: NextResponse.json({ error: "Sem permissão de admin da liga" }, { status: 403 }) },
 }));
-vi.mock("@/lib/supabase/server", () => ({
-  createAdminClient: async () => ({
+const mkAdmin = () => ({
     from: () => ({
       select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: photoUrl === undefined ? null : { photo_url: photoUrl } }) }) }),
     }),
@@ -27,7 +26,10 @@ vi.mock("@/lib/supabase/server", () => ({
         },
       }),
     },
-  }),
+  });
+vi.mock("@/lib/supabase/server", () => ({
+  createAdminClient: async () => mkAdmin(),
+  createUnscopedAdminClient: async () => mkAdmin(),
 }));
 
 const { GET } = await import("@/app/api/liga/admin/submissions/[id]/sheet/route");

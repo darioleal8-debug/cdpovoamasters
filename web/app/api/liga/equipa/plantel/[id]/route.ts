@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { authorizeLeagueDelegate } from "@/lib/auth/liga-delegate-guard";
 import { loadHoophubRoster, parsePlayerFields } from "@/lib/liga/roster";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { storePlayerPhoto, removePlayerPhoto } from "@/lib/liga/roster-photo";
 import { isUuid } from "@/lib/game-sheet/service";
 
 export const runtime = "nodejs";
 async function managedByHoophub(teamId: string): Promise<boolean> {
-  try { return (await loadHoophubRoster(await createAdminClient(), teamId)).length > 0; } catch { return false; }
+  try { return (await loadHoophubRoster(await createUnscopedAdminClient(), teamId)).length > 0; } catch { return false; }
 }
 const HOOPHUB_MANAGED = { error: "O plantel desta equipa vem da app de gestão HoopHub — altere-o lá e fica atualizado aqui." };
 type Params = { params: Promise<{ id: string }> };

@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { publishLiveSessionToLeague } from "@/lib/liga/live-publish";
 import { generateLigaNews } from "@/lib/liga/generate-news";
 import { generateNewsImage } from "@/lib/liga/generate-image";
@@ -25,7 +25,7 @@ export async function ligaCatchUp(opts: {
   schedule: (fn: () => Promise<void>) => void;
 }): Promise<CatchUpReport> {
   const limit = opts.limit ?? 2;
-  const db = await createAdminClient();
+  const db = await createUnscopedAdminClient();
   const since = new Date(Date.now() - LOOKBACK_DAYS * 86_400_000).toISOString();
   const report: CatchUpReport = { published: [], news: [], errors: [] };
 

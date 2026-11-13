@@ -2,21 +2,21 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { authorizeLeagueDelegate } from "@/lib/auth/liga-delegate-guard";
 import { loadHoophubRoster, loadTeamRoster, parsePlayerFields } from "@/lib/liga/roster";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { storePlayerPhoto, removePlayerPhoto } from "@/lib/liga/roster-photo";
 
 export const runtime = "nodejs";
 
 const HOOPHUB_MANAGED_MSG = "O plantel desta equipa vem da app de gestão HoopHub — altere-o lá e fica atualizado aqui.";
 async function isManagedByHoophub(teamId: string): Promise<boolean> {
-  try { return (await loadHoophubRoster(await createAdminClient(), teamId)).length > 0; } catch { return false; }
+  try { return (await loadHoophubRoster(await createUnscopedAdminClient(), teamId)).length > 0; } catch { return false; }
 }
 
 /** Plantel da equipa do delegado. */
 export async function GET() {
   const auth = await authorizeLeagueDelegate();
   if (!auth.ok) return auth.response;
-  const admin = await createAdminClient();
+  const admin = await createUnscopedAdminClient();
   const players = await loadTeamRoster(auth.supabase, auth.teamId, admin);
   const managedBy = players.some((p) => p.source === "hoophub") ? "hoophub" : null;
   return NextResponse.json({ team: { id: auth.teamId, name: auth.teamName }, players, managedBy });

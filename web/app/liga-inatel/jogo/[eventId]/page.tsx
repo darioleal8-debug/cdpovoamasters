@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { parseGameMeta } from "@/types/competitions";
 import { CourtBg } from "@/components/competitions/court-bg";
 import { TeamMono } from "@/components/competitions/team-mono";
@@ -28,7 +28,7 @@ type GamePeriod = { periodo: number; home_points: number; away_points: number };
 type PlayerStat = { nome: string; side: "home" | "away"; numero: number | null; pontos: number; triplos: number; lances_livres: number; faltas: number };
 
 async function getGamePageData(eventId: string) {
-  const supabase = await createAdminClient();
+  const supabase = await createUnscopedAdminClient();
 
   const [eventRes, resultRes, periodsRes, playerStatsRes] = await Promise.all([
     supabase.from("events")

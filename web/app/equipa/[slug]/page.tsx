@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Image from "next/image";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 
 export const revalidate = 300;
@@ -26,11 +26,11 @@ interface TeamRecord { wins: number; losses: number; played: number }
 async function getTeamData(slug: string): Promise<{
   club: Club; season: Season | null; players: Player[]; games: Game[]; record: TeamRecord;
 } | null> {
-  const admin = await createAdminClient();
+  const admin = await createUnscopedAdminClient();
 
   const { data: club } = await admin
     .from("club_settings")
-    .select("id, club_name, logo_url, slug")
+    .select("id, club_id, club_name, logo_url, slug")
     .eq("slug", slug)
     .eq("is_public", true)
     .single();
@@ -40,6 +40,7 @@ async function getTeamData(slug: string): Promise<{
   const { data: season } = await admin
     .from("seasons")
     .select("id, name, year")
+    .eq("club_id", club.club_id)
     .eq("status", "ativa")
     .order("created_at", { ascending: false })
     .limit(1)

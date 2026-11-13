@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useClubName, ClubName } from "@/lib/club-context";
 import { useParams, useRouter } from "next/navigation";
 import { useLiveGame, DEFAULT_PERIOD_SECS } from "@/hooks/use-live-game";
 import { useLivePrefs } from "@/hooks/use-live-prefs";
@@ -72,6 +73,7 @@ function formatGameInfo(ev: EventData | null, opponent: string): string {
 }
 
 export default function LiveGamePage() {
+  const clubName = useClubName();
   const params = useParams<{ eventId: string }>();
   const router = useRouter();
   const { prefs, setLayout, setDark, setFullscreen } = useLivePrefs();
@@ -376,7 +378,7 @@ export default function LiveGamePage() {
           <span style={{ fontSize: 13, fontWeight: 800, color: "var(--text)", flex: 1, minWidth: 200 }}>
             {isTied
               ? `Empate ${session.home_score}–${session.away_score} no fim do ${session.current_period}º período — segue para prolongamento.`
-              : `Fim do ${session.current_period > REGULATION_PERIODS ? "prolongamento" : "4º período"} · CD Póvoa ${session.home_score}–${session.away_score} ${session.opponent_name}`}
+              : `Fim do ${session.current_period > REGULATION_PERIODS ? "prolongamento" : "4º período"} · ${clubName} ${session.home_score}–${session.away_score} ${session.opponent_name}`}
           </span>
           {isTied ? (
             <button onClick={() => setPeriodDialog(true)} disabled={recording}
@@ -706,7 +708,7 @@ export default function LiveGamePage() {
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Terminar Jogo</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">
-            CD Póvoa <strong>{session?.home_score}</strong> –{" "}
+            <ClubName /> <strong>{session?.home_score}</strong> –{" "}
             <strong>{session?.away_score}</strong> {session?.opponent_name}
             <br />Confirmas o resultado final? Depois de finalizado, nenhuma estatística pode ser alterada.
           </p>

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 
 const BUCKET = "noticias";
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -16,7 +16,7 @@ export async function PATCH(
   if (!auth.ok) return auth.response;
 
   const { id } = await params;
-  const admin = await createAdminClient();
+  const admin = await createUnscopedAdminClient();
 
   // Verificar que a notícia existe e é Liga INATEL
   const { data: article } = await admin
@@ -86,7 +86,7 @@ export async function DELETE(
   if (!auth.ok) return auth.response;
 
   const { id } = await params;
-  const admin = await createAdminClient();
+  const admin = await createUnscopedAdminClient();
 
   const { data: article } = await admin
     .from("news")

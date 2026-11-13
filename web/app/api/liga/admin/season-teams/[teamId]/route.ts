@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 
 // PATCH /api/liga/admin/season-teams/[teamId]
 // Ativa/desativa uma equipa e/ou define a sua série (A, B, C…) na temporada atual da Liga INATEL.
@@ -32,7 +32,7 @@ export async function PATCH(
     }
   }
 
-  const adminClient = await createAdminClient();
+  const adminClient = await createUnscopedAdminClient();
 
   const { data: comp } = await adminClient
     .from("competitions")

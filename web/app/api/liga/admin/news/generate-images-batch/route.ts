@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { after } from "next/server";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { generateNewsImage } from "@/lib/liga/generate-image";
 
 export const maxDuration = 300;
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({})) as { force?: boolean };
   const force = body.force === true;
 
-  const admin = await createAdminClient();
+  const admin = await createUnscopedAdminClient();
   let query = admin
     .from("news")
     .select("id, title, excerpt, home_team_name, away_team_name")
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
         console.error(`[generateImages/batch] parando em ${result.errorType} após artigo ${article.id}`);
         const remaining = articles.slice(i + 1);
         if (remaining.length > 0) {
-          const batchAdmin = await createAdminClient();
+          const batchAdmin = await createUnscopedAdminClient();
           await batchAdmin
             .from("news")
             .update({

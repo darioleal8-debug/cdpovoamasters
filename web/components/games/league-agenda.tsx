@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useClubName } from "@/lib/club-context";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -259,8 +260,9 @@ function ExtraGameCard({
   const isFriendly = ev.game_type === "friendly";
   const isTaca     = ev.competition === "Taça";
   const isHome     = meta?.is_home ?? null;
-  const homeTeam   = meta?.home_team ?? (isHome ? "CD Póvoa Masters" : (ev.opponent ?? ""));
-  const awayTeam   = meta?.away_team ?? (!isHome ? "CD Póvoa Masters" : (ev.opponent ?? ""));
+  const clubName   = useClubName();
+  const homeTeam   = meta?.home_team ?? (isHome ? clubName : (ev.opponent ?? ""));
+  const awayTeam   = meta?.away_team ?? (!isHome ? clubName : (ev.opponent ?? ""));
   const pavilion   = meta?.pavilion ?? ev.location;
   const locality   = meta?.locality;
   const mapsUrl    = buildMapsUrl(pavilion, locality);

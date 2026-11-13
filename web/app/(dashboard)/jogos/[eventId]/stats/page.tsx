@@ -1,5 +1,6 @@
 ﻿"use client";
 import { toPeriodPartials } from "@/lib/live/period-scores";
+import { ClubName, useClubName } from "@/lib/club-context";
 
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -237,6 +238,7 @@ function GameDetailFallback({ eventId }: { eventId: string }) {
 }
 
 export default function GameStatsPage() {
+  const clubName = useClubName();
   const params = useParams<{ eventId: string }>();
   const router = useRouter();
   const [pdfLoading,   setPdfLoading]   = useState(false);
@@ -330,7 +332,7 @@ export default function GameStatsPage() {
           user: { id: s.player_id, name: profile?.user.name ?? "—" },
         };
       });
-      await generateGamePDF(session!, statsWithExtras, periodScores, pdfCtx);
+      await generateGamePDF(session!, statsWithExtras, periodScores, { ...pdfCtx, clubName });
     } finally {
       setPdfLoading(false);
     }
@@ -356,7 +358,7 @@ export default function GameStatsPage() {
               </Badge>
             )}
           </div>
-          <p className="text-sm text-muted-foreground">CD Póvoa vs {session.opponent_name}</p>
+          <p className="text-sm text-muted-foreground"><ClubName /> vs {session.opponent_name}</p>
         </div>
         <div className="flex gap-2">
           {session.status === "live" && (
@@ -386,7 +388,7 @@ export default function GameStatsPage() {
         <CardContent className="py-4">
           <div className="flex items-center justify-between">
             <div className="text-center flex-1">
-              <p className="text-xs text-white/50 uppercase tracking-widest">CD Póvoa</p>
+              <p className="text-xs text-white/50 uppercase tracking-widest"><ClubName /></p>
               <p className="text-5xl font-black tabular-nums">{session.home_score}</p>
             </div>
             <div className="flex flex-col items-center gap-1">
@@ -414,7 +416,7 @@ export default function GameStatsPage() {
                 <span className="flex-1 text-center font-bold text-white">Tot</span>
               </div>
               <div className="flex text-xs">
-                <span className="w-24 text-white/60">CD Póvoa</span>
+                <span className="w-24 text-white/60"><ClubName /></span>
                 {periodPartials.map((p) => (
                   <span key={p.period} className="flex-1 text-center text-white tabular-nums">{p.home_score}</span>
                 ))}
@@ -467,7 +469,7 @@ export default function GameStatsPage() {
               </thead>
               <tbody className="divide-y">
                 <tr>
-                  <td className="px-3 py-2.5 font-semibold text-cdpovoa-primary">CD Póvoa</td>
+                  <td className="px-3 py-2.5 font-semibold text-cdpovoa-primary"><ClubName /></td>
                   <td className="text-center px-3 py-2.5 font-black text-lg tabular-nums">{totPts}</td>
                   <td className="text-center px-3 py-2.5 font-bold tabular-nums">{totReb}</td>
                   <td className="text-center px-3 py-2.5 font-bold tabular-nums">{totAst}</td>
@@ -487,9 +489,9 @@ export default function GameStatsPage() {
             </table>
           </div>
 
-          {/* CD Póvoa detailed stats */}
+          {/* detalhes do clube */}
           <div>
-            <p className="text-xs text-muted-foreground mb-2">Detalhes CD Póvoa</p>
+            <p className="text-xs text-muted-foreground mb-2">Detalhes <ClubName /></p>
             <div className="grid grid-cols-4 gap-2 text-center">
               {[
                 { label: "Assist.",   value: totAst },

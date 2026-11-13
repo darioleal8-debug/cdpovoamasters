@@ -5,7 +5,7 @@ import path from "node:path";
 // Inserts com service role ignoram RLS: têm de definir club_id (ver docs/multi-clube.md).
 // A allowlist contém os ficheiros existentes ainda por migrar — só deve diminuir.
 const TABLES = "seasons|players|trainings|training_attendance|training_rsvps|training_notes|training_recurrence_rules|events|game_callups|game_availability|game_sessions|financial_entries|financial_expenses|financial_cash_movements|player_payments|player_payments_history|payment_receipts|documents|chats|birthday_messages|plays|team_kits|club_events|access_requests|palmares|hist_seasons|hist_games|hist_players|hist_player_stats";
-const ADMIN = /SERVICE_ROLE|createAdminClient|adminClient\(|makeAdminClient|requireFinanceAccess/;
+const ADMIN = /SERVICE_ROLE|createAdminClient|createUnscopedAdminClient|createServiceClient|createRawServiceClient|adminClient\(|makeAdminClient|requireFinanceAccess/;
 const INSERT = new RegExp(`\\.from\\("(${TABLES})"\\)[\\s\\S]{0,160}?\\.(insert|upsert)\\(`);
 
 const PENDING = new Set<string>([]);

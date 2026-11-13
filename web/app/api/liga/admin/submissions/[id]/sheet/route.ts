@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { resolveSheetLocation } from "@/lib/liga/sheet-location";
 
 export const runtime = "nodejs";
@@ -21,7 +21,7 @@ export async function GET(
     return NextResponse.json({ error: "Submissão inválida" }, { status: 400 });
   }
 
-  const admin = await createAdminClient();
+  const admin = await createUnscopedAdminClient();
   const { data: sub } = await admin
     .from("result_submissions")
     .select("photo_url")

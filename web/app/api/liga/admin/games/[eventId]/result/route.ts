@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { parseGameMeta } from "@/types/competitions";
 
 export async function POST(
@@ -25,7 +25,7 @@ export async function POST(
     return NextResponse.json({ error: "motivo obrigatório" }, { status: 400 });
   }
 
-  const adminClient = await createAdminClient();
+  const adminClient = await createUnscopedAdminClient();
 
   // Ler evento + resultado atual
   const [eventRes, currentResultRes, compRes] = await Promise.all([

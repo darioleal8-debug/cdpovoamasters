@@ -23,7 +23,7 @@ const PUBLIC_BY_DESIGN = new Set([
 describe("páginas server com service role chamam authorize()", () => {
   for (const file of pages(APP)) {
     const src = readFileSync(file, "utf8");
-    if (!/createAdminClient|SERVICE_ROLE/.test(src) || PUBLIC_BY_DESIGN.has(path.relative(APP, file))) continue;
+    if (!/createAdminClient|createUnscopedAdminClient|SERVICE_ROLE/.test(src) || PUBLIC_BY_DESIGN.has(path.relative(APP, file))) continue;
     it(path.relative(APP, file), () => expect(src).toMatch(/authorize\(/));
   }
 });
