@@ -12,6 +12,10 @@ export const SCOPED_TABLES = new Set([
   "player_payments_history", "payment_receipts", "documents", "chats", "birthday_messages", "plays",
   "team_kits", "club_events", "access_requests", "palmares",
   "hist_seasons", "hist_games", "hist_players", "hist_player_stats",
+  // tabelas filhas (club_id herdado do pai por trigger — migração 129)
+  "calendar_imports", "chat_messages", "chat_participants", "game_current_lineup", "game_period_scores",
+  "game_substitutions", "play_by_play", "player_court_stints", "player_game_stats", "payments", "play_progress",
+  "player_documents", "player_profiles", "player_stats",
 ]);
 
 export const NO_CLUB = "00000000-0000-0000-0000-000000000000";
