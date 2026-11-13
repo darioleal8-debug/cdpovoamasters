@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Loader2, ExternalLink, Globe, GlobeLock } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +20,6 @@ function slugify(str: string): string {
 }
 
 export function PublicPageSettings() {
-  const supabase = createClient();
   const [slug, setSlug] = useState("");
   const [isPublic, setIsPublic] = useState(false);
   const [clubName, setClubName] = useState("");
@@ -30,13 +28,11 @@ export function PublicPageSettings() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    supabase
-      .from("club_settings")
-      .select("id, club_name, slug, is_public")
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) {
+    // Definições do clube do utilizador (a API filtra pelo clube da sessão)
+    fetch("/api/club-settings", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.club_id) {
           setSettingsId(data.id);
           setClubName(data.club_name ?? "");
           setSlug(data.slug ?? "");
@@ -58,13 +54,14 @@ export function PublicPageSettings() {
       return;
     }
     setSaving(true);
-    const { error } = await supabase
-      .from("club_settings")
-      .update({ slug: slug || null, is_public: isPublic })
-      .eq("id", settingsId);
+    const res = await fetch("/api/club-settings", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug: slug || null, is_public: isPublic }),
+    });
+    const j = await res.json().catch(() => ({}));
     setSaving(false);
-    if (error) {
-      toast({ title: "Erro ao guardar", description: error.message, variant: "destructive" });
+    if (!res.ok) {
+      toast({ title: "Erro ao guardar", description: j.error ?? "Tenta novamente.", variant: "destructive" });
     } else {
       toast({ title: "Página pública guardada" });
     }

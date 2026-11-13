@@ -48,14 +48,23 @@ export async function PATCH(req: Request) {
   if (!auth.ok) return auth.response;
   const { supabase, user } = auth;
 
-  let body: Record<string, string>;
+  let body: Record<string, string> & { slug?: string | null; is_public?: boolean };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "JSON inválido" }, { status: 400 }); }
 
   const allowed = ["club_name", "primary_color", "secondary_color", "accent_color"];
-  const updates: Record<string, string> = { updated_at: new Date().toISOString() };
+  const updates: Record<string, string | boolean | null> = { updated_at: new Date().toISOString() };
   for (const key of allowed) {
     if (body[key] !== undefined) updates[key] = body[key];
   }
+  // Página pública da equipa (sempre do clube do utilizador; o slug é único na plataforma)
+  if (body.slug !== undefined) {
+    const slug = body.slug ? String(body.slug).trim() : null;
+    if (slug && !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) {
+      return NextResponse.json({ error: "Slug inválido: usa apenas letras minúsculas, números e hífens." }, { status: 400 });
+    }
+    updates.slug = slug;
+  }
+  if (typeof body.is_public === "boolean") updates.is_public = body.is_public;
 
   const clubId = await clubIdForUser(supabase, user.id);
   if (!clubId) return NextResponse.json({ error: "Sem clube associado" }, { status: 403 });
@@ -67,6 +76,9 @@ export async function PATCH(req: Request) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    if (error.code === "23505") return NextResponse.json({ error: "Esse endereço já está a ser usado por outra equipa." }, { status: 409 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   return NextResponse.json(data);
 }
