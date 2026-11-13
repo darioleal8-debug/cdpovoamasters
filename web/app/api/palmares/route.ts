@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clubIdForUser } from "@/lib/auth/club";
 import { authorize } from "@/lib/auth/guards";
 import { ADMIN } from "@/lib/auth/roles";
 import { createAdminClient } from "@/lib/supabase/server";
@@ -27,6 +28,7 @@ export async function POST(req: NextRequest) {
   const authz = await authorize(ADMIN);
   if (!authz.ok) return authz.response;
   const { supabase } = authz;
+  const clubId = await clubIdForUser(supabase, authz.user.id);
 
   let body: { epoca?: string; competicao?: string; colocacao?: number };
   try { body = await req.json(); } catch { return fail("JSON inválido"); }
@@ -38,7 +40,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabase
     .from("palmares")
-    .insert({ epoca, competicao, colocacao })
+    .insert({ epoca, competicao, colocacao, club_id: clubId })
     .select()
     .single();
 

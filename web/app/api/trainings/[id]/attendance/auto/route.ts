@@ -25,7 +25,7 @@ export async function POST(
   // Buscar treino primeiro: o perfil do jogador é o da época do treino (PRES-08)
   const { data: training } = await adminClient
     .from("trainings")
-    .select("id, date, season_id")
+    .select("id, date, season_id, club_id")
     .eq("id", trainingId)
     .single();
 
@@ -150,6 +150,7 @@ export async function POST(
     .upsert(
       {
         training_id:    trainingId,
+        club_id:        training.club_id,
         player_id:      player.id,
         status:         "present",
         method:         "photo",

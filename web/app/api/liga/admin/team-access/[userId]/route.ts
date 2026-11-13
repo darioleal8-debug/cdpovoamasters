@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { generateSecurePassword } from "@/lib/liga/password";
 import { sendLigaCredentialsEmail } from "@/lib/liga/email-credentials";
 
@@ -14,7 +14,7 @@ export async function PATCH(
   if (!auth.ok) return auth.response;
 
   const { userId } = await params;
-  const adminClient = await createAdminClient();
+  const adminClient = await createUnscopedAdminClient();
 
   const { data: membership } = await adminClient
     .from("league_team_members")
@@ -78,7 +78,7 @@ export async function DELETE(
   if (!auth.ok) return auth.response;
 
   const { userId } = await params;
-  const adminClient = await createAdminClient();
+  const adminClient = await createUnscopedAdminClient();
 
   const { data: membership } = await adminClient
     .from("league_team_members")

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const revalidate = 300;
@@ -10,12 +10,12 @@ export async function GET(
 ) {
   try {
     const { slug } = await params;
-    const admin = await createAdminClient();
+    const admin = await createUnscopedAdminClient();
 
     // 1. Clube público
     const { data: club } = await admin
       .from("club_settings")
-      .select("id, club_name, logo_url, slug")
+      .select("id, club_id, club_name, logo_url, slug")
       .eq("slug", slug)
       .eq("is_public", true)
       .single();
@@ -26,6 +26,7 @@ export async function GET(
     const { data: season } = await admin
       .from("seasons")
       .select("id, name, year")
+      .eq("club_id", club.club_id)
       .eq("status", "ativa")
       .order("created_at", { ascending: false })
       .limit(1)

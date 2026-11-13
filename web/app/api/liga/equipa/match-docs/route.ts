@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeGameSheet, BUCKET, isUuid, jsonError, loadGameForAccess } from "@/lib/game-sheet/service";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -56,7 +56,7 @@ export async function GET(req: Request) {
   // Estado global da validação (apenas o estado e se cada equipa já submeteu)
   let validation: { status: string; label: string; teams_submitted: { home: boolean; away: boolean } } | null = null;
   try {
-    const db = await createAdminClient();
+    const db = await createUnscopedAdminClient();
     const { data: rec } = await db.from("match_reconciliations").select("status, consolidated").eq("event_id", game.id).maybeSingle();
     if (rec) {
       const ts = (rec.consolidated as { teamsSubmitted?: { home: boolean; away: boolean } } | null)?.teamsSubmitted ?? { home: false, away: false };

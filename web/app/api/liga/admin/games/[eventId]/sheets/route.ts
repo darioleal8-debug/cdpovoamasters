@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
-import { createAdminClient } from "@/lib/supabase/server";
-import { createServiceClient } from "@/lib/supabase/service";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
+import { createRawServiceClient as createServiceClient } from "@/lib/supabase/service-raw";
 import { adminAccess, createAndAnalyze, isGameFinished, listGameSheets } from "@/lib/game-sheet/admin-sheets";
 import { isPdf, MAX_PDF_BYTES, MAX_REQUEST_BYTES, sniffImageMime } from "@/lib/game-sheet/image";
 import { jsonError, isUuid, loadGameForAccess } from "@/lib/game-sheet/service";
@@ -22,7 +22,7 @@ export async function GET(_req: Request, { params }: Params) {
   const game = await loadGameForAccess(access, eventId);
   if (!game) return jsonError("Jogo não encontrado", 404);
 
-  const overview = await listGameSheets(access, await createAdminClient(), game);
+  const overview = await listGameSheets(access, await createUnscopedAdminClient(), game);
   const res = NextResponse.json(overview);
   res.headers.set("Cache-Control", "private, no-store");
   return res;
@@ -57,7 +57,7 @@ export async function POST(req: Request, { params }: Params) {
     return jsonError(`Imagem demasiado grande (máx. ${MAX_REQUEST_BYTES / 1024 / 1024} MB após compressão).`, 400);
   }
 
-  const out = await createAndAnalyze(access, await createAdminClient(), game, buffer, mime);
+  const out = await createAndAnalyze(access, await createUnscopedAdminClient(), game, buffer, mime);
   if (!out.ok) return jsonError(out.error, out.status);
   return NextResponse.json(out, { status: out.skipped ? 200 : 201 });
 }

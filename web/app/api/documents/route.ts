@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clubIdForUser } from "@/lib/auth/club";
 import { authorize } from "@/lib/auth/guards";
 import { ADMIN, hasAnyRole } from "@/lib/auth/roles";
 import { createAdminClient } from "@/lib/supabase/server";
@@ -87,7 +88,8 @@ export async function POST(req: NextRequest) {
     }
 
     const adminClient = await createAdminClient();
-    const storageKey  = `documents/${crypto.randomUUID()}.pdf`;
+    const clubId      = await clubIdForUser(adminClient, user.id);
+    const storageKey  = `documents/${clubId ?? "sem-clube"}/${crypto.randomUUID()}.pdf`;
 
     const { error: uploadError } = await adminClient.storage
       .from("club-documents")
@@ -110,6 +112,7 @@ export async function POST(req: NextRequest) {
         required,
         admin_note:  adminNote?.trim() || null,
         created_by:  user.id,
+        club_id:     clubId,
       })
       .select("*")
       .single();

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clubIdForUser } from "@/lib/auth/club";
+import { getOurTeamName } from "@/lib/competitions-data";
 import { authorize } from "@/lib/auth/guards";
 import { MANAGERS } from "@/lib/auth/roles";
 import { createServerClient } from "@supabase/ssr";
@@ -557,7 +559,7 @@ export async function POST(req: NextRequest) {
 
   const file       = formData.get("file") as File | null;
   const seasonId   = formData.get("season_id") as string | null;
-  const ourTeam    = (formData.get("our_team") as string) || "CD Póvoa";
+  const ourTeam    = (formData.get("our_team") as string) || await getOurTeamName();
   const dryRun     = formData.get("dry_run") === "true";
   const importAll  = formData.get("import_all") === "true";
   const useAI      = formData.get("use_ai") === "true";
@@ -777,6 +779,9 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Inserir equipas ───────────────────────────────────
+  const myClubId = await clubIdForUser(supabase, user.id);
+  const { data: myClub } = myClubId ? await supabase.from("clubs").select("slug").eq("id", myClubId).maybeSingle() : { data: null };
+  const isPlatformClub = myClub?.slug === "cd-povoa-masters";
   let teamsCreated = 0;
   const teamErrors: string[] = [];
   const aiTeams = (parseResult._ai_teams ?? []) as AITeam[];
@@ -790,7 +795,8 @@ export async function POST(req: NextRequest) {
         home_pavilion:    aiTeam?.home_pavilion ?? team.home_pavilion ?? null,
         locality:         aiTeam?.locality      ?? team.locality      ?? null,
         ccd_number:       aiTeam?.ccd_number    ?? null,
-        is_our_team:      team.normalized_name === slugTeamName(ourTeam),
+        // is_our_team é global (um só): só a equipa da plataforma o ativa; outros clubes usam clubs.league_team_id
+        is_our_team:      isPlatformClub && team.normalized_name === slugTeamName(ourTeam),
       },
       { onConflict: "normalized_name", ignoreDuplicates: false }
     );

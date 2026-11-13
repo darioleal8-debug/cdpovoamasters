@@ -22,6 +22,7 @@ import {
   Newspaper,
   FolderOpen,
   ClipboardList,
+  Building2,
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -86,7 +87,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Sidebar({ role, rolesExtra = [] }: { role?: UserRole; rolesExtra?: string[] }) {
+export function Sidebar({ role, rolesExtra = [], isMaster = false }: { role?: UserRole; rolesExtra?: string[]; isMaster?: boolean }) {
   const { settings } = useClubSettings();
   const unreadChatCount = useUnreadChatCount();
 
@@ -112,15 +113,15 @@ export function Sidebar({ role, rolesExtra = [] }: { role?: UserRole; rolesExtra
             className="flex h-9 w-9 items-center justify-center rounded-xl text-xs font-bold text-white"
             style={{ background: "var(--action, #F97316)" }}
           >
-            CDP
+            {(settings.club_name || "CD").split(" ").filter(Boolean).slice(0, 3).map((w) => w[0]).join("").toUpperCase()}
           </div>
         )}
         <div className="flex flex-col leading-tight">
           <span className="font-condensed text-sm font-bold uppercase tracking-display text-white">
-            CD Póvoa
+            {settings.club_name}
           </span>
           <span className="text-[11px] font-semibold uppercase tracking-label" style={{ color: "rgba(255,255,255,.4)" }}>
-            Masters · Basquetebol
+            Basquetebol
           </span>
         </div>
       </div>
@@ -175,6 +176,15 @@ export function Sidebar({ role, rolesExtra = [] }: { role?: UserRole; rolesExtra
                   {adminOnlyItems.map((item) => (
                     <NavLink key={item.href} {...item} />
                   ))}
+                </div>
+              </>
+            )}
+
+            {isMaster && (
+              <>
+                <SectionLabel>Plataforma</SectionLabel>
+                <div className="space-y-0.5">
+                  <NavLink href="/master-clubes" icon={Building2} label="Clubes" />
                 </div>
               </>
             )}

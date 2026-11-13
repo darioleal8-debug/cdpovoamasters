@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { generateSecurePassword } from "@/lib/liga/password";
 import { sendLigaCredentialsEmail } from "@/lib/liga/email-credentials";
 
@@ -9,7 +9,7 @@ export async function GET() {
   const auth = await authorizeAsLigaAdmin();
   if (!auth.ok) return auth.response;
 
-  const adminClient = await createAdminClient();
+  const adminClient = await createUnscopedAdminClient();
 
   const [teamsRes, membersRes] = await Promise.all([
     adminClient
@@ -71,7 +71,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const adminClient = await createAdminClient();
+  const adminClient = await createUnscopedAdminClient();
 
   const { data: team } = await adminClient
     .from("league_teams")

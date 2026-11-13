@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { computeStandings, groupStandingsBySeries, normalizeName } from "@/types/competitions";
 import { deepseekJSON } from "@/lib/deepseek";
 import { buildNewsFacts, mentionedPlayers, unknownScores, type LiveTeamStats } from "@/lib/game-sheet/news-facts";
@@ -60,7 +60,7 @@ export type NewsPromptOverrides = {
 };
 
 async function prepareNews(gameId: string) {
-  const adminClient = await createAdminClient();
+  const adminClient = await createUnscopedAdminClient();
 
   const [eventRes, resultRes, compRes, periodsRes, playerStatsRes] = await Promise.all([
     adminClient.from("events").select("id, title, event_date, location, description").eq("id", gameId).single(),
@@ -419,7 +419,7 @@ export async function generateLigaNews(
  * linhas por jogador da equipa que fez o live, orientadas ao lado da liga.
  */
 async function loadLiveTeamStats(
-  db: Awaited<ReturnType<typeof createAdminClient>>,
+  db: Awaited<ReturnType<typeof createUnscopedAdminClient>>,
   gameId: string,
   description: string | null
 ): Promise<LiveTeamStats | null> {

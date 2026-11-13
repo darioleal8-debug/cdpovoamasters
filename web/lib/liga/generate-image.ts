@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { deepseekJSON } from "@/lib/deepseek";
@@ -134,7 +134,7 @@ async function _generateNewsImage(ctx: NewsImageContext): Promise<GenerateResult
     return { ok: false, errorType: "AUTH" };
   }
 
-  const admin = await createAdminClient();
+  const admin = await createUnscopedAdminClient();
   const tTotal = Date.now();
 
   // Buscar URL anterior e dados do jogo em paralelo
@@ -276,7 +276,7 @@ async function _generateNewsImageFromPrompt(
     return { ok: false, errorType: "AUTH" };
   }
 
-  const admin = await createAdminClient();
+  const admin = await createUnscopedAdminClient();
   const tTotal = Date.now();
 
   const [newsRow, gameData] = await Promise.all([
@@ -790,7 +790,7 @@ async function deletePreviousImage(admin: SupabaseClient, oldUrl: string | null)
 
 async function setImageFailed(newsId: string, errorType: FalErrorType, errorMsg: string) {
   try {
-    const admin = await createAdminClient();
+    const admin = await createUnscopedAdminClient();
     await admin.from("news").update({
       image_status: "failed",
       image_error_type: errorType,

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { parseGameMeta } from "@/types/competitions";
 import { resolveSheetLocation } from "@/lib/liga/sheet-location";
 
@@ -8,7 +8,7 @@ export async function GET() {
   const auth = await authorizeAsLigaAdmin();
   if (!auth.ok) return auth.response;
 
-  const adminClient = await createAdminClient();
+  const adminClient = await createUnscopedAdminClient();
 
   const { data: competition } = await adminClient
     .from("competitions")

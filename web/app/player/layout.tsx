@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { clubIdForUser } from "@/lib/auth/club";
 import { createClient } from "@/lib/supabase/server";
 import { PlayerShell } from "@/components/player/player-shell";
 import { readActiveRoleCookie } from "@/lib/auth/guards";
@@ -34,11 +35,14 @@ export default async function PlayerLayout({ children }: { children: React.React
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
+  const clubId = await clubIdForUser(supabase, user.id);
 
   // Fetch club colors + player details in parallel — eliminates sidebar theme flash
   const [{ data: profile }, { data: settingsRow }, { data: kitsRows }, { data: playerRow }] = await Promise.all([
     supabase.from("users").select("name, role, roles_extra, active").eq("id", user.id).single(),
-    supabase.from("club_settings").select("club_name, primary_color, secondary_color, accent_color").eq("id", "default").maybeSingle(),
+    (clubId
+      ? supabase.from("club_settings").select("club_name, primary_color, secondary_color, accent_color").eq("club_id", clubId)
+      : supabase.from("club_settings").select("club_name, primary_color, secondary_color, accent_color").eq("id", "default")).maybeSingle(),
     supabase.from("team_kits").select("team_name, jersey_home_color, shorts_home_color, jersey_away_color"),
     supabase.from("players").select("number, position").eq("user_id", user.id).maybeSingle(),
   ]);

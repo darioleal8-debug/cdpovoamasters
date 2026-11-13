@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { ClubName } from "@/lib/club-context";
 import {
   Upload, Loader2, Check, AlertTriangle, Plus,
   ChevronDown, ChevronUp, FileText, UserPlus,
@@ -229,7 +230,7 @@ export function ImportWizard({ onImported }: Props) {
           <div className="rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3 flex gap-3">
             <AlertTriangle className="h-5 w-5 text-yellow-600 shrink-0 mt-0.5" />
             <div className="text-sm text-yellow-800">
-              <p className="font-semibold mb-1">Equipa CD Póvoa não identificada no PDF</p>
+              <p className="font-semibold mb-1">Equipa <ClubName /> não identificada no PDF</p>
               <p>O DeepSeek não reconheceu automaticamente o nome da equipa. Introduza o nome exacto como aparece no PDF (ex: <strong>*Masters_CDP</strong>, <strong>Póvoa Masters</strong>).</p>
             </div>
           </div>
@@ -271,7 +272,7 @@ export function ImportWizard({ onImported }: Props) {
                 <span><strong>Adversário:</strong> {analysis.game_meta.opponent_name}</span>
               )}
               {(analysis.game_meta.home_score !== null && analysis.game_meta.away_score !== null) && (
-                <span><strong>Resultado:</strong> CD Póvoa {analysis.game_meta.home_score} – {analysis.game_meta.away_score} {analysis.game_meta.opponent_name}</span>
+                <span><strong>Resultado:</strong> <ClubName /> {analysis.game_meta.home_score} – {analysis.game_meta.away_score} {analysis.game_meta.opponent_name}</span>
               )}
               {analysis.game_meta.competition && (
                 <span><strong>Competição:</strong> {analysis.game_meta.competition}</span>

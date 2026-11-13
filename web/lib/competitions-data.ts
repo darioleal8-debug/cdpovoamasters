@@ -1,12 +1,14 @@
 import { loadTeamRoster, type RosterPlayer } from "@/lib/liga/roster";
-import { createAdminClient } from "@/lib/supabase/server";
+import { resolveScope, NO_CLUB } from "@/lib/supabase/club-scope";
+import { leagueTeamNameForClub } from "@/lib/auth/club";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { createPublicClient } from "@/lib/supabase/public";
 import { computeStandings, groupStandingsBySeries, normalizeName, parseGameMeta, type SeriesStandings, type Competition, type LeagueGameResult, type LeagueTeam, type PublicGame, type StandingRow } from "@/types/competitions";
 
 // ─── Competition ─────────────────────────────────────────────────────────────
 
 export async function getCompetitionBySlug(slug: string): Promise<Competition | null> {
-  const supabase = await createAdminClient();
+  const supabase = await createUnscopedAdminClient();
   const { data } = await supabase
     .from("competitions")
     .select("*")
@@ -19,7 +21,13 @@ export async function getCompetitionBySlug(slug: string): Promise<Competition | 
 // ─── Teams ───────────────────────────────────────────────────────────────────
 
 export async function getOurTeamName(): Promise<string> {
-  const supabase = await createAdminClient();
+  const supabase = await createUnscopedAdminClient();
+  // Equipa da Liga do clube do utilizador (clubs.league_team_id); sem sessão/associação: is_our_team
+  const scope = await resolveScope();
+  if (scope && scope.clubId !== NO_CLUB) {
+    const name = await leagueTeamNameForClub(supabase, scope.clubId);
+    if (name) return name;
+  }
   const { data } = await supabase
     .from("league_teams")
     .select("name")
@@ -29,7 +37,7 @@ export async function getOurTeamName(): Promise<string> {
 }
 
 export async function getLeagueTeams(competitionKey: string): Promise<string[]> {
-  const supabase = await createAdminClient();
+  const supabase = await createUnscopedAdminClient();
   const { data } = await supabase
     .from("league_teams")
     .select("name")
@@ -39,7 +47,7 @@ export async function getLeagueTeams(competitionKey: string): Promise<string[]> 
 }
 
 export async function getLeagueTeamsWithDetails(): Promise<LeagueTeam[]> {
-  const supabase = await createAdminClient();
+  const supabase = await createUnscopedAdminClient();
   const { data } = await supabase
     .from("league_teams")
     .select("*")
@@ -49,7 +57,7 @@ export async function getLeagueTeamsWithDetails(): Promise<LeagueTeam[]> {
 }
 
 export async function getTeamBySlug(slug: string): Promise<LeagueTeam | null> {
-  const supabase = await createAdminClient();
+  const supabase = await createUnscopedAdminClient();
   const { data } = await supabase
     .from("league_teams")
     .select("*")
@@ -61,7 +69,7 @@ export async function getTeamBySlug(slug: string): Promise<LeagueTeam | null> {
 /** Plantel público de uma equipa (jogadores ativos registados pelo delegado). */
 export async function getTeamRoster(teamId: string): Promise<RosterPlayer[]> {
   try {
-    const supabase = await createAdminClient();
+    const supabase = await createUnscopedAdminClient();
     return await loadTeamRoster(supabase, teamId);
   } catch {
     return [];
@@ -91,7 +99,7 @@ export async function getCompetitionGames(
   competitionKey: string,
   seasonId: string
 ): Promise<PublicGame[]> {
-  const supabase = await createAdminClient();
+  const supabase = await createUnscopedAdminClient();
   const ourTeam = await getOurTeamName();
 
   const [eventsRes, resultsRes, sessionsRes, pendingRes] = await Promise.all([
@@ -222,7 +230,7 @@ export async function getCompetitionGames(
 // Equipas ativas na temporada (via season_teams). Fallback: todas as não-placeholder.
 async function fetchActiveSeasonTeams(
   competitionId: string,
-  supabase: Awaited<ReturnType<typeof createAdminClient>>
+  supabase: Awaited<ReturnType<typeof createUnscopedAdminClient>>
 ): Promise<Pick<LeagueTeam, "id" | "name" | "normalized_name">[]> {
   const fallback = async () => {
     const { data } = await supabase
@@ -253,7 +261,7 @@ async function fetchActiveSeasonTeams(
 }
 
 export async function getStandings(competitionId: string): Promise<StandingRow[]> {
-  const supabase = await createAdminClient();
+  const supabase = await createUnscopedAdminClient();
   const [resultsRes, seedTeams] = await Promise.all([
     supabase
       .from("league_game_results")
@@ -267,7 +275,7 @@ export async function getStandings(competitionId: string): Promise<StandingRow[]
 export type StandingRowWithForm = StandingRow & { form: ("V" | "E" | "D")[] };
 
 export async function getStandingsWithForm(competitionId: string): Promise<StandingRowWithForm[]> {
-  const supabase = await createAdminClient();
+  const supabase = await createUnscopedAdminClient();
   const [resultsRes, seedTeams] = await Promise.all([
     supabase
       .from("league_game_results")
@@ -306,7 +314,7 @@ export async function getStandingsWithForm(competitionId: string): Promise<Stand
 
 /** team_id → letra da série, para as equipas ativas da competição. */
 export async function getSeriesByTeamId(competitionId: string): Promise<Map<string, string | null>> {
-  const supabase = await createAdminClient();
+  const supabase = await createUnscopedAdminClient();
   const { data, error } = await supabase
     .from("season_teams")
     .select("team_id, series")
@@ -337,13 +345,13 @@ export async function getStandingsWithFormBySeries(
 }
 
 export async function getTeamNames(competitionId: string): Promise<string[]> {
-  const supabase = await createAdminClient();
+  const supabase = await createUnscopedAdminClient();
   const teams = await fetchActiveSeasonTeams(competitionId, supabase);
   return teams.map((t) => t.name).sort((a, b) => a.localeCompare(b, "pt"));
 }
 
 export async function getTeamLogos(): Promise<Record<string, string | null>> {
-  const supabase = await createAdminClient();
+  const supabase = await createUnscopedAdminClient();
   const { data } = await supabase
     .from("league_teams")
     .select("name, logo_url")
@@ -376,7 +384,7 @@ export type AdminSubmission = {
 };
 
 export async function getPendingSubmissions(): Promise<AdminSubmission[]> {
-  const supabase = await createAdminClient();
+  const supabase = await createUnscopedAdminClient();
   const { data } = await supabase
     .from("result_submissions")
     .select(`
@@ -392,7 +400,7 @@ export async function getPendingSubmissions(): Promise<AdminSubmission[]> {
 }
 
 export async function getPendingSubmissionCount(): Promise<number> {
-  const supabase = await createAdminClient();
+  const supabase = await createUnscopedAdminClient();
   const { count } = await supabase
     .from("result_submissions")
     .select("*", { count: "exact", head: true })
@@ -401,7 +409,7 @@ export async function getPendingSubmissionCount(): Promise<number> {
 }
 
 export async function getSubmission(id: string): Promise<AdminSubmission | null> {
-  const supabase = await createAdminClient();
+  const supabase = await createUnscopedAdminClient();
   const { data } = await supabase
     .from("result_submissions")
     .select(`

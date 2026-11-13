@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import {
   GAME_PHOTOS_BUCKET as BUCKET,
   deleteGamePhoto,
@@ -20,7 +20,7 @@ export async function GET(
   if (!auth.ok) return auth.response;
 
   const { eventId } = await params;
-  const admin = await createAdminClient();
+  const admin = await createUnscopedAdminClient();
 
   const [photosRes, newsRes, sheetRes, gameTeams] = await Promise.all([
     admin
@@ -86,7 +86,7 @@ export async function PATCH(
     return NextResponse.json({ error: "photo_id e action são obrigatórios" }, { status: 400 });
   }
 
-  const admin = await createAdminClient();
+  const admin = await createUnscopedAdminClient();
 
   if (body.action === "hide" || body.action === "unhide") {
     const { error } = await admin
@@ -157,7 +157,7 @@ export async function POST(
   const teamRaw = ((form.get("team_id") as string | null) ?? "").trim() || null;
   if (!photo) return NextResponse.json({ error: "photo é obrigatório" }, { status: 400 });
 
-  const admin = await createAdminClient();
+  const admin = await createUnscopedAdminClient();
   const teams = await getGameTeams(admin, eventId);
   if (!teams) return NextResponse.json({ error: "Jogo não encontrado" }, { status: 404 });
   if (teamRaw && teamRaw !== teams.homeId && teamRaw !== teams.awayId) {

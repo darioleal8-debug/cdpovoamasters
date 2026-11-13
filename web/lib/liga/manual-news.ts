@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 
 /**
  * Notícias manuais da Liga INATEL: o admin escreve título e corpo, sem DeepSeek.
@@ -57,7 +57,7 @@ export function validateManualNews(input: {
   return { ok: true, data: { title, excerpt, body } };
 }
 
-type Db = Awaited<ReturnType<typeof createAdminClient>>;
+type Db = Awaited<ReturnType<typeof createUnscopedAdminClient>>;
 
 async function uniqueSlug(db: Db, base: string): Promise<string> {
   const root = base || "noticia";
@@ -99,7 +99,7 @@ async function applyGamePhotoCover(db: Db, newsId: string, gameId: string): Prom
 
 /** Notícia existente para pré-preencher o editor (por id ou pelo jogo). */
 export async function loadManualNews(opts: { newsId?: string | null; gameId?: string | null }) {
-  const db = await createAdminClient();
+  const db = await createUnscopedAdminClient();
   let game: { id: string; home: string | null; away: string | null } | null = null;
 
   if (opts.gameId) {
@@ -138,7 +138,7 @@ export async function saveManualNews(input: ManualNewsInput): Promise<
   if (!v.ok) return { ok: false, error: v.error, status: 400 };
   const { title, excerpt, body } = v.data;
 
-  const db = await createAdminClient();
+  const db = await createUnscopedAdminClient();
 
   // Dados do jogo (equipas, data, resultado) quando a notícia está ligada a um jogo
   let gameId = input.gameId || null;

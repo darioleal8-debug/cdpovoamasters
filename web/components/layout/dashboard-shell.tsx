@@ -15,10 +15,11 @@ interface Props {
   userRole:       UserRole;
   userRolesExtra: UserRole[];
   availableRoles: UserRole[];
+  isMaster?:      boolean;
   children:       React.ReactNode;
 }
 
-export function DashboardShell({ userName, userEmail, userRole, userRolesExtra, availableRoles, children }: Props) {
+export function DashboardShell({ userName, userEmail, userRole, userRolesExtra, availableRoles, isMaster = false, children }: Props) {
   useActivityTracker();
 
   // O tema escuro só existe na área de gestão: aplica ao entrar, limpa ao sair
@@ -42,7 +43,7 @@ export function DashboardShell({ userName, userEmail, userRole, userRolesExtra, 
     >
       {/* ── Sidebar (desktop ≥ 1280 px) ─────────────────────────── */}
       <div className="hidden xl:block shrink-0" style={{ width: "var(--sidebar-w, 256px)" }}>
-        <Sidebar role={userRole} rolesExtra={userRolesExtra} />
+        <Sidebar role={userRole} rolesExtra={userRolesExtra} isMaster={isMaster} />
       </div>
 
       {/* ── Tab Rail (tablet 768–1279 px) ────────────────────────── */}

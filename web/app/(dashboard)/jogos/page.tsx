@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { ClubName } from "@/lib/club-context";
 import { useSeasons } from "@/hooks/use-seasons";
 import { useGames } from "@/hooks/use-games";
 import { useLeagueCalendar } from "@/hooks/use-league-calendar";
@@ -407,7 +408,7 @@ export default function JogosPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="res-home" className="text-xs font-semibold uppercase tracking-wide">
-                      CD Póvoa Masters
+                      <ClubName />
                     </Label>
                     <Input
                       id="res-home"

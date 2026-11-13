@@ -4,7 +4,7 @@ import { fakeSupabase, type Handler, type FakeQuery, type FakeResult } from "./t
 import { emptySheetData } from "./schema";
 
 let current: ReturnType<typeof fakeSupabase>;
-vi.mock("@/lib/supabase/server", () => ({ createClient: async () => current.client, createAdminClient: async () => current.client }));
+vi.mock("@/lib/supabase/server", () => ({ createClient: async () => current.client, createAdminClient: async () => current.client, createUnscopedAdminClient: async () => current.client }));
 const afterCalls: (() => unknown)[] = [];
 vi.mock("next/server", async (orig) => ({ ...(await orig<typeof import("next/server")>()), after: (fn: () => unknown) => { afterCalls.push(fn); } }));
 const safeRunReconciliation = vi.fn(async () => undefined);

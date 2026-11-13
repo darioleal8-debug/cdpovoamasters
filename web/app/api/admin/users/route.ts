@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { clubIdForUser, clubIdOfRow } from "@/lib/auth/club";
 import { banDurationFor } from "@/lib/auth/session-revocation";
 import { authorize } from "@/lib/auth/guards";
 import { createServerClient } from "@supabase/ssr";
@@ -15,12 +17,7 @@ function stripBom(v: string | undefined): string {
 }
 
 function adminClient() {
-  const url = stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL);
-  const key = stripBom(process.env.SUPABASE_SERVICE_ROLE_KEY);
-  if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY não configurada");
-  return createClient(url, key, {
-    auth: { persistSession: false },
-  });
+  return createServiceClient(); // isolado por clube (ver lib/supabase/club-scope.ts)
 }
 
 async function getAuthUser() {
@@ -219,6 +216,15 @@ export async function POST(req: NextRequest) {
     return fail(`Erro ao criar perfil: ${profileError.message}`, 500);
   }
 
+  // ── Associar o novo utilizador ao clube de quem o criou ──
+  const callerClubId = await clubIdForUser(admin, authUser.id);
+  if (callerClubId) {
+    await admin.from("club_members").upsert(
+      { club_id: callerClubId, user_id: newUserId, role, active: role === "jogador" ? false : true },
+      { onConflict: "club_id,user_id" },
+    );
+  }
+
   // ── Criar registo de jogador automaticamente ─────────────
   let playerRecord = null;
   let playerCreationError: string | null = null;
@@ -228,6 +234,7 @@ export async function POST(req: NextRequest) {
     // (o nome e email vivem em public.users e auth.users)
     const playerPayload: Record<string, unknown> = {
       season_id, user_id: newUserId,
+      club_id: await clubIdOfRow(admin, "seasons", season_id),
     };
     if (phone)         playerPayload.phone      = phone.replace(/\s+/g, "");
     if (birth_date)    playerPayload.birth_date = birth_date;
@@ -368,7 +375,7 @@ export async function PATCH(req: NextRequest) {
       }
     } else {
       // Criar registo de jogador para esta época
-      const playerPayload: Record<string, unknown> = { user_id, season_id };
+      const playerPayload: Record<string, unknown> = { user_id, season_id, club_id: await clubIdOfRow(admin, "seasons", season_id) };
       if (jersey_number != null) playerPayload.number   = jersey_number;
       if (position)              playerPayload.position = position;
       await admin.from("players").insert(playerPayload);

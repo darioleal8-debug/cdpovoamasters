@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { adminAccess, analyzeSheetCandidate } from "@/lib/game-sheet/admin-sheets";
 import { isUuid, jsonError, loadGameForAccess } from "@/lib/game-sheet/service";
 
@@ -26,7 +26,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ eventId
   const game = await loadGameForAccess(access, eventId);
   if (!game) return jsonError("Jogo não encontrado", 404);
 
-  const out = await analyzeSheetCandidate(access, await createAdminClient(), game, {
+  const out = await analyzeSheetCandidate(access, await createUnscopedAdminClient(), game, {
     kind: body.kind, id: body.id, force: body.force === true,
   });
   if (!out.ok) return jsonError(out.error, out.status);

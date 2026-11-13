@@ -7,7 +7,7 @@ import path from "node:path";
 // authorizeAsLigaAdmin() (sessão + is_liga_admin) / authorizeLeagueDelegate() (sessão + membro de
 // equipa) / authorizeGameSheet() (sessão + delegado de equipa ou admin da liga). Exceções explícitas abaixo.
 const API = path.join(__dirname, "..", "..", "app", "api");
-const SERVICE_ROLE = /SERVICE_ROLE|createAdminClient|adminClient\(|makeAdminClient|requireFinanceAccess/;
+const SERVICE_ROLE = /SERVICE_ROLE|createAdminClient|createUnscopedAdminClient|createServiceClient|createRawServiceClient|adminClient\(|makeAdminClient|requireFinanceAccess/;
 const PUBLIC_BY_DESIGN = new Set([
   "activate/route.ts",               // ativação por token (sem sessão)
   "public/request-access/route.ts",  // formulário público com rate-limit

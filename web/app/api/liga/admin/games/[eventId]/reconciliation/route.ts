@@ -1,7 +1,7 @@
 import { after, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { BUCKET, isUuid, jsonError, loadImport, type GameInfo } from "@/lib/game-sheet/service";
 import { adminAccess } from "@/lib/game-sheet/admin-sheets";
 import { reanalyzeImport } from "@/lib/game-sheet/run";
@@ -40,7 +40,7 @@ export async function GET(_req: Request, { params }: Params) {
   const { eventId } = await params;
   if (!isUuid(eventId)) return jsonError("Jogo inválido", 400);
 
-  const db = await createAdminClient();
+  const db = await createUnscopedAdminClient();
   const game = await loadMatchGame(db, eventId);
   if (!game) return jsonError("Jogo não encontrado", 404);
   const docs = await loadMatchDocs(db, eventId);
@@ -110,7 +110,7 @@ export async function POST(req: Request, { params }: Params) {
   let body: Body;
   try { body = (await req.json()) as Body; } catch { return jsonError("JSON inválido", 400); }
 
-  const db = await createAdminClient();
+  const db = await createUnscopedAdminClient();
   const game = await loadMatchGame(db, eventId);
   if (!game) return jsonError("Jogo não encontrado", 404);
 

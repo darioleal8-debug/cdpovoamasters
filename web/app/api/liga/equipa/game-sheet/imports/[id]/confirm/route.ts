@@ -1,7 +1,7 @@
 import { after, NextResponse } from "next/server";
 import { analyzeSheet, toLegacyExtraction } from "@/lib/game-sheet/engine";
 import { authorizeGameSheet, importView, jsonError, loadGameForAccess, loadImport, parseSheet, type Access, type GameInfo } from "@/lib/game-sheet/service";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { ProStatsDataSchema } from "@/lib/match-docs/pro-stats-schema";
 import { validateProStats } from "@/lib/match-docs/validate";
 import { safeRunReconciliation } from "@/lib/match-docs/service";
@@ -11,7 +11,7 @@ export const maxDuration = 60;
 
 /** Submissão pendente do jogo (uma por jogo), lida com o cliente de serviço DEPOIS de autorizado. */
 async function pendingSubmission(gameId: string): Promise<{ id: string; submitted_by_user_id: string | null } | null> {
-  const db = await createAdminClient();
+  const db = await createUnscopedAdminClient();
   const { data } = await db.from("result_submissions").select("id, submitted_by_user_id").eq("event_id", gameId).eq("status", "pending").maybeSingle();
   return (data as { id: string; submitted_by_user_id: string | null } | null) ?? null;
 }

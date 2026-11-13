@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import crypto from "crypto";
 
 export const runtime = "nodejs";
@@ -12,7 +12,7 @@ function ok(msg: string) {
 }
 
 // Rate-limit: máx 3 pedidos por IP em 24 h
-async function checkRateLimit(supabase: Awaited<ReturnType<typeof createAdminClient>>, ipHash: string): Promise<boolean> {
+async function checkRateLimit(supabase: Awaited<ReturnType<typeof createUnscopedAdminClient>>, ipHash: string): Promise<boolean> {
   const since = new Date(Date.now() - 86_400_000).toISOString();
   const { count } = await supabase
     .from("access_requests")
@@ -68,14 +68,17 @@ export async function POST(req: NextRequest) {
     ?? "unknown";
   const ipHash = crypto.createHash("sha256").update(ip).digest("hex");
 
-  const supabase = await createAdminClient();
+  const supabase = await createUnscopedAdminClient();
   const allowed = await checkRateLimit(supabase, ipHash);
   if (!allowed) {
     return fail("Demasiados pedidos. Tenta novamente amanhã.", 429);
   }
 
   // ── Inserção ─────────────────────────────────────────────────────────────────
+  // Pedidos de acesso são geridos pelo clube da plataforma (CD Póvoa Masters).
+  const { data: platformClub } = await supabase.from("clubs").select("id").eq("slug", "cd-povoa-masters").maybeSingle();
   const { error } = await supabase.from("access_requests").insert({
+    club_id:      platformClub?.id ?? null,
     club_name:    String(body.club_name).trim(),
     city:         String(body.city).trim(),
     category:     String(body.category),

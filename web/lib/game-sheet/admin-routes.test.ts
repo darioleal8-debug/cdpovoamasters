@@ -22,6 +22,10 @@ vi.mock("@/lib/auth/liga-admin-guard", () => ({
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => userClient.client,
   createAdminClient: async () => adminClient.client,
+  createUnscopedAdminClient: async () => adminClient.client,
+}));
+vi.mock("@/lib/supabase/service-raw", () => ({
+  createRawServiceClient: () => serviceClient.client,
 }));
 vi.mock("@/lib/supabase/service", () => ({
   createServiceClient: () => serviceClient.client,

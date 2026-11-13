@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { authorizeLeagueDelegate } from "@/lib/auth/liga-delegate-guard";
 import { deleteGamePhoto } from "@/lib/liga/game-photos";
 
@@ -14,7 +14,7 @@ export async function DELETE(
   const { user } = auth;
 
   const { id } = await params;
-  const admin = await createAdminClient();
+  const admin = await createUnscopedAdminClient();
 
   const { data: photo } = await admin
     .from("game_photos")

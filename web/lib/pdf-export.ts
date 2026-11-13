@@ -13,7 +13,9 @@ export interface PdfGameContext {
   eventDate?: string | null;     // YYYY-MM-DD
   eventTime?: string | null;     // HH:MM[:SS]
   location?: string | null;
-  /** lado do CD Póvoa no jogo (casa/fora) — só para o rótulo */
+  /** nome do clube (por omissão CD Póvoa) */
+  clubName?: string | null;
+  /** lado do clube no jogo (casa/fora) — só para o rótulo */
   isHome?: boolean | null;
 }
 
@@ -87,7 +89,7 @@ export function renderBoxScore(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
   doc.setTextColor(...WHITE);
-  doc.text("CD Póvoa", cx - 34, 24, { align: "right" });
+  doc.text(ctx.clubName || "CD Póvoa", cx - 34, 24, { align: "right" });
   doc.text(doc.splitTextToSize(opp, 90)[0], cx + 34, 24);
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
@@ -139,7 +141,7 @@ export function renderBoxScore(
       startY: y,
       head: [["PARCIAIS", ...partials.map((p) => lbl(p.period)), "FINAL"]],
       body: [
-        ["CD Póvoa", ...partials.map((p) => p.home_score), session.home_score],
+        [ctx.clubName || "CD Póvoa", ...partials.map((p) => p.home_score), session.home_score],
         [opp, ...partials.map((p) => p.away_score), session.away_score],
       ],
       theme: "plain",
@@ -211,7 +213,7 @@ export function renderBoxScore(
     startY: y,
     head: [["EQUIPA", "PTS", "2P C/T", "2P%", "3P C/T", "3P%", "LL C/T", "LL%", "RES OF", "RES DEF", "RES", "AST", "ROU", "DES", "PER", "F", "FS", "EFF"]],
     body: [
-      ["CD Póvoa", T.pts, `${T.fg2m}/${T.fg2a}`, pct(T.fg2m, T.fg2a), `${T.fg3m}/${T.fg3a}`, pct(T.fg3m, T.fg3a),
+      [ctx.clubName || "CD Póvoa", T.pts, `${T.fg2m}/${T.fg2a}`, pct(T.fg2m, T.fg2a), `${T.fg3m}/${T.fg3a}`, pct(T.fg3m, T.fg3a),
         `${T.ftm}/${T.fta}`, pct(T.ftm, T.fta), T.ro, T.rd, T.ro + T.rd, T.ast, T.stl, T.blk, T.tov, T.fc, T.fd, T.eff],
       [opp, session.away_score, "—", "—", "—", "—", "—", "—",
         session.away_reb_off ?? 0, session.away_reb_def ?? 0, oppReb, "—", "—", "—", "—", session.away_fouls ?? 0, "—", "—"],

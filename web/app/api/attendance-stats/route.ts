@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { authorize } from "@/lib/auth/guards";
 import { hasAnyRole, MANAGERS } from "@/lib/auth/roles";
 import { createClient as createAdmin } from "@supabase/supabase-js";
@@ -8,11 +9,7 @@ import { getOfficialGameEventIds, getOfficialGameSessionIds } from "@/lib/stats/
 export const runtime = "nodejs";
 
 function adminDb() {
-  return createAdmin(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  return createServiceClient(); // isolado por clube (ver lib/supabase/club-scope.ts)
 }
 
 function fail(msg: string, status = 400) {

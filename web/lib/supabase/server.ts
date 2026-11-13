@@ -48,3 +48,12 @@ export async function createAdminClient() {
   const { createServiceClient } = await import("./service");
   return createServiceClient();
 }
+
+/**
+ * Service role SEM isolamento por clube. Só para código público ou da Liga (dados partilhados entre clubes,
+ * com autorização própria): páginas/rotas /liga-inatel, /api/liga, /api/public, /equipa.
+ */
+export async function createUnscopedAdminClient() {
+  const { createRawServiceClient } = await import("./service-raw");
+  return createRawServiceClient();
+}

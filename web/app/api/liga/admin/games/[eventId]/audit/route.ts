@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 
 export async function GET(
   _req: Request,
@@ -10,7 +10,7 @@ export async function GET(
   if (!auth.ok) return auth.response;
 
   const { eventId } = await params;
-  const adminClient = await createAdminClient();
+  const adminClient = await createUnscopedAdminClient();
 
   const { data, error } = await adminClient
     .from("liga_resultado_audit")

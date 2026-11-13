@@ -1,4 +1,5 @@
 import { todayInClubTz } from "@/lib/time/club-time";
+import { clubIdForUser, leagueTeamNameForClub } from "@/lib/auth/club";
 import { pickNextTraining } from "@/lib/time/pick-next-training";
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/auth/guards";
@@ -98,7 +99,12 @@ export async function GET(req: NextRequest) {
     supabase.from("players").select("id", { count: "exact", head: true }).eq("season_id", sid),
 
     // Nome da equipa do clube na liga (para V/D)
-    supabase.from("league_teams").select("name").eq("is_our_team", true).maybeSingle(),
+    (async () => {
+      const cid = await clubIdForUser(supabase, user.id);
+      const n = cid ? await leagueTeamNameForClub(supabase, cid) : null;
+      if (n) return { data: { name: n } };
+      return supabase.from("league_teams").select("name").eq("is_our_team", true).maybeSingle();
+    })(),
   ]);
 
   const nextGame      = nextGameRes.data ?? null;

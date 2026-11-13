@@ -1,4 +1,5 @@
 import { todayInClubTz } from "@/lib/time/club-time";
+import { ClubName } from "@/lib/club-context";
 import { createClient } from "@/lib/supabase/server";
 import { getCallupsByGame } from "@/lib/callups/club-callups";
 import { redirect, notFound } from "next/navigation";
@@ -265,7 +266,7 @@ export default async function GameDetailPage({ params }: Props) {
                       style={{ color: won ? "#15803d" : lost ? "#dc2626" : "#374151" }}>
                       {session.home_score as number}
                     </p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">CD Póvoa</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5"><ClubName /></p>
                   </div>
                   <span className="text-lg font-bold text-muted-foreground">–</span>
                   <div className="text-center">

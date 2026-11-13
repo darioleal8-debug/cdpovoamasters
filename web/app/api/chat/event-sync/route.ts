@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { authorize } from "@/lib/auth/guards";
 import { MANAGERS } from "@/lib/auth/roles";
 import { createClient as createSupabase } from "@supabase/supabase-js";
@@ -7,11 +8,7 @@ import { ensureGameThread, ensureTrainingThread, archiveOldEventThreads } from "
 export const runtime = "nodejs";
 
 function adminClient() {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY não configurada");
-  return createSupabase(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, {
-    auth: { persistSession: false },
-  });
+  return createServiceClient(); // isolado por clube (ver lib/supabase/club-scope.ts)
 }
 
 function fail(msg: string, status = 400) {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import crypto from "crypto";
 
 export const runtime = "nodejs";
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
     const ipHash = hashIp(ip);
 
-    const supabase = await createAdminClient();
+    const supabase = await createUnscopedAdminClient();
 
     // Verify the event exists and is a valid league game
     const { data: event } = await supabase

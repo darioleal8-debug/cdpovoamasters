@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { clubIdForUser } from "@/lib/auth/club";
 import { authorize } from "@/lib/auth/guards";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
@@ -7,11 +9,7 @@ import { cookies } from "next/headers";
 export const runtime = "nodejs";
 
 function adminClient() {
-  return createAdmin(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  return createServiceClient(); // isolado por clube (ver lib/supabase/club-scope.ts)
 }
 
 async function getAuthUser() {
@@ -50,6 +48,7 @@ export async function POST(req: NextRequest) {
   if (!authUser) return fail("Não autenticado", 401);
 
   const db = adminClient();
+  const clubId = await clubIdForUser(db, authUser.id);
   const profile = authz.profile; // papel ativo (authorize)
   if (!profile || !["admin", "treinador"].includes(profile.role)) return fail("Sem permissão", 403);
 
@@ -74,7 +73,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await db
     .from("hist_seasons")
-    .insert({ label: label.trim(), start_year: sy, end_year: ey, notes: notes?.trim() ?? null })
+    .insert({ club_id: clubId, label: label.trim(), start_year: sy, end_year: ey, notes: notes?.trim() ?? null })
     .select()
     .single();
 

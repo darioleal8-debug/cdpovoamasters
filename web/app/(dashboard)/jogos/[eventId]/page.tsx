@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useClubName } from "@/lib/club-context";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -147,8 +148,9 @@ export default function GameDetailPage() {
   // ── Derived ──────────────────────────────────────────────
   const meta   = event ? parseMeta(event) : null;
   const isHome = meta?.is_home ?? null;
-  const homeTeam = meta?.home_team ?? (isHome ? "CD Póvoa Masters" : (event?.opponent ?? ""));
-  const awayTeam = meta?.away_team ?? (!isHome ? "CD Póvoa Masters" : (event?.opponent ?? ""));
+  const clubName = useClubName();
+  const homeTeam = meta?.home_team ?? (isHome ? clubName : (event?.opponent ?? ""));
+  const awayTeam = meta?.away_team ?? (!isHome ? clubName : (event?.opponent ?? ""));
   const pavilion = meta?.pavilion ?? event?.location ?? null;
   const locality = meta?.locality ?? null;
   const mapsUrl  = buildMapsUrl(pavilion, locality);

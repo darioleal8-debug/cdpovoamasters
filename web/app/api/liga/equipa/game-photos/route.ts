@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { authorizeLeagueDelegate } from "@/lib/auth/liga-delegate-guard";
 import {
   GAME_PHOTOS_BUCKET,
@@ -9,7 +9,7 @@ import {
   syncNewsCover,
 } from "@/lib/liga/game-photos";
 
-async function assertTeamInGame(admin: Awaited<ReturnType<typeof createAdminClient>>, gameId: string, teamId: string) {
+async function assertTeamInGame(admin: Awaited<ReturnType<typeof createUnscopedAdminClient>>, gameId: string, teamId: string) {
   const teams = await getGameTeams(admin, gameId);
   if (!teams) return NextResponse.json({ error: "Jogo não encontrado" }, { status: 404 });
   if (teams.homeId !== teamId && teams.awayId !== teamId) {
@@ -27,7 +27,7 @@ export async function GET(req: Request) {
   const gameId = new URL(req.url).searchParams.get("game_id");
   if (!gameId) return NextResponse.json({ error: "game_id obrigatório" }, { status: 400 });
 
-  const admin = await createAdminClient();
+  const admin = await createUnscopedAdminClient();
   const denied = await assertTeamInGame(admin, gameId, auth.teamId);
   if (denied) return denied;
 
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "photo e game_id são obrigatórios" }, { status: 400 });
   }
 
-  const admin = await createAdminClient();
+  const admin = await createUnscopedAdminClient();
   const denied = await assertTeamInGame(admin, gameId, auth.teamId);
   if (denied) return denied;
 

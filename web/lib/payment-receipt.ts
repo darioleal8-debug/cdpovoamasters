@@ -79,7 +79,7 @@ export async function sendAndLogPaymentReceipt(opts: {
   // ── 2. user_id do jogador (players.name e .email removidos na migration 041) ──
   const { data: playerRow, error: playerErr } = await admin
     .from("players")
-    .select("user_id")
+    .select("user_id, club_id")
     .eq("id", playerId)
     .single();
 
@@ -148,11 +148,12 @@ export async function sendAndLogPaymentReceipt(opts: {
 
   try {
     // Obter club_settings para nome do clube
-    const { data: clubRow } = await admin
-      .from("club_settings")
-      .select("club_name")
-      .limit(1)
-      .maybeSingle();
+    const clubQ = admin.from("club_settings").select("club_name");
+    const { data: clubRow } = await (
+      (playerRow as { club_id?: string | null }).club_id
+        ? clubQ.eq("club_id", (playerRow as { club_id: string }).club_id)
+        : clubQ.limit(1)
+    ).maybeSingle();
     if (clubRow?.club_name) clubName = clubRow.club_name;
 
     // Obter season_id e amount_due do pagamento
@@ -233,6 +234,7 @@ export async function sendAndLogPaymentReceipt(opts: {
     await admin.from("payment_receipts").upsert(
       {
         player_id:      playerId,
+        club_id:        (playerRow as { club_id?: string | null }).club_id ?? null,
         payment_id:     paymentId,
         email,
         receipt_number: receiptNumber,

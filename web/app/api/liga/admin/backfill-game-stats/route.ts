@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { authorize } from "@/lib/auth/guards";
 import { ADMIN } from "@/lib/auth/roles";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createUnscopedAdminClient } from "@/lib/supabase/server";
 
 type ExtractionRaw = {
   arbitros?: string[];
@@ -24,7 +24,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "eventId obrigatório" }, { status: 400 });
   }
 
-  const admin = await createAdminClient();
+  const admin = await createUnscopedAdminClient();
 
   // Verificar que existe resultado aprovado
   const { data: result } = await admin

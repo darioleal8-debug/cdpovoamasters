@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { ClubName } from "@/lib/club-context";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -162,7 +163,7 @@ export default function SpectatorPage() {
 
         <div className="flex items-center justify-between">
           <div className="text-center flex-1">
-            <p className="text-xs text-white/40 uppercase tracking-widest mb-1">CD Póvoa</p>
+            <p className="text-xs text-white/40 uppercase tracking-widest mb-1"><ClubName /></p>
             <p className="text-6xl font-black tabular-nums leading-none">{session.home_score}</p>
           </div>
           <div className="text-3xl font-bold text-white/30 px-4">–</div>
@@ -257,7 +258,7 @@ export default function SpectatorPage() {
       )}
 
       <div className="text-center mt-8 text-white/20 text-xs">
-        CD Póvoa · Atualização em tempo real
+        <ClubName /> · Atualização em tempo real
       </div>
     </div>
   );
