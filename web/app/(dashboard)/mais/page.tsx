@@ -9,7 +9,6 @@ import {
   History,
   Landmark,
   LogOut,
-  Newspaper,
   Settings,
   Users,
   UserCog,
@@ -36,7 +35,6 @@ const ITEMS: MenuItem[] = [
   { label: "Histórico",        href: "/historico",     icon: History,       desc: "Épocas anteriores" },
   { label: "Financeiro",       href: "/financeiro",    icon: Landmark,      desc: "Caixa e entradas" },
   { label: "Liga INATEL",      href: "/liga-inatel",   icon: Shield,        desc: "Classificação e resultados" },
-  { label: "Notícias",         href: "/noticias-admin", icon: Newspaper,   desc: "Gerir artigos e publicações" },
   { label: "Gestão de Contas", href: "/gestao-contas", icon: UserCog,       desc: "Contas de utilizador" },
   { label: "Configurações",    href: "/configuracoes", icon: Settings,      desc: "Preferências do clube" },
 ];

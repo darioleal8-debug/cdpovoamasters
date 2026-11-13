@@ -36,7 +36,7 @@ describe("handlers com service role exigem authorize()/cron", () => {
       const name = h.slice(0, h.indexOf("("));
       it(`${rel} ${name}`, () => {
         const body = h.split(/\nexport /)[0];
-        expect(/authorize\(|requireFinanceAccess\(\)|isAuthorizedCron\(|authorizeAsLigaAdmin\(|authorizeLeagueDelegate\(|authorizeGameSheet\(/.test(body)).toBe(true);
+        expect(/authorize\(|authorizeMaster\(|requireFinanceAccess\(\)|isAuthorizedCron\(|authorizeAsLigaAdmin\(|authorizeLeagueDelegate\(|authorizeGameSheet\(/.test(body)).toBe(true);
       });
     }
   }

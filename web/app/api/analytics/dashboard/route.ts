@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authorize } from "@/lib/auth/guards";
+import { authorizeMaster } from "@/lib/auth/master";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -10,7 +10,7 @@ function fail(msg: string, status = 400) {
 
 export async function GET(req: NextRequest) {
   // Sessão + conta ativa + admin/treinador/tesoureiro (papel ativo)
-  const auth = await authorize(["admin", "treinador", "tesoureiro"]);
+  const auth = await authorizeMaster();
   if (!auth.ok) return auth.response;
 
   const sp = req.nextUrl.searchParams;

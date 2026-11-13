@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { authorize } from "@/lib/auth/guards";
+import { authorizeMaster } from "@/lib/auth/master";
 import { createAdminClient } from "@/lib/supabase/server";
 
 export async function GET() {
-  const auth = await authorize(["admin"]);
+  const auth = await authorizeMaster();
   if (!auth.ok) return auth.response;
 
   const { data, error } = await auth.supabase
@@ -16,7 +16,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const auth = await authorize(["admin"]);
+  const auth = await authorizeMaster();
   if (!auth.ok) return auth.response;
 
   const { email, team_id } = (await req.json()) as { email: string; team_id: string };

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { authorize } from "@/lib/auth/guards";
+import { authorizeMaster } from "@/lib/auth/master";
 
 export async function GET() {
-  const auth = await authorize(["admin"]);
+  const auth = await authorizeMaster();
   if (!auth.ok) return auth.response;
 
   const { data, error } = await auth.supabase
@@ -16,7 +16,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const auth = await authorize(["admin"]);
+  const auth = await authorizeMaster();
   if (!auth.ok) return auth.response;
 
   const body = await req.json() as {

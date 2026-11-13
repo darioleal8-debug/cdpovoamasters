@@ -39,10 +39,8 @@ const mainItems = [
 const managementItems = [
   { label: "Temporadas",       href: "/temporadas",    icon: CalendarRange },
   { label: "Plantel",           href: "/jogadores",     icon: Users },
-  { label: "Gestão de Contas", href: "/gestao-contas", icon: UserCog },
   { label: "Jogos",            href: "/jogos",         icon: Calendar },
   { label: "Treinos",          href: "/treinos",       icon: Dumbbell },
-  { label: "Pagamentos",       href: "/pagamentos",    icon: CreditCard },
   { label: "Estatísticas",     href: "/estatisticas",  icon: BarChart3 },
   { label: "Documentos",       href: "/documentos",    icon: FolderOpen },
   { label: "Histórico",        href: "/historico",     icon: History   },
@@ -74,8 +72,9 @@ const communicationItems = [
   { label: "Chat Interno", href: "/chat", icon: MessageSquare },
 ];
 
-const accountItems = [
+const accountItems: { label: string; href: string; icon: typeof Settings; adminOnly?: boolean }[] = [
   { label: "Configurações",       href: "/configuracoes",          icon: Settings },
+  { label: "Gestão de Contas",    href: "/gestao-contas",          icon: UserCog, adminOnly: true },
   { label: "Importar Calendário", href: "/configuracoes/importar", icon: FileUp },
 ];
 
@@ -160,16 +159,13 @@ export function Sidebar({ role, rolesExtra = [], isMaster = false }: { role?: Us
               ))}
             </div>
 
-            {hasFinanceAccess && (
-              <>
-                <SectionLabel>Financeiro</SectionLabel>
-                <div className="space-y-0.5">
-                  <NavLink href="/financeiro" icon={Landmark} label="Gestão Financeira" />
-                </div>
-              </>
-            )}
+            <SectionLabel>Financeiro</SectionLabel>
+            <div className="space-y-0.5">
+              <NavLink href="/pagamentos" icon={CreditCard} label="Pagamentos" />
+              {hasFinanceAccess && <NavLink href="/financeiro" icon={Landmark} label="Gestão Financeira" />}
+            </div>
 
-            {isAdmin && (
+            {isMaster && (
               <>
                 <SectionLabel>Analytics</SectionLabel>
                 <div className="space-y-0.5">
@@ -211,9 +207,11 @@ export function Sidebar({ role, rolesExtra = [], isMaster = false }: { role?: Us
               <Separator className="mb-3" style={{ background: "rgba(255,255,255,.08)" }} />
               <SectionLabel>Conta</SectionLabel>
               <div className="space-y-0.5">
-                {accountItems.map((item) => (
-                  <NavLink key={item.href} {...item} />
-                ))}
+                {accountItems
+                  .filter((item) => !item.adminOnly || isAdmin)
+                  .map(({ label, href, icon }) => (
+                    <NavLink key={href} label={label} href={href} icon={icon} />
+                  ))}
               </div>
             </div>
           </>

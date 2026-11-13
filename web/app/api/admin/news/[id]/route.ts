@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authorize } from "@/lib/auth/guards";
-import { ADMIN } from "@/lib/auth/roles";
+import { authorizeMaster } from "@/lib/auth/master";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
 // Sessão + conta ativa + admin (papel ativo); antes procurava o perfil por email
 async function checkAdmin() {
-  const auth = await authorize(ADMIN);
+  const auth = await authorizeMaster();
   return auth.ok ? { user: auth.user, supabase: auth.supabase } : null;
 }
 

@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { authorize } from "@/lib/auth/guards";
+import { authorizeMaster } from "@/lib/auth/master";
 import { createAdminClient } from "@/lib/supabase/server";
 
 export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const auth = await authorize(["admin"]);
+  const auth = await authorizeMaster();
   if (!auth.ok) return auth.response;
 
   const { id } = await params;
