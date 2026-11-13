@@ -98,3 +98,39 @@ export async function resolveDocKind(input: ClassifyInput): Promise<{ kind: DocK
   }
   return { kind: declared, changed: false, classification };
 }
+
+// ─── Fotografia de jogo vs documento (capturas de estatísticas, folhas, tabelas) ───────────────
+
+export const PHOTO_SYSTEM_PROMPT = `Distingues fotografias de um jogo de basquetebol de documentos. Responde APENAS com JSON:
+{"type":"game_photo"|"document","confidence":number,"reason":string}
+
+- "game_photo": fotografia real tirada num pavilhão/campo: jogadores, equipa, bola, cesto, banco, bancada, grupo de atletas.
+- "document": captura de ecrã de uma aplicação, tabela de estatísticas, folha de jogo (manuscrita ou impressa), resultado/placard digital, ou qualquer imagem dominada por texto, números ou tabelas.
+Nunca leias nem devolvas os valores — só classifica. "confidence" 0–1.`;
+
+/** Confiança mínima para tratar uma imagem como documento (e não como fotografia do jogo). */
+export const DOCUMENT_PHOTO_CONFIDENCE = 0.75;
+
+/**
+ * true = é um documento (não serve como fotografia do jogo); false = fotografia; null = não foi possível
+ * decidir (sem chave, erro de API…) — quem chama deve aceitar a foto (nunca bloquear por falha técnica).
+ */
+export async function isDocumentNotPhoto(buffer: Buffer, mime: string): Promise<boolean | null> {
+  if (!process.env.DEEPSEEK_API_KEY) return null;
+  try {
+    const doc = await prepareDocument(buffer, mime, { digital: true });
+    if (!doc.pages.length) return null;
+    const r = await deepseekJSONDetailed<{ type?: string; confidence?: number }>({
+      model: process.env.DEEPSEEK_VISION_MODEL || "deepseek-flash",
+      system: PHOTO_SYSTEM_PROMPT,
+      user: [imagePart(doc.pages[0].buffer, "auto"), { type: "text", text: "Classifica esta imagem e devolve o JSON pedido." }],
+      temperature: 0, maxTokens: 200, maxRetryTokens: 400, timeoutMs: 15_000, transientRetries: 1,
+    });
+    if (!r.ok) return null;
+    if (r.data.type !== "document" && r.data.type !== "game_photo") return null;
+    const c = typeof r.data.confidence === "number" ? r.data.confidence : 0;
+    return r.data.type === "document" && c >= DOCUMENT_PHOTO_CONFIDENCE;
+  } catch {
+    return null;
+  }
+}

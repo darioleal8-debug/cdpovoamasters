@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
-import { classifyDocument, looksLikeStatsText, resolveDocKind } from "./classify";
+import { classifyDocument, isDocumentNotPhoto, looksLikeStatsText, resolveDocKind } from "./classify";
 import { extractProStats, proStatsStatus } from "./pro-stats-extract";
 
 const fx = (f: string) => JSON.parse(readFileSync(join(__dirname, "__fixtures__", f), "utf8"));
@@ -83,5 +83,24 @@ describe("leitura da tabela Matosinhos vs Afuradence (12 Nov 2026)", { timeout: 
     expect(t.players[2].stats.eff).toBe(-2); // EFF negativa preservada
     expect(r.issues.filter((i) => i.severity === "error")).toEqual([]);
     expect(proStatsStatus(r.data, r.issues)).toBe("ready_to_confirm");
+  });
+});
+
+describe("fotografia de jogo vs documento", { timeout: 30_000 }, () => {
+  it("captura de estatísticas é documento (não pode ser foto/capa)", async () => {
+    responses.push({ type: "document", confidence: 0.96 });
+    expect(await isDocumentNotPhoto(await img(), "image/jpeg")).toBe(true);
+  });
+  it("foto real do jogo é aceite", async () => {
+    responses.push({ type: "game_photo", confidence: 0.9 });
+    expect(await isDocumentNotPhoto(await img(), "image/jpeg")).toBe(false);
+  });
+  it("dúvida ou falha da API: null (a foto é aceite, nunca se bloqueia por falha técnica)", async () => {
+    responses.push({ type: "document", confidence: 0.4 });
+    expect(await isDocumentNotPhoto(await img(), "image/jpeg")).toBe(false);
+    responses.push(new Response("erro", { status: 500 }), new Response("erro", { status: 500 }));
+    expect(await isDocumentNotPhoto(await img(), "image/jpeg")).toBeNull();
+    delete process.env.DEEPSEEK_API_KEY;
+    expect(await isDocumentNotPhoto(await img(), "image/jpeg")).toBeNull();
   });
 });

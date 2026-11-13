@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { parseGameMeta } from "@/types/competitions";
 import { generateNewsImage } from "@/lib/liga/generate-image";
+import { isDocumentNotPhoto } from "@/lib/match-docs/classify";
 
 type AdminClient = Awaited<ReturnType<typeof createUnscopedAdminClient>>;
 
@@ -61,6 +62,15 @@ export async function storeGamePhoto(
     return { ok: false, status: 400, error: "Ficheiro demasiado grande (máx. 10 MB)" };
   }
 
+  // Só fotografias do jogo: capturas de estatísticas, folhas e tabelas não podem ser capa da notícia
+  const buffer = Buffer.from(await photo.arrayBuffer());
+  if ((await isDocumentNotPhoto(buffer, photo.type)) === true) {
+    return {
+      ok: false, status: 422,
+      error: "Esta imagem parece um documento (estatísticas, folha de jogo ou tabela), não uma fotografia do jogo. Carrega-a na secção de documentos do resultado.",
+    };
+  }
+
   if (teamId) {
     const { count } = await admin
       .from("game_photos")
@@ -74,7 +84,6 @@ export async function storeGamePhoto(
 
   const ext = photo.type === "image/webp" ? "webp" : photo.type === "image/png" ? "png" : "jpg";
   const storagePath = `${gameId}/${teamId ?? "liga"}/${crypto.randomUUID()}.${ext}`;
-  const buffer = Buffer.from(await photo.arrayBuffer());
 
   const { error: uploadErr } = await admin.storage
     .from(GAME_PHOTOS_BUCKET)

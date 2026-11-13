@@ -4,6 +4,7 @@ import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { deepseekJSON } from "@/lib/deepseek";
+import { isDocumentNotPhoto } from "@/lib/match-docs/classify";
 
 // ─── Font loading (Inter Bold WOFF — embutida no SVG para librsvg no Vercel) ─
 let _fontB64: string | null | undefined;
@@ -148,13 +149,8 @@ async function _generateNewsImage(ctx: NewsImageContext): Promise<GenerateResult
   const gameId = newsRow.data?.game_id;
   if (gameId) {
     try {
-      const { data: gamePics } = await admin
-        .from("game_photos")
-        .select("id, storage_path")
-        .eq("game_id", gameId)
-        .eq("hidden", false)
-        .order("created_at", { ascending: true })
-        .limit(1);
+      const realPic = await pickRealCoverPhoto(admin, gameId);
+      const gamePics = realPic ? [realPic] : [];
 
       if (gamePics && gamePics.length > 0) {
         // Foto real: usar URL pública directamente — sem download, sem compressão
@@ -234,19 +230,14 @@ async function _generateNewsImage(ctx: NewsImageContext): Promise<GenerateResult
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[generateNewsImage] fail attempt=${attempt} type=${errorType} ${Date.now() - t1}ms — ${msg}`);
 
-      if (errorType === "BILLING" || errorType === "AUTH" || errorType === "CONTENT") {
-        await setImageFailed(ctx.newsId, errorType, msg);
-        return { ok: false, errorType };
-      }
-      if (attempt === 2) {
-        await setImageFailed(ctx.newsId, errorType, msg);
-        return { ok: false, errorType };
+      if (errorType === "BILLING" || errorType === "AUTH" || errorType === "CONTENT" || attempt === 2) {
+        return await scoreboardFallback(ctx, oldImageUrl, { type: errorType, msg });
       }
       const delay = errorType === "RATE_LIMIT" ? 10_000 : 5_000;
       await new Promise((r) => setTimeout(r, delay));
     }
   }
-  return { ok: false, errorType: "UNKNOWN" };
+  return await scoreboardFallback(ctx, oldImageUrl, { type: "UNKNOWN", msg: "geração falhou" });
 }
 
 // Brief criativo do admin → DeepSeek interpreta → gera prompt Flux
@@ -289,13 +280,8 @@ async function _generateNewsImageFromPrompt(
   const gameIdBrief = newsRow.data?.game_id;
   if (gameIdBrief) {
     try {
-      const { data: gamePics } = await admin
-        .from("game_photos")
-        .select("id, storage_path")
-        .eq("game_id", gameIdBrief)
-        .eq("hidden", false)
-        .order("created_at", { ascending: true })
-        .limit(1);
+      const realPic = await pickRealCoverPhoto(admin, gameIdBrief);
+      const gamePics = realPic ? [realPic] : [];
       if (gamePics && gamePics.length > 0) {
         const { data: pub } = admin.storage.from("game-photos").getPublicUrl(gamePics[0].storage_path);
         await admin.from("news").update({
@@ -784,6 +770,69 @@ async function deletePreviousImage(admin: SupabaseClient, oldUrl: string | null)
     if (!oldPath) return;
     await admin.storage.from(BUCKET).remove([oldPath]);
   } catch { /* best effort */ }
+}
+
+// ─── Seleção da foto de capa: só fotografias reais do jogo ────────────────────
+
+/**
+ * Primeira fotografia visível do jogo que não seja um documento (captura de estatísticas, folha, tabela).
+ * Documentos detetados são ocultados da galeria (o admin pode voltar a mostrá-los). Se a deteção
+ * falhar tecnicamente, a foto é aceite — nunca se perde uma foto real por falha da API.
+ */
+async function pickRealCoverPhoto(admin: SupabaseClient, gameId: string): Promise<{ id: string; storage_path: string } | null> {
+  const { data: pics } = await admin
+    .from("game_photos")
+    .select("id, storage_path")
+    .eq("game_id", gameId)
+    .eq("hidden", false)
+    .order("created_at", { ascending: true })
+    .limit(6);
+  for (const pic of pics ?? []) {
+    try {
+      const { data: blob } = await admin.storage.from("game-photos").download(pic.storage_path as string);
+      if (blob) {
+        const buf = Buffer.from(await blob.arrayBuffer());
+        const mime = blob.type && blob.type.startsWith("image/") ? blob.type : "image/jpeg";
+        if ((await isDocumentNotPhoto(buf, mime)) === true) {
+          console.warn(`[generateNewsImage] foto ${pic.id} é um documento, não uma foto de jogo — ocultada e ignorada como capa`);
+          await admin.from("game_photos").update({ hidden: true }).eq("id", pic.id);
+          continue;
+        }
+      }
+    } catch (e) {
+      console.warn(`[generateNewsImage] verificação da foto ${pic.id} falhou: ${(e as Error).message} — aceite`);
+    }
+    return { id: pic.id as string, storage_path: pic.storage_path as string };
+  }
+  return null;
+}
+
+// ─── Último recurso: scoreboard com o resultado final ─────────────────────────
+
+/** Scoreboard (fundo liso + placard com equipas e resultado final) quando não há foto nem imagem IA. */
+async function scoreboardFallback(ctx: NewsImageContext, oldImageUrl: string | null, failure: { type: FalErrorType; msg: string }): Promise<GenerateResult> {
+  try {
+    const admin = await createUnscopedAdminClient();
+    const gameData = await fetchGameImageData(ctx.newsId, admin);
+    const hasScore = (gameData?.homeScore != null && gameData?.awayScore != null) || !!ctx.scoreStr;
+    if (!hasScore) throw new Error("sem resultado final para o scoreboard");
+    const base = await sharp({ create: { width: 1600, height: 900, channels: 3, background: "#0B1626" } }).png().toBuffer();
+    const svg = buildOverlaySvg(await buildOverlayData(ctx, gameData));
+    const webp = await sharp(base).composite([{ input: svg, blend: "over" }]).webp({ quality: 88 }).toBuffer();
+    const { publicUrl } = await saveImageToStorage(admin, ctx.newsId, webp);
+    const { error } = await admin.from("news").update({
+      cover_image_url: publicUrl, image_source: "fallback", image_status: "ready",
+      image_error: null, image_error_type: null,
+    }).eq("id", ctx.newsId);
+    if (error) throw new Error(error.message);
+    await deletePreviousImage(admin, oldImageUrl);
+    console.info(`[generateNewsImage] scoreboard com resultado final usado (IA falhou: ${failure.type}) ${ctx.newsId}`);
+    return { ok: true };
+  } catch (e) {
+    console.error(`[generateNewsImage] scoreboard fallback falhou: ${(e as Error).message}`);
+    await setImageFailed(ctx.newsId, failure.type, failure.msg);
+    return { ok: false, errorType: failure.type };
+  }
 }
 
 // ─── DB helpers ───────────────────────────────────────────────────────────────
