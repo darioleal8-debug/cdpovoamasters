@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   BarChart3,
   CalendarRange,
@@ -17,7 +16,7 @@ import {
   Shield,
   FolderOpen,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { logout } from "@/lib/auth/logout";
 import { toast } from "@/components/ui/toaster";
 
 interface MenuItem {
@@ -43,14 +42,10 @@ const ITEMS: MenuItem[] = [
 ];
 
 export default function MaisPage() {
-  const router = useRouter();
-  const supabase = createClient();
 
-  async function handleLogout() {
-    await supabase.auth.signOut();
+  function handleLogout() {
     toast({ title: "Sessão terminada", description: "Até breve!" });
-    router.push("/login");
-    router.refresh();
+    void logout();
   }
 
   return (
