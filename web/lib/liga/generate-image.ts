@@ -1004,6 +1004,7 @@ async function callDeepSeekForPrompt(
   userContent: string,
 ): Promise<{ prompt: string; negativePrompt: string }> {
   const result = await deepseekJSON<{ prompt?: string; negative_prompt?: string }>({
+    feature: "imagem-noticia",
     system: systemPrompt,
     user: userContent,
     maxTokens: 1000,

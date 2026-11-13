@@ -293,6 +293,7 @@ export async function generateLigaNews(
   let lastIssues: string[] = [];
   for (let attempt = 0; attempt < 3 && !newsData; attempt++) {
     const aiResult = await deepseekJSON<NewsJSON>({
+    feature: "noticias",
       system,
       user: userPrompt + feedback,
       maxTokens: 4096,

@@ -72,6 +72,7 @@ export async function analyzeGameSheet(input: {
 
   // ── 1. Leitura completa ──
   const full = await deepseekJSONDetailed<unknown>({
+    feature: "folha-jogo",
     model: cfg.model,
     system: buildSystemPrompt(DEFAULT_LAYOUT, input.adminInstructions, input.opencvZones),
     user: [
@@ -106,6 +107,7 @@ export async function analyzeGameSheet(input: {
     const crop = await cropRegions(prepared, doubtful.map((e) => e.region!)).catch(() => null);
     if (crop) {
       const recheck = await deepseekJSONDetailed<unknown>({
+    feature: "folha-jogo",
         model: cfg.model,
         system: buildSystemPrompt(DEFAULT_LAYOUT, input.adminInstructions),
         user: [

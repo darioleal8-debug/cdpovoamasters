@@ -9,7 +9,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!m.ok) return m.response;
   const { id } = await params;
 
-  let body: { active?: boolean; name?: string; league_team_id?: string | null };
+  let body: { active?: boolean; name?: string; league_team_id?: string | null; ai_monthly_budget_eur?: number };
   try { body = await req.json(); } catch { return fail("JSON inválido"); }
 
   const upd: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -17,6 +17,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.name !== undefined) {
     if (!body.name.trim()) return fail("Nome inválido");
     upd.name = body.name.trim();
+  }
+  if (body.ai_monthly_budget_eur !== undefined) {
+    const v = Number(body.ai_monthly_budget_eur);
+    if (!Number.isFinite(v) || v < 0 || v > 1000) return fail("Limite de IA inválido");
+    upd.ai_monthly_budget_eur = v;
   }
   if (body.league_team_id !== undefined) upd.league_team_id = body.league_team_id || null;
 

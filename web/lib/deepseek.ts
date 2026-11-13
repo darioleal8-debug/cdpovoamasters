@@ -20,6 +20,8 @@ export interface DeepSeekJSONOptions {
   transientRetries?: number;
   /** Limite de tokens no retry por finish_reason=length (default 32 768) */
   maxRetryTokens?: number;
+  /** Etiqueta da funcionalidade, para o registo de consumo por clube */
+  feature?: string;
 }
 
 export type DeepSeekJSONResult<T> =
@@ -35,7 +37,8 @@ export type DeepSeekErrorKind =
   | "http"
   | "network"
   | "truncated"
-  | "invalid_json";
+  | "invalid_json"
+  | "budget";
 
 export interface DeepSeekCallMeta {
   model: string;
@@ -114,6 +117,21 @@ export async function deepseekJSONDetailed<T = Record<string, unknown>>(
     model, durationMs: 0, attempts: 0, promptTokens: null, completionTokens: null, cacheHitTokens: null,
   };
   if (!apiKey) return { ok: false, error: "DEEPSEEK_API_KEY não configurada", kind: "config", meta };
+
+  // Controlo de gasto por clube (falha aberta: nunca impede a chamada por erro do próprio controlo)
+  let usage: typeof import("./ai-usage") | null = null;
+  let aiCtx: Awaited<ReturnType<typeof import("./ai-usage").resolveAiContext>> = null;
+  try {
+    usage = await import("./ai-usage");
+    aiCtx = await usage.resolveAiContext();
+    const b = await usage.checkAiBudget(aiCtx);
+    if (!b.allowed) {
+      return {
+        ok: false, kind: "budget", meta,
+        error: `A equipa atingiu o limite mensal de IA (${usage.eur(b.limitEur)}). Volta a tentar no próximo mês ou fala com o Master Admin.`,
+      };
+    }
+  } catch { /* sem controlo */ }
 
   const maxTokens = opts.maxTokens ?? 4096;
   const timeoutMs = opts.timeoutMs ?? 45_000;
@@ -228,8 +246,15 @@ export async function deepseekJSONDetailed<T = Record<string, unknown>>(
     }
   }
 
-  const done = (r: AttemptResult<T>): DeepSeekDetailedResult<T> => {
+  const done = async (r: AttemptResult<T>): Promise<DeepSeekDetailedResult<T>> => {
     meta.durationMs = Date.now() - started;
+    if (usage) {
+      await usage.recordAiUsage(aiCtx, {
+        feature: opts.feature ?? "geral", model,
+        promptTokens: meta.promptTokens ?? 0, cacheHitTokens: meta.cacheHitTokens ?? 0,
+        completionTokens: meta.completionTokens ?? 0, ok: r.ok,
+      });
+    }
     return r.ok ? { ok: true, data: r.data, meta } : { ok: false, error: r.error, kind: r.kind, meta };
   };
 

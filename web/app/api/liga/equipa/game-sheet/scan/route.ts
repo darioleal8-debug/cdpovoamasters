@@ -21,6 +21,7 @@ async function callAndParse(
   label: string,
 ): Promise<{ data: Record<string, unknown>; reason?: string }> {
   const result = await deepseekJSON<Record<string, unknown>>({
+    feature: "folha-jogo",
     user: userContent,
     maxTokens: 4096,
     temperature: 0,

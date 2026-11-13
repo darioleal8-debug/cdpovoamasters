@@ -79,6 +79,7 @@ export async function crossCheckWithAI(input: {
     erros_matematicos: input.result.mathIssues.filter((i) => i.docId === "consolidated").map((i) => i.message),
   };
   const r = await deepseekJSONDetailed<unknown>({
+    feature: "estatisticas-jogo",
     system: SYSTEM,
     user: JSON.stringify(payload).slice(0, 60_000),
     temperature: 0.1,

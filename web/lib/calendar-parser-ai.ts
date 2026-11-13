@@ -105,6 +105,8 @@ interface DeepSeekResponse {
  * Chama a API DeepSeek (compatível com OpenAI chat/completions).
  * Lança erro se a chave não estiver configurada ou a API devolver erro.
  */
+import { guardAiBudget, trackRawUsage } from "@/lib/ai-usage";
+
 async function callDeepSeek(
   systemPrompt: string,
   messages: Array<{ role: "user" | "assistant"; content: string }>,
@@ -127,6 +129,7 @@ async function callDeepSeek(
     ` msgs=${payload.messages.length} max_tokens=${DEEPSEEK_MAX_TOK}`
   );
 
+  await guardAiBudget();
   const res = await fetch(DEEPSEEK_ENDPOINT, {
     method:  "POST",
     headers: {
@@ -144,6 +147,7 @@ async function callDeepSeek(
   }
 
   const data = (await res.json()) as DeepSeekResponse;
+  await trackRawUsage("calendario", DEEPSEEK_MODEL, (data as { usage?: { prompt_tokens?: number; completion_tokens?: number } }).usage);
   const choice = data.choices?.[0];
 
   if (!choice?.message?.content) {

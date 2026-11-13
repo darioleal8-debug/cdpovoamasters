@@ -132,6 +132,7 @@ export async function extractProStats(input: {
   ];
 
   const full = await deepseekJSONDetailed<unknown>({
+    feature: "estatisticas-jogo",
     model: cfg.model, system, user: doc.pages.length ? user : buildProStatsUserPrompt(input.game, input.submittingTeam, doc, input.rosterHint),
     temperature: 0, maxTokens: cfg.maxOutputTokens, maxRetryTokens: cfg.maxOutputTokens * 2,
     timeoutMs: Math.max(10_000, cfg.timeBudgetMs - 8_000), transientRetries: 1,
@@ -180,6 +181,7 @@ export async function extractProStats(input: {
     });
     const zooms = await zoomHalves(doc.pages).catch(() => [] as Awaited<ReturnType<typeof zoomHalves>>);
     const recheck = await deepseekJSONDetailed<unknown>({
+    feature: "estatisticas-jogo",
       model: cfg.model,
       system: `${PRO_STATS_SYSTEM_PROMPT}\n\nMODO 2.ª LEITURA: a leitura anterior tem inconsistências matemáticas. Volta a ler APENAS o que é pedido e devolve {"rows":[{"id":string,"rowText":string,"stats":{<abreviatura da coluna>:<texto da célula>},"note":string|null}],"columns":[{"id":string,"values":[{"id":<id do jogador>,"value":<texto da célula>}]}]}. Copia o que está escrito, sem aritmética. A causa mais provável é teres lido valores da linha de cima/baixo ou da coluna ao lado: para cada linha, localiza o NOME do jogador, segue essa linha exata até ao fim e transcreve-a em "rowText" antes de preencher "stats"; para cada coluna pedida, localiza o cabeçalho e desce na vertical, célula a célula, jogador a jogador.`,
       user: [

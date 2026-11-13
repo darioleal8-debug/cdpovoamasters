@@ -135,6 +135,7 @@ Dados (já ordenados por created_at — o primeiro de cada grupo deve ser mantid
 ${JSON.stringify({ operation: "detect_and_remove_duplicates", rounds }, null, 2)}`;
 
   const result = await deepseekJSON<DSResponse>({
+    feature: "calendario",
     system: CLEANUP_SYSTEM,
     user: userMsg,
     maxTokens: 2000,

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardAiBudget, trackRawUsage } from "@/lib/ai-usage";
 import { clubIdForUser } from "@/lib/auth/club";
 import { getOurTeamName } from "@/lib/competitions-data";
 import { authorize } from "@/lib/auth/guards";
@@ -479,6 +480,7 @@ async function detectCompetitions(
   });
 
   try {
+    await guardAiBudget();
     const resp = await fetch("https://api.deepseek.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -522,6 +524,7 @@ ${JSON.stringify({ operation: "competition_detection", games: ambiguousGames }, 
 
     if (resp.ok) {
       const json = await resp.json();
+      await trackRawUsage("calendario", "deepseek-chat", json.usage);
       console.log(`[import-calendar] competition detection tokens: ${json.usage?.prompt_tokens}+${json.usage?.completion_tokens}`);
       const raw = (json.choices?.[0]?.message?.content ?? "") as string;
       const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();

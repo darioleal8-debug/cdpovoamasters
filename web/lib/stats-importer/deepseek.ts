@@ -165,6 +165,8 @@ export interface BoxScoreParseResult {
   errors:       string[];
 }
 
+import { guardAiBudget, trackRawUsage } from "@/lib/ai-usage";
+
 export async function parseBoxScoreWithDeepSeek(pdfText: string, teamNameOverride?: string): Promise<BoxScoreParseResult> {
   const key = process.env.DEEPSEEK_API_KEY;
   if (!key) throw new Error("DEEPSEEK_API_KEY não configurada no servidor");
@@ -196,6 +198,7 @@ ${OUTPUT_SCHEMA}`;
 
   console.log(`[import-stats] DeepSeek call — ${pdfText.length} chars`);
 
+  await guardAiBudget();
   const res = await fetch(DEEPSEEK_ENDPOINT, {
     method:  "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
@@ -208,6 +211,7 @@ ${OUTPUT_SCHEMA}`;
   }
 
   const data = (await res.json()) as DeepSeekResponse;
+  await trackRawUsage("importar-estatisticas", DEEPSEEK_MODEL, (data as { usage?: { prompt_tokens?: number; completion_tokens?: number } }).usage);
   const choice = data.choices?.[0];
   if (!choice?.message?.content) throw new Error("DeepSeek: resposta sem conteúdo");
 

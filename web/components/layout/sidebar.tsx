@@ -23,6 +23,7 @@ import {
   FolderOpen,
   ClipboardList,
   Building2,
+  Sparkles,
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -180,6 +181,7 @@ export function Sidebar({ role, rolesExtra = [], isMaster = false }: { role?: Us
                 <SectionLabel>Plataforma</SectionLabel>
                 <div className="space-y-0.5">
                   <NavLink href="/master-clubes" icon={Building2} label="Clubes" />
+                  <NavLink href="/master-ia" icon={Sparkles} label="Consumo de IA" />
                 </div>
               </>
             )}

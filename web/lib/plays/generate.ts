@@ -54,6 +54,7 @@ export async function generatePlay({ prompt, current }: GenerateInput): Promise<
     temperature: 0.4,
     timeoutMs: 90_000,
     transientRetries: 1,
+    feature: "laboratorio",
   });
   if (!r.ok) {
     const status = r.kind === "config" ? 503 : r.kind === "rate_limit" ? 429 : 502;

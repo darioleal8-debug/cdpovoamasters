@@ -68,6 +68,7 @@ export async function classifyDocument(input: ClassifyInput): Promise<Classifica
 
   // 2. Classificação visual (primeira página/secção; low detail chega para distinguir o aspeto)
   const r = await deepseekJSONDetailed<{ type?: string; confidence?: number; app?: string | null; reason?: string }>({
+    feature: "estatisticas-jogo",
     model: process.env.DEEPSEEK_VISION_MODEL || "deepseek-flash",
     system: CLASSIFY_SYSTEM_PROMPT,
     user: [
@@ -121,6 +122,7 @@ export async function isDocumentNotPhoto(buffer: Buffer, mime: string): Promise<
     const doc = await prepareDocument(buffer, mime, { digital: true });
     if (!doc.pages.length) return null;
     const r = await deepseekJSONDetailed<{ type?: string; confidence?: number }>({
+    feature: "estatisticas-jogo",
       model: process.env.DEEPSEEK_VISION_MODEL || "deepseek-flash",
       system: PHOTO_SYSTEM_PROMPT,
       user: [imagePart(doc.pages[0].buffer, "auto"), { type: "text", text: "Classifica esta imagem e devolve o JSON pedido." }],

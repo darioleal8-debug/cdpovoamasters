@@ -175,6 +175,8 @@ export interface HistParseResult {
   errors:   string[];
 }
 
+import { guardAiBudget, trackRawUsage } from "@/lib/ai-usage";
+
 export async function parseHistBoxScoreWithDeepSeek(pdfText: string, teamNameOverride?: string): Promise<HistParseResult> {
   const key = process.env.DEEPSEEK_API_KEY;
   if (!key) throw new Error("DEEPSEEK_API_KEY não configurada");
@@ -195,6 +197,7 @@ IMPORTANTE: O JSON abaixo é apenas a ESTRUTURA do output. Os placeholders em <M
 Devolve APENAS JSON válido (sem markdown, sem texto adicional):
 ${OUTPUT_SCHEMA}`;
 
+  await guardAiBudget();
   const res = await fetch(DEEPSEEK_ENDPOINT, {
     method:  "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
@@ -211,6 +214,7 @@ ${OUTPUT_SCHEMA}`;
   }
 
   const data    = await res.json() as { choices: { message: { content: string }; finish_reason: string }[]; usage?: { prompt_tokens: number; completion_tokens: number } };
+  await trackRawUsage("importar-historico", DEEPSEEK_MODEL, data.usage);
   const choice  = data.choices?.[0];
   if (!choice?.message?.content) throw new Error("DeepSeek: resposta sem conteúdo");
 

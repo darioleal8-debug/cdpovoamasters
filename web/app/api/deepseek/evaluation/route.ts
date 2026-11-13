@@ -255,6 +255,7 @@ Devolve exatamente este JSON:
     user: userPrompt,
     maxTokens: 4096,
     model: "deepseek-chat",
+    feature: "avaliacao-jogadores",
   });
 
   if (!aiResult.ok) {
