@@ -1,4 +1,6 @@
 import { loadTeamRoster, type RosterPlayer } from "@/lib/liga/roster";
+import { resolveScope, NO_CLUB } from "@/lib/supabase/club-scope";
+import { leagueTeamNameForClub } from "@/lib/auth/club";
 import { createAdminClient } from "@/lib/supabase/server";
 import { createPublicClient } from "@/lib/supabase/public";
 import { computeStandings, groupStandingsBySeries, normalizeName, parseGameMeta, type SeriesStandings, type Competition, type LeagueGameResult, type LeagueTeam, type PublicGame, type StandingRow } from "@/types/competitions";
@@ -20,6 +22,12 @@ export async function getCompetitionBySlug(slug: string): Promise<Competition | 
 
 export async function getOurTeamName(): Promise<string> {
   const supabase = await createAdminClient();
+  // Equipa da Liga do clube do utilizador (clubs.league_team_id); sem sessão/associação: is_our_team
+  const scope = await resolveScope();
+  if (scope && scope.clubId !== NO_CLUB) {
+    const name = await leagueTeamNameForClub(supabase, scope.clubId);
+    if (name) return name;
+  }
   const { data } = await supabase
     .from("league_teams")
     .select("name")

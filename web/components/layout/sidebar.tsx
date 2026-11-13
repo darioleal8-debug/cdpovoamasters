@@ -113,15 +113,15 @@ export function Sidebar({ role, rolesExtra = [], isMaster = false }: { role?: Us
             className="flex h-9 w-9 items-center justify-center rounded-xl text-xs font-bold text-white"
             style={{ background: "var(--action, #F97316)" }}
           >
-            CDP
+            {(settings.club_name || "CD").split(" ").filter(Boolean).slice(0, 3).map((w) => w[0]).join("").toUpperCase()}
           </div>
         )}
         <div className="flex flex-col leading-tight">
           <span className="font-condensed text-sm font-bold uppercase tracking-display text-white">
-            CD Póvoa
+            {settings.club_name}
           </span>
           <span className="text-[11px] font-semibold uppercase tracking-label" style={{ color: "rgba(255,255,255,.4)" }}>
-            Masters · Basquetebol
+            Basquetebol
           </span>
         </div>
       </div>

@@ -54,5 +54,7 @@ export async function POST(req: NextRequest) {
     if (error.code === "23505") return fail("Já existe um clube com este slug ou equipa da Liga", 409);
     return fail(error.message, 500);
   }
+  // Definições (branding) próprias do clube, neutras e não públicas
+  await admin.from("club_settings").insert({ id: club.slug, club_id: club.id, club_name: club.name, slug: club.slug, is_public: false });
   return NextResponse.json({ club: { ...club, members: 0, league_team_name: null } }, { status: 201 });
 }

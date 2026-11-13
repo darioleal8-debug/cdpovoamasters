@@ -60,7 +60,9 @@ export async function GET(req: NextRequest) {
     let pagos      = 1;
     let totalMeses = 10;
     try {
-      const { data: clubRow } = await admin.from("club_settings").select("club_name").limit(1).maybeSingle();
+      const { data: pl } = await admin.from("players").select("club_id").eq("id", receipt.player_id).maybeSingle();
+      const clubQ = admin.from("club_settings").select("club_name");
+      const { data: clubRow } = await (pl?.club_id ? clubQ.eq("club_id", pl.club_id) : clubQ.limit(1)).maybeSingle();
       if (clubRow?.club_name) clubName = clubRow.club_name;
 
       if (payment.season_id) {

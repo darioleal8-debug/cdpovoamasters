@@ -3,6 +3,7 @@ import { authorize } from "@/lib/auth/guards";
 import { ADMIN } from "@/lib/auth/roles";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { clubIdForUser } from "@/lib/auth/club";
 
 export const runtime = "nodejs";
 
@@ -19,11 +20,11 @@ async function getSupabase() {
 export async function GET() {
   const supabase = await getSupabase();
 
-  const { data, error } = await supabase
-    .from("club_settings")
-    .select("*")
-    .eq("id", "default")
-    .single();
+  // Com sessão: definições do clube do utilizador. Sem sessão (páginas públicas): as da plataforma.
+  const { data: { user } } = await supabase.auth.getUser();
+  const clubId = user ? await clubIdForUser(supabase, user.id) : null;
+  const base = supabase.from("club_settings").select("*");
+  const { data, error } = await (clubId ? base.eq("club_id", clubId) : base.eq("id", "default")).single();
 
   if (error) {
     // Tabela ainda não existe — devolver defaults silenciosamente
@@ -56,10 +57,13 @@ export async function PATCH(req: Request) {
     if (body[key] !== undefined) updates[key] = body[key];
   }
 
+  const clubId = await clubIdForUser(supabase, user.id);
+  if (!clubId) return NextResponse.json({ error: "Sem clube associado" }, { status: 403 });
+
   const { data, error } = await supabase
     .from("club_settings")
     .update(updates)
-    .eq("id", "default")
+    .eq("club_id", clubId)
     .select()
     .single();
 

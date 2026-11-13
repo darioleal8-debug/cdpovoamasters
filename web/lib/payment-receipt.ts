@@ -148,11 +148,12 @@ export async function sendAndLogPaymentReceipt(opts: {
 
   try {
     // Obter club_settings para nome do clube
-    const { data: clubRow } = await admin
-      .from("club_settings")
-      .select("club_name")
-      .limit(1)
-      .maybeSingle();
+    const clubQ = admin.from("club_settings").select("club_name");
+    const { data: clubRow } = await (
+      (playerRow as { club_id?: string | null }).club_id
+        ? clubQ.eq("club_id", (playerRow as { club_id: string }).club_id)
+        : clubQ.limit(1)
+    ).maybeSingle();
     if (clubRow?.club_name) clubName = clubRow.club_name;
 
     // Obter season_id e amount_due do pagamento

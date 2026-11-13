@@ -123,7 +123,7 @@ export function TabRail({ role, rolesExtra = [] }: { role?: UserRole; rolesExtra
         {settings.logo_url ? (
           <Image src={settings.logo_url} alt={settings.club_name} width={36} height={36} className="rounded-lg object-contain" />
         ) : (
-          <span className="font-condensed text-xs font-bold text-white">CDP</span>
+          <span className="font-condensed text-xs font-bold text-white">{(settings.club_name || "CD").split(" ").filter(Boolean).slice(0, 3).map((w) => w[0]).join("").toUpperCase()}</span>
         )}
       </div>
 
