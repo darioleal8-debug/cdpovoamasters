@@ -117,35 +117,49 @@ export function useLeagueCalendar(seasonId: string | null) {
   const supabase = createClient();
 
   const load = useCallback(async () => {
-    if (!seasonId) { setRawGames([]); setLoading(false); return; }
     setLoading(true);
 
-    const [eventsRes, teamRes] = await Promise.all([
-      supabase
-        .from("events")
-        .select("*")
-        .eq("season_id", seasonId)
-        .eq("type", "jogo")
-        .not("description", "is", null)
-        .order("event_date", { ascending: true })
-        .order("event_time", { ascending: true }),
-      supabase
-        .from("league_teams")
-        .select("name")
-        .eq("is_our_team", true)
-        .maybeSingle(),
-    ]);
+    let rows: Event[] = [];
+    let ourTeamName: string | null = null;
 
-    if (eventsRes.error) {
-      toast({ title: "Erro ao carregar calendário", variant: "destructive" });
-      setLoading(false);
-      return;
+    if (seasonId) {
+      const [eventsRes, teamRes] = await Promise.all([
+        supabase
+          .from("events")
+          .select("*")
+          .eq("season_id", seasonId)
+          .eq("type", "jogo")
+          .not("description", "is", null)
+          .order("event_date", { ascending: true })
+          .order("event_time", { ascending: true }),
+        supabase
+          .from("league_teams")
+          .select("name")
+          .eq("is_our_team", true)
+          .maybeSingle(),
+      ]);
+      if (eventsRes.error) {
+        toast({ title: "Erro ao carregar calendário", variant: "destructive" });
+        setLoading(false);
+        return;
+      }
+      rows = (eventsRes.data ?? []) as Event[];
+      ourTeamName = teamRes.data?.name ?? null;
     }
 
-    const ourTeamName = teamRes.data?.name ?? null;
+    // Espelho da Liga: clube associado a uma equipa da Liga sem jogos próprios na época
+    if (rows.length === 0) {
+      try {
+        const res = await fetch("/api/club/league-calendar");
+        if (res.ok) {
+          const j = (await res.json()) as { team_name: string | null; events: Event[] };
+          if (j.team_name) { rows = j.events ?? []; ourTeamName = j.team_name; }
+        }
+      } catch { /* sem espelho */ }
+    }
 
-    const games = (eventsRes.data ?? [])
-      .map((e) => eventToLeagueGame(e as Event, ourTeamName))
+    const games = rows
+      .map((e) => eventToLeagueGame(e, ourTeamName))
       .filter((g): g is LeagueGame => g !== null);
 
     // Deduplicar por data + home + away

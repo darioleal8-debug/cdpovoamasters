@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/toaster";
 
-interface Club { id: string; name: string; slug: string; active: boolean; members: number; league_team_name: string | null }
+interface Club { id: string; name: string; slug: string; active: boolean; members: number; league_team_id?: string | null; league_team_name: string | null }
 interface Team { id: string; name: string }
 interface Member { user_id: string; name: string | null; email: string | null; role: string; active: boolean }
 
@@ -48,6 +48,13 @@ export function MasterClubsClient() {
     load();
   }
 
+  async function setLeagueTeam(c: Club, teamId: string) {
+    const r = await api(`/api/master/clubs/${c.id}`, { method: "PATCH", body: JSON.stringify({ league_team_id: teamId === "none" ? null : teamId }) });
+    if (!r.ok) return err(r.data.error);
+    toast({ title: teamId === "none" ? "Equipa da Liga desassociada" : "Equipa da Liga associada" });
+    load();
+  }
+
   return (
     <div className="mx-auto max-w-4xl space-y-4 p-4 md:p-6">
       <div className="flex items-center justify-between gap-3">
@@ -73,7 +80,15 @@ export function MasterClubsClient() {
                   {c.slug}{c.league_team_name ? ` · Liga: ${c.league_team_name}` : ""} · {c.members} utilizador(es)
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Select value={c.league_team_id ?? "none"} onValueChange={(v) => setLeagueTeam(c, v)}>
+                  <SelectTrigger className="h-8 w-52 text-xs"><SelectValue placeholder="Equipa da Liga" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem equipa da Liga</SelectItem>
+                    {c.league_team_id && c.league_team_name && <SelectItem value={c.league_team_id}>{c.league_team_name}</SelectItem>}
+                    {teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
                 <Button size="sm" variant="outline" onClick={() => setOpenClub(c)}><Users className="mr-1 h-4 w-4" /> Utilizadores</Button>
                 <Button size="sm" variant={c.active ? "outline" : "default"} onClick={() => toggleActive(c)}>
                   {c.active ? "Desativar" : "Ativar"}
