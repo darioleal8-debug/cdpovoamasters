@@ -20,7 +20,7 @@ export async function GET() {
     return NextResponse.json({ games: [] });
   }
 
-  const [eventsRes, resultsRes, submissionsRes] = await Promise.all([
+  const [eventsRes, resultsRes, submissionsRes, reconRes, importsRes, draftNewsRes] = await Promise.all([
     adminClient
       .from("events")
       .select("id, event_date, event_time, location, description, opponent, original_scheduled_at")
@@ -34,7 +34,16 @@ export async function GET() {
       .from("result_submissions")
       .select("id, event_id, status, home_team_name, away_team_name, home_score, away_score, submitted_by_name, submitted_by_team, submitted_at, notes, import_id, photo_url")
       .order("submitted_at", { ascending: false }),
+    // Ações pendentes do admin (para ordenar a lista): divergências por resolver,
+    // folhas por rever/confirmar e notícias em rascunho
+    adminClient.from("match_reconciliations").select("event_id").in("status", ["discrepancies", "manual_review"]),
+    adminClient.from("game_sheet_imports").select("event_id").in("status", ["needs_review", "ready_to_confirm"]),
+    adminClient.from("news").select("game_id").eq("is_published", false).not("game_id", "is", null),
   ]);
+
+  const reconPending = new Set((reconRes.data ?? []).map((r: { event_id: string }) => r.event_id));
+  const importsPending = new Set((importsRes.data ?? []).map((r: { event_id: string }) => r.event_id));
+  const draftNews = new Set((draftNewsRes.data ?? []).map((r: { game_id: string }) => r.game_id));
 
   const resultMap = new Map((resultsRes.data ?? []).map((r: { event_id: string }) => [r.event_id, r]));
   // O caminho da folha de jogo não sai do servidor: só o tipo (abre via /submissions/[id]/sheet)
@@ -61,6 +70,12 @@ export async function GET() {
     const subs = (subsByEvent[e.id] ?? []) as unknown[];
     const pendingCount = (subs as Array<{status: string}>).filter(s => s.status === "pending").length;
 
+    const pendingActions: string[] = [];
+    if (pendingCount > 0) pendingActions.push("submission");
+    if (reconPending.has(e.id)) pendingActions.push("reconciliation");
+    if (importsPending.has(e.id)) pendingActions.push("sheet_review");
+    if (draftNews.has(e.id)) pendingActions.push("draft_news");
+
     return {
       id: e.id,
       event_date: e.event_date,
@@ -76,6 +91,7 @@ export async function GET() {
       result_id: result ? (result as unknown as {id: string}).id : null,
       result_status: result ? "approved" : pendingCount > 0 ? "pending" : "no_result",
       pending_count: pendingCount,
+      pending_actions: pendingActions,
       submissions: subs,
     };
   });

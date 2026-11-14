@@ -53,6 +53,7 @@ type AdminGame = {
   result: { home_score: number; away_score: number } | null;
   result_status: "no_result" | "pending" | "approved";
   pending_count: number;
+  pending_actions?: string[];
   submissions: Submission[];
 };
 
@@ -109,6 +110,13 @@ const STATUS_CHIP: Record<string, { label: string; bg: string; color: string }> 
   no_result: { label: "Sem resultado", bg: "#F3F4F6", color: "#6B7280" },
   pending:   { label: "Pendente",      bg: "#FEF3C7", color: "#92400E" },
   approved:  { label: "Aprovado",      bg: "#D1FAE5", color: "#065F46" },
+};
+
+const PENDING_ACTION_LABEL: Record<string, string> = {
+  submission: "Resultado por aprovar",
+  reconciliation: "Divergências por resolver",
+  sheet_review: "Folha de jogo por rever",
+  draft_news: "Notícia em rascunho",
 };
 
 function Chip({ status }: { status: string }) {
@@ -791,6 +799,15 @@ export default function LigaAdminPage() {
     if (filterStatus  !== "all" && g.result_status !== filterStatus) return false;
     if (filterTeam    !== "all" && g.home_team !== filterTeam && g.away_team !== filterTeam) return false;
     return true;
+  }).sort((a, b) => {
+    // Jogos com ações pendentes de confirmação do admin vão sempre para o topo;
+    // dentro de cada grupo mantém-se a ordem cronológica.
+    const pa = (a.pending_actions?.length ?? 0) > 0 ? 0 : 1;
+    const pb = (b.pending_actions?.length ?? 0) > 0 ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    const da = `${a.event_date} ${a.event_time ?? ""}`;
+    const db = `${b.event_date} ${b.event_time ?? ""}`;
+    return da < db ? -1 : da > db ? 1 : 0;
   });
 
   const selectedGame = games.find(g => g.id === selectedId) ?? null;
@@ -996,6 +1013,13 @@ export default function LigaAdminPage() {
                         borderRadius: "99px", fontSize: "10px", fontWeight: 700,
                         padding: "1px 7px",
                       }}>{game.pending_count}</span>
+                    )}
+                    {(game.pending_actions?.length ?? 0) > 0 && (
+                      <span title={game.pending_actions!.map(a => PENDING_ACTION_LABEL[a] ?? a).join(" · ")} style={{
+                        background: "#FEF3C7", color: "#92400E", border: "1px solid #FCD34D",
+                        borderRadius: "99px", fontSize: "9px", fontWeight: 700,
+                        padding: "2px 7px", letterSpacing: "0.06em", textTransform: "uppercase",
+                      }}>Ação pendente</span>
                     )}
                   </div>
 
