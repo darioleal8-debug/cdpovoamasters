@@ -113,11 +113,7 @@ const STATUS_CHIP: Record<string, { label: string; bg: string; color: string }> 
 };
 
 const PENDING_ACTION_LABEL: Record<string, string> = {
-  submission: "Resultado por aprovar",
-  reconciliation: "Divergências por resolver",
-  sheet_review: "Folha de jogo por rever",
-  draft_news: "Notícia em rascunho",
-  no_result: "Jogo realizado sem resultado",
+  no_result: "Jogo terminado sem resultado confirmado nem notícia publicada",
 };
 
 function Chip({ status }: { status: string }) {
