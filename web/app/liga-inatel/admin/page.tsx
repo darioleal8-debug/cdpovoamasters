@@ -117,6 +117,7 @@ const PENDING_ACTION_LABEL: Record<string, string> = {
   reconciliation: "Divergências por resolver",
   sheet_review: "Folha de jogo por rever",
   draft_news: "Notícia em rascunho",
+  no_result: "Jogo realizado sem resultado",
 };
 
 function Chip({ status }: { status: string }) {

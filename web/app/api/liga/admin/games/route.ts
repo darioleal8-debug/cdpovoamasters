@@ -4,6 +4,23 @@ import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { parseGameMeta } from "@/types/competitions";
 import { resolveSheetLocation } from "@/lib/liga/sheet-location";
 
+// Data/hora atual em Lisboa como "YYYY-MM-DD HH:MM" (comparável por texto)
+function nowLisbon(): string {
+  return new Date().toLocaleString("sv-SE", { timeZone: "Europe/Lisbon" }).slice(0, 16);
+}
+
+// Jogo já terminou? (início + 2h; sem hora conhecida, só no dia seguinte)
+function gameIsOver(date: string, time: string | null, now: string): boolean {
+  if (!time) return date < now.slice(0, 10);
+  const [h, m] = time.split(":").map(Number);
+  const end = h * 60 + (m || 0) + 120;
+  const endDate = end >= 1440
+    ? new Date(Date.UTC(+date.slice(0, 4), +date.slice(5, 7) - 1, +date.slice(8, 10) + 1)).toISOString().slice(0, 10)
+    : date;
+  const em = end % 1440;
+  return `${endDate} ${String(Math.floor(em / 60)).padStart(2, "0")}:${String(em % 60).padStart(2, "0")}` <= now;
+}
+
 export async function GET() {
   const auth = await authorizeAsLigaAdmin();
   if (!auth.ok) return auth.response;
@@ -41,6 +58,7 @@ export async function GET() {
     adminClient.from("news").select("game_id").eq("is_published", false).not("game_id", "is", null),
   ]);
 
+  const now = nowLisbon();
   const reconPending = new Set((reconRes.data ?? []).map((r: { event_id: string }) => r.event_id));
   const importsPending = new Set((importsRes.data ?? []).map((r: { event_id: string }) => r.event_id));
   const draftNews = new Set((draftNewsRes.data ?? []).map((r: { game_id: string }) => r.game_id));
@@ -75,6 +93,8 @@ export async function GET() {
     if (reconPending.has(e.id)) pendingActions.push("reconciliation");
     if (importsPending.has(e.id)) pendingActions.push("sheet_review");
     if (draftNews.has(e.id)) pendingActions.push("draft_news");
+    // Jogo já realizado e sem resultado nem submissão: falta intervenção do admin/delegados
+    if (!result && pendingCount === 0 && gameIsOver(e.event_date, e.event_time, now)) pendingActions.push("no_result");
 
     return {
       id: e.id,
