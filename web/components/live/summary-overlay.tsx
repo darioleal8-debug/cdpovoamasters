@@ -106,6 +106,7 @@ function fmt(made: number, att: number) { return `${made}/${att}`; }
 export function SummaryOverlay({
   session, roster, onCourtIds, plays, clockSecs, secsById, tokens, onClose, onExport,
 }: SummaryOverlayProps) {
+  const [chartPlayer, setChartPlayer] = useState<string>("all");
   const opponent = session.opponent_name?.trim() || "Opponent";
   const awayFoulsGame = totalAwayFouls(plays as never);
   const { playerMap, awayRebOff, awayRebDef } = deriveStats(plays, session.current_period);
@@ -242,7 +243,15 @@ export function SummaryOverlay({
                 opacity: isOnCourt ? 1 : 0.75,
               };
               return (
-                <div key={player.user_id} style={rowStyle}>
+                <div
+                  key={player.user_id}
+                  style={{
+                    ...rowStyle, cursor: "pointer",
+                    outline: chartPlayer === player.user_id ? "2px solid var(--accent)" : "none",
+                  }}
+                  title="Tap to see this player's shot chart"
+                  onClick={() => setChartPlayer((cur) => (cur === player.user_id ? "all" : player.user_id))}
+                >
                   <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
                     <span style={{ fontFamily: MONO, fontSize: 15, fontWeight: 700, color: "var(--muted)" }}>
                       #{player.jersey_number ?? "–"}
@@ -307,7 +316,10 @@ export function SummaryOverlay({
             plays={plays as never}
             players={roster.map((r) => ({ id: r.user_id, name: r.user.name, number: r.jersey_number }))}
             emptyText="No located shots yet"
+            selectedPlayerId={chartPlayer}
+            onSelectPlayer={setChartPlayer}
           />
+          <span style={{ fontSize: 12, color: "var(--muted)" }}>Tip: tap a player row in the table above to see only their shots.</span>
         </div>
 
         {/* AI analysis for the coach */}

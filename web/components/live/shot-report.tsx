@@ -25,7 +25,7 @@ function pct(made: number, att: number) {
  * player profile (all official games). Free throws are excluded: they always come from the line.
  */
 export function ShotReport({
-  plays, players, fixedPlayerId, emptyText,
+  plays, players, fixedPlayerId, emptyText, selectedPlayerId, onSelectPlayer,
 }: {
   plays: ShotRow[];
   /** When given, shows a player filter ("All players" + each player). */
@@ -33,9 +33,14 @@ export function ShotReport({
   /** Locks the report to a single player (profile page). */
   fixedPlayerId?: string;
   emptyText?: string;
+  /** Optional controlled player filter ("all" or a player id), e.g. driven by clicking a player row. */
+  selectedPlayerId?: string;
+  onSelectPlayer?: (id: string) => void;
 }) {
-  const [playerId, setPlayerId] = useState<string>("all");
-  const [view, setView] = useState<"chart" | "zones">("zones");
+  const [ownPlayerId, setOwnPlayerId] = useState<string>("all");
+  const playerId = selectedPlayerId ?? ownPlayerId;
+  const setPlayerId = (id: string) => { setOwnPlayerId(id); onSelectPlayer?.(id); };
+  const [view, setView] = useState<"chart" | "zones">("chart");
 
   const activePlayer = fixedPlayerId ?? (playerId === "all" ? undefined : playerId);
 
@@ -61,8 +66,8 @@ export function ShotReport({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <button style={tab(view === "zones")} onClick={() => setView("zones")}>Zones</button>
         <button style={tab(view === "chart")} onClick={() => setView("chart")}>Shot chart</button>
+        <button style={tab(view === "zones")} onClick={() => setView("zones")}>Zones</button>
         {players && !fixedPlayerId && (
           <select
             value={playerId}
