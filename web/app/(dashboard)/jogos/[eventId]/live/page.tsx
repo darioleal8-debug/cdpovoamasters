@@ -19,6 +19,7 @@ import { Layout1c } from "@/components/live/layout-1c";
 import { MobileScoringScreen } from "@/components/live/mobile-scoring";
 import { ShotFlow } from "@/components/live/shot-flow";
 import { PlayHistory } from "@/components/live/play-history";
+import { LiveNotices } from "@/components/live/live-notices";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -307,6 +308,7 @@ export default function LiveGamePage() {
   return (
     <div
       ref={containerRef}
+      className="live-press"
       style={{
         ...tokens,
         background: "var(--bg)",
@@ -514,6 +516,9 @@ export default function LiveGamePage() {
           )}
         </div>
       )}
+
+      <LiveNotices />
+      <style>{`.live-press button:active:not(:disabled){transform:scale(0.96);filter:brightness(1.2);transition:transform .06s}`}</style>
 
       {/* ── Shot location + assist (inside the container so it also shows in full screen) ── */}
       {pendingShot && session && (

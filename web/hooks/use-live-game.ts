@@ -2,7 +2,16 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { toast } from "@/components/ui/toaster";
+import { toast as baseToast } from "@/components/ui/toaster";
+import { liveNotice, PLAY_LABEL } from "@/lib/live/notice";
+
+// Every live message also shows as a soft in-container notice (visible in full screen);
+// errors additionally keep the persistent toast.
+function toast(opts: { title: string; description?: string; variant?: "default" | "destructive" }) {
+  const text = opts.description && opts.variant !== "destructive" ? `${opts.title} — ${opts.description}` : opts.title;
+  liveNotice(opts.variant === "destructive" ? `${opts.title}${opts.description ? ` — ${opts.description}` : ""}` : text, opts.variant === "destructive" ? "error" : "ok");
+  if (opts.variant === "destructive") baseToast(opts as never);
+}
 import type {
   GameSession, PlayByPlay, PlayerGameStats,
   PlayerGameStatsWithUser, GamePeriodScore, PlayEventType,
@@ -356,6 +365,7 @@ export function useLiveGame(
       { clock_running: true, clock_started_at: new Date().toISOString() },
       cur
     );
+    liveNotice("▶ Clock started", "info");
   }
 
   async function stopClock(): Promise<void> {
@@ -373,6 +383,7 @@ export function useLiveGame(
       },
       cur
     );
+    liveNotice("⏸ Clock stopped", "info");
   }
 
   async function resetClock(): Promise<void> {
@@ -555,6 +566,12 @@ export function useLiveGame(
       }
 
       await Promise.all([loadPlays(session.id), loadPlayerStats(session.id), loadSession()]);
+      const who = roster.find((p) => p.user_id === input.player_id);
+      const ast = input.secondary_player_id ? roster.find((p) => p.user_id === input.secondary_player_id) : null;
+      liveNotice(
+        `✓ ${who ? `#${who.jersey_number} ${who.user.name.split(" ")[0]} · ` : ""}${PLAY_LABEL[input.event_type] ?? input.event_type}` +
+        (ast ? ` · ast #${ast.jersey_number} ${ast.user.name.split(" ")[0]}` : isMadeShot(input.event_type) && shotKindOf(input.event_type) !== "ft" ? " · no assist" : ""),
+      );
       return true;
     } finally {
       setRecording(false);
@@ -568,7 +585,7 @@ export function useLiveGame(
     if (!session || recording) return;
     setRecording(true);
     try {
-      await supabase.rpc("record_play", {
+      const { error: oppErr } = await supabase.rpc("record_play", {
         p_game_session_id: session.id,
         p_event_type:      pts === 1 ? "ft_made" : pts === 3 ? "3pt_made" : "2pt_made",
         p_period:          session.current_period,
@@ -578,7 +595,9 @@ export function useLiveGame(
         p_game_clock:      formatClock(clockSecs),
         p_description:     `Opponent +${pts}`,
       });
+      if (oppErr) { toast({ title: "Error", description: oppErr.message, variant: "destructive" }); return; }
       await Promise.all([loadPlays(session.id), loadSession()]);
+      liveNotice(`✓ Opponent +${pts}`);
     } finally {
       setRecording(false);
     }
@@ -594,7 +613,7 @@ export function useLiveGame(
     setRecording(true);
     try {
       const foulDesc = type === "foul_def" ? "Defensive foul" : type === "foul_of" ? "Offensive foul" : type === "foul_tec" ? "Technical foul" : "Unsportsmanlike foul";
-      await supabase.rpc("record_play", {
+      const { error: foulErr } = await supabase.rpc("record_play", {
         p_game_session_id: session.id,
         p_event_type:      type,
         p_period:          session.current_period,
@@ -604,7 +623,9 @@ export function useLiveGame(
         p_game_clock:      formatClock(clockSecs),
         p_description:     `Opponent · ${foulDesc}`,
       });
+      if (foulErr) { toast({ title: "Error", description: foulErr.message, variant: "destructive" }); return; }
       await Promise.all([loadPlays(session.id), loadSession()]);
+      liveNotice(`✓ Opponent · ${foulDesc}`);
     } finally {
       setRecording(false);
     }
@@ -617,7 +638,7 @@ export function useLiveGame(
     if (!session || recording) return;
     setRecording(true);
     try {
-      await supabase.rpc("record_play", {
+      const { error: rebErr } = await supabase.rpc("record_play", {
         p_game_session_id: session.id,
         p_event_type:      type === "reb_off" ? "rebound_off" : "rebound_def",
         p_period:          session.current_period,
@@ -627,7 +648,9 @@ export function useLiveGame(
         p_game_clock:      formatClock(clockSecs),
         p_description:     `Opponent · ${type === "reb_off" ? "Offensive rebound" : "Defensive rebound"}`,
       });
+      if (rebErr) { toast({ title: "Error", description: rebErr.message, variant: "destructive" }); return; }
       await Promise.all([loadPlays(session.id), loadSession()]);
+      liveNotice(`✓ Opponent · ${type === "reb_off" ? "Offensive rebound" : "Defensive rebound"}`);
     } finally {
       setRecording(false);
     }
@@ -685,6 +708,9 @@ export function useLiveGame(
 
     setOnCourtIds(newLineup);
     await Promise.all([loadPlays(session.id), loadSession(), loadStints(session.id)]);
+    const pIn = roster.find((p) => p.user_id === inId);
+    const pOut = roster.find((p) => p.user_id === outId);
+    liveNotice(`↔ Sub · #${pIn?.jersey_number} ${pIn?.user.name.split(" ")[0] ?? ""} in, #${pOut?.jersey_number} ${pOut?.user.name.split(" ")[0] ?? ""} out`);
   }
 
   // ── Set lineup (replaces on-court, managing stints) ─────
@@ -940,6 +966,7 @@ export function useLiveGame(
     setSession((s) => s ? { ...s, current_period: nextP, clock_running: false, clock_elapsed_secs: 0, clock_started_at: null, away_fouls: 0 } : s);
     setClockSecs(session.period_duration_secs ?? DEFAULT_PERIOD_SECS);
     await Promise.all([loadPeriodScores(session.id), loadPlays(session.id), loadStints(session.id)]);
+    liveNotice(`→ Period ${nextP} ready`, "info");
   }
 
   // ── Finish game ─────────────────────────────────────────
