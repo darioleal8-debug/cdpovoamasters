@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { ShotReport, type ShotRow } from "@/components/live/shot-report";
 
 type StatBlock = {
   pontos:       number;
@@ -12,6 +13,7 @@ type StatBlock = {
 type ApiResponse = {
   season: StatBlock | null;
   last5:  StatBlock | null;
+  shots?: ShotRow[];
 };
 
 type TabKey = "season" | "last5";
@@ -79,6 +81,14 @@ export function StatsSection({ seasonId }: { seasonId: string | null }) {
           </div>
         ))}
       </div>
+
+      {/* Shooting zones (all official games this season) */}
+      {!loading && (data?.shots?.length ?? 0) > 0 && (
+        <div className="border-t px-4 py-4 space-y-2">
+          <span className="text-sm font-semibold">Shooting zones · this season</span>
+          <ShotReport plays={data?.shots ?? []} />
+        </div>
+      )}
 
       {/* Empty state */}
       {!loading && !stats && (

@@ -4,9 +4,9 @@ import type { LiveLayout, LivePrefs } from "@/hooks/use-live-prefs";
 import { SANS } from "./tokens";
 
 const MODES: { id: LiveLayout; label: string }[] = [
-  { id: "a", label: "Jogador → ação" },
-  { id: "b", label: "Ação → jogador" },
-  { id: "c", label: "Folha de jogo" },
+  { id: "a", label: "Player → action" },
+  { id: "b", label: "Action → player" },
+  { id: "c", label: "Scoresheet" },
 ];
 
 interface LivePrefsBarProps {
@@ -53,7 +53,7 @@ export function LivePrefsBar({ prefs, onSetLayout, onSetDark, onToggleFullscreen
     }}>
       {/* Left label */}
       <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", color: "oklch(0.55 0.015 250)", textTransform: "uppercase", whiteSpace: "nowrap" }}>
-        MODO DE REGISTO
+        SCORING MODE
       </span>
       <span style={{ fontSize: 12, fontWeight: 700, color: "oklch(0.3 0.02 250)", whiteSpace: "nowrap" }}>
         {MODES.find(m => m.id === prefs.layout)?.label}
@@ -74,17 +74,17 @@ export function LivePrefsBar({ prefs, onSetLayout, onSetDark, onToggleFullscreen
       {/* Theme buttons */}
       <div style={groupStyle}>
         <button onClick={() => onSetDark(false)}
-          style={!prefs.dark ? activeBtn : inactiveBtn} title="Tema claro">
+          style={!prefs.dark ? activeBtn : inactiveBtn} title="Light theme">
           ☀ Claro
         </button>
         <button onClick={() => onSetDark(true)}
-          style={prefs.dark ? activeBtn : inactiveBtn} title="Tema escuro">
+          style={prefs.dark ? activeBtn : inactiveBtn} title="Dark theme">
           ☾ Escuro
         </button>
       </div>
 
       {/* Summary + share + fullscreen icon buttons */}
-      <button onClick={onOpenSummary} title="Resumo estatístico"
+      <button onClick={onOpenSummary} title="Stats summary"
         style={{
           ...iconBtn,
           background: "oklch(1 0 0)", border: "1px solid oklch(0.8 0.01 250)",
@@ -92,7 +92,7 @@ export function LivePrefsBar({ prefs, onSetLayout, onSetDark, onToggleFullscreen
         }}>
         ▤
       </button>
-      <button onClick={onOpenShare} title="Exportar resultado"
+      <button onClick={onOpenShare} title="Export result"
         style={{
           ...iconBtn,
           background: "oklch(0.33 0.1 145)", border: "none",
@@ -101,7 +101,7 @@ export function LivePrefsBar({ prefs, onSetLayout, onSetDark, onToggleFullscreen
         }}>
         ↗
       </button>
-      <button onClick={onToggleFullscreen} title="Ecrã cheio"
+      <button onClick={onToggleFullscreen} title="Full screen"
         style={{
           ...iconBtn,
           background: "oklch(0.22 0.02 250)", border: "none",

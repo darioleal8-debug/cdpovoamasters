@@ -39,11 +39,11 @@ export interface Layout1cProps {
 }
 
 const FOUL_SEL_OPTIONS: { id: FoulSel; label: string; event: PlayerFoulEvent }[] = [
-  { id: "Def",  label: "DEFENSIVA", event: "foul_def"  },
-  { id: "Of",   label: "OFENSIVA",  event: "foul_of"   },
-  { id: "Tec",  label: "TÉCNICA",   event: "foul_tec"  },
-  { id: "Anti", label: "ANTIDESP.", event: "foul_anti" },
-  { id: "Sofr", label: "SOFRIDA",   event: "foul_drawn" },
+  { id: "Def",  label: "DEFENSIVE", event: "foul_def"  },
+  { id: "Of",   label: "OFFENSIVE",  event: "foul_of"   },
+  { id: "Tec",  label: "TECHNICAL",   event: "foul_tec"  },
+  { id: "Anti", label: "UNSPORTS.", event: "foul_anti" },
+  { id: "Sofr", label: "DRAWN",   event: "foul_drawn" },
 ];
 
 function Pips({ count, max = 5 }: { count: number; max?: number }) {
@@ -103,8 +103,8 @@ export function Layout1c({
         <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div>
-              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase" }}>PÓVOA · PT</div>
-              <div style={{ fontSize: 10, color: "var(--muted)" }}>ADV. RES {awayRebOff + awayRebDef} · FALTAS {awayFouls}/5</div>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase" }}>PÓVOA · PTS</div>
+              <div style={{ fontSize: 10, color: "var(--muted)" }}>OPP. REB {awayRebOff + awayRebDef} · FOULS {awayFouls}/5</div>
             </div>
             <span style={{ fontFamily: MONO, fontSize: 42, fontWeight: 700, color: "var(--text)" }}>{session.home_score}</span>
             <span style={{ fontFamily: MONO, fontSize: 24, color: "var(--muted)" }}>:</span>
@@ -112,22 +112,22 @@ export function Layout1c({
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase" }}>{session.current_period}º PERÍODO</span>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase" }}>PERIOD {session.current_period}</span>
             <span style={{ fontFamily: MONO, fontSize: 36, fontWeight: 700, color: "var(--text)" }}>{formatClock(clockSecs)}</span>
           </div>
 
           <button onClick={running ? onStopClock : onStartClock}
             style={{ height: 46, padding: "0 20px", borderRadius: 10, border: "none", cursor: "pointer", fontFamily: SANS, fontSize: 14, fontWeight: 700, background: "var(--accent)", color: "var(--accentInk)" }}>
-            {running ? "■ Parar" : "▶ Iniciar"}
+            {running ? "■ Stop" : "▶ Start"}
           </button>
           <button onClick={onNextPeriod}
             style={{ height: 46, padding: "0 16px", borderRadius: 10, cursor: "pointer", fontFamily: SANS, fontSize: 14, fontWeight: 700, background: "var(--panel)", border: "1px solid var(--line)", color: "var(--text)" }}>
-            Período +
+            Period +
           </button>
 
           <div style={{ flex: 1 }} />
           <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase" }}>FALTAS DE EQUIPA {homeFouls}/5</span>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase" }}>TEAM FOULS {homeFouls}/5</span>
             <Pips count={homeFouls} />
           </div>
         </div>
@@ -137,11 +137,11 @@ export function Layout1c({
       <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, padding: "12px 18px" }}>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 16 }}>
           <div style={{ minWidth: 160 }}>
-            <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", color: "var(--text)" }}>ADVERSÁRIO · PT</div>
+            <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", color: "var(--text)" }}>OPPONENT · PTS</div>
             <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{session.away_score} no jogo · sem registo individual</div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase" }}>PONTOS</span>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase" }}>POINTS</span>
             <div style={{ display: "flex", gap: 6 }}>
               {([1,2,3] as const).map(pts => (
                 <button key={pts} onClick={() => onRecordOpponentPoints(pts)} disabled={recording}
@@ -152,30 +152,30 @@ export function Layout1c({
             </div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase" }}>RESSALTOS</span>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase" }}>REBOUNDS</span>
             <div style={{ display: "flex", gap: 6 }}>
               {(["reb_off","reb_def"] as const).map((t, i) => (
                 <button key={t} onClick={() => onRecordOpponentReb(t)} disabled={recording}
                   style={{ padding: "0 12px", height: 46, borderRadius: 10, border: "1px solid var(--line)", background: "var(--chip)", color: "var(--text)", fontFamily: SANS, fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
-                  {["RES OF.","RES DEF."][i]}
+                  {["OFF. REB","DEF. REB"][i]}
                 </button>
               ))}
             </div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase" }}>FALTAS DO ADVERSÁRIO</span>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase" }}>OPPONENT FOULS</span>
             <div style={{ display: "flex", gap: 6 }}>
               {(["foul_def","foul_of","foul_tec","foul_anti"] as FoulType[]).map((t, i) => (
                 <button key={t} onClick={() => onRecordOpponentFoul(t)} disabled={recording}
                   style={{ padding: "0 12px", height: 46, borderRadius: 10, border: "1px solid var(--danger)", background: "var(--dangerSoft)", color: "var(--danger)", fontFamily: SANS, fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
-                  {["DEFENSIVA","OFENSIVA","TÉCNICA","ANTIDESP."][i]}
+                  {["DEFENSIVE","OFFENSIVE","TECHNICAL","UNSPORTS."][i]}
                 </button>
               ))}
             </div>
           </div>
           <div style={{ flex: 1 }} />
           <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase" }}>FALTAS DE EQUIPA {awayFouls}/5</span>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase" }}>TEAM FOULS {awayFouls}/5</span>
             <Pips count={awayFouls} />
           </div>
         </div>
@@ -184,7 +184,7 @@ export function Layout1c({
       {/* Foul type selector */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase", whiteSpace: "nowrap" }}>
-          TIPO DE FALTA A REGISTAR NA FOLHA
+          FOUL TYPE TO RECORD
         </span>
         {FOUL_SEL_OPTIONS.map((f) => (
           <button key={f.id} onClick={() => setFoulSel(f.id)}
@@ -211,14 +211,14 @@ export function Layout1c({
           fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)",
           textTransform: "uppercase", fontFamily: SANS, minWidth: 900,
         }}>
-          <span>JOGADOR</span>
-          <span style={{ textAlign: "center" }}>1 PONTO</span>
-          <span style={{ textAlign: "center" }}>2 PONTOS</span>
-          <span style={{ textAlign: "center" }}>3 PONTOS</span>
-          <span style={{ textAlign: "center" }}>FALHOU 1P/2P/3P</span>
-          <span style={{ textAlign: "center" }}>RESSALTO</span>
-          <span style={{ textAlign: "center" }}>ASSIST.</span>
-          <span style={{ textAlign: "center" }}>FALTA {FOUL_SEL_OPTIONS.find(f => f.id === foulSel)?.label}</span>
+          <span>PLAYER</span>
+          <span style={{ textAlign: "center" }}>1 POINT</span>
+          <span style={{ textAlign: "center" }}>2 POINTS</span>
+          <span style={{ textAlign: "center" }}>3 POINTS</span>
+          <span style={{ textAlign: "center" }}>MISSED 1P/2P/3P</span>
+          <span style={{ textAlign: "center" }}>REBOUND</span>
+          <span style={{ textAlign: "center" }}>ASSISTS</span>
+          <span style={{ textAlign: "center" }}>FOUL {FOUL_SEL_OPTIONS.find(f => f.id === foulSel)?.label}</span>
           <span style={{ textAlign: "right" }}>TOTAL</span>
         </div>
 
@@ -280,7 +280,7 @@ export function Layout1c({
                     <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>
                       {player.user.name}
                     </span>
-                    <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "var(--muted)", marginLeft: "auto" }} title="Tempo jogado">
+                    <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "var(--muted)", marginLeft: "auto" }} title="Time played">
                       ⏱ {formatMinutes(stats?.secs_played)}
                     </span>
                   </div>
@@ -294,7 +294,7 @@ export function Layout1c({
                       fontFamily: SANS, letterSpacing: "0.05em",
                     }}
                   >
-                    {isOnCourt ? "EM CAMPO ↓" : "BANCO ↑"}
+                    {isOnCourt ? "ON COURT ↓" : "BENCH ↑"}
                   </button>
                 </div>
 
@@ -324,21 +324,19 @@ export function Layout1c({
                 <button disabled={recording}
                   onClick={() => onRecordPlay("rebound_off", player.user_id)}
                   style={neutralCellBtn}>
-                  RES {reb}
+                  REB {reb}
                 </button>
 
                 {/* Assist */}
-                <button disabled={recording}
-                  onClick={() => onRecordPlay("assist", player.user_id)}
-                  style={neutralCellBtn}>
+                <span style={{ ...neutralCellBtn, cursor: "default", opacity: 0.7, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   AST {ast}
-                </button>
+                </span>
 
                 {/* Foul */}
                 <button disabled={recording}
                   onClick={() => onRecordPlay(currentFoulEvent(), player.user_id)}
                   style={dangerCellBtn}>
-                  {foulSel === "Sofr" ? `FS ${getStats(player.user_id)?.fouls_drawn ?? 0}` : `F ${fouls}`}
+                  {foulSel === "Sofr" ? `FD ${getStats(player.user_id)?.fouls_drawn ?? 0}` : `F ${fouls}`}
                 </button>
 
                 {/* Total */}
@@ -355,9 +353,9 @@ export function Layout1c({
       <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, padding: "10px 18px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
           <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase" }}>
-            REGISTADO AGORA · {plays.length} registos
+            LOGGED · {plays.length} plays
           </span>
-          <span style={{ fontSize: 11, color: "var(--muted)" }}>Toca no × para apagar qualquer registo</span>
+          <span style={{ fontSize: 11, color: "var(--muted)" }}>Tap × to undo any play</span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {plays.slice(0, 4).map((p) => {
@@ -368,7 +366,7 @@ export function Layout1c({
               <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span style={{ fontFamily: MONO, fontSize: 12, color: "var(--muted)", minWidth: 50 }}>{p.game_clock || "—"}</span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", flex: 1 }}>
-                  {!p.is_home_team && <span style={{ color: "var(--muted)" }}>Adversário · </span>}
+                  {!p.is_home_team && <span style={{ color: "var(--muted)" }}>Opponent · </span>}
                   {player && <span>#{player.jersey_number} {player.user.name.split(" ")[0]} · </span>}
                   {label}
                 </span>

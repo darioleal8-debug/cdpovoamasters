@@ -12,6 +12,6 @@ describe("becos sem saída de UI", () => {
   it("o diálogo 'Iniciar jogo' tem saída (UX-09)", () => {
     const src = read("app/(dashboard)/jogos/[eventId]/live/page.tsx");
     expect(src).toMatch(/router\.push\("\/jogos"\)/);
-    expect(src).toContain("Cancelar");
+    expect(src).toContain("Cancel");
   });
 });

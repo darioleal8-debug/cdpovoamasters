@@ -92,8 +92,20 @@ export async function GET(req: NextRequest) {
   const seasonRows = rows;
   const last5Rows = rows.slice(0, 5);
 
+  // Localização dos lançamentos (2PT/3PT) registados no live, só de jogos oficiais terminados.
+  const { data: shotRows } = await supabase
+    .from("play_by_play")
+    .select("event_type, shot_x, shot_y, shot_zone")
+    .eq("player_id", player.id)
+    .in("game_session_id", allowedSessionIds)
+    .in("event_type", ["2pt_made", "2pt_miss", "3pt_made", "3pt_miss"])
+    .is("deleted_at", null)
+    .not("shot_x", "is", null)
+    .not("shot_y", "is", null);
+
   return NextResponse.json({
     season: calcStats(seasonRows),
     last5:  calcStats(last5Rows),
+    shots:  shotRows ?? [],
   });
 }

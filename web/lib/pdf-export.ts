@@ -1,5 +1,10 @@
 import type { GameSession, PlayerGameStatsWithUser, GamePeriodScore } from "@/types/database";
 import { toPeriodPartials } from "@/lib/live/period-scores";
+import {
+  BASKET_Y_M, COURT_L_M, COURT_W_M, FT_RADIUS_M, KEY_HALF_W_M, KEY_LENGTH_M,
+  RESTRICTED_RADIUS_M, SHOT_ZONE_LABELS, THREE_CORNER_X_M, THREE_RADIUS_M,
+  zoneStats, type ShotPoint,
+} from "@/lib/live/shot-zones";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -17,6 +22,8 @@ export interface PdfGameContext {
   clubName?: string | null;
   /** lado do clube no jogo (casa/fora) — só para o rótulo */
   isHome?: boolean | null;
+  /** lançamentos com localização (2PT/3PT) → página extra com o shot chart */
+  shots?: ShotPoint[] | null;
 }
 
 type RGB = [number, number, number];
@@ -42,6 +49,105 @@ const fmtLongDate = (d: string) => {
   const dt = new Date(d + "T12:00:00");
   return dt.toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" });
 };
+
+/** Página extra: shot chart da equipa + acerto por zona. */
+function renderShotPage(doc: any, session: GameSession, shots: ShotPoint[]): void {
+  const W = doc.internal.pageSize.getWidth();
+  const M = 12;
+  doc.addPage();
+  doc.setFillColor(...NAVY);
+  doc.rect(0, 0, W, 20, "F");
+  doc.setTextColor(...WHITE);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.text("Shot Chart", M, 13);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.text(`vs ${session.opponent_name ?? "—"}  ·  ${session.home_score}–${session.away_score}`, W - M, 13, { align: "right" });
+
+  // Half court: baseline at the top. 10 mm per metre would not fit — scale to the page.
+  const scale = 11.5;            // mm per metre
+  const ox = M + 4, oy = 28;     // court origin (top-left)
+  const cw = COURT_W_M * scale, ch = COURT_L_M * scale;
+  const cx = ox + cw / 2;
+  const by = oy + BASKET_Y_M * scale;
+
+  doc.setDrawColor(...MUTED);
+  doc.setLineWidth(0.35);
+  doc.rect(ox, oy, cw, ch);
+  const key = KEY_HALF_W_M * scale;
+  doc.rect(cx - key, oy, key * 2, KEY_LENGTH_M * scale);
+
+  const arc = (acx: number, acy: number, r: number, a0: number, a1: number) => {
+    const n = 40;
+    let px = acx + r * Math.cos(a0), py = acy + r * Math.sin(a0);
+    for (let i = 1; i <= n; i++) {
+      const a = a0 + ((a1 - a0) * i) / n;
+      const x = acx + r * Math.cos(a), y = acy + r * Math.sin(a);
+      doc.line(px, py, x, y);
+      px = x; py = y;
+    }
+  };
+  // 3-point line: straight corners + arc (angles measured from +x axis, y down)
+  const cornerDy = Math.sqrt(THREE_RADIUS_M ** 2 - THREE_CORNER_X_M ** 2);
+  const rx = THREE_CORNER_X_M * scale;
+  doc.line(cx - rx, oy, cx - rx, by + cornerDy * scale);
+  doc.line(cx + rx, oy, cx + rx, by + cornerDy * scale);
+  const a0 = Math.atan2(cornerDy, THREE_CORNER_X_M);
+  arc(cx, by, THREE_RADIUS_M * scale, a0, Math.PI - a0);
+  // free-throw circle, restricted area, backboard, rim
+  arc(cx, oy + KEY_LENGTH_M * scale, FT_RADIUS_M * scale, 0, Math.PI);
+  arc(cx, by, RESTRICTED_RADIUS_M * scale, 0, Math.PI);
+  doc.line(cx - 0.9 * scale, oy + 1.2 * scale, cx + 0.9 * scale, oy + 1.2 * scale);
+  doc.setDrawColor(...ORANGE);
+  doc.setLineWidth(0.6);
+  doc.circle(cx, by, 0.225 * scale, "S");
+
+  for (const s of shots) {
+    const x = ox + (s.x / 100) * cw;
+    const y = oy + (s.y / 100) * ch;
+    if (s.made) {
+      doc.setDrawColor(...GREEN);
+      doc.setLineWidth(0.5);
+      doc.circle(x, y, 1.3, "S");
+    } else {
+      doc.setDrawColor(...RED);
+      doc.setLineWidth(0.5);
+      doc.line(x - 1.1, y - 1.1, x + 1.1, y + 1.1);
+      doc.line(x + 1.1, y - 1.1, x - 1.1, y + 1.1);
+    }
+  }
+
+  // Zone table
+  const tx = ox + cw + 14;
+  const made = shots.filter((s) => s.made).length;
+  doc.setTextColor(...INK);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("Field goals by zone", tx, oy + 3);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  let ty = oy + 10;
+  for (const z of zoneStats(shots)) {
+    if (z.att === 0) continue;
+    doc.setTextColor(...INK);
+    doc.text(SHOT_ZONE_LABELS[z.zone], tx, ty);
+    doc.setFont("helvetica", "bold");
+    doc.text(`${z.made}/${z.att}  ${z.pct === null ? "—" : Math.round(z.pct * 100) + "%"}`, W - M, ty, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    ty += 6;
+  }
+  doc.setDrawColor(...LINE);
+  doc.setLineWidth(0.2);
+  doc.line(tx, ty - 3, W - M, ty - 3);
+  doc.setFont("helvetica", "bold");
+  doc.text("Total FG", tx, ty + 2);
+  doc.text(`${made}/${shots.length}  ${pct(made, shots.length)}`, W - M, ty + 2, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...MUTED);
+  doc.setFontSize(8);
+  doc.text("O made   X missed (2PT and 3PT, free throws excluded)", tx, ty + 12);
+}
 
 /**
  * Desenha o box score num documento jsPDF (A4 horizontal). Separado de
@@ -297,6 +403,8 @@ export function renderBoxScore(
     },
     margin: { left: M, right: M, bottom: 14 },
   });
+
+  if (ctx.shots && ctx.shots.length > 0) renderShotPage(doc, session, ctx.shots);
 
   // ── Rodapé ──────────────────────────────────────────────
   const pages = doc.getNumberOfPages();

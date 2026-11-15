@@ -15,6 +15,8 @@ import { ArrowLeft, Calendar, Clock, MapPin, Radio, Trophy, Download, Eye, Uploa
 import type { PlayerGameStatsWithUser } from "@/types/database";
 import { EventPhotoGallery } from "@/components/shared/event-photo-gallery";
 import { ImportStatsModal } from "@/components/games/import-stats-modal";
+import { ShotReport } from "@/components/live/shot-report";
+import { shotsFromPlays } from "@/lib/live/shot-zones";
 
 function pct(made: number, att: number) {
   return att > 0 ? `${Math.round((made / att) * 100)}%` : "—";
@@ -245,7 +247,7 @@ export default function GameStatsPage() {
   const [importOpen,   setImportOpen]   = useState(false);
   const [isFriendly,   setIsFriendly]   = useState(false);
 
-  const { session, playerStats, periodScores, roster, loading } =
+  const { session, playerStats, periodScores, roster, plays, loading } =
     useLiveGame(params.eventId);
   // game_period_scores guarda acumulados; a tabela mostra parciais (STA-08)
   const periodPartials = useMemo(() => toPeriodPartials(periodScores), [periodScores]);
@@ -332,7 +334,7 @@ export default function GameStatsPage() {
           user: { id: s.player_id, name: profile?.user.name ?? "—" },
         };
       });
-      await generateGamePDF(session!, statsWithExtras, periodScores, { ...pdfCtx, clubName });
+      await generateGamePDF(session!, statsWithExtras, periodScores, { ...pdfCtx, clubName, shots: shotsFromPlays(plays) });
     } finally {
       setPdfLoading(false);
     }
@@ -607,6 +609,18 @@ export default function GameStatsPage() {
               </tbody>
             </table>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Shot chart + zones ──────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-base">Shot Chart</CardTitle></CardHeader>
+        <CardContent>
+          <ShotReport
+            plays={plays}
+            players={roster.map((r) => ({ id: r.user_id, name: r.user?.name ?? r.user_id, number: r.jersey_number ?? null }))}
+            emptyText="No shot locations were recorded for this game."
+          />
         </CardContent>
       </Card>
 

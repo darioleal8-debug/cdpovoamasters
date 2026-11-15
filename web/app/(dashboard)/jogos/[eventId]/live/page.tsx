@@ -17,6 +17,7 @@ import { Layout1a } from "@/components/live/layout-1a";
 import { Layout1b } from "@/components/live/layout-1b";
 import { Layout1c } from "@/components/live/layout-1c";
 import { MobileScoringScreen } from "@/components/live/mobile-scoring";
+import { ShotFlow } from "@/components/live/shot-flow";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -130,7 +131,8 @@ export default function LiveGamePage() {
   const {
     session, roster, onCourt, bench, onCourtIds, plays, clockSecs, loading, recording,
     startGame, startClock, stopClock,
-    recordPlay, recordOpponentPoints, recordOpponentFoul, recordOpponentReb,
+    recordPlay, pendingShot, confirmShot, cancelShot,
+    recordOpponentPoints, recordOpponentFoul, recordOpponentReb,
     substitutePlayer, setLineup, undoPlay, nextPeriod, finishGame,
   } = game;
 
@@ -319,7 +321,7 @@ export default function LiveGamePage() {
               fontFamily: SANS, fontSize: 13, fontWeight: 700, cursor: "pointer",
             }}
           >
-            ⤡ Sair do ecrã cheio
+            ⤡ Exit full screen
           </button>
           <button
             onClick={() => setSummaryOpen(true)}
@@ -329,7 +331,7 @@ export default function LiveGamePage() {
               background: "var(--panel)", border: "1px solid var(--line)", color: "var(--text)",
             }}
           >
-            ▤ Resumo estatístico
+            ▤ Stats summary
           </button>
           <button
             onClick={() => setShareOpen(true)}
@@ -340,9 +342,9 @@ export default function LiveGamePage() {
               color: "oklch(0.9 0.12 145)",
             }}
           >
-            ↗ Exportar
+            ↗ Export
           </button>
-          <span style={{ fontSize: 11, color: "var(--muted)", fontFamily: SANS }}>ou tecla Esc</span>
+          <span style={{ fontSize: 11, color: "var(--muted)", fontFamily: SANS }}>or press Esc</span>
         </div>
       ) : (
         <LivePrefsBar
@@ -363,7 +365,7 @@ export default function LiveGamePage() {
           background: "oklch(0.97 0.04 80)", borderBottom: "1px solid oklch(0.85 0.08 80)",
           color: "oklch(0.45 0.1 70)", fontSize: 11, fontWeight: 700, fontFamily: SANS,
         }}>
-          🏋️ JOGO DE TREINO — não conta para a classificação
+          🏋️ TRAINING GAME — does not count towards the standings
         </div>
       )}
 
@@ -377,20 +379,20 @@ export default function LiveGamePage() {
         }}>
           <span style={{ fontSize: 13, fontWeight: 800, color: "var(--text)", flex: 1, minWidth: 200 }}>
             {isTied
-              ? `Empate ${session.home_score}–${session.away_score} no fim do ${session.current_period}º período — segue para prolongamento.`
-              : `Fim do ${session.current_period > REGULATION_PERIODS ? "prolongamento" : "4º período"} · ${clubName} ${session.home_score}–${session.away_score} ${session.opponent_name}`}
+              ? `Tied ${session.home_score}–${session.away_score} at the end of period ${session.current_period} — heading to overtime.`
+              : `End of ${session.current_period > REGULATION_PERIODS ? "overtime" : "period 4"} · ${clubName} ${session.home_score}–${session.away_score} ${session.opponent_name}`}
           </span>
           {isTied ? (
             <button onClick={() => setPeriodDialog(true)} disabled={recording}
               style={{ height: 44, padding: "0 18px", borderRadius: 10, border: "none", cursor: "pointer",
                 background: "var(--accent)", color: "var(--accentInk)", fontSize: 14, fontWeight: 800 }}>
-              ⏱ Prolongamento
+              ⏱ Overtime
             </button>
           ) : (
             <button onClick={() => setFinishDialog(true)} disabled={recording}
               style={{ height: 44, padding: "0 18px", borderRadius: 10, border: "none", cursor: "pointer",
                 background: "oklch(0.55 0.2 25)", color: "white", fontSize: 14, fontWeight: 800 }}>
-              🏁 Finalizar jogo
+              🏁 Finish game
             </button>
           )}
         </div>
@@ -416,10 +418,10 @@ export default function LiveGamePage() {
         }}>
           <div style={{ fontSize: 64, lineHeight: 1 }}>↻</div>
           <p style={{ fontSize: 18, fontWeight: 700, color: "var(--text)", fontFamily: SANS }}>
-            Roda o dispositivo para landscape
+            Rotate your device to landscape
           </p>
           <p style={{ fontSize: 13, color: "var(--muted)", fontFamily: SANS }}>
-            O ecrã de marcação ao vivo funciona na horizontal.
+            The live scorer works in landscape.
           </p>
           {session && (
             <div style={{ display: "flex", gap: 32, fontFamily: SANS }}>
@@ -452,7 +454,7 @@ export default function LiveGamePage() {
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 36, marginBottom: 8 }}>🏁</div>
             <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--text)", fontFamily: SANS, margin: 0 }}>
-              Jogo Terminado
+              Game Finished
             </h2>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 24, marginTop: 16 }}>
               <div style={{ textAlign: "center" }}>
@@ -470,19 +472,31 @@ export default function LiveGamePage() {
             onClick={() => router.push(`/jogos/${params.eventId}/stats`)}
             style={{ background: "var(--accent)", color: "var(--accentInk)", fontFamily: SANS }}
           >
-            Ver Box Score Completo
+            View full box score
           </Button>
           {eventData?.competition === "Liga" && eventData?.game_type !== "friendly" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "center" }}>
               <Button variant="outline" disabled={game.publishing} onClick={() => game.publishToLeague()}>
-                {game.publishing ? "A publicar…" : "🏆 Publicar resultado e estatísticas na Liga INATEL"}
+                {game.publishing ? "Publishing…" : "🏆 Publish result and stats to Liga INATEL"}
               </Button>
               <span style={{ fontSize: 11, color: "var(--muted)", fontFamily: SANS, textAlign: "center" }}>
-                Feito automaticamente ao finalizar o jogo. Usa este botão só para voltar a publicar.
+                Done automatically when the game ends. Use this button only to publish again.
               </span>
             </div>
           )}
         </div>
+      )}
+
+      {/* ── Shot location + assist (inside the container so it also shows in full screen) ── */}
+      {pendingShot && session && (
+        <ShotFlow
+          shot={pendingShot}
+          roster={roster}
+          onCourt={onCourt}
+          saving={recording}
+          onConfirm={confirmShot}
+          onCancel={cancelShot}
+        />
       )}
 
       {/* ── Summary overlay ────────────────────────────────── */}
@@ -521,11 +535,11 @@ export default function LiveGamePage() {
         }}
       >
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>🏀 Iniciar Jogo</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>🏀 Start Game</DialogTitle></DialogHeader>
           <div className="space-y-4">
             {/* Adversário */}
             <div className="space-y-1.5">
-              <Label>Adversário</Label>
+              <Label>Opponent</Label>
               {resolvedOpponent && !editingOpponent ? (
                 <div className="flex items-center gap-2 text-sm">
                   <span className="font-medium">{formatGameInfo(eventData, resolvedOpponent)}</span>
@@ -534,7 +548,7 @@ export default function LiveGamePage() {
                     onClick={() => setEditingOpponent(true)}
                     className="text-xs text-muted-foreground underline hover:text-foreground shrink-0"
                   >
-                    Editar
+                    Edit
                   </button>
                 </div>
               ) : (
@@ -548,7 +562,7 @@ export default function LiveGamePage() {
             </div>
             {/* Tempo de jogo por período */}
             <div className="space-y-1.5">
-              <Label htmlFor="period-minutes">Tempo de cada período (minutos)</Label>
+              <Label htmlFor="period-minutes">Period length (minutes)</Label>
               <div className="flex items-center gap-1.5">
                 {[8, 10, 12].map((m) => (
                   <button
@@ -581,13 +595,13 @@ export default function LiveGamePage() {
             {roster.length === 0 ? (
               <div className="space-y-2">
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                  <p className="text-sm font-medium text-amber-800">Ainda não há convocatória para este jogo.</p>
+                  <p className="text-sm font-medium text-amber-800">There is no squad call-up for this game yet.</p>
                   <div className="mt-2 flex gap-3">
                     <a
                       href={`/jogos/${params.eventId}/convocatoria`}
                       className="text-xs text-amber-700 underline hover:text-amber-900"
                     >
-                      → Ir à convocatória
+                      → Go to call-up
                     </a>
                     {!useActivePlayers && activePlayers.length > 0 && (
                       <button
@@ -595,14 +609,14 @@ export default function LiveGamePage() {
                         onClick={() => setUseActivePlayers(true)}
                         className="text-xs text-amber-700 underline hover:text-amber-900"
                       >
-                        Escolher do plantel
+                        Choose from roster
                       </button>
                     )}
                   </div>
                 </div>
                 {useActivePlayers && (
                   <div className="space-y-1.5">
-                    <Label>5 inicial — plantel ativo (seleciona até 5)</Label>
+                    <Label>Starting five — active roster (select up to 5)</Label>
                     <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
                       {activePlayers.map((p) => (
                         <button
@@ -623,13 +637,13 @@ export default function LiveGamePage() {
                         </button>
                       ))}
                     </div>
-                    <p className="text-xs text-muted-foreground">{startingFive.length}/5 selecionados</p>
+                    <p className="text-xs text-muted-foreground">{startingFive.length}/5 selected</p>
                   </div>
                 )}
               </div>
             ) : (
               <div className="space-y-1.5">
-                <Label>5 inicial (seleciona até 5)</Label>
+                <Label>Starting five (select up to 5)</Label>
                 <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
                   {roster.map((p) => (
                     <button
@@ -650,13 +664,13 @@ export default function LiveGamePage() {
                     </button>
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground">{startingFive.length}/5 selecionados</p>
+                <p className="text-xs text-muted-foreground">{startingFive.length}/5 selected</p>
               </div>
             )}
           </div>
           <DialogFooter>
             <Button variant="outline" disabled={recording} onClick={() => router.push("/jogos")}>
-              Cancelar
+              Cancel
             </Button>
             <Button disabled={recording}
               onClick={async () => {
@@ -681,7 +695,7 @@ export default function LiveGamePage() {
                 }
               }}
             >
-              {recording ? "A iniciar…" : "Iniciar Jogo"}
+              {recording ? "Starting…" : "Start Game"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -690,15 +704,15 @@ export default function LiveGamePage() {
       {/* ── DIALOG: Próximo Período ──────────────────────── */}
       <Dialog open={periodDialog} onOpenChange={setPeriodDialog}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>{atOrPastRegulation ? "Prolongamento" : "Próximo Período"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{atOrPastRegulation ? "Overtime" : "Next Period"}</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">
             {atOrPastRegulation
-              ? <>Jogo empatado {session?.home_score}–{session?.away_score}. Terminar o {session?.current_period}º período e avançar para o prolongamento?</>
-              : <>Terminar o {session?.current_period}º período e avançar para o {(session?.current_period ?? 0) + 1}º?</>}
+              ? <>Game tied {session?.home_score}–{session?.away_score}. End period {session?.current_period} and go to overtime?</>
+              : <>End period {session?.current_period} and move to period {(session?.current_period ?? 0) + 1}?</>}
           </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPeriodDialog(false)}>Cancelar</Button>
-            <Button onClick={async () => { await nextPeriod(); setPeriodDialog(false); }}>Confirmar</Button>
+            <Button variant="outline" onClick={() => setPeriodDialog(false)}>Cancel</Button>
+            <Button onClick={async () => { await nextPeriod(); setPeriodDialog(false); }}>Confirm</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -706,17 +720,17 @@ export default function LiveGamePage() {
       {/* ── DIALOG: Terminar Jogo ────────────────────────── */}
       <Dialog open={finishDialog} onOpenChange={setFinishDialog}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Terminar Jogo</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Finish Game</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">
             <ClubName /> <strong>{session?.home_score}</strong> –{" "}
             <strong>{session?.away_score}</strong> {session?.opponent_name}
-            <br />Confirmas o resultado final? Depois de finalizado, nenhuma estatística pode ser alterada.
+            <br />Confirm the final score? Once the game is finished, no stats can be changed.
           </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setFinishDialog(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setFinishDialog(false)}>Cancel</Button>
             <Button variant="destructive" disabled={recording}
               onClick={async () => { const ok = await finishGame(); if (ok) setFinishDialog(false); }}>
-              🏁 Terminar Jogo
+              🏁 Finish Game
             </Button>
           </DialogFooter>
         </DialogContent>

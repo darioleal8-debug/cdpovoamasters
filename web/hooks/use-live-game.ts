@@ -9,6 +9,7 @@ import type {
 } from "@/types/database";
 import type { PlayerWithUser } from "@/types/database";
 import type { CourtStint } from "@/lib/live/minutes";
+import { isShotEvent, isMadeShot, shotKindOf, classifyShotZone, FREE_THROW_POINT } from "@/lib/live/shot-zones";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -57,10 +58,12 @@ export function useLiveGame(
   const [recording, setRecording] = useState(false);
   const sessionRef = useRef<GameSession | null>(null);
   sessionRef.current = session;
+  /** Shot waiting for the scorer to pick the court zone (and the assist on made 2PT/3PT). */
+  const [pendingShot, setPendingShot] = useState<{ event_type: PlayEventType; player_id: string } | null>(null);
   /** Jogo terminado → nenhuma estatística pode ser alterada. */
   const locked = () => {
     if (sessionRef.current?.status === "live") return false;
-    toast({ title: "Jogo terminado", description: "As estatísticas já não podem ser alteradas.", variant: "destructive" });
+    toast({ title: "Game finished", description: "Stats can no longer be changed.", variant: "destructive" });
     return true;
   };
 
@@ -336,7 +339,7 @@ export function useLiveGame(
       .single();
     if (error || !data) {
       setSession(rollback);
-      toast({ title: "Relógio não atualizado", description: error?.message ?? "Tenta novamente.", variant: "destructive" });
+      toast({ title: "Clock not updated", description: error?.message ?? "Please try again.", variant: "destructive" });
       // repõe o estado real a partir da BD
       loadSession();
       return;
@@ -414,7 +417,7 @@ export function useLiveGame(
         .single();
 
       if (error) {
-        toast({ title: "Erro ao iniciar jogo", description: error.message, variant: "destructive" });
+        toast({ title: "Could not start the game", description: error.message, variant: "destructive" });
         return false;
       }
 
@@ -428,7 +431,7 @@ export function useLiveGame(
           points_delta: 0,
           home_score_after: 0,
           away_score_after: 0,
-          description: "Início do jogo",
+          description: "Game start",
         }),
         rosterToUse.length > 0
           ? supabase.from("player_game_stats").insert(
@@ -462,7 +465,7 @@ export function useLiveGame(
       setSession(data as GameSession);
       setOnCourtIds(startingFiveIds.slice(0, 5));
       await Promise.all([loadPlays(data.id), loadPlayerStats(data.id)]);
-      toast({ title: "🏀 Jogo iniciado!" });
+      toast({ title: "🏀 Game started!" });
       return true;
     } finally {
       setRecording(false);
@@ -471,12 +474,59 @@ export function useLiveGame(
 
   // ── Record event ────────────────────────────────────────
 
+  /**
+   * Public entry point used by every live layout. Shots (2PT / 3PT / FT, made or
+   * missed) are not saved straight away: the scorer first picks the court zone
+   * and, for made 2PT/3PT, who assisted (see ShotFlow). Everything else is saved at once.
+   */
   async function recordPlay(input: {
     event_type: PlayEventType;
     player_id?: string;
     secondary_player_id?: string;
     game_clock?: string;
     description?: string;
+  }): Promise<boolean> {
+    if (locked()) return false;
+    if (isShotEvent(input.event_type) && input.player_id) {
+      if (!session || recording) return false;
+      setPendingShot({ event_type: input.event_type, player_id: input.player_id });
+      return true;
+    }
+    return recordPlayNow(input);
+  }
+
+  /** Called by ShotFlow once the scorer has chosen a zone (or skipped it) and the assist. */
+  async function confirmShot(
+    spot: { x: number; y: number } | null,
+    assistPlayerId: string | null
+  ): Promise<boolean> {
+    const shot = pendingShot;
+    if (!shot) return false;
+    const kind = shotKindOf(shot.event_type);
+    const point = kind === "ft" ? (spot ?? FREE_THROW_POINT) : spot;
+    const ok = await recordPlayNow({
+      event_type: shot.event_type,
+      player_id: shot.player_id,
+      secondary_player_id: isMadeShot(shot.event_type) && kind !== "ft" ? (assistPlayerId ?? undefined) : undefined,
+      shot_x: point?.x,
+      shot_y: point?.y,
+      shot_zone: kind === "ft" ? "free_throw" : point ? classifyShotZone(point.x, point.y) : undefined,
+    });
+    if (ok) setPendingShot(null);
+    return ok;
+  }
+
+  function cancelShot() { setPendingShot(null); }
+
+  async function recordPlayNow(input: {
+    event_type: PlayEventType;
+    player_id?: string;
+    secondary_player_id?: string;
+    game_clock?: string;
+    description?: string;
+    shot_x?: number;
+    shot_y?: number;
+    shot_zone?: string;
   }): Promise<boolean> {
     if (locked()) return false;
     if (!session || recording) return false;
@@ -492,11 +542,14 @@ export function useLiveGame(
         p_player_id:           input.player_id ?? null,
         p_secondary_player_id: input.secondary_player_id ?? null,
         p_game_clock:          input.game_clock ?? formatClock(clockSecs),
+        p_shot_x:              input.shot_x ?? null,
+        p_shot_y:              input.shot_y ?? null,
+        p_shot_zone:           input.shot_zone ?? null,
         p_description:         input.description ?? null,
       });
 
       if (error) {
-        toast({ title: "Erro", description: error.message, variant: "destructive" });
+        toast({ title: "Error", description: error.message, variant: "destructive" });
         return false;
       }
 
@@ -522,7 +575,7 @@ export function useLiveGame(
         p_is_home_team:    false,
         p_points_delta:    pts,
         p_game_clock:      formatClock(clockSecs),
-        p_description:     `Adversário +${pts}`,
+        p_description:     `Opponent +${pts}`,
       });
       await Promise.all([loadPlays(session.id), loadSession()]);
     } finally {
@@ -539,7 +592,7 @@ export function useLiveGame(
     if (!session || recording) return;
     setRecording(true);
     try {
-      const foulDesc = type === "foul_def" ? "Falta defensiva" : type === "foul_of" ? "Falta ofensiva" : type === "foul_tec" ? "Falta técnica" : "Falta antidesportiva";
+      const foulDesc = type === "foul_def" ? "Defensive foul" : type === "foul_of" ? "Offensive foul" : type === "foul_tec" ? "Technical foul" : "Unsportsmanlike foul";
       await supabase.rpc("record_play", {
         p_game_session_id: session.id,
         p_event_type:      type,
@@ -548,7 +601,7 @@ export function useLiveGame(
         p_is_home_team:    false,
         p_points_delta:    0,
         p_game_clock:      formatClock(clockSecs),
-        p_description:     `Adversário · ${foulDesc}`,
+        p_description:     `Opponent · ${foulDesc}`,
       });
       await Promise.all([loadPlays(session.id), loadSession()]);
     } finally {
@@ -571,7 +624,7 @@ export function useLiveGame(
         p_is_home_team:    false,
         p_points_delta:    0,
         p_game_clock:      formatClock(clockSecs),
-        p_description:     `Adversário · ${type === "reb_off" ? "Ressalto ofensivo" : "Ressalto defensivo"}`,
+        p_description:     `Opponent · ${type === "reb_off" ? "Offensive rebound" : "Defensive rebound"}`,
       });
       await Promise.all([loadPlays(session.id), loadSession()]);
     } finally {
@@ -638,7 +691,7 @@ export function useLiveGame(
   async function setLineup(userIds: string[]): Promise<boolean> {
     if (locked()) return false;
     if (!session) {
-      toast({ title: "Erro", description: "Sessão de jogo não encontrada.", variant: "destructive" });
+      toast({ title: "Error", description: "Game session not found.", variant: "destructive" });
       return false;
     }
     const newIds = userIds.slice(0, 5);
@@ -676,13 +729,13 @@ export function useLiveGame(
     );
 
     if (error) {
-      toast({ title: "Erro ao definir 5", description: error.message, variant: "destructive" });
+      toast({ title: "Could not set the lineup", description: error.message, variant: "destructive" });
       return false;
     }
 
     setOnCourtIds(newIds);
     loadStints(session.id);
-    toast({ title: "5 em campo atualizado!" });
+    toast({ title: "Lineup updated!" });
     return true;
   }
 
@@ -701,11 +754,11 @@ export function useLiveGame(
         p_is_home_team:    team === "home",
         p_points_delta:    0,
         p_game_clock:      formatClock(clockSecs),
-        p_description:     `Timeout ${team === "home" ? "CD Póvoa" : "Adversário"}`,
+        p_description:     `Timeout ${team === "home" ? "CD Póvoa" : "Opponent"}`,
       });
       if (!error) {
         await Promise.all([loadPlays(session.id), loadSession()]);
-        toast({ title: `Timeout ${team === "home" ? "CD Póvoa" : "Adversário"}` });
+        toast({ title: `Timeout ${team === "home" ? "CD Póvoa" : "Opponent"}` });
       }
     } finally {
       setRecording(false);
@@ -722,7 +775,7 @@ export function useLiveGame(
 
     const UNUNDOABLE = ["game_start", "period_end", "game_end", "substitution_in"];
     if (UNUNDOABLE.includes(play.event_type)) {
-      toast({ title: "Esta ação não pode ser anulada", variant: "destructive" });
+      toast({ title: "This action cannot be undone", variant: "destructive" });
       return false;
     }
 
@@ -730,15 +783,15 @@ export function useLiveGame(
     try {
       const { error } = await supabase.rpc("undo_play", { p_play_id: playId });
       if (error) {
-        toast({ title: "Erro ao anular jogada", description: error.message, variant: "destructive" });
+        toast({ title: "Could not undo the play", description: error.message, variant: "destructive" });
         return false;
       }
       await Promise.all([loadPlays(session.id), loadPlayerStats(session.id), loadSession()]);
-      toast({ title: "Jogada anulada" });
+      toast({ title: "Play undone" });
       return true;
     } catch (e) {
       console.error("[undoPlay]", e);
-      toast({ title: "Erro ao anular jogada", variant: "destructive" });
+      toast({ title: "Could not undo the play", variant: "destructive" });
       return false;
     } finally {
       setRecording(false);
@@ -769,7 +822,7 @@ export function useLiveGame(
       points_delta: 0,
       home_score_after: session.home_score,
       away_score_after: session.away_score,
-      description: `Fim do ${session.current_period}º período`,
+      description: `End of period ${session.current_period}`,
     });
 
     // Close all open stints (usar o relógio real, não 0)
@@ -865,7 +918,7 @@ export function useLiveGame(
       points_delta: 0,
       home_score_after: session.home_score,
       away_score_after: session.away_score,
-      description: `Fim — CD Póvoa ${session.home_score} vs ${session.away_score} ${session.opponent_name}`,
+      description: `Final — CD Póvoa ${session.home_score} vs ${session.away_score} ${session.opponent_name}`,
     });
 
     const { error: finishErr } = await supabase.from("game_sessions").update({
@@ -876,12 +929,12 @@ export function useLiveGame(
       updated_at: new Date().toISOString(),
     }).eq("id", session.id);
     if (finishErr) {
-      toast({ title: "Erro ao terminar o jogo", description: finishErr.message, variant: "destructive" });
+      toast({ title: "Could not finish the game", description: finishErr.message, variant: "destructive" });
       return false;
     }
 
     setSession((s) => s ? { ...s, status: "finished" } : s);
-    toast({ title: "🏁 Jogo terminado!", description: "Estatísticas guardadas." });
+    toast({ title: "🏁 Game finished!", description: "Stats saved." });
     // Jogos da Liga INATEL: o resultado e as estatísticas live passam a ser os oficiais
     void publishToLeague(session.id, { silentIfNotLeague: true });
     return true;
@@ -898,18 +951,18 @@ export function useLiveGame(
       const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; homeScore?: number; awayScore?: number; isTest?: boolean };
       if (!res.ok || !j.ok) {
         if (opts.silentIfNotLeague && res.status === 422) return false;
-        toast({ title: "Resultado não publicado na Liga", description: j.error ?? "Tenta novamente.", variant: "destructive" });
+        toast({ title: "Result not published to the League", description: j.error ?? "Please try again.", variant: "destructive" });
         return false;
       }
       toast({
-        title: "🏆 Liga INATEL atualizada",
+        title: "🏆 Liga INATEL updated",
         description: j.isTest
-          ? `Jogo de teste ${j.homeScore}–${j.awayScore}: resultado gravado (não conta para a classificação).`
-          : `Resultado ${j.homeScore}–${j.awayScore} e estatísticas publicados. A notícia está a ser gerada.`,
+          ? `Test game ${j.homeScore}–${j.awayScore}: result saved (does not count towards the standings).`
+          : `Result ${j.homeScore}–${j.awayScore} and stats published. The news article is being generated.`,
       });
       return true;
     } catch {
-      toast({ title: "Resultado não publicado na Liga", description: "Sem ligação — tenta novamente.", variant: "destructive" });
+      toast({ title: "Result not published to the League", description: "No connection — please try again.", variant: "destructive" });
       return false;
     } finally {
       setPublishing(false);
@@ -925,7 +978,7 @@ export function useLiveGame(
     plays, playerStats, periodScores, clockSecs, stints,
     loading, recording,
     startGame, startClock, stopClock, resetClock,
-    recordPlay, recordOpponentPoints,
+    recordPlay, pendingShot, confirmShot, cancelShot, recordOpponentPoints,
     recordOpponentFoul, recordOpponentReb,
     substitutePlayer, setLineup, callTimeout, undoPlay,
     nextPeriod, finishGame, publishToLeague, publishing,

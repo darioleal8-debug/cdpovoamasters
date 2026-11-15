@@ -28,7 +28,7 @@ function fmt(made: number, att: number) { return `${made}/${att}`; }
 export function SummaryOverlay({
   session, roster, onCourtIds, plays, clockSecs, secsById, tokens, onClose, onExport,
 }: SummaryOverlayProps) {
-  const opponent = session.opponent_name?.trim() || "Adversário";
+  const opponent = session.opponent_name?.trim() || "Opponent";
   const awayFoulsGame = totalAwayFouls(plays as never);
   const { playerMap, awayRebOff, awayRebDef } = deriveStats(plays, session.current_period);
 
@@ -84,7 +84,7 @@ export function SummaryOverlay({
         <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
           <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
             <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", color: "var(--muted)", textTransform: "uppercase" }}>
-              Resumo estatístico · {session.current_period}º Período · {formatClock(clockSecs)}
+              Stats summary · Period {session.current_period} · {formatClock(clockSecs)}
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{ fontFamily: MONO, fontSize: 34, fontWeight: 700, color: "var(--text)" }}>
@@ -96,7 +96,7 @@ export function SummaryOverlay({
               </span>
             </div>
             <span style={{ fontSize: 12, color: "var(--muted)", fontFamily: SANS }}>
-              {opponent} · {session.away_score} pontos · {awayRebOff + awayRebDef} ressaltos · {awayFoulsGame} faltas
+              {opponent} · {session.away_score} points · {awayRebOff + awayRebDef} rebounds · {awayFoulsGame} fouls
             </span>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -111,7 +111,7 @@ export function SummaryOverlay({
                   whiteSpace: "nowrap",
                 }}
               >
-                ↗ Exportar
+                ↗ Export
               </button>
             )}
             <button
@@ -123,7 +123,7 @@ export function SummaryOverlay({
                 whiteSpace: "nowrap",
               }}
             >
-              Voltar ao jogo
+              Back to game
             </button>
           </div>
         </div>
@@ -135,19 +135,19 @@ export function SummaryOverlay({
             display: "grid", gridTemplateColumns: COL, gap: 8,
             padding: "0 8px 8px 8px", minWidth: 1200,
           }}>
-            <span style={{ ...headerCell, textAlign: "left" }}>JOGADOR</span>
+            <span style={{ ...headerCell, textAlign: "left" }}>PLAYER</span>
             <span style={headerCell}>MIN</span>
             <span style={headerCell}>PTS</span>
-            <span style={headerCell}>2P M/T</span>
-            <span style={headerCell}>3P M/T</span>
-            <span style={headerCell}>LL M/T</span>
-            <span style={headerCell}>RES OF/DEF</span>
+            <span style={headerCell}>2P M/A</span>
+            <span style={headerCell}>3P M/A</span>
+            <span style={headerCell}>FT M/A</span>
+            <span style={headerCell}>REB O/D</span>
             <span style={headerCell}>AST</span>
-            <span style={headerCell}>ROU</span>
-            <span style={headerCell}>PER</span>
-            <span style={headerCell}>BLO</span>
-            <span style={headerCell}>FALT</span>
-            <span style={headerCell}>D·O·T·A</span>
+            <span style={headerCell}>STL</span>
+            <span style={headerCell}>TOV</span>
+            <span style={headerCell}>BLK</span>
+            <span style={headerCell}>PF</span>
+            <span style={headerCell}>D·O·T·U</span>
             <span style={headerCell}>EFF</span>
           </div>
 
@@ -199,7 +199,7 @@ export function SummaryOverlay({
               background: "var(--accentSoft)", border: "1px solid var(--accent)", marginTop: 4,
             }}>
               <span style={{ fontSize: 13, fontWeight: 800, color: "var(--accent)", fontFamily: SANS }}>
-                TOTAL EQUIPA
+                TEAM TOTAL
               </span>
               <span style={{ ...numCell, color: "var(--accent)" }}>—</span>
               <span style={{ ...numCell, fontSize: 20, fontWeight: 700, color: "var(--accent)" }}>{totPts}</span>
@@ -213,7 +213,7 @@ export function SummaryOverlay({
               <span style={{ ...numCell, color: "var(--accent)" }}>{totBlk}</span>
               <span style={{ ...numCell, fontWeight: 700, color: "var(--accent)" }}>{totFf}</span>
               <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", color: "var(--accent)", textAlign: "right", fontFamily: SANS }}>
-                DEF·OF·TÉC·ANTI
+                DEF·OFF·TECH·UNSP
               </span>
               <span style={{ ...numCell, fontWeight: 700, color: "var(--accent)" }}>{totEff}</span>
             </div>

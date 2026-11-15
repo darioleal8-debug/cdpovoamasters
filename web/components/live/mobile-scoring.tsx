@@ -41,43 +41,42 @@ export interface MobileScoringScreenProps {
 // ── Module-level constants ────────────────────────────────────────────────────
 
 const SCORE_ACTIONS: Array<{ event: PlayEventType; label: string; sub: string; style: ActionStyle }> = [
-  { event: "2pt_made", label: "+2", sub: "CONV",  style: "accent"  },
-  { event: "3pt_made", label: "+3", sub: "CONV",  style: "accent"  },
-  { event: "ft_made",  label: "+1", sub: "LL",    style: "accent"  },
+  { event: "2pt_made", label: "+2", sub: "MADE",  style: "accent"  },
+  { event: "3pt_made", label: "+3", sub: "MADE",  style: "accent"  },
+  { event: "ft_made",  label: "+1", sub: "FT",    style: "accent"  },
   { event: "2pt_miss", label: "×2", sub: "MISS",  style: "neutral" },
   { event: "3pt_miss", label: "×3", sub: "MISS",  style: "neutral" },
-  { event: "ft_miss",  label: "×1", sub: "LL F.", style: "neutral" },
+  { event: "ft_miss",  label: "×1", sub: "FT MISS", style: "neutral" },
 ];
 
 const STAT_ACTIONS: Array<{ event: PlayEventType; label: string; style: ActionStyle }> = [
-  { event: "rebound_off", label: "REB OF", style: "neutral" },
-  { event: "rebound_def", label: "REB DE", style: "neutral" },
-  { event: "assist",      label: "ASSIST", style: "neutral" },
-  { event: "steal",       label: "ROUBO",  style: "neutral" },
-  { event: "turnover",    label: "PERDA",  style: "neutral" },
-  { event: "block",       label: "BLOCO",  style: "neutral" },
+  { event: "rebound_off", label: "OFF REB", style: "neutral" },
+  { event: "rebound_def", label: "DEF REB", style: "neutral" },
+  { event: "steal",       label: "STEAL",  style: "neutral" },
+  { event: "turnover",    label: "TOV",  style: "neutral" },
+  { event: "block",       label: "BLOCK",  style: "neutral" },
 ];
 
 const FOUL_ACTIONS: Array<{ event: PlayEventType; label: string; style: ActionStyle }> = [
-  { event: "foul_def",  label: "F.DEF",  style: "danger" },
-  { event: "foul_of",   label: "F.OF",   style: "danger" },
-  { event: "foul_tec",  label: "F.TEC",  style: "danger" },
-  { event: "foul_anti", label: "ANTID.", style: "danger" },
-  { event: "foul_drawn", label: "F.SOFR", style: "neutral" },
+  { event: "foul_def",  label: "DEF.",  style: "danger" },
+  { event: "foul_of",   label: "OFF.",   style: "danger" },
+  { event: "foul_tec",  label: "TECH.",  style: "danger" },
+  { event: "foul_anti", label: "UNSP.", style: "danger" },
+  { event: "foul_drawn", label: "DRAWN", style: "neutral" },
 ];
 
 const PLAY_LABELS: Record<string, string> = {
-  "2pt_made": "+2pts",       "2pt_miss": "×2pts",
-  "3pt_made": "+3pts",       "3pt_miss": "×3pts",
-  "ft_made":  "+1 LL",       "ft_miss":  "×LL",
-  "rebound_off": "Res. OF",  "rebound_def": "Res. DEF",
-  "assist": "Assist.",       "steal": "Roubo",
-  "block": "Bloco",          "turnover": "Perda",
-  "foul_def": "F. Def.",     "foul_of": "F. Of.",
-  "foul_tec": "F. Téc.",     "foul_anti": "Antid.",
-  "foul_drawn": "F. Sofrida",
-  "substitution_in": "Entrou", "substitution_out": "Saiu",
-  "period_end": "Fim período", "game_start": "Início",
+  "2pt_made": "+2 pts",       "2pt_miss": "×2 pts",
+  "3pt_made": "+3 pts",       "3pt_miss": "×3 pts",
+  "ft_made":  "+1 FT",       "ft_miss":  "×FT",
+  "rebound_off": "Off. reb",  "rebound_def": "Def. reb",
+  "assist": "Assist",       "steal": "Steal",
+  "block": "Block",          "turnover": "Turnover",
+  "foul_def": "Def. foul",     "foul_of": "Off. foul",
+  "foul_tec": "Tech. foul",     "foul_anti": "Unsp. foul",
+  "foul_drawn": "Foul drawn",
+  "substitution_in": "In", "substitution_out": "Out",
+  "period_end": "End period", "game_start": "Start",
 };
 
 const UNUNDOABLE = new Set(["game_start", "period_end", "game_end", "substitution_in"]);
@@ -120,7 +119,7 @@ function PlayerRow({ player, pts, fouls, secs, isSelected, isSubTarget, isPendin
         {player.user.name.split(" ")[0]}
       </span>
       <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
-        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 600, color: "var(--muted)" }} title="Tempo jogado">{formatMinutes(secs)}</span>
+        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 600, color: "var(--muted)" }} title="Time played">{formatMinutes(secs)}</span>
         <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{pts}P</span>
         {fouls > 0 && (
           <span style={{
@@ -277,7 +276,7 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
               background: "var(--dangerSoft)", padding: "1px 5px",
               borderRadius: 4, marginLeft: 4,
             }}>
-              F.EQ.{homeFouls}
+              TF {homeFouls}
             </span>
           )}
         </div>
@@ -311,7 +310,7 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
             fontFamily: SANS, fontSize: 10, fontWeight: 800, flexShrink: 0,
           } as React.CSSProperties}
         >
-          ADV
+          OPP
         </button>
       </div>
 
@@ -326,7 +325,7 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
             fontSize: 9, fontWeight: 800, letterSpacing: "0.08em",
             color: "var(--muted)", textTransform: "uppercase",
           }}>
-            PT ADV:
+            OPP PTS:
           </span>
           {([1, 2, 3] as const).map((pts) => (
             <button key={pts} onClick={() => recordOpponentPoints(pts)} style={{
@@ -341,7 +340,7 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
             fontSize: 9, fontWeight: 800, letterSpacing: "0.08em",
             color: "var(--muted)", textTransform: "uppercase", marginLeft: 6,
           }}>
-            F ADV:
+            OPP F:
           </span>
           {(["foul_def", "foul_of", "foul_tec", "foul_anti"] as FoulType[]).map((t, i) => (
             <button key={t} onClick={() => recordOpponentFoul(t)} style={{
@@ -349,7 +348,7 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
               border: "1px solid var(--danger)", background: "var(--dangerSoft)",
               color: "var(--danger)", cursor: "pointer", fontFamily: SANS, fontSize: 10, fontWeight: 800,
             } as React.CSSProperties}>
-              {["F.D", "F.O", "TEC", "ANT"][i]}
+              {["DEF", "OFF", "TECH", "UNSP"][i]}
             </button>
           ))}
           <span style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)" }}>
@@ -373,9 +372,9 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
             fontSize: 9, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)",
             textTransform: "uppercase", padding: "0 4px 2px", flexShrink: 0,
           }}>
-            EM CAMPO {onCourt.length}/5
+            ON COURT {onCourt.length}/5
             {pendingIn && (
-              <span style={{ color: "var(--accent)" }}> · toca p/ substituir</span>
+              <span style={{ color: "var(--accent)" }}> · tap to substitute</span>
             )}
           </div>
 
@@ -437,7 +436,7 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
           }}>
             {selectedPlayer
               ? `#${selectedPlayer.jersey_number} ${selectedPlayer.user.name}`
-              : "← Seleciona um jogador em campo"
+              : "← Select a player on court"
             }
           </div>
 
@@ -493,7 +492,7 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
                 borderRight: idx === 0 ? "1px solid var(--line)" : "none",
               } as React.CSSProperties}
             >
-              {tab === "banco" ? `BANCO (${bench.length})` : `FEED (${plays.length})`}
+              {tab === "banco" ? `BENCH (${bench.length})` : `FEED (${plays.length})`}
             </button>
           ))}
         </div>
@@ -538,7 +537,7 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
                     {play.game_clock ?? "—"}
                   </span>
                   <span style={{ flex: 1, color: "var(--text)" }}>
-                    {!play.is_home_team && <span style={{ color: "var(--muted)" }}>ADV · </span>}
+                    {!play.is_home_team && <span style={{ color: "var(--muted)" }}>OPP · </span>}
                     {plyr && `#${plyr.jersey_number} `}
                     {label}
                   </span>
@@ -582,7 +581,7 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
             <div style={{ fontSize: 13, fontWeight: 800, color: "var(--text)" }}>
               {session?.opponent_name
                 ? `CDP vs ${session.opponent_name}`
-                : "Jogo ao vivo"
+                : "Live game"
               }
             </div>
 
@@ -600,7 +599,7 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
                 fontSize: 9, fontWeight: 800, letterSpacing: "0.1em",
                 color: "var(--muted)", textTransform: "uppercase", marginBottom: 8,
               }}>
-                RESSALTOS ADV.
+                OPP. REBOUNDS
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 {(["reb_off", "reb_def"] as const).map((t) => (
@@ -609,7 +608,7 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
                     background: "var(--chip)", color: "var(--text)", cursor: "pointer",
                     fontFamily: SANS, fontSize: 11, fontWeight: 700,
                   } as React.CSSProperties}>
-                    {t === "reb_off" ? "REB OF" : "REB DE"}
+                    {t === "reb_off" ? "OFF REB" : "DEF REB"}
                   </button>
                 ))}
               </div>
@@ -620,7 +619,7 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
                 fontSize: 9, fontWeight: 800, letterSpacing: "0.1em",
                 color: "var(--muted)", textTransform: "uppercase", marginBottom: 8,
               }}>
-                FALTAS DE EQUIPA
+                TEAM FOULS
               </div>
               <div style={{ display: "flex", gap: 16, fontFamily: SANS }}>
                 <div>
@@ -633,7 +632,7 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, color: "var(--muted)", maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session?.opponent_name || "ADV"}</div>
+                  <div style={{ fontSize: 10, color: "var(--muted)", maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session?.opponent_name || "OPP"}</div>
                   <div style={{
                     fontFamily: MONO, fontSize: 24, fontWeight: 700,
                     color: awayFouls >= 4 ? "var(--danger)" : "var(--text)",
