@@ -94,10 +94,16 @@ export default function LiveGamePage() {
     typeof window !== "undefined" && window.innerHeight <= 500
   );
 
+  // Largura de telemóvel (<700px) — tablets nunca usam o ecrã de marcação mobile
+  const [isNarrow, setIsNarrow] = useState(() =>
+    typeof window !== "undefined" && window.innerWidth < 700
+  );
+
   useEffect(() => {
     function update() {
       setIsLandscape(window.innerWidth > window.innerHeight);
       setIsMobileHeight(window.innerHeight <= 500);
+      setIsNarrow(window.innerWidth < 700);
     }
     window.addEventListener("resize", update);
     window.addEventListener("orientationchange", update);
@@ -108,7 +114,9 @@ export default function LiveGamePage() {
   }, []);
 
   // ── Modo de marcação mobile: landscape + fullscreen OU telemóvel em landscape ──
-  const isMobileScoring = isLandscape && (isFullscreen || isMobileHeight);
+  // Só telemóveis em landscape usam o ecrã mobile; em tablet (fullscreen ou não) mantém-se o template escolhido.
+  const isMobileScoring = isLandscape && isMobileHeight;
+  const needsRotate = isFullscreen && !isLandscape && isNarrow;
 
   // ── Event data (opponent, game_type, etc.) ───────────────
   const [isFriendly, setIsFriendly] = useState(false);
@@ -407,7 +415,7 @@ export default function LiveGamePage() {
       )}
 
       {/* Prompt de rotação (portrait + fullscreen) */}
-      {isFullscreen && !isLandscape && (
+      {needsRotate && (
         <div style={{
           flex:           1,
           display:        "flex",
@@ -443,7 +451,7 @@ export default function LiveGamePage() {
       )}
 
       {/* ── Live layouts (desktop / tablet, ou mobile sem fullscreen) ─ */}
-      {(!isMobileScoring && !(isFullscreen && !isLandscape)) && isLive && layoutProps && (
+      {(!isMobileScoring && !needsRotate) && isLive && layoutProps && (
         <>
           {prefs.layout === "a" && <Layout1a {...layoutProps} />}
           {prefs.layout === "b" && <Layout1b {...layoutProps} />}

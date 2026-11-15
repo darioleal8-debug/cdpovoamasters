@@ -78,7 +78,7 @@ export function ShotFlow({ shot, roster, onCourt, saving, onConfirm, onCancel }:
       aria-modal="true"
       aria-label={step === "zone" ? "Shot location" : "Assist"}
       style={{
-        position: "fixed", inset: 0, zIndex: 80, display: "flex", alignItems: "center", justifyContent: "center",
+        position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center",
         background: "rgba(0,0,0,0.6)", padding: 12, fontFamily: SANS,
       }}
       onClick={(e) => { if (e.target === e.currentTarget && !saving) onCancel(); }}
