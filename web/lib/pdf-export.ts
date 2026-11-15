@@ -72,14 +72,8 @@ function renderShotPage(doc: any, session: GameSession, shots: ShotPoint[]): voi
   const cx = ox + cw / 2;
   const by = oy + BASKET_Y_M * scale;
 
-  // Hardwood floor: tan planks, white lines
-  doc.setFillColor(220, 178, 122);
-  doc.rect(ox, oy, cw, ch, "F");
-  doc.setDrawColor(200, 158, 100);
-  doc.setLineWidth(0.15);
-  for (let px = ox + cw / 15; px < ox + cw - 0.1; px += cw / 15) doc.line(px, oy, px, oy + ch);
-  doc.setDrawColor(255, 255, 255);
-  doc.setLineWidth(0.5);
+  doc.setDrawColor(...MUTED);
+  doc.setLineWidth(0.35);
   doc.rect(ox, oy, cw, ch);
   const key = KEY_HALF_W_M * scale;
   doc.rect(cx - key, oy, key * 2, KEY_LENGTH_M * scale);
@@ -113,12 +107,11 @@ function renderShotPage(doc: any, session: GameSession, shots: ShotPoint[]): voi
     const x = ox + (s.x / 100) * cw;
     const y = oy + (s.y / 100) * ch;
     if (s.made) {
-      doc.setDrawColor(46, 125, 50);
-      doc.setLineWidth(0.7);
-      doc.circle(x, y, 1.3, "S");
+      doc.setFillColor(...GREEN);
+      doc.circle(x, y, 1.1, "F");
     } else {
-      doc.setDrawColor(179, 38, 30);
-      doc.setLineWidth(0.7);
+      doc.setDrawColor(...RED);
+      doc.setLineWidth(0.5);
       doc.line(x - 1.1, y - 1.1, x + 1.1, y + 1.1);
       doc.line(x + 1.1, y - 1.1, x - 1.1, y + 1.1);
     }
