@@ -86,17 +86,30 @@ export function ShotReport({
         <>
           <div style={{ maxWidth: 520, width: "100%" }}>
             {view === "zones" ? <ZoneHeatmap stats={zones} /> : <ShotChart shots={shots} />}
+            {view === "chart" && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginTop: 8 }}>
+                <span style={{ fontSize: 15 }}>
+                  FG%: <strong style={{ fontSize: 24 }}>{shots.length ? ((made / shots.length) * 100).toFixed(1) : "0.0"}%</strong>{" "}
+                  <span style={{ opacity: 0.7 }}>({made}-{shots.length})</span>
+                </span>
+                <span style={{ display: "flex", gap: 14, fontSize: 13, alignItems: "center" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                    <svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5" fill="none" stroke="#2e7d32" strokeWidth="2.2" /></svg>
+                    Made Shot
+                  </span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                    <svg width="16" height="16" viewBox="0 0 16 16"><path d="M3 3L13 13M13 3L3 13" stroke="#b3261e" strokeWidth="2.2" strokeLinecap="round" /></svg>
+                    Missed Shot
+                  </span>
+                </span>
+              </div>
+            )}
           </div>
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13 }}>
             <span><strong>FG</strong> {made}/{shots.length} ({pct(made, shots.length)})</span>
             <span><strong>2PT</strong> {m2}/{a2} ({pct(m2, a2)})</span>
             <span><strong>3PT</strong> {m3}/{a3} ({pct(m3, a3)})</span>
-            {view === "chart" ? (
-              <span style={{ opacity: 0.7 }}>
-                <span style={{ color: "#22c55e", fontWeight: 800 }}>○</span> made ·{" "}
-                <span style={{ color: "#ef4444", fontWeight: 800 }}>×</span> missed
-              </span>
-            ) : (
+            {view === "chart" ? null : (
               <span style={{ opacity: 0.7 }}>
                 Red → green = lower → higher FG% (made/attempted shown per zone)
               </span>

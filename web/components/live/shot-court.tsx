@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useId, useMemo, useRef } from "react";
 import {
   BASKET_POINT, COURT_L_M, COURT_W_M, FT_RADIUS_M, KEY_HALF_W_M, KEY_LENGTH_M,
   RESTRICTED_RADIUS_M, SHOT_ZONE_LABELS, THREE_CORNER_X_M, THREE_RADIUS_M, BASKET_Y_M,
@@ -33,6 +33,25 @@ function CourtLines({ lineOpacity = 0.7 }: { lineOpacity?: number }) {
       <line x1={cx - 9} y1={by - 4} x2={cx + 9} y2={by - 4} strokeWidth={1.4} />
       <circle cx={cx} cy={by + 0.2} r={2.25} stroke="var(--accent, #f97316)" strokeOpacity={1} strokeWidth={1.2} />
     </g>
+  );
+}
+
+/** Hardwood floor: alternating tan planks with thin seams. */
+function WoodFloor({ id }: { id: string }) {
+  return (
+    <>
+      <defs>
+        <pattern id={id} width={20} height={H} patternUnits="userSpaceOnUse">
+          <rect width={20} height={H} fill="#dcb27a" />
+          <rect x={0} width={5} height={H} fill="#e3bd87" />
+          <rect x={5} width={5} height={H} fill="#d8ac71" />
+          <rect x={10} width={5} height={H} fill="#e0b880" />
+          <rect x={15} width={5} height={H} fill="#d6aa6f" />
+          <path d={`M5,0V${H}M10,0V${H}M15,0V${H}M20,0V${H}`} stroke="#8a5a22" strokeOpacity={0.22} strokeWidth={0.35} />
+        </pattern>
+      </defs>
+      <rect x={0} y={0} width={W} height={H} rx={2} fill={`url(#${id})`} />
+    </>
   );
 }
 
@@ -75,13 +94,17 @@ interface BaseProps {
  * Also used read-only with markers (shot chart).
  */
 export function ShotCourt({
-  onPick, selected, markers, className, style, label,
+  onPick, selected, markers, className, style, label, floor = "wood",
 }: BaseProps & {
   onPick?: (x: number, y: number) => void;
   selected?: { x: number; y: number } | null;
   markers?: ShotPoint[];
+  /** "wood" = hardwood look (default); "plain" = theme background */
+  floor?: "wood" | "plain";
 }) {
   const ref = useRef<SVGSVGElement>(null);
+  const woodId = "wood" + useId().replace(/:/g, "");
+  const wood = floor === "wood";
 
   function handle(e: React.PointerEvent<SVGSVGElement>) {
     if (!onPick || !ref.current) return;
@@ -98,19 +121,19 @@ export function ShotCourt({
       role="img"
       aria-label={label ?? "Half court"}
       className={className}
-      style={{ width: "100%", height: "auto", display: "block", touchAction: "manipulation", cursor: onPick ? "crosshair" : "default", color: "var(--muted, #8a8a8a)", ...style }}
+      style={{ width: "100%", height: "auto", display: "block", touchAction: "manipulation", cursor: onPick ? "crosshair" : "default", color: wood ? "#ffffff" : "var(--muted, #8a8a8a)", ...style }}
       onPointerDown={handle}
     >
-      <rect x={0} y={0} width={W} height={H} rx={2} fill="var(--court-bg, rgba(127,127,127,0.07))" />
-      <CourtLines />
+      {wood ? <WoodFloor id={woodId} /> : <rect x={0} y={0} width={W} height={H} rx={2} fill="var(--court-bg, rgba(127,127,127,0.07))" />}
+      <CourtLines lineOpacity={wood ? 0.95 : 0.7} />
       {markers?.map((m, i) => {
         const { sx, sy } = pctToSvg(m.x, m.y);
         return m.made ? (
-          <circle key={i} cx={sx} cy={sy} r={2.1} fill="none" stroke="#22c55e" strokeWidth={1.1} />
+          <circle key={i} cx={sx} cy={sy} r={1.8} fill="none" stroke={wood ? "#2e7d32" : "#22c55e"} strokeWidth={wood ? 1.2 : 1.1} />
         ) : (
-          <g key={i} stroke="#ef4444" strokeWidth={1.1} strokeLinecap="round">
-            <line x1={sx - 1.8} y1={sy - 1.8} x2={sx + 1.8} y2={sy + 1.8} />
-            <line x1={sx + 1.8} y1={sy - 1.8} x2={sx - 1.8} y2={sy + 1.8} />
+          <g key={i} stroke={wood ? "#b3261e" : "#ef4444"} strokeWidth={wood ? 1.1 : 1.1} strokeLinecap="round">
+            <line x1={sx - 1.5} y1={sy - 1.5} x2={sx + 1.5} y2={sy + 1.5} />
+            <line x1={sx + 1.5} y1={sy - 1.5} x2={sx - 1.5} y2={sy + 1.5} />
           </g>
         );
       })}
@@ -118,8 +141,8 @@ export function ShotCourt({
         const { sx, sy } = pctToSvg(selected.x, selected.y);
         return (
           <g>
-            <circle cx={sx} cy={sy} r={5.2} fill="var(--accent, #f97316)" fillOpacity={0.25} />
-            <circle cx={sx} cy={sy} r={2.4} fill="var(--accent, #f97316)" stroke="#fff" strokeWidth={0.8} />
+            <circle cx={sx} cy={sy} r={5.2} fill={wood ? "#2563eb" : "var(--accent, #f97316)"} fillOpacity={0.3} />
+            <circle cx={sx} cy={sy} r={2.4} fill={wood ? "#2563eb" : "var(--accent, #f97316)"} stroke="#fff" strokeWidth={0.8} />
           </g>
         );
       })()}
