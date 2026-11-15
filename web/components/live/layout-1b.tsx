@@ -131,7 +131,7 @@ export function Layout1b({
     };
   };
 
-  const UNUNDOABLE = ["game_start", "period_end", "game_end", "substitution_in"];
+  const UNUNDOABLE: string[] = []; // every action can be undone
 
   return (
     <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 14, fontFamily: SANS }}>

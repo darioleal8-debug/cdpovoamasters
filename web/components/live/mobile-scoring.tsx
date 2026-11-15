@@ -79,7 +79,7 @@ const PLAY_LABELS: Record<string, string> = {
   "period_end": "End period", "game_start": "Start",
 };
 
-const UNUNDOABLE = new Set(["game_start", "period_end", "game_end", "substitution_in"]);
+const UNUNDOABLE = new Set<string>(); // every action can be undone
 
 // ── Module-level sub-components ───────────────────────────────────────────────
 

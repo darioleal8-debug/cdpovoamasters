@@ -68,7 +68,7 @@ export function Layout1c({
   const [foulSel, setFoulSel] = useState<FoulSel>("Def");
 
   const running = session.clock_running;
-  const UNUNDOABLE = ["game_start", "period_end", "game_end", "substitution_in"];
+  const UNUNDOABLE: string[] = []; // every action can be undone
 
   function getStats(pid: string) { return derivedStats.get(pid); }
 

@@ -497,6 +497,7 @@ export interface PlayByPlay {
   season_id: string;
   period: number;
   game_clock: string;
+  clock_time_secs?: number | null;
   event_type: PlayEventType;
   player_id: string | null;
   secondary_player_id: string | null;

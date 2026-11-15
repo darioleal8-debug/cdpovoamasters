@@ -766,40 +766,122 @@ export function useLiveGame(
     }
   }
 
-  // ── Undo specific play ──────────────────────────────────
+  // ── Undo specific play (any action) ─────────────────────
+  // Stat plays: soft-deleted by the undo_play RPC (reverses score/stats/assists).
+  // Structural plays (substitutions, period end, game end, game start) also restore the state they changed.
 
   async function undoPlay(playId: string): Promise<boolean> {
-    if (locked()) return false;
     if (!session || recording) return false;
     const play = plays.find((p) => p.id === playId);
     if (!play) return false;
+    const type = play.event_type as string;
 
-    const UNUNDOABLE = ["game_start", "period_end", "game_end", "substitution_in"];
-    if (UNUNDOABLE.includes(play.event_type)) {
-      toast({ title: "This action cannot be undone", variant: "destructive" });
-      return false;
+    // Everything except re-opening a finished game needs a live game
+    if (type !== "game_end" && locked()) return false;
+
+    const later = plays.filter((p) => p.id !== play.id && String(p.created_at) > String(play.created_at));
+    const fail = (title: string) => { toast({ title, variant: "destructive" }); return false; };
+
+    if (type === "game_end") {
+      if (session.status !== "finished") return fail("The game is not finished");
+      if (later.length > 0) return fail("Undo the later actions first");
+    }
+    if (type === "period_end") {
+      if (later.length > 0) return fail("Undo the later actions first");
+      if (session.current_period !== play.period + 1) return fail("This period end can no longer be undone");
+    }
+    if (type === "game_start" && plays.length > 1) {
+      return fail("Undo all the other actions before undoing the game start");
     }
 
     setRecording(true);
     try {
+      if (type === "game_start") {
+        // Nothing else was logged: wipe the session so the game can be started again
+        const sid = session.id;
+        for (const table of ["play_by_play", "player_game_stats", "game_current_lineup", "player_court_stints", "game_period_scores"]) {
+          const { error } = await supabase.from(table).delete().eq("game_session_id", sid);
+          if (error) { toast({ title: "Could not undo the game start", description: error.message, variant: "destructive" }); return false; }
+        }
+        const { error } = await supabase.from("game_sessions").delete().eq("id", sid);
+        if (error) { toast({ title: "Could not undo the game start", description: error.message, variant: "destructive" }); return false; }
+        setSession(null);
+        setPlays([]);
+        setOnCourtIds([]);
+        toast({ title: "Game start undone" });
+        return true;
+      }
+
       const { error } = await supabase.rpc("undo_play", { p_play_id: playId });
       if (error) {
         toast({ title: "Could not undo the play", description: error.message, variant: "destructive" });
         return false;
       }
-      await Promise.all([loadPlays(session.id), loadPlayerStats(session.id), loadSession()]);
-      toast({ title: "Play undone" });
+
+      if (type === "substitution_in" && play.player_id && play.secondary_player_id) {
+        const inId = play.player_id as string;
+        const outId = play.secondary_player_id as string;
+        if (onCourtIds.includes(inId) && !onCourtIds.includes(outId)) {
+          const newLineup = onCourtIds.filter((id) => id !== inId).concat(outId);
+          await supabase.from("game_current_lineup").upsert(
+            { game_session_id: session.id, on_court_ids: newLineup, updated_at: new Date().toISOString() },
+            { onConflict: "game_session_id" }
+          );
+          await supabase.from("player_court_stints").delete()
+            .eq("game_session_id", session.id).eq("player_id", inId)
+            .eq("period", play.period).eq("entry_clock_secs", play.clock_time_secs ?? 0);
+          await supabase.from("player_court_stints")
+            .update({ exit_clock_secs: null, exit_home_score: null, exit_away_score: null })
+            .eq("game_session_id", session.id).eq("player_id", outId)
+            .eq("period", play.period).eq("exit_clock_secs", play.clock_time_secs ?? 0);
+          setOnCourtIds(newLineup);
+        } else {
+          toast({ title: "Substitution removed from the log", description: "The lineup had already changed, so it was left as it is." });
+        }
+      }
+
+      if (type === "period_end") {
+        const prev = play.period;
+        const awayFoulTypes = ["foul_committed", "foul_def", "foul_of", "foul_tec", "foul_anti"];
+        const awayFouls = plays.filter((p) => p.id !== play.id && p.period === prev && !p.is_home_team && awayFoulTypes.includes(p.event_type as string)).length;
+        await supabase.from("player_court_stints").delete().eq("game_session_id", session.id).eq("period", session.current_period);
+        await supabase.from("player_court_stints")
+          .update({ exit_clock_secs: null, exit_home_score: null, exit_away_score: null })
+          .eq("game_session_id", session.id).eq("period", prev).in("player_id", onCourtIds);
+        await supabase.from("game_sessions").update({
+          current_period: prev,
+          clock_running: false,
+          clock_started_at: null,
+          clock_elapsed_secs: session.period_duration_secs ?? DEFAULT_PERIOD_SECS, // back to 00:00 of that period
+          away_fouls: awayFouls,
+          updated_at: new Date().toISOString(),
+        }).eq("id", session.id);
+        setClockSecs(0);
+      }
+
+      if (type === "game_end") {
+        await supabase.from("game_sessions").update({
+          status: "live", finished_at: null, updated_at: new Date().toISOString(),
+        }).eq("id", session.id);
+        await supabase.from("player_court_stints")
+          .update({ exit_clock_secs: null, exit_home_score: null, exit_away_score: null })
+          .eq("game_session_id", session.id).eq("period", session.current_period).in("player_id", onCourtIds);
+      }
+
+      await Promise.all([
+        loadPlays(session.id), loadPlayerStats(session.id), loadSession(),
+        loadStints(session.id), loadPeriodScores(session.id),
+      ]);
+      toast({ title: type === "game_end" ? "Game re-opened" : "Action undone" });
       return true;
     } catch (e) {
       console.error("[undoPlay]", e);
-      toast({ title: "Could not undo the play", variant: "destructive" });
+      toast({ title: "Could not undo the action", variant: "destructive" });
       return false;
     } finally {
       setRecording(false);
     }
   }
-
-  // ── Next period ─────────────────────────────────────────
 
   async function nextPeriod(): Promise<void> {
     if (locked()) return;

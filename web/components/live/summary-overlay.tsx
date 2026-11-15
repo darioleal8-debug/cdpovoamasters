@@ -7,6 +7,84 @@ import { deriveStats, efficiency, totalAwayFouls } from "@/lib/live/derive-stats
 import { formatMinutes } from "@/lib/live/minutes";
 import { formatClock } from "@/hooks/use-live-game";
 import { MONO, SANS } from "./tokens";
+import { useState } from "react";
+import { ShotReport } from "./shot-report";
+
+interface Analysis {
+  headline?: string; what_happened?: string[]; strengths?: string[]; concerns?: string[];
+  suggestions?: string[]; player_notes?: Array<{ player: string; note: string }>; conclusion?: string;
+}
+
+/** AI coach analysis (DeepSeek) built from every stat logged so far. */
+function AiAnalysis({ sessionId }: { sessionId: string }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<{ analysis: Analysis; generatedAt: string } | null>(null);
+
+  async function run() {
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch("/api/deepseek/live-analysis", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error ?? `Error ${res.status}`);
+      setData(j);
+    } catch (e) {
+      setError((e as Error).message || "Could not generate the analysis");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const list = (title: string, items?: string[]) =>
+    items && items.length > 0 ? (
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 4 }}>{title}</div>
+        <ul style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 3, fontSize: 14, color: "var(--text)" }}>
+          {items.map((t, i) => <li key={i}>{t}</li>)}
+        </ul>
+      </div>
+    ) : null;
+
+  const a = data?.analysis;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <button
+          onClick={run} disabled={loading}
+          style={{
+            height: 44, padding: "0 18px", borderRadius: 10, border: "none", cursor: loading ? "wait" : "pointer",
+            background: "var(--accent)", color: "var(--accentInk)", fontFamily: SANS, fontSize: 14, fontWeight: 700,
+          }}
+        >
+          {loading ? "Analysing…" : a ? "↻ Refresh analysis" : "✦ Generate AI analysis"}
+        </button>
+        {data && <span style={{ fontSize: 12, color: "var(--muted)" }}>Based on all stats up to {new Date(data.generatedAt).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}</span>}
+      </div>
+      {error && <div style={{ color: "var(--danger)", fontSize: 13 }}>{error}</div>}
+      {a && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16, borderRadius: 14, border: "1px solid var(--line)", background: "var(--panel)" }}>
+          {a.headline && <div style={{ fontSize: 17, fontWeight: 800, color: "var(--text)" }}>{a.headline}</div>}
+          {list("What happened", a.what_happened)}
+          {list("Strengths", a.strengths)}
+          {list("Concerns", a.concerns)}
+          {list("Suggestions", a.suggestions)}
+          {a.player_notes && a.player_notes.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase", marginBottom: 4 }}>Players</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 14, color: "var(--text)" }}>
+                {a.player_notes.map((n, i) => <div key={i}><b>{n.player}</b> — {n.note}</div>)}
+              </div>
+            </div>
+          )}
+          {a.conclusion && <div style={{ fontSize: 14, fontWeight: 700, color: "var(--accent)" }}>{a.conclusion}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface SummaryOverlayProps {
   session: GameSession;
@@ -218,6 +296,26 @@ export function SummaryOverlay({
               <span style={{ ...numCell, fontWeight: 700, color: "var(--accent)" }}>{totEff}</span>
             </div>
           </div>
+        </div>
+
+        {/* Shot chart — made and missed, by court zone */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 16, borderRadius: 14, border: "1px solid var(--line)", background: "var(--panel)" }}>
+          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", color: "var(--muted)", textTransform: "uppercase" }}>
+            Shot chart
+          </span>
+          <ShotReport
+            plays={plays as never}
+            players={roster.map((r) => ({ id: r.user_id, name: r.user.name, number: r.jersey_number }))}
+            emptyText="No located shots yet"
+          />
+        </div>
+
+        {/* AI analysis for the coach */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", color: "var(--muted)", textTransform: "uppercase" }}>
+            AI analysis · coach insights
+          </span>
+          <AiAnalysis sessionId={session.id} />
         </div>
       </div>
     </div>

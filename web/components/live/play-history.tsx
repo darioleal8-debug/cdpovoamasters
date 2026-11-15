@@ -6,7 +6,7 @@ import { EVENT_LABELS } from "./layout-1a";
 
 const SANS = "var(--font-sans, system-ui, sans-serif)";
 const MONO = "var(--font-mono, ui-monospace, monospace)";
-const UNUNDOABLE = new Set(["game_start", "period_end", "game_end", "substitution_in"]);
+const UNUNDOABLE = new Set<string>(); // every action can be undone
 
 interface Props {
   plays: PlayByPlay[];

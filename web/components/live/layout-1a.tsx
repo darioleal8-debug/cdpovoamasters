@@ -374,7 +374,7 @@ function PlayLog({
   onUndoPlay: (id: string) => void;
 }) {
   const visible = plays.slice(0, 4);
-  const UNUNDOABLE = ["game_start", "period_end", "game_end", "substitution_in"];
+  const UNUNDOABLE: string[] = []; // every action can be undone
 
   return (
     <div style={{

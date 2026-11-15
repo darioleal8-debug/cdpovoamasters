@@ -16,9 +16,10 @@ interface LivePrefsBarProps {
   onToggleFullscreen: () => void;
   onOpenSummary: () => void;
   onOpenShare: () => void;
+  onOpenHistory?: () => void;
 }
 
-export function LivePrefsBar({ prefs, onSetLayout, onSetDark, onToggleFullscreen, onOpenSummary, onOpenShare }: LivePrefsBarProps) {
+export function LivePrefsBar({ prefs, onSetLayout, onSetDark, onToggleFullscreen, onOpenSummary, onOpenShare, onOpenHistory }: LivePrefsBarProps) {
   const groupStyle: React.CSSProperties = {
     display: "flex", alignItems: "center", gap: 4,
     background: "oklch(0.94 0.006 250)", borderRadius: 13, padding: 5,
@@ -84,7 +85,16 @@ export function LivePrefsBar({ prefs, onSetLayout, onSetDark, onToggleFullscreen
       </div>
 
       {/* Summary + share + fullscreen icon buttons */}
-      <button onClick={onOpenSummary} title="Stats summary"
+      {onOpenHistory && (
+        <button onClick={onOpenHistory} title="All plays · filter by period · undo any play"
+          style={{
+            ...btnBase, background: "oklch(1 0 0)", border: "1px solid oklch(0.8 0.01 250)",
+            color: "oklch(0.3 0.02 250)",
+          }}>
+          ↶ History / Undo
+        </button>
+      )}
+      <button onClick={onOpenSummary} title="Stats summary, shot chart and AI analysis"
         style={{
           ...iconBtn,
           background: "oklch(1 0 0)", border: "1px solid oklch(0.8 0.01 250)",

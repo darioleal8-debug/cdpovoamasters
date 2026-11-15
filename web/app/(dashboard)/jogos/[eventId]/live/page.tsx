@@ -323,7 +323,9 @@ export default function LiveGamePage() {
       {/* ── Barra de preferências ou barra mínima de ecrã cheio ── */}
       {isFullscreen ? (
         <div style={{
-          display: "flex", alignItems: "center", gap: 12, padding: "8px 16px",
+          // sticky + left gap: iPadOS draws its own close (X) button over the top-left corner in full screen
+          position: "sticky", top: 0, zIndex: 120,
+          display: "flex", alignItems: "center", gap: 12, padding: "8px 16px 8px 92px", minHeight: 76,
           background: "var(--panel)", borderBottom: "1px solid var(--line)", flexShrink: 0,
         }}>
           <button
@@ -344,8 +346,20 @@ export default function LiveGamePage() {
               background: "var(--panel)", border: "1px solid var(--line)", color: "var(--text)",
             }}
           >
-            ▤ Stats summary
+            ▤ Stats &amp; AI
           </button>
+          {session && (
+            <button
+              onClick={() => setHistoryOpen(true)}
+              style={{
+                height: 44, padding: "0 16px", borderRadius: 10, cursor: "pointer",
+                fontFamily: SANS, fontSize: 13, fontWeight: 700,
+                background: "var(--panel)", border: "1px solid var(--line)", color: "var(--text)",
+              }}
+            >
+              ↶ History / Undo
+            </button>
+          )}
           <button
             onClick={() => setShareOpen(true)}
             style={{
@@ -367,6 +381,7 @@ export default function LiveGamePage() {
           onToggleFullscreen={toggleFullscreen}
           onOpenSummary={() => setSummaryOpen(true)}
           onOpenShare={() => setShareOpen(true)}
+          onOpenHistory={session ? () => setHistoryOpen(true) : undefined}
         />
       )}
 
@@ -513,7 +528,7 @@ export default function LiveGamePage() {
       )}
 
       {/* ── Play history (full list, filter by period, undo any play) ── */}
-      {isLive && session && !historyOpen && !pendingShot && (
+      {isMobileScoring && session && !historyOpen && !pendingShot && (
         <button
           onClick={() => setHistoryOpen(true)}
           style={{
