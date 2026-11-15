@@ -33,6 +33,7 @@ interface EventData {
   event_time: string | null;
   location: string | null;
   competition: string | null;
+  season_id: string | null;
 }
 
 interface ActivePlayer {
@@ -116,7 +117,7 @@ export default function LiveGamePage() {
     const supabase = createClient();
     supabase
       .from("events")
-      .select("game_type, opponent, description, title, event_date, event_time, location, competition")
+      .select("game_type, opponent, description, title, event_date, event_time, location, competition, season_id")
       .eq("id", params.eventId)
       .single()
       .then(({ data }) => {
@@ -157,15 +158,17 @@ export default function LiveGamePage() {
 
   // Load active roster when no callups exist
   useEffect(() => {
-    if (!loading && !session && roster.length === 0) {
+    // Only the game's own season/club roster — never another club's players
+    if (!loading && !session && roster.length === 0 && eventData?.season_id) {
       const supabase = createClient();
       supabase
-        .from("v_active_roster")
+        .from("v_roster")
         .select("player_id, name, number")
+        .eq("season_id", eventData.season_id)
         .order("number", { ascending: true, nullsFirst: false })
         .then(({ data }) => { if (data) setActivePlayers(data as ActivePlayer[]); });
     }
-  }, [loading, session, roster.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loading, session, roster.length, eventData?.season_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!loading && !session) setStartDialog(true);
