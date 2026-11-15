@@ -148,8 +148,9 @@ export function useLiveGame(
       .from("play_by_play")
       .select("*")
       .eq("game_session_id", sessionId)
+      .is("deleted_at", null) // undone plays must disappear from the log, shot chart and stats
       .order("created_at", { ascending: false })
-      .limit(500);
+      .limit(2000);
     setPlays(data ?? []);
   }, []);
 

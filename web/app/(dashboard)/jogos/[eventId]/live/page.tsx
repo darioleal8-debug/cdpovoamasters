@@ -18,6 +18,7 @@ import { Layout1b } from "@/components/live/layout-1b";
 import { Layout1c } from "@/components/live/layout-1c";
 import { MobileScoringScreen } from "@/components/live/mobile-scoring";
 import { ShotFlow } from "@/components/live/shot-flow";
+import { PlayHistory } from "@/components/live/play-history";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,6 +85,7 @@ export default function LiveGamePage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   // ── Orientação do dispositivo ─────────────────────────────
   const [isLandscape, setIsLandscape] = useState(() =>
@@ -508,6 +510,24 @@ export default function LiveGamePage() {
           onConfirm={confirmShot}
           onCancel={cancelShot}
         />
+      )}
+
+      {/* ── Play history (full list, filter by period, undo any play) ── */}
+      {isLive && session && !historyOpen && !pendingShot && (
+        <button
+          onClick={() => setHistoryOpen(true)}
+          style={{
+            position: "fixed", left: 12, bottom: 12, zIndex: 150,
+            padding: "10px 16px", borderRadius: 999, fontSize: 13, fontWeight: 800, fontFamily: SANS,
+            border: "1px solid var(--line)", background: "var(--panel, var(--bg))", color: "var(--text)",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.3)", cursor: "pointer",
+          }}
+        >
+          ↶ History / Undo
+        </button>
+      )}
+      {historyOpen && session && (
+        <PlayHistory plays={plays} roster={roster} recording={recording} onUndoPlay={undoPlay} onClose={() => setHistoryOpen(false)} />
       )}
 
       {/* ── Summary overlay ────────────────────────────────── */}
