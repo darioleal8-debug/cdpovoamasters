@@ -61,3 +61,14 @@ describe("shotsFromPlays / zoneStats", () => {
     expect(z.find((s) => s.zone === "three_top")!.att).toBe(1);
   });
 });
+
+describe("isBlockedShot", () => {
+  it("only flags missed 2PT/3PT marked as blocked and not undone", async () => {
+    const { isBlockedShot, BLOCKED_DESC } = await import("./shot-zones");
+    expect(isBlockedShot({ event_type: "2pt_miss", description: BLOCKED_DESC })).toBe(true);
+    expect(isBlockedShot({ event_type: "3pt_miss", description: BLOCKED_DESC })).toBe(true);
+    expect(isBlockedShot({ event_type: "2pt_made", description: BLOCKED_DESC })).toBe(false);
+    expect(isBlockedShot({ event_type: "2pt_miss", description: null })).toBe(false);
+    expect(isBlockedShot({ event_type: "2pt_miss", description: BLOCKED_DESC, deleted_at: "x" })).toBe(false);
+  });
+});

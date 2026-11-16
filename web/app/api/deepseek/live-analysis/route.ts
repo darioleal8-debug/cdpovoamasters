@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/auth/guards";
 import { MANAGERS } from "@/lib/auth/roles";
 import { deepseekJSON } from "@/lib/deepseek";
-import { shotsFromPlays, zoneStats, SHOT_ZONE_LABELS } from "@/lib/live/shot-zones";
+import { shotsFromPlays, zoneStats, isBlockedShot, SHOT_ZONE_LABELS } from "@/lib/live/shot-zones";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
   const playerLines = (stats ?? [])
     .filter((s) => (s.pts ?? 0) + (s.reb_off ?? 0) + (s.reb_def ?? 0) + (s.ast ?? 0) + (s.stl ?? 0) + (s.blk ?? 0) + (s.tov ?? 0) + (s.fouls_committed ?? 0) + (s.fg2_att ?? 0) + (s.fg3_att ?? 0) + (s.ft_att ?? 0) + (s.seconds_played ?? 0) > 0)
     .map((s) =>
-      `${nameOf.get(s.player_id as string) ?? s.player_id}: ${Math.round(((s.seconds_played as number) ?? 0) / 60)} min, ${s.pts} pts, 2PT ${s.fg2_made}/${s.fg2_att}, 3PT ${s.fg3_made}/${s.fg3_att}, FT ${s.ft_made}/${s.ft_att}, REB ${(s.reb_off ?? 0) + (s.reb_def ?? 0)} (off ${s.reb_off}), AST ${s.ast}, STL ${s.stl}, BLK ${s.blk}, TOV ${s.tov}, fouls ${s.fouls_committed}, +/- ${s.plus_minus ?? 0}`
+      `${nameOf.get(s.player_id as string) ?? s.player_id}: ${Math.round(((s.seconds_played as number) ?? 0) / 60)} min, ${s.pts} pts, 2PT ${s.fg2_made}/${s.fg2_att}, 3PT ${s.fg3_made}/${s.fg3_att}, FT ${s.ft_made}/${s.ft_att}, REB ${(s.reb_off ?? 0) + (s.reb_def ?? 0)} (off ${s.reb_off}), AST ${s.ast}, STL ${s.stl}, BLK ${s.blk}, TOV ${s.tov}, shots blocked ${plays.filter((p) => p.player_id === s.player_id && isBlockedShot(p)).length}, fouls ${s.fouls_committed}, +/- ${s.plus_minus ?? 0}`
     )
     .join("\n");
 

@@ -18,7 +18,7 @@ import type {
 } from "@/types/database";
 import type { PlayerWithUser } from "@/types/database";
 import type { CourtStint } from "@/lib/live/minutes";
-import { isShotEvent, isMadeShot, shotKindOf, classifyShotZone, FREE_THROW_POINT } from "@/lib/live/shot-zones";
+import { isShotEvent, isMadeShot, shotKindOf, classifyShotZone, FREE_THROW_POINT, BLOCKED_DESC } from "@/lib/live/shot-zones";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -510,7 +510,8 @@ export function useLiveGame(
   /** Called by ShotFlow once the scorer has chosen a zone (or skipped it) and the assist. */
   async function confirmShot(
     spot: { x: number; y: number } | null,
-    assistPlayerId: string | null
+    assistPlayerId: string | null,
+    blocked?: boolean
   ): Promise<boolean> {
     const shot = pendingShot;
     if (!shot) return false;
@@ -523,6 +524,7 @@ export function useLiveGame(
       shot_x: point?.x,
       shot_y: point?.y,
       shot_zone: kind === "ft" ? "free_throw" : point ? classifyShotZone(point.x, point.y) : undefined,
+      description: blocked && !isMadeShot(shot.event_type) && kind !== "ft" ? BLOCKED_DESC : undefined,
     });
     if (ok) setPendingShot(null);
     return ok;
@@ -570,6 +572,7 @@ export function useLiveGame(
       const ast = input.secondary_player_id ? roster.find((p) => p.user_id === input.secondary_player_id) : null;
       liveNotice(
         `✓ ${who ? `#${who.jersey_number} ${who.user.name.split(" ")[0]} · ` : ""}${PLAY_LABEL[input.event_type] ?? input.event_type}` +
+        (input.description === BLOCKED_DESC ? " · blocked" : "") +
         (ast ? ` · ast #${ast.jersey_number} ${ast.user.name.split(" ")[0]}` : isMadeShot(input.event_type) && shotKindOf(input.event_type) !== "ft" ? " · no assist" : ""),
       );
       return true;

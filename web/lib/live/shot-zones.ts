@@ -166,3 +166,10 @@ export function zoneStats(shots: ShotPoint[]): ZoneStat[] {
     return { zone, made: v.made, att: v.att, pct: v.att > 0 ? v.made / v.att : null };
   });
 }
+
+/** Stored in play_by_play.description on a missed 2PT/3PT that the opponent blocked ("block received"). */
+export const BLOCKED_DESC = "Shot blocked";
+
+export function isBlockedShot(p: { event_type: string; description?: string | null; deleted_at?: string | null }): boolean {
+  return !p.deleted_at && (p.event_type === "2pt_miss" || p.event_type === "3pt_miss") && p.description === BLOCKED_DESC;
+}

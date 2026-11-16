@@ -21,7 +21,7 @@ interface Props {
   /** Players currently on court (assist candidates). */
   onCourt: PlayerWithUser[];
   saving: boolean;
-  onConfirm: (spot: { x: number; y: number } | null, assistPlayerId: string | null) => Promise<boolean>;
+  onConfirm: (spot: { x: number; y: number } | null, assistPlayerId: string | null, blocked?: boolean) => Promise<boolean>;
   onCancel: () => void;
 }
 
@@ -36,6 +36,8 @@ export function ShotFlow({ shot, roster, onCourt, saving, onConfirm, onCancel }:
   const needsAssist = made && kind !== "ft";
   const shooter = roster.find((p) => p.user_id === shot.player_id);
 
+  const canBeBlocked = !made && kind !== "ft";
+  const [blocked, setBlocked] = useState(false);
   const [step, setStep] = useState<"zone" | "assist">("zone");
   const [spot, setSpot] = useState<{ x: number; y: number } | null>(kind === "ft" ? FREE_THROW_POINT : null);
 
@@ -59,7 +61,7 @@ export function ShotFlow({ shot, roster, onCourt, saving, onConfirm, onCancel }:
       setStep("assist");
       return;
     }
-    await onConfirm(withSpot, null);
+    await onConfirm(withSpot, null, canBeBlocked ? blocked : undefined);
   }
 
   const teammates = onCourt
@@ -126,6 +128,21 @@ export function ShotFlow({ shot, roster, onCourt, saving, onConfirm, onCancel }:
                   </div>
                 )}
               </div>
+              {canBeBlocked && (
+                <button
+                  disabled={saving}
+                  onClick={() => setBlocked((b) => !b)}
+                  aria-pressed={blocked}
+                  style={{
+                    ...btn,
+                    background: blocked ? "var(--danger, #dc2626)" : "var(--chip, var(--panel))",
+                    color: blocked ? "#fff" : "var(--text)",
+                    borderColor: blocked ? "var(--danger, #dc2626)" : "var(--line)",
+                  }}
+                >
+                  {blocked ? "✓ Shot blocked (block received)" : "Shot blocked by opponent?"}
+                </button>
+              )}
               <button
                 disabled={saving || !spot}
                 onClick={() => finishZone(spot)}

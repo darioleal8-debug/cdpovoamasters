@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { PlayByPlay, PlayerWithUser } from "@/types/database";
 import { EVENT_LABELS } from "./layout-1a";
+import { isBlockedShot } from "@/lib/live/shot-zones";
 
 const SANS = "var(--font-sans, system-ui, sans-serif)";
 const MONO = "var(--font-mono, ui-monospace, monospace)";
@@ -107,6 +108,7 @@ export function PlayHistory({ plays, roster, recording, onUndoPlay, onClose }: P
                   {!p.is_home_team && <span style={{ color: "var(--muted)" }}>Opponent · </span>}
                   {player && <span>#{player.jersey_number} {player.user.name.split(" ")[0]} · </span>}
                   {EVENT_LABELS[p.event_type] ?? p.event_type}
+                  {isBlockedShot(p) && <span style={{ color: "var(--danger, #ef4444)" }}> · blocked</span>}
                   {assist && <span style={{ color: "var(--muted)", fontWeight: 600 }}> (ast #{assist.jersey_number} {assist.user.name.split(" ")[0]})</span>}
                 </span>
                 <span style={{ fontFamily: MONO, fontSize: 11, color: "var(--muted)", minWidth: 52, textAlign: "right" }}>
