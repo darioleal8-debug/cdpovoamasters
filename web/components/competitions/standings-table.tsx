@@ -1,3 +1,4 @@
+import type { CSSProperties, ReactNode } from "react";
 import { TeamMono } from "./team-mono";
 
 export interface StandingRow {
@@ -10,7 +11,10 @@ export interface StandingRow {
   pc: number;
   diff: number;
   pts: number;
+  /** Últimos jogos, do mais recente para o mais antigo. */
   form?: ("V" | "E" | "D")[];
+  home_w?: number; home_d?: number; home_l?: number;
+  away_w?: number; away_d?: number; away_l?: number;
 }
 
 interface Props {
@@ -21,9 +25,22 @@ interface Props {
   teamLogos?: Record<string, string | null>;
 }
 
+const FORM_STYLE: Record<"V" | "E" | "D", CSSProperties> = {
+  V: { background: "#2F7A3E", color: "#FFFFFF" },
+  E: { background: "#E9E2D8", color: "#6F675F" },
+  D: { background: "#B3261E", color: "#FFFFFF" },
+};
+
+/** "2-1" (V-D) — acrescenta os empates ("2-1-1" = V-E-D) só quando existem. */
+function record(w = 0, d = 0, l = 0): string {
+  return d > 0 ? `${w}-${d}-${l}` : `${w}-${l}`;
+}
+
 export function StandingsTable({ standings, ourTeamName, limit, mini, teamLogos }: Props) {
   const rows = limit ? standings.slice(0, limit) : standings;
   const hasForm = rows.some((r) => r.form && r.form.length > 0);
+  const hasSplit = rows.some((r) => r.home_w !== undefined);
+  const hasDraws = rows.some((r) => (r.draws ?? 0) > 0);
 
   if (rows.length === 0) {
     return (
@@ -41,19 +58,32 @@ export function StandingsTable({ standings, ourTeamName, limit, mini, teamLogos 
     );
   }
 
+  const padY = mini ? "10px" : "12px";
+  const padX = mini ? "8px" : "10px";
+  const BG = "#FFFDFA";
+
+  // Colunas fixas à esquerda (# e Equipa) para a tabela larga continuar legível no telemóvel
+  const stickyBase: CSSProperties = { position: "sticky", zIndex: 1 };
+  const POS_W = 36;
+
   const TH = ({
     children,
     right,
-    hide,
+    center,
+    sticky,
+    title,
   }: {
-    children: React.ReactNode;
+    children: ReactNode;
     right?: boolean;
-    hide?: "sm" | "md";
+    center?: boolean;
+    sticky?: "pos" | "team";
+    title?: string;
   }) => (
     <th
+      title={title}
       style={{
-        padding: mini ? "6px 8px" : "8px 10px",
-        textAlign: right ? "right" : "left",
+        padding: mini ? "6px 8px" : `8px ${padX}`,
+        textAlign: center ? "center" : right ? "right" : "left",
         fontFamily: "var(--font-ibm-mono, monospace)",
         fontSize: "10px",
         fontWeight: 500,
@@ -62,69 +92,95 @@ export function StandingsTable({ standings, ourTeamName, limit, mini, teamLogos 
         color: "#6F675F",
         whiteSpace: "nowrap",
         borderBottom: "2px solid #E9E2D8",
-        display: hide === "sm" ? undefined : hide === "md" ? undefined : undefined,
+        background: BG,
+        ...(sticky === "pos" ? { ...stickyBase, left: 0, minWidth: POS_W } : {}),
+        ...(sticky === "team"
+          ? { ...stickyBase, left: POS_W, boxShadow: "6px 0 6px -6px rgba(26,22,18,.18)" }
+          : {}),
       }}
-      className={hide === "sm" ? "hidden sm:table-cell" : hide === "md" ? "hidden md:table-cell" : undefined}
     >
       {children}
     </th>
   );
 
+  const num: CSSProperties = {
+    padding: `${padY} ${padX}`,
+    textAlign: "right",
+    fontVariantNumeric: "tabular-nums",
+    whiteSpace: "nowrap",
+  };
+
   return (
-    <div style={{ overflowX: "auto" }}>
+    <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
       <table
         style={{
           width: "100%",
-          minWidth: mini ? 320 : 480,
-          borderCollapse: "collapse",
+          minWidth: mini ? 320 : undefined,
+          borderCollapse: "separate",
+          borderSpacing: 0,
           fontFamily: "var(--font-barlow, sans-serif)",
           fontSize: mini ? "13px" : "14px",
         }}
       >
         <thead>
           <tr>
-            <TH>#</TH>
-            <TH>Equipa</TH>
-            <TH right>J</TH>
-            {!mini && <TH right hide="sm">V</TH>}
-            {!mini && <TH right hide="sm">E</TH>}
-            {!mini && <TH right hide="sm">D</TH>}
-            {!mini && <TH right hide="md">PM</TH>}
-            {!mini && <TH right hide="md">PS</TH>}
-            {!mini && <TH right hide="sm">Dif</TH>}
-            <TH right>PTS</TH>
-            {!mini && hasForm && <TH hide="sm">Forma</TH>}
+            <TH sticky={mini ? undefined : "pos"}>#</TH>
+            <TH sticky={mini ? undefined : "team"}>Equipa</TH>
+            <TH right title="Jogos">J</TH>
+            {!mini && <TH right title="Vitórias">V</TH>}
+            {!mini && hasDraws && <TH right title="Empates">E</TH>}
+            {!mini && <TH right title="Derrotas">D</TH>}
+            {!mini && <TH right title="Pontos marcados">PM</TH>}
+            {!mini && <TH right title="Pontos sofridos">PS</TH>}
+            {!mini && <TH right title="Diferença de pontos">Dif</TH>}
+            <TH right title="Pontos na classificação">PTS</TH>
+            {!mini && hasForm && <TH center title="Últimos 5 jogos (o mais recente à direita)">Últ. 5</TH>}
+            {!mini && hasSplit && <TH center title="Vitórias-derrotas em casa">Casa</TH>}
+            {!mini && hasSplit && <TH center title="Vitórias-derrotas fora">Fora</TH>}
           </tr>
         </thead>
         <tbody>
           {rows.map((row, i) => {
             const isFirst = i === 0;
             const isOurs = ourTeamName && row.team_name === ourTeamName;
+            const rowBg = isFirst ? "#FFF4EA" : isOurs ? "#FEF3EA" : BG;
+            const cellBorder = "1px solid #F0EAE1";
+            const sticky = (kind: "pos" | "team"): CSSProperties =>
+              mini
+                ? {}
+                : kind === "pos"
+                  ? { ...stickyBase, left: 0, background: rowBg, minWidth: POS_W }
+                  : { ...stickyBase, left: POS_W, background: rowBg, boxShadow: "6px 0 6px -6px rgba(26,22,18,.18)" };
+            const form = [...(row.form ?? [])].slice(0, 5).reverse(); // antigo → recente
+
             return (
-              <tr
-                key={row.team_name}
-                style={{
-                  background: isFirst ? "#FFF4EA" : isOurs ? "rgba(249,115,22,.06)" : undefined,
-                  borderBottom: "1px solid #F0EAE1",
-                }}
-              >
+              <tr key={row.team_name} style={{ background: rowBg }}>
                 {/* Posição */}
                 <td
                   style={{
-                    padding: mini ? "10px 8px" : "12px 10px",
+                    padding: `${padY} ${padX}`,
+                    borderBottom: cellBorder,
                     fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))",
                     fontWeight: 700,
                     fontSize: mini ? "15px" : "18px",
                     color: isFirst ? "#F97316" : "#8C837A",
                     fontVariantNumeric: "tabular-nums",
                     whiteSpace: "nowrap",
+                    ...sticky("pos"),
                   }}
                 >
                   {i + 1}
                 </td>
 
                 {/* Equipa */}
-                <td style={{ padding: mini ? "10px 8px" : "12px 10px", maxWidth: mini ? 140 : 200 }}>
+                <td
+                  style={{
+                    padding: `${padY} ${padX}`,
+                    borderBottom: cellBorder,
+                    maxWidth: mini ? 140 : undefined,
+                    ...sticky("team"),
+                  }}
+                >
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <TeamMono name={row.team_name} size={mini ? 28 : 32} logoUrl={teamLogos?.[row.team_name]} />
                     <span
@@ -132,6 +188,7 @@ export function StandingsTable({ standings, ourTeamName, limit, mini, teamLogos 
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
+                        maxWidth: mini ? undefined : 150,
                         fontWeight: isOurs ? 600 : 400,
                         color: isOurs ? "#C2530A" : "#1A1612",
                       }}
@@ -142,68 +199,22 @@ export function StandingsTable({ standings, ourTeamName, limit, mini, teamLogos 
                 </td>
 
                 {/* J */}
-                <td style={{ padding: mini ? "10px 8px" : "12px 10px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                  {row.gp}
-                </td>
+                <td style={{ ...num, borderBottom: cellBorder }}>{row.gp}</td>
 
-                {/* V */}
-                {!mini && (
-                  <td
-                    className="hidden sm:table-cell"
-                    style={{ padding: "12px 10px", textAlign: "right", fontVariantNumeric: "tabular-nums", color: "#2F7A3E" }}
-                  >
-                    {row.wins}
-                  </td>
+                {!mini && <td style={{ ...num, borderBottom: cellBorder, color: "#2F7A3E" }}>{row.wins}</td>}
+                {!mini && hasDraws && (
+                  <td style={{ ...num, borderBottom: cellBorder, color: "#6F675F" }}>{row.draws ?? 0}</td>
                 )}
-
-                {/* E */}
-                {!mini && (
-                  <td
-                    className="hidden sm:table-cell"
-                    style={{ padding: "12px 10px", textAlign: "right", fontVariantNumeric: "tabular-nums", color: "#6F675F" }}
-                  >
-                    {row.draws ?? 0}
-                  </td>
-                )}
-
-                {/* D */}
-                {!mini && (
-                  <td
-                    className="hidden sm:table-cell"
-                    style={{ padding: "12px 10px", textAlign: "right", fontVariantNumeric: "tabular-nums", color: "#B3261E" }}
-                  >
-                    {row.losses}
-                  </td>
-                )}
-
-                {/* PM */}
-                {!mini && (
-                  <td
-                    className="hidden md:table-cell"
-                    style={{ padding: "12px 10px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}
-                  >
-                    {row.pf}
-                  </td>
-                )}
-
-                {/* PS */}
-                {!mini && (
-                  <td
-                    className="hidden md:table-cell"
-                    style={{ padding: "12px 10px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}
-                  >
-                    {row.pc}
-                  </td>
-                )}
+                {!mini && <td style={{ ...num, borderBottom: cellBorder, color: "#B3261E" }}>{row.losses}</td>}
+                {!mini && <td style={{ ...num, borderBottom: cellBorder }}>{row.pf}</td>}
+                {!mini && <td style={{ ...num, borderBottom: cellBorder }}>{row.pc}</td>}
 
                 {/* DIF */}
                 {!mini && (
                   <td
-                    className="hidden sm:table-cell"
                     style={{
-                      padding: "12px 10px",
-                      textAlign: "right",
-                      fontVariantNumeric: "tabular-nums",
+                      ...num,
+                      borderBottom: cellBorder,
                       color: row.diff > 0 ? "#2F7A3E" : row.diff < 0 ? "#B3261E" : "#6F675F",
                     }}
                   >
@@ -214,47 +225,59 @@ export function StandingsTable({ standings, ourTeamName, limit, mini, teamLogos 
                 {/* PTS */}
                 <td
                   style={{
-                    padding: mini ? "10px 8px" : "12px 10px",
-                    textAlign: "right",
+                    ...num,
+                    borderBottom: cellBorder,
                     fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))",
                     fontWeight: 800,
                     fontSize: mini ? "18px" : "22px",
                     color: "#1A1612",
-                    fontVariantNumeric: "tabular-nums",
                   }}
                 >
                   {row.pts}
                 </td>
 
-                {/* Forma */}
+                {/* Últimos 5 (antigo → recente) */}
                 {!mini && hasForm && (
-                  <td className="hidden sm:table-cell" style={{ padding: "12px 10px" }}>
-                    <div style={{ display: "flex", gap: 3 }}>
-                      {(row.form ?? []).length === 0
-                        ? <span style={{ color: "#8C837A", fontSize: "12px" }}>–</span>
-                        : (row.form ?? []).map((f, fi) => (
-                            <span
-                              key={fi}
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                width: 20,
-                                height: 20,
-                                borderRadius: "3px",
-                                fontFamily: "var(--font-ibm-mono, monospace)",
-                                fontSize: "10px",
-                                fontWeight: 500,
-                                letterSpacing: 0,
-                                background: f === "V" ? "#1A1612" : f === "E" ? "#F5EFE6" : "#E9E2D8",
-                                color: f === "V" ? "#F97316" : f === "E" ? "#8C837A" : "#6F675F",
-                                border: f === "E" ? "1px solid #E9E2D8" : undefined,
-                              }}
-                            >
-                              {f}
-                            </span>
-                          ))}
+                  <td style={{ padding: `${padY} ${padX}`, borderBottom: cellBorder }}>
+                    <div style={{ display: "flex", gap: 3, justifyContent: "center" }}>
+                      {form.length === 0 ? (
+                        <span style={{ color: "#8C837A", fontSize: "12px" }}>–</span>
+                      ) : (
+                        form.map((f, fi) => (
+                          <span
+                            key={fi}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: 22,
+                              height: 22,
+                              borderRadius: "4px",
+                              fontFamily: "var(--font-ibm-mono, monospace)",
+                              fontSize: "11px",
+                              fontWeight: 600,
+                              ...FORM_STYLE[f],
+                              outline: fi === form.length - 1 ? "2px solid #F97316" : undefined,
+                              outlineOffset: 1,
+                            }}
+                          >
+                            {f}
+                          </span>
+                        ))
+                      )}
                     </div>
+                  </td>
+                )}
+
+                {/* Casa / Fora (V-D) */}
+                {!mini && hasSplit && (
+                  <td style={{ ...num, textAlign: "center", borderBottom: cellBorder }}>
+                    {record(row.home_w, row.home_d, row.home_l)}
+                  </td>
+                )}
+                {!mini && hasSplit && (
+                  <td style={{ ...num, textAlign: "center", borderBottom: cellBorder }}>
+                    {record(row.away_w, row.away_d, row.away_l)}
                   </td>
                 )}
               </tr>

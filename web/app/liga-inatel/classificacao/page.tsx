@@ -146,6 +146,7 @@ export default async function ClassificacaoPage() {
         >
           <span>Pontuação: vitória 3 pts · empate 1 pt · derrota 0 pts</span>
           <span>Desempate: pontos → diferença → pm</span>
+          <span>PM/PS: pontos marcados/sofridos · Últ. 5: mais recente à direita · Casa/Fora: vitórias-derrotas</span>
         </div>
       </div>
     </div>

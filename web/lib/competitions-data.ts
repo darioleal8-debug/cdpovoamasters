@@ -279,16 +279,25 @@ export async function getStandingsWithForm(competitionId: string): Promise<Stand
   const [resultsRes, seedTeams] = await Promise.all([
     supabase
       .from("league_game_results")
-      .select("home_team_name, away_team_name, home_score, away_score, approved_at")
+      .select("home_team_name, away_team_name, home_score, away_score, approved_at, events(event_date, event_time)")
       .eq("competition_id", competitionId)
       .order("approved_at", { ascending: false }),
     fetchActiveSeasonTeams(competitionId, supabase),
   ]);
 
-  const results = (resultsRes.data ?? []) as {
+  type EventRef = { event_date: string | null; event_time: string | null };
+  const raw = (resultsRes.data ?? []) as unknown as {
     home_team_name: string; away_team_name: string;
     home_score: number; away_score: number; approved_at: string;
+    events: EventRef | EventRef[] | null;
   }[];
+
+  // Mais recente primeiro, pela data do jogo (e não pela data de aprovação do resultado)
+  const gameKey = (r: (typeof raw)[number]) => {
+    const ev = Array.isArray(r.events) ? r.events[0] : r.events;
+    return ev?.event_date ? `${ev.event_date}T${ev.event_time ?? "00:00"}` : r.approved_at;
+  };
+  const results = [...raw].sort((a, b) => gameKey(b).localeCompare(gameKey(a)));
 
   const standings = computeStandings(results, seedTeams);
 

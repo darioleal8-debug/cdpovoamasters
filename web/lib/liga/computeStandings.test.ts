@@ -160,3 +160,26 @@ describe("groupStandingsBySeries", () => {
     expect(groups.map((g) => g.series)).toEqual(["A", "B"]);
   });
 });
+
+// ── Casa / Fora ───────────────────────────────────────────────────────────────
+
+describe("computeStandings (casa/fora)", () => {
+  test("separa vitórias e derrotas em casa e fora", () => {
+    const results = [
+      { home_team_name: "A", away_team_name: "B", home_score: 80, away_score: 70 }, // A ganha em casa
+      { home_team_name: "B", away_team_name: "A", home_score: 60, away_score: 65 }, // A ganha fora
+      { home_team_name: "A", away_team_name: "C", home_score: 50, away_score: 55 }, // A perde em casa
+      { home_team_name: "C", away_team_name: "A", home_score: 70, away_score: 70 }, // empate fora
+    ];
+    const s = computeStandings(results);
+    const a = s.find((r) => r.team_name === "A")!;
+    const b = s.find((r) => r.team_name === "B")!;
+    const c = s.find((r) => r.team_name === "C")!;
+    expect([a.home_w, a.home_d, a.home_l]).toEqual([1, 0, 1]);
+    expect([a.away_w, a.away_d, a.away_l]).toEqual([1, 1, 0]);
+    expect([b.home_w, b.home_l, b.away_w, b.away_l]).toEqual([0, 1, 0, 1]);
+    expect([c.home_w, c.home_d, c.away_w, c.away_l]).toEqual([0, 1, 1, 0]);
+    expect(a.pf).toBe(80 + 65 + 50 + 70);
+    expect(a.pc).toBe(70 + 60 + 55 + 70);
+  });
+});

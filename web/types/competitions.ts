@@ -82,6 +82,9 @@ export interface StandingRow {
   pc: number;    // pontos sofridos
   diff: number;  // diferença
   pts: number;   // pontos (vitória=3, empate=1, derrota=0 — regulamento Liga INATEL)
+  // Campanha em casa / fora (equipa da casa = home_team_name do jogo)
+  home_w: number; home_d: number; home_l: number;
+  away_w: number; away_d: number; away_l: number;
 }
 
 // Jogo público (calendar + result merged)
@@ -137,7 +140,7 @@ export function computeStandings(
 
   if (seedTeams) {
     for (const t of seedTeams) {
-      map.set(t.id, { team_id: t.id, team_name: t.name, gp: 0, wins: 0, draws: 0, losses: 0, pf: 0, pc: 0, diff: 0, pts: 0 });
+      map.set(t.id, { team_id: t.id, team_name: t.name, gp: 0, wins: 0, draws: 0, losses: 0, pf: 0, pc: 0, diff: 0, pts: 0, home_w: 0, home_d: 0, home_l: 0, away_w: 0, away_d: 0, away_l: 0 });
       normToId.set(t.normalized_name, t.id);
       normToId.set(normalizeName(t.name), t.id);
     }
@@ -150,7 +153,7 @@ export function computeStandings(
     }
     const fallbackKey = normalizeName(name);
     if (!map.has(fallbackKey)) {
-      map.set(fallbackKey, { team_name: name, gp: 0, wins: 0, draws: 0, losses: 0, pf: 0, pc: 0, diff: 0, pts: 0 });
+      map.set(fallbackKey, { team_name: name, gp: 0, wins: 0, draws: 0, losses: 0, pf: 0, pc: 0, diff: 0, pts: 0, home_w: 0, home_d: 0, home_l: 0, away_w: 0, away_d: 0, away_l: 0 });
     }
     return map.get(fallbackKey)!;
   }
@@ -162,14 +165,14 @@ export function computeStandings(
     away.gp++;  away.pf += r.away_score;  away.pc += r.home_score;
 
     if (r.home_score > r.away_score) {
-      home.wins++;   home.pts += POINTS_WIN;
-      away.losses++; away.pts += POINTS_LOSS;
+      home.wins++;   home.pts += POINTS_WIN;   home.home_w++;
+      away.losses++; away.pts += POINTS_LOSS;  away.away_l++;
     } else if (r.home_score < r.away_score) {
-      away.wins++;   away.pts += POINTS_WIN;
-      home.losses++; home.pts += POINTS_LOSS;
+      away.wins++;   away.pts += POINTS_WIN;   away.away_w++;
+      home.losses++; home.pts += POINTS_LOSS;  home.home_l++;
     } else {
-      home.draws++;  home.pts += POINTS_DRAW;
-      away.draws++;  away.pts += POINTS_DRAW;
+      home.draws++;  home.pts += POINTS_DRAW;  home.home_d++;
+      away.draws++;  away.pts += POINTS_DRAW;  away.away_d++;
     }
   }
 
