@@ -16,7 +16,9 @@ const EVENT_TITLE: Record<string, string> = {
 };
 
 interface Props {
-  shot: { event_type: PlayEventType; player_id: string };
+  shot: { event_type: PlayEventType; player_id: string; opponent?: boolean };
+  /** Opponent team name, shown in the header when the shot is the opponent's. */
+  opponentName?: string | null;
   roster: PlayerWithUser[];
   /** Players currently on court (assist candidates). */
   onCourt: PlayerWithUser[];
@@ -30,13 +32,14 @@ interface Props {
  *  1. where on the court the shot was taken (2PT / 3PT / free throw, made or missed);
  *  2. for made 2PT / 3PT, who assisted (or "No assist").
  */
-export function ShotFlow({ shot, roster, onCourt, saving, onConfirm, onCancel }: Props) {
+export function ShotFlow({ shot, opponentName, roster, onCourt, saving, onConfirm, onCancel }: Props) {
   const kind = shotKindOf(shot.event_type);
   const made = isMadeShot(shot.event_type);
-  const needsAssist = made && kind !== "ft";
+  const isOpp = shot.opponent === true;
+  const needsAssist = made && kind !== "ft" && !isOpp;
   const shooter = roster.find((p) => p.user_id === shot.player_id);
 
-  const canBeBlocked = !made && kind !== "ft";
+  const canBeBlocked = !made && kind !== "ft" && !isOpp;
   const [blocked, setBlocked] = useState(false);
   const [step, setStep] = useState<"zone" | "assist">("zone");
   const [spot, setSpot] = useState<{ x: number; y: number } | null>(kind === "ft" ? FREE_THROW_POINT : null);
@@ -98,7 +101,7 @@ export function ShotFlow({ shot, roster, onCourt, saving, onConfirm, onCancel }:
             {step === "zone" ? "Shot location" : "Assist"}
           </span>
           <span style={{ fontSize: 16, fontWeight: 800 }}>
-            {shooter ? `#${shooter.jersey_number ?? "–"} ${shooter.user.name}` : "Player"} · {EVENT_TITLE[shot.event_type] ?? shot.event_type}
+            {isOpp ? `Opponent${opponentName ? ` · ${opponentName}` : ""}` : shooter ? `#${shooter.jersey_number ?? "–"} ${shooter.user.name}` : "Player"} · {EVENT_TITLE[shot.event_type] ?? shot.event_type}
           </span>
         </div>
 
@@ -150,7 +153,7 @@ export function ShotFlow({ shot, roster, onCourt, saving, onConfirm, onCancel }:
               >
                 {needsAssist ? "Confirm spot → assist" : "Confirm"}
               </button>
-              {kind !== "ft" && (
+              {kind !== "ft" && !isOpp && (
                 <button disabled={saving} onClick={() => finishZone(null)} style={{ ...btn, fontWeight: 700 }}>
                   Skip zone
                 </button>

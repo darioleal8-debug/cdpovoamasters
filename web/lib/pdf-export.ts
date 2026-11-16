@@ -24,6 +24,8 @@ export interface PdfGameContext {
   isHome?: boolean | null;
   /** lançamentos com localização (2PT/3PT) → página extra com o shot chart */
   shots?: ShotPoint[] | null;
+  /** lançamentos do adversário (2PT/3PT, com zona) → página extra com o shot chart do adversário */
+  oppShots?: ShotPoint[] | null;
 }
 
 type RGB = [number, number, number];
@@ -51,7 +53,7 @@ const fmtLongDate = (d: string) => {
 };
 
 /** Página extra: shot chart da equipa + acerto por zona. */
-function renderShotPage(doc: any, session: GameSession, shots: ShotPoint[]): void {
+function renderShotPage(doc: any, session: GameSession, shots: ShotPoint[], title = "Shot Chart"): void {
   const W = doc.internal.pageSize.getWidth();
   const M = 12;
   doc.addPage();
@@ -60,7 +62,7 @@ function renderShotPage(doc: any, session: GameSession, shots: ShotPoint[]): voi
   doc.setTextColor(...WHITE);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
-  doc.text("Shot Chart", M, 13);
+  doc.text(title, M, 13);
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   doc.text(`vs ${session.opponent_name ?? "—"}  ·  ${session.home_score}–${session.away_score}`, W - M, 13, { align: "right" });
@@ -404,6 +406,9 @@ export function renderBoxScore(
   });
 
   if (ctx.shots && ctx.shots.length > 0) renderShotPage(doc, session, ctx.shots);
+  if (ctx.oppShots && ctx.oppShots.length > 0) {
+    renderShotPage(doc, session, ctx.oppShots, `Opponent Shot Chart · ${session.opponent_name ?? "—"}`);
+  }
 
   // ── Rodapé ──────────────────────────────────────────────
   const pages = doc.getNumberOfPages();

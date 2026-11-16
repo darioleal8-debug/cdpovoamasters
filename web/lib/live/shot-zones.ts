@@ -129,12 +129,13 @@ export function shotsFromPlays(
     player_id?: string | null;
     deleted_at?: string | null;
   }[],
-  opts: { playerId?: string; includeFreeThrows?: boolean } = {}
+  opts: { playerId?: string; includeFreeThrows?: boolean; /** "home" (our team, default) or "away" (opponent) */ side?: "home" | "away" } = {}
 ): ShotPoint[] {
+  const wantAway = opts.side === "away";
   const out: ShotPoint[] = [];
   for (const p of plays) {
     if (p.deleted_at) continue;
-    if (p.is_home_team === false) continue;
+    if (wantAway ? p.is_home_team !== false : p.is_home_team === false) continue;
     if (opts.playerId && p.player_id !== opts.playerId) continue;
     const kind = shotKindOf(p.event_type);
     if (!kind) continue;

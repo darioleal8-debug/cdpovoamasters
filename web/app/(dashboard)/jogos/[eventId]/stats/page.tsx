@@ -334,7 +334,7 @@ export default function GameStatsPage() {
           user: { id: s.player_id, name: profile?.user.name ?? "—" },
         };
       });
-      await generateGamePDF(session!, statsWithExtras, periodScores, { ...pdfCtx, clubName, shots: shotsFromPlays(plays) });
+      await generateGamePDF(session!, statsWithExtras, periodScores, { ...pdfCtx, clubName, shots: shotsFromPlays(plays), oppShots: shotsFromPlays(plays, { side: "away" }) });
     } finally {
       setPdfLoading(false);
     }

@@ -69,7 +69,7 @@ export function useLiveGame(
   const myClubIdsRef = useRef<string[] | null>(null);
   sessionRef.current = session;
   /** Shot waiting for the scorer to pick the court zone (and the assist on made 2PT/3PT). */
-  const [pendingShot, setPendingShot] = useState<{ event_type: PlayEventType; player_id: string } | null>(null);
+  const [pendingShot, setPendingShot] = useState<{ event_type: PlayEventType; player_id: string; opponent?: boolean } | null>(null);
   /** Jogo terminado → nenhuma estatística pode ser alterada. */
   const locked = () => {
     if (sessionRef.current?.status === "live") return false;
@@ -528,6 +528,11 @@ export function useLiveGame(
   ): Promise<boolean> {
     const shot = pendingShot;
     if (!shot) return false;
+    if (shot.opponent) {
+      const done = await recordOpponentShotNow(shot.event_type, spot);
+      if (done) setPendingShot(null);
+      return done;
+    }
     const kind = shotKindOf(shot.event_type);
     const point = kind === "ft" ? (spot ?? FREE_THROW_POINT) : spot;
     const ok = await recordPlayNow({
@@ -596,24 +601,62 @@ export function useLiveGame(
 
   // ── Opponent points ─────────────────────────────────────
 
-  async function recordOpponentPoints(pts: number): Promise<void> {
+  const OPP_SHOT_TYPES: Record<"made" | "miss", Record<1 | 2 | 3, PlayEventType>> = {
+    made: { 1: "ft_made", 2: "2pt_made", 3: "3pt_made" },
+    miss: { 1: "ft_miss", 2: "2pt_miss", 3: "3pt_miss" },
+  };
+
+  /** Opponent shot (2PT / 3PT / FT, made or missed). Free throws are saved at once (fixed spot);
+   *  2PT / 3PT first ask the court zone through ShotFlow. */
+  async function startOpponentShot(pts: 1 | 2 | 3, result: "made" | "miss"): Promise<void> {
     if (locked()) return;
     if (!session || recording) return;
+    const event_type = OPP_SHOT_TYPES[result][pts];
+    if (pts === 1) {
+      await recordOpponentShotNow(event_type, null);
+      return;
+    }
+    setPendingShot({ event_type, player_id: "", opponent: true });
+  }
+
+  async function recordOpponentPoints(pts: number): Promise<void> {
+    await startOpponentShot(pts === 1 ? 1 : pts === 3 ? 3 : 2, "made");
+  }
+
+  async function recordOpponentMiss(pts: number): Promise<void> {
+    await startOpponentShot(pts === 1 ? 1 : pts === 3 ? 3 : 2, "miss");
+  }
+
+  async function recordOpponentShotNow(
+    eventType: PlayEventType,
+    spot: { x: number; y: number } | null
+  ): Promise<boolean> {
+    if (locked()) return false;
+    if (!session || recording) return false;
+    const kind = shotKindOf(eventType);
+    const made = isMadeShot(eventType);
+    const pts = kind === "3" ? 3 : kind === "2" ? 2 : 1;
+    const point = kind === "ft" ? FREE_THROW_POINT : spot;
+    const label = made ? `Opponent +${pts}` : `Opponent ${kind === "ft" ? "FT" : `${pts}PT`} missed`;
     setRecording(true);
     try {
       const { error: oppErr } = await supabase.rpc("record_play", {
         p_game_session_id: session.id,
-        p_event_type:      pts === 1 ? "ft_made" : pts === 3 ? "3pt_made" : "2pt_made",
+        p_event_type:      eventType,
         p_period:          session.current_period,
         p_clock_time_secs: Math.round(clockSecs),
         p_is_home_team:    false,
-        p_points_delta:    pts,
+        p_points_delta:    made ? pts : 0,
         p_game_clock:      formatClock(clockSecs),
-        p_description:     `Opponent +${pts}`,
+        p_shot_x:          point?.x ?? null,
+        p_shot_y:          point?.y ?? null,
+        p_shot_zone:       kind === "ft" ? "free_throw" : point ? classifyShotZone(point.x, point.y) : null,
+        p_description:     label,
       });
-      if (oppErr) { toast({ title: "Error", description: oppErr.message, variant: "destructive" }); return; }
+      if (oppErr) { toast({ title: "Error", description: oppErr.message, variant: "destructive" }); return false; }
       await Promise.all([loadPlays(session.id), loadSession()]);
-      liveNotice(`✓ Opponent +${pts}`);
+      liveNotice(`✓ ${label}`);
+      return true;
     } finally {
       setRecording(false);
     }
@@ -1104,7 +1147,7 @@ export function useLiveGame(
     plays, playerStats, periodScores, clockSecs, stints,
     loading, recording,
     startGame, startClock, stopClock, resetClock,
-    recordPlay, pendingShot, confirmShot, cancelShot, recordOpponentPoints,
+    recordPlay, pendingShot, confirmShot, cancelShot, recordOpponentPoints, recordOpponentMiss,
     recordOpponentFoul, recordOpponentReb,
     substitutePlayer, setLineup, callTimeout, undoPlay,
     nextPeriod, finishGame, publishToLeague, publishing,

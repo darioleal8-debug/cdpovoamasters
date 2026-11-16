@@ -27,6 +27,7 @@ export interface Layout1aProps {
   awayRebDef: number;
   onRecordPlay: (eventType: PlayEventType, playerId: string) => Promise<boolean>;
   onRecordOpponentPoints: (pts: 1 | 2 | 3) => Promise<void>;
+  onRecordOpponentMiss: (pts: 1 | 2 | 3) => Promise<void>;
   onRecordOpponentFoul: (type: FoulType) => Promise<void>;
   onRecordOpponentReb: (type: "reb_off" | "reb_def") => Promise<void>;
   onStartClock: () => Promise<void>;
@@ -214,10 +215,11 @@ function Scoreboard1a({
 
 function OpponentBar({
   session, awayFouls, awayRebOff, awayRebDef, recording,
-  onRecordOpponentPoints, onRecordOpponentFoul, onRecordOpponentReb,
+  onRecordOpponentPoints, onRecordOpponentMiss, onRecordOpponentFoul, onRecordOpponentReb,
 }: {
   session: GameSession; awayFouls: number; awayRebOff: number; awayRebDef: number; recording: boolean;
   onRecordOpponentPoints: (pts: 1|2|3) => void;
+  onRecordOpponentMiss: (pts: 1|2|3) => void;
   onRecordOpponentFoul: (type: FoulType) => void;
   onRecordOpponentReb: (type: "reb_off"|"reb_def") => void;
 }) {
@@ -255,6 +257,11 @@ function OpponentBar({
             {([1, 2, 3] as const).map(pts => (
               <button key={pts} onClick={() => onRecordOpponentPoints(pts)} disabled={recording}
                 style={{ ...accentBtn, width: 48 }}>+{pts}</button>
+            ))}
+            {([1, 2, 3] as const).map(pts => (
+              <button key={`miss${pts}`} onClick={() => onRecordOpponentMiss(pts)} disabled={recording}
+                title={`Opponent missed ${pts === 1 ? "free throw" : `${pts}PT`}`}
+                style={{ ...btnBase, width: 48, border: "1px solid var(--danger, #dc2626)", background: "var(--dangerSoft, transparent)", color: "var(--danger, #dc2626)" }}>✕{pts}</button>
             ))}
           </div>
         </div>
@@ -440,7 +447,7 @@ function PlayLog({
 export function Layout1a({
   session, roster, onCourt, bench, plays, derivedStats, clockSecs, recording,
   homeFouls, awayFouls, awayRebOff, awayRebDef,
-  onRecordPlay, onRecordOpponentPoints, onRecordOpponentFoul, onRecordOpponentReb,
+  onRecordPlay, onRecordOpponentPoints, onRecordOpponentMiss, onRecordOpponentFoul, onRecordOpponentReb,
   onStartClock, onStopClock, onNextPeriod, onSubstitute, onSetLineup, onUndoPlay,
 }: Layout1aProps) {
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerWithUser | null>(null);
@@ -507,6 +514,7 @@ export function Layout1a({
         session={session} awayFouls={awayFouls} awayRebOff={awayRebOff} awayRebDef={awayRebDef}
         recording={recording}
         onRecordOpponentPoints={onRecordOpponentPoints}
+        onRecordOpponentMiss={onRecordOpponentMiss}
         onRecordOpponentFoul={onRecordOpponentFoul}
         onRecordOpponentReb={onRecordOpponentReb}
       />

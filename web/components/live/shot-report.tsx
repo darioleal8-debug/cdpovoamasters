@@ -42,12 +42,23 @@ export function ShotReport({
   const setPlayerId = (id: string) => { setOwnPlayerId(id); onSelectPlayer?.(id); };
   const [view, setView] = useState<"chart" | "zones">("chart");
 
-  const activePlayer = fixedPlayerId ?? (playerId === "all" ? undefined : playerId);
+  const [side, setSide] = useState<"home" | "away">("home");
+  const hasOpp = !fixedPlayerId && plays.some(
+    (p) => p.is_home_team === false && !p.deleted_at && p.shot_x !== null && p.shot_x !== undefined
+  );
+  const away = hasOpp && side === "away";
+
+  const activePlayer = away ? undefined : fixedPlayerId ?? (playerId === "all" ? undefined : playerId);
 
   const shots: ShotPoint[] = useMemo(
-    () => shotsFromPlays(plays, { playerId: activePlayer }),
-    [plays, activePlayer]
+    () => shotsFromPlays(plays, { playerId: activePlayer, side: away ? "away" : "home" }),
+    [plays, activePlayer, away]
   );
+  const ft = useMemo(() => {
+    const all = shotsFromPlays(plays, { playerId: activePlayer, includeFreeThrows: true, side: away ? "away" : "home" })
+      .filter((s) => s.kind === "ft");
+    return { made: all.filter((s) => s.made).length, att: all.length };
+  }, [plays, activePlayer, away]);
   const zones = useMemo(() => zoneStats(shots), [shots]);
 
   const made = shots.filter((s) => s.made).length;
@@ -68,7 +79,13 @@ export function ShotReport({
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <button style={tab(view === "chart")} onClick={() => setView("chart")}>Shot chart</button>
         <button style={tab(view === "zones")} onClick={() => setView("zones")}>Zones</button>
-        {players && !fixedPlayerId && (
+        {hasOpp && (
+          <>
+            <button style={tab(!away)} onClick={() => setSide("home")}>Our team</button>
+            <button style={tab(away)} onClick={() => setSide("away")}>Opponent</button>
+          </>
+        )}
+        {players && !fixedPlayerId && !away && (
           <select
             value={playerId}
             onChange={(e) => setPlayerId(e.target.value)}
@@ -96,6 +113,7 @@ export function ShotReport({
             <span><strong>FG</strong> {made}/{shots.length} ({pct(made, shots.length)})</span>
             <span><strong>2PT</strong> {m2}/{a2} ({pct(m2, a2)})</span>
             <span><strong>3PT</strong> {m3}/{a3} ({pct(m3, a3)})</span>
+            {ft.att > 0 && <span><strong>FT</strong> {ft.made}/{ft.att} ({pct(ft.made, ft.att)})</span>}
             {view === "chart" ? (
               <span style={{ opacity: 0.7 }}>
                 <span style={{ color: "#22c55e", fontWeight: 800 }}>●</span> made ·{" "}

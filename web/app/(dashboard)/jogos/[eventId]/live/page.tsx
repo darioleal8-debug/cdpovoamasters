@@ -144,7 +144,7 @@ export default function LiveGamePage() {
     session, roster, onCourt, bench, onCourtIds, plays, clockSecs, loading, recording,
     startGame, startClock, stopClock,
     recordPlay, pendingShot, confirmShot, cancelShot,
-    recordOpponentPoints, recordOpponentFoul, recordOpponentReb,
+    recordOpponentPoints, recordOpponentMiss, recordOpponentFoul, recordOpponentReb,
     substitutePlayer, setLineup, undoPlay, nextPeriod, finishGame,
   } = game;
 
@@ -284,6 +284,7 @@ export default function LiveGamePage() {
     onRecordPlay: (eventType: import("@/types/database").PlayEventType, playerId: string) =>
       recordPlay({ event_type: eventType, player_id: playerId }),
     onRecordOpponentPoints: recordOpponentPoints,
+    onRecordOpponentMiss: recordOpponentMiss,
     onRecordOpponentFoul: recordOpponentFoul,
     onRecordOpponentReb: recordOpponentReb,
     onStartClock: startClock,
@@ -524,6 +525,7 @@ export default function LiveGamePage() {
       {pendingShot && session && (
         <ShotFlow
           shot={pendingShot}
+          opponentName={session.opponent_name}
           roster={roster}
           onCourt={onCourt}
           saving={recording}

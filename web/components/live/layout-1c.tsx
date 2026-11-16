@@ -28,6 +28,7 @@ export interface Layout1cProps {
   awayRebDef: number;
   onRecordPlay: (eventType: PlayEventType, playerId: string) => Promise<boolean>;
   onRecordOpponentPoints: (pts: 1 | 2 | 3) => Promise<void>;
+  onRecordOpponentMiss: (pts: 1 | 2 | 3) => Promise<void>;
   onRecordOpponentFoul: (type: FoulType) => Promise<void>;
   onRecordOpponentReb: (type: "reb_off" | "reb_def") => Promise<void>;
   onStartClock: () => Promise<void>;
@@ -62,7 +63,7 @@ function Pips({ count, max = 5 }: { count: number; max?: number }) {
 export function Layout1c({
   session, roster, onCourt, bench, plays, derivedStats, clockSecs, recording,
   homeFouls, awayFouls, awayRebOff, awayRebDef,
-  onRecordPlay, onRecordOpponentPoints, onRecordOpponentFoul, onRecordOpponentReb,
+  onRecordPlay, onRecordOpponentPoints, onRecordOpponentMiss, onRecordOpponentFoul, onRecordOpponentReb,
   onStartClock, onStopClock, onNextPeriod, onSubstitute, onSetLineup, onUndoPlay,
 }: Layout1cProps) {
   const [foulSel, setFoulSel] = useState<FoulSel>("Def");
@@ -147,6 +148,13 @@ export function Layout1c({
                 <button key={pts} onClick={() => onRecordOpponentPoints(pts)} disabled={recording}
                   style={{ width: 48, height: 46, borderRadius: 10, border: "1px solid var(--line)", background: "var(--chip)", color: "var(--text)", fontFamily: SANS, fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
                   +{pts}
+                </button>
+              ))}
+              {([1,2,3] as const).map(pts => (
+                <button key={`miss${pts}`} onClick={() => onRecordOpponentMiss(pts)} disabled={recording}
+                  title={`Opponent missed ${pts === 1 ? "free throw" : `${pts}PT`}`}
+                  style={{ width: 48, height: 46, borderRadius: 10, border: "1px solid var(--danger, #dc2626)", background: "var(--dangerSoft, transparent)", color: "var(--danger, #dc2626)", fontFamily: SANS, fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
+                  ✕{pts}
                 </button>
               ))}
             </div>

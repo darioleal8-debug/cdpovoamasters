@@ -69,6 +69,12 @@ export async function POST(req: NextRequest) {
   const zones = zoneStats(shots).filter((z) => z.att > 0)
     .map((z) => `${SHOT_ZONE_LABELS[z.zone]}: ${z.made}/${z.att}`).join("; ");
 
+  const oppShots = shotsFromPlays(plays, { side: "away" });
+  const oppZones = zoneStats(oppShots).filter((z) => z.att > 0)
+    .map((z) => `${SHOT_ZONE_LABELS[z.zone]}: ${z.made}/${z.att}`).join("; ");
+  const oppFt = shotsFromPlays(plays, { side: "away", includeFreeThrows: true }).filter((s) => s.kind === "ft");
+  const oppFtMade = oppFt.filter((s) => s.made).length;
+
   const playerLines = (stats ?? [])
     .filter((s) => (s.pts ?? 0) + (s.reb_off ?? 0) + (s.reb_def ?? 0) + (s.ast ?? 0) + (s.stl ?? 0) + (s.blk ?? 0) + (s.tov ?? 0) + (s.fouls_committed ?? 0) + (s.fg2_att ?? 0) + (s.fg3_att ?? 0) + (s.ft_att ?? 0) + (s.seconds_played ?? 0) > 0)
     .map((s) =>
@@ -87,6 +93,8 @@ export async function POST(req: NextRequest) {
     `Our team: FG ${homeFg.m}/${homeFg.a}, turnovers ${homeTov}.`,
     `Opponent (team totals only, no individual tracking): rebounds ${oppReb}, fouls ${oppFouls}.`,
     zones ? `Our field goals by court zone (made/attempted): ${zones}.` : "No located shots yet.",
+    oppZones ? `Opponent field goals by court zone (made/attempted): ${oppZones}.` : "",
+    oppFt.length ? `Opponent free throws: ${oppFtMade}/${oppFt.length}.` : "",
     playerLines ? `Our players:\n${playerLines}` : "No player stats yet.",
   ].filter(Boolean).join("\n\n");
 

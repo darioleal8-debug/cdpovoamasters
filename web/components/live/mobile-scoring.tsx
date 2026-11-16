@@ -24,6 +24,7 @@ interface LiveGameHandle {
   recording: boolean;
   recordPlay: (args: { event_type: PlayEventType; player_id: string }) => Promise<boolean>;
   recordOpponentPoints: (pts: 1 | 2 | 3) => Promise<void>;
+  recordOpponentMiss: (pts: 1 | 2 | 3) => Promise<void>;
   recordOpponentFoul: (type: FoulType) => Promise<void>;
   recordOpponentReb: (type: "reb_off" | "reb_def") => Promise<void>;
   startClock: () => Promise<void>;
@@ -182,7 +183,7 @@ function ActionButton({ event: _event, label, sub, actionStyle, enabled, onClick
 export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScreenProps) {
   const {
     session, roster, onCourt, bench, plays, stints, clockSecs, recording,
-    recordPlay, recordOpponentPoints, recordOpponentFoul, recordOpponentReb,
+    recordPlay, recordOpponentPoints, recordOpponentMiss, recordOpponentFoul, recordOpponentReb,
     startClock, stopClock, substitutePlayer, setLineup, undoPlay,
   } = game;
 
@@ -334,6 +335,17 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
               fontFamily: SANS, fontSize: 13, fontWeight: 800,
             } as React.CSSProperties}>
               +{pts}
+            </button>
+          ))}
+          {([1, 2, 3] as const).map((pts) => (
+            <button key={`miss${pts}`} onClick={() => recordOpponentMiss(pts)}
+              title={`Opponent missed ${pts === 1 ? "free throw" : `${pts}PT`}`}
+              style={{
+                height: 40, minWidth: 44, borderRadius: 8, border: "1px solid var(--danger)",
+                background: "var(--dangerSoft)", color: "var(--danger)", cursor: "pointer",
+                fontFamily: SANS, fontSize: 13, fontWeight: 800,
+              } as React.CSSProperties}>
+              ✕{pts}
             </button>
           ))}
           <span style={{
