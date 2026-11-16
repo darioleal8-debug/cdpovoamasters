@@ -426,7 +426,7 @@ async function loadLiveTeamStats(
 ): Promise<LiveTeamStats | null> {
   try {
     const { data: sess } = await db.from("game_sessions")
-      .select("id, status").eq("event_id", gameId).eq("status", "finished").maybeSingle();
+      .select("id, status").eq("event_id", gameId).eq("status", "finished").order("created_at", { ascending: true }).limit(1).maybeSingle();
     if (!sess) return null;
     const { data: stats } = await db.from("player_game_stats")
       .select("player_id, pts, reb_off, reb_def, ast, stl, blk, tov, efficiency, fg2_made, fg2_att, fg3_made, fg3_att, ft_made, ft_att, seconds_played")

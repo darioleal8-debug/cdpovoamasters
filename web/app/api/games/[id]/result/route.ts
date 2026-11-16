@@ -122,6 +122,8 @@ export async function POST(
     .from("game_sessions")
     .select("id, status")
     .eq("event_id", eventId)
+    .order("created_at", { ascending: true })
+    .limit(1)
     .maybeSingle();
 
   let sessionId: string;

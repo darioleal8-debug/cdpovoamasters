@@ -66,6 +66,7 @@ export function useLiveGame(
   const [loading, setLoading] = useState(true);
   const [recording, setRecording] = useState(false);
   const sessionRef = useRef<GameSession | null>(null);
+  const myClubIdsRef = useRef<string[] | null>(null);
   sessionRef.current = session;
   /** Shot waiting for the scorer to pick the court zone (and the assist on made 2PT/3PT). */
   const [pendingShot, setPendingShot] = useState<{ event_type: PlayEventType; player_id: string } | null>(null);
@@ -242,11 +243,23 @@ export function useLiveGame(
   }, []);
 
   const loadSession = useCallback(async () => {
-    const { data } = await supabase
+    // Several clubs can score the same league game (one session per club): take this club's own.
+    const { data: rows } = await supabase
       .from("game_sessions")
       .select("*")
       .eq("event_id", eventId)
-      .maybeSingle();
+      .order("created_at", { ascending: true });
+    if (!myClubIdsRef.current) {
+      const { data: ids } = await supabase.rpc("my_club_ids");
+      myClubIdsRef.current = (Array.isArray(ids) ? ids : []) as string[];
+    }
+    const mine = myClubIdsRef.current;
+    const list = (rows ?? []) as GameSession[];
+    const data =
+      list.find((r) => (r as { club_id?: string | null }).club_id && mine.includes((r as { club_id?: string | null }).club_id as string)) ??
+      list.find((r) => !(r as { club_id?: string | null }).club_id) ??
+      (mine.length === 0 ? list[0] : undefined) ??
+      null;
     if (data) {
       setSession(data as GameSession);
       setClockSecs(computeClockSecs(data as GameSession));

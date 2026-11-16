@@ -136,7 +136,9 @@ export function resolveOurSide(
   ourTeamName: string
 ): Side {
   const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  const isOurs = (t?: string) => !!t && (norm(t).includes("povoa") || norm(t) === norm(ourTeamName));
+  // "povoa" só identifica "nós" quando quem regista é o CD Póvoa; para outros clubes só o nome da própria equipa
+  const povoaIsUs = norm(ourTeamName).includes("povoa");
+  const isOurs = (t?: string) => !!t && ((povoaIsUs && norm(t).includes("povoa")) || norm(t) === norm(ourTeamName));
   if (meta?.home_team && isOurs(meta.home_team)) return "home";
   if (meta?.away_team && isOurs(meta.away_team)) return "away";
   if (meta?.is_home === false) return "away";

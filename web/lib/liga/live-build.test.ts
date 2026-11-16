@@ -42,3 +42,11 @@ describe("buildLiveLeagueResult", () => {
     expect(resolveOurSide({ home_team: "CD Póvoa", away_team: "Y" }, "CD Póvoa")).toBe("home");
   });
 });
+
+describe("resolveOurSide — other clubs scoring the same game", () => {
+  it("a non-Póvoa club is matched by its own team name, not by 'Póvoa' in the opponent", () => {
+    const meta = { home_team: "CD Póvoa", away_team: "CBF Felgueiras BAD" };
+    expect(resolveOurSide(meta, "CBF Felgueiras BAD")).toBe("away");
+    expect(resolveOurSide(meta, "CD Póvoa")).toBe("home");
+  });
+});

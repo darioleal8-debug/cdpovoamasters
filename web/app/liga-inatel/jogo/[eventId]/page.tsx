@@ -50,11 +50,31 @@ async function getGamePageData(eventId: string) {
   const meta = parseGameMeta(event.description ?? null);
   if (meta?.is_test === true || event.is_test === true) return null;
 
-  // Estatística registada ao vivo no HoopHub (jogo finalizado) → box score completo
-  const { data: liveSession } = await supabase.from("game_sessions")
-    .select("id, home_score, away_score")
+  // Estatística registada ao vivo no HoopHub (jogo finalizado): uma sessão por equipa que registou o jogo
+  const { data: liveRows } = await supabase.from("game_sessions")
+    .select("id, home_score, away_score, club_id, opponent_name")
     .eq("event_id", eventId).eq("status", "finished")
-    .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    .order("created_at", { ascending: true });
+  const clubIds = [...new Set((liveRows ?? []).map((r) => r.club_id as string | null).filter(Boolean) as string[])];
+  const clubTeamName = new Map<string, string>();
+  if (clubIds.length) {
+    const { data: clubs } = await supabase.from("clubs").select("id, league_team_id").in("id", clubIds);
+    const teamIds = (clubs ?? []).map((c) => c.league_team_id as string | null).filter(Boolean) as string[];
+    const { data: lteams } = teamIds.length
+      ? await supabase.from("league_teams").select("id, name").in("id", teamIds)
+      : { data: [] as { id: string; name: string }[] };
+    for (const c of clubs ?? []) {
+      const t = (lteams ?? []).find((x) => x.id === c.league_team_id);
+      if (t) clubTeamName.set(c.id as string, t.name as string);
+    }
+  }
+  const liveSessions = (liveRows ?? []).map((r) => ({
+    id: r.id as string,
+    home_score: r.home_score as number,
+    away_score: r.away_score as number,
+    teamName: r.club_id ? (clubTeamName.get(r.club_id as string) ?? null) : null,
+  }));
+  const liveSession = liveSessions[0] ?? null;
 
   const result = resultRes.data ?? null;
 
@@ -125,6 +145,7 @@ async function getGamePageData(eventId: string) {
     prevGame,
     nextGame,
     liveSession: liveSession ?? null,
+    liveSessions,
   };
 }
 
@@ -153,7 +174,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ eve
   const data = await getGamePageData(eventId);
   if (!data) notFound();
 
-  const { event, meta, result, periods, playerStats, homeLogoUrl, awayLogoUrl, news, photos, prevGame, nextGame, liveSession } = data;
+  const { event, meta, result, periods, playerStats, homeLogoUrl, awayLogoUrl, news, photos, prevGame, nextGame, liveSession, liveSessions } = data;
 
   const homeTeam = meta?.home_team ?? result?.home_team_name ?? "—";
   const awayTeam = meta?.away_team ?? result?.away_team_name ?? "—";
@@ -396,20 +417,31 @@ export default async function GameDetailPage({ params }: { params: Promise<{ eve
         </section>
       )}
 
-      {/* ── BOX SCORE DO REGISTO AO VIVO ── */}
-      {hasResult && liveSession && (
-        <section style={SECTION}>
-          <PlayerBoxScore
-            publicView
-            title={`Box Score · ${ourTeamLive} (registo ao vivo)`}
-            sessionId={liveSession.id}
-            ourTeamName={ourTeamLive}
-            opponentName={(event.opponent as string | null) ?? (ourTeamLive === homeTeam ? awayTeam : homeTeam)}
-            homeScore={liveSession.home_score}
-            awayScore={liveSession.away_score}
-          />
-        </section>
-      )}
+      {/* ── BOX SCORE DO REGISTO AO VIVO (uma por equipa que registou o jogo) ── */}
+      {hasResult && liveSessions.length > 0 && (() => {
+        const ordered = [...liveSessions].sort((a, b) => {
+          const aHome = (a.teamName ?? ourTeamLive) === homeTeam ? 0 : 1;
+          const bHome = (b.teamName ?? ourTeamLive) === homeTeam ? 0 : 1;
+          return aHome - bHome;
+        });
+        return ordered.map((ls) => {
+          const team = ls.teamName ?? ourTeamLive;
+          const opp = team === homeTeam ? awayTeam : homeTeam;
+          return (
+            <section key={ls.id} style={SECTION}>
+              <PlayerBoxScore
+                publicView
+                title={`Box Score · ${team} (registo ao vivo)`}
+                sessionId={ls.id}
+                ourTeamName={team}
+                opponentName={ls.teamName ? opp : ((event.opponent as string | null) ?? opp)}
+                homeScore={ls.home_score}
+                awayScore={ls.away_score}
+              />
+            </section>
+          );
+        });
+      })()}
 
       {/* ── NOTÍCIAS RELACIONADAS ── */}
       {news.length > 0 && (

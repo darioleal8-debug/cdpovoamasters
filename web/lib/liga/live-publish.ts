@@ -22,7 +22,7 @@ export async function publishLiveSessionToLeague(sessionId: string, actorUserId:
 
   const { data: session } = await db
     .from("game_sessions")
-    .select("id, event_id, status, home_score, away_score, current_period")
+    .select("id, event_id, club_id, status, home_score, away_score, current_period")
     .eq("id", sessionId)
     .maybeSingle();
   if (!session) return { ok: false, status: 404, error: "Jogo ao vivo não encontrado" };
@@ -46,7 +46,15 @@ export async function publishLiveSessionToLeague(sessionId: string, actorUserId:
 
   const meta = parseGameMeta(event.description ?? null);
   const isTest = event.is_test === true || meta?.is_test === true;
-  const ourTeam = await getOurTeamName();
+  // Equipa de quem registou: a do clube da sessão (cada clube pode registar o mesmo jogo); CD Póvoa por omissão
+  let ourTeam = await getOurTeamName();
+  if (session.club_id) {
+    const { data: club } = await db.from("clubs").select("league_team_id").eq("id", session.club_id).maybeSingle();
+    if (club?.league_team_id) {
+      const { data: team } = await db.from("league_teams").select("name").eq("id", club.league_team_id).maybeSingle();
+      if (team?.name) ourTeam = team.name as string;
+    }
+  }
   const ourSide = resolveOurSide(meta, ourTeam);
   const homeName = meta?.home_team ?? (ourSide === "home" ? ourTeam : (event.opponent ?? "Adversário"));
   const awayName = meta?.away_team ?? (ourSide === "away" ? ourTeam : (event.opponent ?? "Adversário"));
