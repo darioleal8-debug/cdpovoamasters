@@ -54,6 +54,7 @@ type AdminGame = {
   result_status: "no_result" | "pending" | "approved";
   pending_count: number;
   pending_actions?: string[];
+  live_discrepancy?: string | null;
   submissions: Submission[];
 };
 
@@ -114,6 +115,7 @@ const STATUS_CHIP: Record<string, { label: string; bg: string; color: string }> 
 
 const PENDING_ACTION_LABEL: Record<string, string> = {
   no_result: "Jogo terminado sem resultado confirmado nem notícia publicada",
+  live_score_mismatch: "As duas equipas registaram resultados diferentes ao vivo",
 };
 
 function Chip({ status }: { status: string }) {
@@ -1017,6 +1019,13 @@ export default function LigaAdminPage() {
                         borderRadius: "99px", fontSize: "9px", fontWeight: 700,
                         padding: "2px 7px", letterSpacing: "0.06em", textTransform: "uppercase",
                       }}>Ação pendente</span>
+                    )}
+                    {game.live_discrepancy && (
+                      <span title={game.live_discrepancy} style={{
+                        background: "#FEE2E2", color: "#991B1B", border: "1px solid #FCA5A5",
+                        borderRadius: "99px", fontSize: "9px", fontWeight: 700,
+                        padding: "2px 7px", letterSpacing: "0.06em", textTransform: "uppercase",
+                      }}>Resultados divergentes · {game.live_discrepancy}</span>
                     )}
                   </div>
 

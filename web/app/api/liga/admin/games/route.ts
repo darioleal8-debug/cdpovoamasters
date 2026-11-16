@@ -1,3 +1,4 @@
+import { liveScoreDiscrepancy, describeDiscrepancy } from "@/lib/liga/live-discrepancy";
 import { NextResponse } from "next/server";
 import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
 import { createUnscopedAdminClient } from "@/lib/supabase/server";
@@ -55,6 +56,31 @@ export async function GET() {
     adminClient.from("news").select("game_id").eq("is_published", true).not("game_id", "is", null),
   ]);
 
+  // Sessões live finalizadas por jogo (uma por clube): deteta registos divergentes entre as duas equipas
+  const eventIds = (eventsRes.data ?? []).map((e: { id: string }) => e.id);
+  const { data: liveRows } = eventIds.length
+    ? await adminClient.from("game_sessions")
+        .select("event_id, club_id, home_score, away_score, created_at")
+        .in("event_id", eventIds).eq("status", "finished").not("club_id", "is", null)
+        .order("created_at", { ascending: true })
+    : { data: [] as { event_id: string; club_id: string; home_score: number; away_score: number }[] };
+  const liveClubIds = [...new Set((liveRows ?? []).map((r) => r.club_id as string))];
+  const { data: liveClubs } = liveClubIds.length
+    ? await adminClient.from("clubs").select("id, name, league_team_id").in("id", liveClubIds)
+    : { data: [] as { id: string; name: string; league_team_id: string | null }[] };
+  const clubLabel = new Map((liveClubs ?? []).map((c) => [c.id as string, c.name as string]));
+  const discrepancyByEvent = new Map<string, string>();
+  const liveByEvent = new Map<string, { teamName: string; own: number; opp: number }[]>();
+  for (const r of liveRows ?? []) {
+    const list = liveByEvent.get(r.event_id as string) ?? [];
+    list.push({ teamName: clubLabel.get(r.club_id as string) ?? "Equipa", own: r.home_score as number, opp: r.away_score as number });
+    liveByEvent.set(r.event_id as string, list);
+  }
+  for (const [eid, list] of liveByEvent) {
+    const d = liveScoreDiscrepancy(list);
+    if (d) discrepancyByEvent.set(eid, describeDiscrepancy(d));
+  }
+
   const now = nowLisbon();
   const publishedNews = new Set((publishedNewsRes.data ?? []).map((r: { game_id: string }) => r.game_id));
 
@@ -86,6 +112,8 @@ export async function GET() {
     // Ação pendente do Master admin: jogo já terminado, sem resultado confirmado e sem notícia publicada
     const pendingActions: string[] = [];
     if (!result && !publishedNews.has(e.id) && gameIsOver(e.event_date, e.event_time, now)) pendingActions.push("no_result");
+    const liveDiscrepancy = discrepancyByEvent.get(e.id) ?? null;
+    if (liveDiscrepancy) pendingActions.push("live_score_mismatch");
 
     return {
       id: e.id,
@@ -103,6 +131,7 @@ export async function GET() {
       result_status: result ? "approved" : pendingCount > 0 ? "pending" : "no_result",
       pending_count: pendingCount,
       pending_actions: pendingActions,
+      live_discrepancy: liveDiscrepancy,
       submissions: subs,
     };
   });
