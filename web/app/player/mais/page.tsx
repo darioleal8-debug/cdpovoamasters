@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "@/components/ui/toaster";
+import { useClubLeague } from "@/hooks/use-club-league";
 
 interface MenuItem {
   label: string;
@@ -30,7 +31,6 @@ const ITEMS: MenuItem[] = [
   { label: "Estatísticas",        href: "/player/estatisticas",    icon: BarChart3,     desc: "Equipa e calendário" },
   { label: "Laboratório",         href: "/player/laboratorio",     icon: ClipboardList, desc: "Jogadas e táticas" },
   { label: "Pagamentos",          href: "/player/meus-pagamentos", icon: CreditCard,    desc: "Histórico de quotas" },
-  { label: "Liga INATEL",         href: "/liga-inatel",            icon: Shield,        desc: "Classificação e resultados" },
   { label: "Notícias",            href: "/noticias",               icon: Newspaper,     desc: "Novidades e regulamentos" },
   { label: "O Meu Perfil",        href: "/player/meu-perfil",      icon: User,          desc: "Dados e foto de perfil" },
   { label: "Preferências",        href: "/player/preferencias",    icon: Settings,      desc: "Notificações e conta" },
@@ -38,6 +38,12 @@ const ITEMS: MenuItem[] = [
 
 export default function PlayerMaisPage() {
   const router = useRouter();
+  const { league } = useClubLeague();
+  const items: (MenuItem & { external?: boolean })[] = [...ITEMS];
+  if (league) {
+    const at = items.findIndex((i) => i.href === "/noticias");
+    items.splice(at < 0 ? items.length : at, 0, { label: league.external ? league.name : "Liga INATEL", href: league.href, icon: Shield, desc: league.external ? "Site da liga" : "Classificação e resultados", external: league.external });
+  }
   const supabase = createClient();
 
   async function handleLogout() {
@@ -57,10 +63,11 @@ export default function PlayerMaisPage() {
       </h1>
 
       <div className="grid grid-cols-2 gap-3">
-        {ITEMS.map(({ label, href, icon: Icon, desc }) => (
+        {items.map(({ label, href, icon: Icon, desc, external }) => (
           <Link
             key={href}
             href={href}
+            {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
             className="flex flex-col gap-2 rounded-2xl p-4 transition-colors active:opacity-70"
             style={{
               background:  "var(--paper,#F6F7F9)",

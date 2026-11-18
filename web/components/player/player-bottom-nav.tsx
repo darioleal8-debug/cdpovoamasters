@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home, Dumbbell, Calendar, Users, MoreHorizontal,
-  User, BarChart2, CreditCard, MessageSquare, Trophy, ClipboardList, X,
+  User, BarChart2, CreditCard, MessageSquare, Trophy, ClipboardList, Globe, X,
 } from "lucide-react";
 import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
+import { useClubLeague } from "@/hooks/use-club-league";
 import { useState } from "react";
 
 const PRIMARY_NAV = [
@@ -16,7 +17,7 @@ const PRIMARY_NAV = [
   { label: "Equipa",  href: "/player/plantel",        icon: Users,    exact: false },
 ] as const;
 
-const SHEET_NAV = [
+const SHEET_NAV_BASE = [
   { label: "O Meu Perfil",       href: "/player/meu-perfil",      icon: User          },
   { label: "Assiduidade",        href: "/player/assiduidade",     icon: BarChart2     },
   { label: "Pagamentos",         href: "/player/meus-pagamentos", icon: CreditCard    },
@@ -28,6 +29,10 @@ const SHEET_NAV = [
 export function PlayerBottomNav() {
   const pathname  = usePathname();
   const chatBadge = useUnreadChatCount();
+  const { league } = useClubLeague();
+  type SheetItem = { label: string; href: string; icon: React.ElementType; external?: boolean };
+  const SHEET_NAV: SheetItem[] = [...SHEET_NAV_BASE];
+  if (league) SHEET_NAV.push({ label: "Site da Liga", href: league.href, icon: Globe, external: league.external });
   const [sheetOpen, setSheetOpen] = useState(false);
 
   function isActive(href: string, exact: boolean) {
@@ -201,13 +206,14 @@ export function PlayerBottomNav() {
             padding: "4px 16px 16px",
           }}
         >
-          {SHEET_NAV.map(({ label, href, icon: Icon }) => {
+          {SHEET_NAV.map(({ label, href, icon: Icon, external }) => {
             const active = isActive(href, false);
             const badge  = href === "/player/chat" ? chatBadge : 0;
             return (
               <Link
                 key={href}
                 href={href}
+                {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                 onClick={() => setSheetOpen(false)}
                 style={{
                   display: "flex",

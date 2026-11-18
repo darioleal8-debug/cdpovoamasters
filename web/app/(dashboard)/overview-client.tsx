@@ -10,6 +10,7 @@ import { ClubNoticesCard }    from "@/components/dashboard/club-notices-card";
 import { PlayerSeasonCard }   from "@/components/dashboard/player-season-card";
 import { BirthdayBanner }     from "@/components/birthday/birthday-banner";
 import { NextBirthdayNotice } from "@/components/birthday/next-birthday-notice";
+import { LigaLinkCard }       from "@/components/liga/liga-link-card";
 import { createClient }       from "@/lib/supabase/client";
 
 // ── Types ─────────────────────────────────────────────────────
@@ -302,6 +303,7 @@ function TrainerView({ data }: TrainerViewProps) {
       </div>
       <div className="flex flex-col gap-4 order-1 md:order-2">
         <NextTrainingCard training={data.nextTraining} />
+        <LigaLinkCard />
         {data.notices.length > 0 && <ClubNoticesCard notices={data.notices} />}
       </div>
     </div>
@@ -326,6 +328,7 @@ function PlayerView({ data }: PlayerViewProps) {
       </div>
       <div className="flex flex-col gap-4">
         <PlayerSeasonCard data={data.playerData} />
+        <LigaLinkCard />
         {data.notices.length > 0 && <ClubNoticesCard notices={data.notices} />}
       </div>
     </div>

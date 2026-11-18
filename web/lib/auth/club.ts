@@ -29,3 +29,31 @@ export async function leagueTeamNameForClub(db: Db, clubId: string): Promise<str
   const lt = data?.league_teams as { name?: string } | { name?: string }[] | null | undefined;
   return (Array.isArray(lt) ? lt[0]?.name : lt?.name) ?? null;
 }
+
+export interface ClubLeagueLink {
+  name: string;
+  href: string;
+  /** true → site de outra liga (abre noutro separador); false → Liga INATEL dentro do HoopHub */
+  external: boolean;
+}
+
+/**
+ * Liga que o clube disputa, para o link "Site da Liga".
+ * - clubs.league_url definido → essa liga (link externo);
+ * - senão clubs.league_team_id definido → Liga INATEL (/liga-inatel);
+ * - senão null (o clube não tem liga associada → sem link).
+ */
+export async function clubLeagueLink(db: Db, clubId: string): Promise<ClubLeagueLink | null> {
+  const { data } = await db
+    .from("clubs")
+    .select("league_team_id, league_name, league_url")
+    .eq("id", clubId)
+    .maybeSingle();
+  if (!data) return null;
+  const url = typeof data.league_url === "string" ? data.league_url.trim() : "";
+  if (/^https?:\/\//i.test(url)) {
+    return { name: data.league_name?.trim() || "Site da Liga", href: url, external: true };
+  }
+  if (data.league_team_id) return { name: "Liga INATEL", href: "/liga-inatel", external: false };
+  return null;
+}

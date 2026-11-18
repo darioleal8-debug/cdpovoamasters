@@ -10,9 +10,10 @@ interface NavLinkProps {
   label: string;
   badge?: number;
   exact?: boolean;
+  external?: boolean;
 }
 
-export function NavLink({ href, icon: Icon, label, badge, exact = false }: NavLinkProps) {
+export function NavLink({ href, icon: Icon, label, badge, exact = false, external = false }: NavLinkProps) {
   const pathname = usePathname();
   const isActive = exact
     ? pathname === href
@@ -21,6 +22,7 @@ export function NavLink({ href, icon: Icon, label, badge, exact = false }: NavLi
   return (
     <Link
       href={href}
+      {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
       aria-current={isActive ? "page" : undefined}
       className={cn(
         "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",

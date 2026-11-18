@@ -24,12 +24,14 @@ import {
   ClipboardList,
   Building2,
   Sparkles,
+  Globe,
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { useClubSettings } from "@/lib/club-context";
 import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
+import { useClubLeague } from "@/hooks/use-club-league";
 import type { UserRole } from "@/types/database";
 import { NavLink } from "@/components/layout/nav-link";
 
@@ -71,6 +73,7 @@ const communicationItems = [
   { label: "Chat Interno", href: "/chat", icon: MessageSquare },
 ];
 
+
 const accountItems: { label: string; href: string; icon: typeof Settings; adminOnly?: boolean }[] = [
   { label: "Configurações",       href: "/configuracoes",          icon: Settings },
   { label: "Gestão de Contas",    href: "/gestao-contas",          icon: UserCog, adminOnly: true },
@@ -88,6 +91,9 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 export function Sidebar({ role, rolesExtra = [], isMaster = false }: { role?: UserRole; rolesExtra?: string[]; isMaster?: boolean }) {
   const { settings } = useClubSettings();
   const unreadChatCount = useUnreadChatCount();
+  // Liga do clube (Liga INATEL ou outra); sem liga → sem link
+  const { league } = useClubLeague();
+  const ligaSite = league ? <NavLink href={league.href} external={league.external} icon={Globe} label="Site da Liga" /> : null;
 
   const rolesAll = [role, ...rolesExtra].filter(Boolean) as string[];
   const isSeccionista    = role === "seccionista";
@@ -139,6 +145,7 @@ export function Sidebar({ role, rolesExtra = [], isMaster = false }: { role?: Us
               {communicationItems.map((item) => (
                 <NavLink key={item.href} {...item} badge={unreadChatCount} />
               ))}
+              {ligaSite}
             </div>
           </>
         ) : (
@@ -202,6 +209,7 @@ export function Sidebar({ role, rolesExtra = [], isMaster = false }: { role?: Us
               {communicationItems.map((item) => (
                 <NavLink key={item.href} {...item} badge={unreadChatCount} />
               ))}
+              {ligaSite}
             </div>
 
             <div className="mt-auto pt-4">

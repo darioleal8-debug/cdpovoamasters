@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
 import { useClubSettings } from "@/lib/club-context";
+import { useClubLeague } from "@/hooks/use-club-league";
 import type { UserRole } from "@/types/database";
 
 interface RailItem {
@@ -28,6 +29,7 @@ interface RailItem {
   href:   string;
   icon:   React.ElementType;
   exact?: boolean;
+  external?: boolean;
 }
 
 const PRIMARY: RailItem[] = [
@@ -46,7 +48,6 @@ const SECONDARY: RailItem[] = [
   { label: "Docs",       href: "/documentos",    icon: FolderOpen },
   { label: "Histórico",  href: "/historico",     icon: History },
   { label: "Financeiro", href: "/financeiro",    icon: Landmark },
-  { label: "Liga",       href: "/liga-inatel",   icon: Shield },
   { label: "Definições", href: "/configuracoes", icon: Settings },
 ];
 
@@ -60,6 +61,7 @@ function RailLink({ item, badge }: { item: RailItem; badge?: number }) {
   return (
     <Link
       href={href}
+      {...(item.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
       aria-current={active ? "page" : undefined}
       className="relative flex flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2.5 w-full transition-colors"
       style={{
@@ -95,15 +97,21 @@ function RailLink({ item, badge }: { item: RailItem; badge?: number }) {
 export function TabRail({ role, rolesExtra = [] }: { role?: UserRole; rolesExtra?: string[] }) {
   const { settings }  = useClubSettings();
   const chatBadge     = useUnreadChatCount();
+  const { league }    = useClubLeague();
   const rolesAll      = [role, ...rolesExtra].filter(Boolean) as string[];
   const isManager     = rolesAll.includes("admin") || rolesAll.includes("treinador");
   const hasFinance    = rolesAll.includes("admin") || rolesAll.includes("tesoureiro");
 
-  const secondary = SECONDARY.filter((item) => {
+  const secondary: RailItem[] = SECONDARY.filter((item) => {
     if (item.href === "/financeiro") return hasFinance;
     if (item.href === "/gestao-contas") return isManager;
     return true;
   });
+  // Liga do clube (Liga INATEL ou outra); sem liga → sem item. Inserida antes de "Definições".
+  if (league) {
+    const at = secondary.findIndex((i) => i.href === "/configuracoes");
+    secondary.splice(at < 0 ? secondary.length : at, 0, { label: "Liga", href: league.href, icon: Shield, external: league.external });
+  }
 
   return (
     <aside

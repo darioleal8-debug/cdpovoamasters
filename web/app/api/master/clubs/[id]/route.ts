@@ -9,7 +9,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!m.ok) return m.response;
   const { id } = await params;
 
-  let body: { active?: boolean; name?: string; league_team_id?: string | null; ai_monthly_budget_eur?: number };
+  let body: { active?: boolean; name?: string; league_team_id?: string | null; league_name?: string | null; league_url?: string | null; ai_monthly_budget_eur?: number };
   try { body = await req.json(); } catch { return fail("JSON inválido"); }
 
   const upd: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -24,10 +24,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     upd.ai_monthly_budget_eur = v;
   }
   if (body.league_team_id !== undefined) upd.league_team_id = body.league_team_id || null;
+  // Outra liga (fora da Liga INATEL): nome + endereço do site. Vazio = usar a Liga INATEL (se houver equipa associada).
+  if (body.league_url !== undefined) {
+    const url = body.league_url?.trim() || null;
+    if (url && !/^https?:\/\/\S+$/i.test(url)) return fail("Endereço da liga inválido (tem de começar por http:// ou https://)");
+    upd.league_url = url;
+    if (!url) upd.league_name = null;
+  }
+  if (body.league_name !== undefined && upd.league_url !== null) upd.league_name = body.league_name?.trim() || null;
 
   const { data: club, error } = await m.admin
     .from("clubs").update(upd).eq("id", id)
-    .select("id, name, slug, active, league_team_id").maybeSingle();
+    .select("id, name, slug, active, league_team_id, league_name, league_url").maybeSingle();
   if (error) return error.code === "23505" ? fail("Equipa da Liga já associada a outro clube", 409) : fail(error.message, 500);
   if (!club) return fail("Clube não encontrado", 404);
   return NextResponse.json({ club });

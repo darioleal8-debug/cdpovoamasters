@@ -10,7 +10,7 @@ export async function GET() {
   const { admin } = m;
 
   const [{ data: clubs, error }, { data: members }, { data: teams }] = await Promise.all([
-    admin.from("clubs").select("id, name, slug, active, league_team_id, created_at").order("name"),
+    admin.from("clubs").select("id, name, slug, active, league_team_id, league_name, league_url, created_at").order("name"),
     admin.from("club_members").select("club_id, active"),
     admin.from("league_teams").select("id, name").order("name"),
   ]);

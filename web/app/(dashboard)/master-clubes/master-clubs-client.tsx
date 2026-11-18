@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/toaster";
 
-interface Club { id: string; name: string; slug: string; active: boolean; members: number; league_team_id?: string | null; league_team_name: string | null }
+interface Club { id: string; name: string; slug: string; active: boolean; members: number; league_team_id?: string | null; league_team_name: string | null; league_name?: string | null; league_url?: string | null }
 interface Team { id: string; name: string }
 interface Member { user_id: string; name: string | null; email: string | null; role: string; active: boolean }
 
@@ -55,6 +55,23 @@ export function MasterClubsClient() {
     load();
   }
 
+  async function setOtherLeague(c: Club) {
+    const url = window.prompt(
+      `Site da liga de "${c.name}" quando NÃO é a Liga INATEL (https://...). Deixa vazio para usar a Liga INATEL.`,
+      c.league_url ?? ""
+    );
+    if (url === null) return;
+    let name: string | null = null;
+    if (url.trim()) {
+      name = window.prompt("Nome da liga (ex.: Liga Regional do Porto):", c.league_name ?? "");
+      if (name === null) return;
+    }
+    const r = await api(`/api/master/clubs/${c.id}`, { method: "PATCH", body: JSON.stringify({ league_url: url.trim() || null, league_name: name }) });
+    if (!r.ok) return err(r.data.error);
+    toast({ title: url.trim() ? "Liga do clube definida" : "Liga do clube: Liga INATEL" });
+    load();
+  }
+
   return (
     <div className="mx-auto max-w-4xl space-y-4 p-4 md:p-6">
       <div className="flex items-center justify-between gap-3">
@@ -77,7 +94,7 @@ export function MasterClubsClient() {
                   <Badge variant={c.active ? "default" : "secondary"}>{c.active ? "Ativo" : "Inativo"}</Badge>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {c.slug}{c.league_team_name ? ` · Liga: ${c.league_team_name}` : ""} · {c.members} utilizador(es)
+                  {c.slug}{c.league_url ? ` · Liga: ${c.league_name ?? c.league_url}` : c.league_team_name ? ` · Liga: INATEL (${c.league_team_name})` : " · Sem liga"} · {c.members} utilizador(es)
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -89,6 +106,7 @@ export function MasterClubsClient() {
                     {teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                <Button size="sm" variant="outline" onClick={() => setOtherLeague(c)}>Outra liga</Button>
                 <Button size="sm" variant="outline" onClick={() => setOpenClub(c)}><Users className="mr-1 h-4 w-4" /> Utilizadores</Button>
                 <Button size="sm" variant={c.active ? "outline" : "default"} onClick={() => toggleActive(c)}>
                   {c.active ? "Desativar" : "Ativar"}

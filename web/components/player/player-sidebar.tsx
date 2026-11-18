@@ -4,10 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BarChart2, Calendar, ClipboardList, CreditCard, Dumbbell,
-  Home, LogOut, MessageSquare, Trophy, User, Users,
+  Globe, Home, LogOut, MessageSquare, Trophy, User, Users,
 } from "lucide-react";
 import { logout } from "@/lib/auth/logout";
 import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
+import { useClubLeague } from "@/hooks/use-club-league";
 import { usePlayerPending } from "./player-pending-context";
 import { toast } from "@/components/ui/toaster";
 import { RoleSwitcherChip } from "@/components/auth/role-switcher";
@@ -45,6 +46,10 @@ export function PlayerSidebar({
   const pathname  = usePathname();
   const chatBadge = useUnreadChatCount();
   const pending   = usePlayerPending();
+  const { league } = useClubLeague();
+  type NavItem = { href: string; label: string; icon: React.ElementType; exact: boolean; pendingKey: string | null; external?: boolean };
+  const navItems: NavItem[] = [...PLAYER_NAV];
+  if (league) navItems.push({ href: league.href, label: "Site da Liga", icon: Globe, exact: false, pendingKey: null, external: league.external });
 
   function isActive(href: string, exact: boolean) {
     return exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
@@ -109,7 +114,7 @@ export function PlayerSidebar({
         )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-          {PLAYER_NAV.map((item) => {
+          {navItems.map((item) => {
             const active = isActive(item.href, item.exact);
             const badge  = item.href === "/player/chat" ? chatBadge : 0;
             const hasPendingDot =
@@ -120,6 +125,7 @@ export function PlayerSidebar({
               <Link
                 key={item.href}
                 href={item.href}
+                {...(item.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                 aria-current={active ? "page" : undefined}
                 style={{
                   display: "flex",

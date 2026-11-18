@@ -13,9 +13,11 @@ import {
   Users,
   UserCog,
   FolderOpen,
+  Globe,
 } from "lucide-react";
 import { logout } from "@/lib/auth/logout";
 import { toast } from "@/components/ui/toaster";
+import { useClubLeague } from "@/hooks/use-club-league";
 
 interface MenuItem {
   label:    string;
@@ -38,6 +40,10 @@ const ITEMS: MenuItem[] = [
 ];
 
 export default function MaisPage() {
+  const { league } = useClubLeague();
+  const items: (MenuItem & { external?: boolean })[] = league
+    ? [...ITEMS.slice(0, -1), { label: "Site da Liga", href: league.href, icon: Globe, desc: league.external ? league.name : "Liga INATEL: classificação e resultados", external: league.external }, ITEMS[ITEMS.length - 1]]
+    : ITEMS;
 
   function handleLogout() {
     toast({ title: "Sessão terminada", description: "Até breve!" });
@@ -52,10 +58,11 @@ export default function MaisPage() {
       </h1>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {ITEMS.map(({ label, href, icon: Icon, desc }) => (
+        {items.map(({ label, href, icon: Icon, desc, external }) => (
           <Link
             key={href}
             href={href}
+            {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
             className="flex flex-col gap-2 rounded-2xl p-4 transition-colors active:opacity-70"
             style={{
               background:   "var(--paper,#F6F7F9)",
