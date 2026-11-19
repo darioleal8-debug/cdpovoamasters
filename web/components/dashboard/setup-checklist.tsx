@@ -61,7 +61,7 @@ export function SetupChecklist({ playersCount, alwaysShow = false }: Props) {
   return (
     <section
       className="rounded-2xl p-5"
-      style={{ background: "var(--surface,#fff)", border: "1px solid var(--border,#E3E7EE)" }}
+      style={{ background: "var(--paper,#F6F7F9)", border: "1px solid var(--line,#E4E7EE)" }}
       aria-label="Primeiros passos"
     >
       <h2 className="font-condensed text-xl font-bold uppercase tracking-display" style={{ color: "var(--text,#0A1220)" }}>
@@ -77,7 +77,7 @@ export function SetupChecklist({ playersCount, alwaysShow = false }: Props) {
           return (
             <li key={s.id} className="flex items-start gap-3" style={{ opacity: s.locked ? 0.55 : 1 }}>
               {s.done
-                ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--ok,#16A34A)" }} />
+                ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--ok,#12855B)" }} />
                 : <Circle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--muted-text,#5A6478)" }} />}
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold" style={{ color: "var(--text,#0A1220)" }}>
@@ -90,7 +90,7 @@ export function SetupChecklist({ playersCount, alwaysShow = false }: Props) {
                   <Link
                     href={s.href}
                     className="mt-2 inline-flex h-9 items-center rounded-xl px-4 text-sm font-semibold"
-                    style={{ background: "var(--ink,#0A1220)", color: "#fff" }}
+                    style={{ background: "var(--club-secondary,#F28C28)", color: "var(--club-secondary-fg,#fff)" }}
                   >
                     {s.action}
                   </Link>
