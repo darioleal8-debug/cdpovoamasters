@@ -315,7 +315,6 @@ export function EventPhotoGallery({ entityType, entityId, title }: Props) {
           ref={fileRef}
           type="file"
           accept="image/*"
-          capture="environment"
           className="sr-only"
           onChange={handleFileChange}
         />
