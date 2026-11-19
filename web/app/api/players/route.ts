@@ -105,6 +105,18 @@ export async function POST(req: NextRequest) {
     return fail((e as Error).message, 500);
   }
 
+  // Um jogador do plantel só existe ligado a uma conta de jogador (do clube): validar a conta
+  const { data: account } = await admin
+    .from("users")
+    .select("id, role, roles_extra")
+    .eq("id", userId)
+    .maybeSingle();
+  const isPlayerAccount = !!account &&
+    (account.role === "jogador" || ((account.roles_extra as string[] | null) ?? []).includes("jogador"));
+  if (!isPlayerAccount) {
+    return fail("Só é possível criar jogadores a partir de uma conta de jogador. Cria primeiro a conta.", 422);
+  }
+
   const { data: dup } = await admin
     .from("players")
     .select("id")

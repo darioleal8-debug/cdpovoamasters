@@ -249,6 +249,16 @@ export async function POST(req: NextRequest) {
       .select()
       .single();
 
+    if (playerError && role === "jogador") {
+      // Um jogador só existe com conta E perfil desportivo: se o perfil não ficou criado,
+      // desfazemos a conta em vez de deixar uma conta de jogador "a meio" fora do plantel.
+      await admin.from("club_members").delete().eq("user_id", newUserId);
+      await admin.from("users").delete().eq("id", newUserId);
+      await admin.auth.admin.deleteUser(newUserId);
+      console.error("[api/admin/users] Perfil de jogador falhou; conta revertida:", playerError.message);
+      return fail(`Não foi possível criar o jogador (a conta não foi criada): ${playerError.message}`, 422);
+    }
+
     if (playerError) {
       // players.name já não existe (041) e (user_id, season_id) é único: um conflito aqui
       // significa que este utilizador já tem perfil nesta época — não há registo "por nome" a ligar.
