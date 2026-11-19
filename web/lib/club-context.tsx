@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 // ─── Utilitários de cor ───────────────────────────────────
 
@@ -150,6 +151,23 @@ export function ClubProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  // O provider vive no layout raiz e não remonta na navegação cliente (login → dashboard).
+  // Sem sessão a API devolve o branding público da plataforma (CD Póvoa Masters); por isso, sempre que
+  // o utilizador muda (login, logout, troca de conta), voltamos a carregar o branding do clube dele.
+  useEffect(() => {
+    const supabase = createClient();
+    let currentUserId: string | null | undefined;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const uid = session?.user?.id ?? null;
+      if (currentUserId === undefined) { currentUserId = uid; return; } // evento inicial: já carregado acima
+      if (uid === currentUserId) return;                                // refresh de token, etc.
+      currentUserId = uid;
+      setLoading(true);
+      refresh();
+    });
+    return () => subscription.unsubscribe();
+  }, [refresh]);
 
   return (
     <ClubContext.Provider value={{ settings, theme, loading, refresh }}>
