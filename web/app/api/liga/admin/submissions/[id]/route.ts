@@ -51,7 +51,11 @@ export async function PATCH(
     // Jogo com validação cruzada (documentos das equipas / estatísticas profissionais):
     // aprova a partir dos dados consolidados, com as mesmas salvaguardas do painel de validação
     const { data: rec } = await adminClient.from("match_reconciliations").select("consolidated").eq("event_id", sub.event_id).maybeSingle();
-    if (rec?.consolidated && sub.status === "pending") {
+    // Só usa a validação cruzada se esta já tiver um resultado final consolidado; senão (ex.: documento
+    // ainda por confirmar) aprova a partir da submissão da equipa, como no fluxo clássico.
+    const recFinal = (rec?.consolidated as { final?: { home: number | null; away: number | null } } | null)?.final;
+    const hasConsolidatedFinal = recFinal != null && recFinal.home !== null && recFinal.away !== null;
+    if (rec?.consolidated && hasConsolidatedFinal && sub.status === "pending") {
       const out = await approveFromReconciliation({
         eventId: sub.event_id, motivo, acknowledge: acknowledge === true, userId: auth.user.id,
         userClient: auth.supabase, schedule: (fn) => after(fn),
