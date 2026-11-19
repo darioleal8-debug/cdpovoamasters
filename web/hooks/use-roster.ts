@@ -93,24 +93,6 @@ export function useRoster(seasonId: string | null) {
 
   useEffect(() => { load(); }, [load]);
 
-  // Criar jogador — vai ao API route (que usa service role para Storage)
-  async function createPlayer(fd: FormData): Promise<boolean> {
-    try {
-      const res = await fetch("/api/players", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        toast({ title: "Erro ao criar jogador", description: data.error ?? "Erro desconhecido", variant: "destructive" });
-        return false;
-      }
-      toast({ title: "Jogador criado com sucesso!" });
-      await load();
-      return true;
-    } catch (e) {
-      toast({ title: "Erro de rede", description: (e as Error).message, variant: "destructive" });
-      return false;
-    }
-  }
-
   // Editar dados desportivos — cria o perfil se ainda não existir nesta época
   // Devolve { ok, playerId } para que o chamador possa usar o ID real mesmo quando
   // o perfil foi criado de raiz (o playerId original era null).
@@ -200,5 +182,5 @@ export function useRoster(seasonId: string | null) {
     return true;
   }
 
-  return { players, loading, createPlayer, updatePlayer, updatePlayerPhoto, deletePlayer, refresh: load };
+  return { players, loading, updatePlayer, updatePlayerPhoto, deletePlayer, refresh: load };
 }

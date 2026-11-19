@@ -33,7 +33,9 @@ export function useSeasons() {
       year: data.year,
       start_date: data.start_date,
       end_date: data.end_date,
-      status: "arquivada",
+      // A primeira temporada do clube (ou se não houver nenhuma ativa) fica logo ativa;
+      // senão o clube novo fica sem temporada selecionada e sem perceber porquê.
+      status: activeSeason ? "arquivada" : "ativa",
     });
 
     if (error) {

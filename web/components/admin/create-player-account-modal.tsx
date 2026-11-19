@@ -371,6 +371,11 @@ export function CreatePlayerAccountModal({ open, onClose }: Props) {
                 <Label>Temporada *</Label>
                 {seasonsLoading ? (
                   <div className="h-10 animate-pulse rounded-md bg-muted" />
+                ) : seasons.length === 0 ? (
+                  <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2.5 text-sm text-amber-800">
+                    Ainda não há temporadas. <a href="/temporadas" className="font-medium underline">Cria primeiro a temporada</a> para
+                    poderes criar jogadores do plantel.
+                  </div>
                 ) : (
                   <Select value={seasonId} onValueChange={setSeasonId}>
                     <SelectTrigger>
@@ -423,7 +428,7 @@ export function CreatePlayerAccountModal({ open, onClose }: Props) {
               onClick={() => { reset(); onClose(); }}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={submitting} className="gap-1.5">
+            <Button type="submit" disabled={submitting || (needsPlayerFields && !seasonsLoading && seasons.length === 0)} className="gap-1.5">
               {submitting
                 ? <Loader2 className="h-4 w-4 animate-spin" />
                 : <UserPlus className="h-4 w-4" />}

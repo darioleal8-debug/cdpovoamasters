@@ -20,6 +20,7 @@ import { Camera, FileText, RefreshCw, UserPlus } from "lucide-react";
 import type { RosterEntry, PlayerPosition } from "@/types/database";
 import { CreatePlayerAccountModal } from "@/components/admin/create-player-account-modal";
 import { PlayerDocumentsModal } from "@/components/players/player-documents-modal";
+import { SetupChecklist } from "@/components/dashboard/setup-checklist";
 import {
   PhotoUploadWithTemplate,
   type PhotoUploadResult,
@@ -53,6 +54,13 @@ export default function JogadoresPage() {
   const [submitting,   setSubmitting]   = useState(false);
   const [accountModal, setAccountModal] = useState(false);
   const [docsPlayer,   setDocsPlayer]   = useState<RosterEntry | null>(null);
+
+  // Link dos "Primeiros passos" (/jogadores?novo=1) abre logo a criação de conta de jogador
+  useEffect(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("novo") === "1") {
+      setAccountModal(true);
+    }
+  }, []);
 
   // Carregar template do clube uma vez
   useEffect(() => {
@@ -152,6 +160,7 @@ export default function JogadoresPage() {
             </SelectContent>
           </Select>
           <Button variant="outline" size="sm" onClick={() => setAccountModal(true)}
+            disabled={!seasonId}
             className="hidden md:flex gap-1.5 h-9">
             <UserPlus className="h-4 w-4" />
             Criar Conta
@@ -159,8 +168,11 @@ export default function JogadoresPage() {
         </div>
       </div>
 
+      {/* Sem temporada selecionada/ativa não há plantel: guiar pelos passos em vez de uma tabela vazia */}
+      {!seasonsLoading && !seasonId && <SetupChecklist playersCount={0} alwaysShow />}
+
       {/* Mobile: grelha de cartões 2×2 */}
-      <div className="md:hidden">
+      <div className="md:hidden" hidden={!seasonId}>
         <RosterCards
           players={players}
           loading={loading}
@@ -170,7 +182,7 @@ export default function JogadoresPage() {
       </div>
 
       {/* Tablet+: tabela completa */}
-      <div className="hidden md:block">
+      <div className="hidden md:block" style={{ display: seasonId ? undefined : "none" }}>
         <RosterTable
           players={players}
           loading={loading}
@@ -184,6 +196,7 @@ export default function JogadoresPage() {
       <button
         type="button"
         onClick={() => setAccountModal(true)}
+        disabled={!seasonId}
         aria-label="Criar conta de jogador"
         className="md:hidden fixed right-4 z-40 flex items-center gap-2 h-14 px-5 rounded-full shadow-lg font-semibold text-sm"
         style={{
