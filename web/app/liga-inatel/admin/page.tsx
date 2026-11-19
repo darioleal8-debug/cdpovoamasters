@@ -937,6 +937,15 @@ export default function LigaAdminPage() {
       </div>
 
       {/* ── Game list ── */}
+      <style>{`
+        @media (max-width: 640px) {
+          .lga-row { padding: 10px 10px !important; gap: 6px !important; align-items: flex-start !important; }
+          .lga-main { flex-wrap: wrap !important; gap: 8px 10px !important; align-items: flex-start !important; overflow: hidden; }
+          .lga-teams { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: anywhere; line-height: 1.25; }
+          .lga-chips { order: 10; flex-basis: 100%; flex-wrap: wrap !important; padding-left: 50px; }
+          .lga-actions { flex-direction: column; }
+        }
+      `}</style>
       <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
         {filtered.length === 0 && (
           <p style={{ textAlign: "center", color: "#8C837A", fontSize: "14px", padding: "40px 0" }}>
@@ -955,9 +964,10 @@ export default function LigaAdminPage() {
               boxShadow: isSelected ? "0 0 0 2px rgba(249,115,22,.15)" : undefined,
             }}>
               {/* Game row */}
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px" }}>
+              <div className="lga-row" style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px" }}>
                 {/* Expand button – main click area */}
                 <button
+                  className="lga-main"
                   onClick={() => selectGame(game)}
                   style={{
                     display: "flex", alignItems: "center", gap: "12px",
@@ -978,7 +988,7 @@ export default function LigaAdminPage() {
 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-                      <span style={{
+                      <span className="lga-teams" style={{
                         fontWeight: 700, fontSize: "14px", color: "#1A1612",
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                         maxWidth: "100%",
@@ -1013,7 +1023,7 @@ export default function LigaAdminPage() {
                     </div>
                   )}
 
-                  <div style={{ flexShrink: 0, display: "flex", gap: "6px", alignItems: "center" }}>
+                  <div className="lga-chips" style={{ flexShrink: 0, display: "flex", gap: "6px", alignItems: "center" }}>
                     <Chip status={game.result_status} />
                     {game.pending_count > 0 && (
                       <span style={{
@@ -1047,7 +1057,7 @@ export default function LigaAdminPage() {
                 </button>
 
                 {/* WhatsApp / Edit / Delete icon buttons */}
-                <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
+                <div className="lga-actions" style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
                   {isAwaitingResult(game) && (
                     <a
                       href={whatsappShareUrl(pendingResultMessage(game, window.location.origin))}
