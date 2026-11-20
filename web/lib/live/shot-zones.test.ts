@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  BASKET_POINT, FREE_THROW_POINT, classifyShotZone, isThreePointArea, shotsFromPlays, zoneStats,
+  BASKET_POINT, FREE_THROW_POINT, classifyShotZone, isThreePointArea, resolveShotSpot, shotsFromPlays, zoneStats,
 } from "./shot-zones";
 
 describe("classifyShotZone", () => {
@@ -70,5 +70,42 @@ describe("isBlockedShot", () => {
     expect(isBlockedShot({ event_type: "2pt_made", description: BLOCKED_DESC })).toBe(false);
     expect(isBlockedShot({ event_type: "2pt_miss", description: null })).toBe(false);
     expect(isBlockedShot({ event_type: "2pt_miss", description: BLOCKED_DESC, deleted_at: "x" })).toBe(false);
+  });
+});
+
+describe("resolveShotSpot", () => {
+  it("accepts a 3PT behind the line and a 2PT inside it untouched", () => {
+    expect(resolveShotSpot("3", 50, 95)).toEqual({ ok: true, x: 50, y: 95, snapped: false });
+    expect(resolveShotSpot("2", 50, 35)).toEqual({ ok: true, x: 50, y: 35, snapped: false });
+  });
+  it("rejects a 3PT well inside the line and a 2PT well behind it", () => {
+    expect(resolveShotSpot("3", 50, 35)).toMatchObject({ ok: false, reason: "inside_three_line" });
+    expect(resolveShotSpot("3", 60, 20)).toMatchObject({ ok: false, reason: "inside_three_line" });
+    expect(resolveShotSpot("2", 50, 95)).toMatchObject({ ok: false, reason: "outside_two_area" });
+    expect(resolveShotSpot("2", 2, 6)).toMatchObject({ ok: false, reason: "outside_two_area" });
+  });
+  it("snaps a tap just on the wrong side of the arc", () => {
+    // arc top is at y = (1.575 + 6.75) / 14 = 59.46 %
+    const inside = resolveShotSpot("3", 50, 58.5);
+    expect(inside.ok && inside.snapped).toBe(true);
+    if (inside.ok) expect(isThreePointArea(inside.x, inside.y)).toBe(true);
+    const outside = resolveShotSpot("2", 50, 60.5);
+    expect(outside.ok && outside.snapped).toBe(true);
+    if (outside.ok) expect(isThreePointArea(outside.x, outside.y)).toBe(false);
+  });
+  it("snaps near the corner line and never lets a snapped spot end on the wrong side", () => {
+    const c3 = resolveShotSpot("3", 100 * (7.5 + 6.5) / 15, 6); // 0.1 m inside the corner line
+    expect(c3.ok && c3.snapped).toBe(true);
+    if (c3.ok) expect(isThreePointArea(c3.x, c3.y)).toBe(true);
+    const c2 = resolveShotSpot("2", 100 * (7.5 + 6.7) / 15, 6); // 0.1 m behind the corner line
+    expect(c2.ok && c2.snapped).toBe(true);
+    if (c2.ok) expect(isThreePointArea(c2.x, c2.y)).toBe(false);
+  });
+  it("the line itself counts as a 2PT", () => {
+    const x = 50, y = ((1.575 + 6.75) / 14) * 100;
+    expect(isThreePointArea(x, y)).toBe(false);
+  });
+  it("free throws are always valid", () => {
+    expect(resolveShotSpot("ft", 50, 41).ok).toBe(true);
   });
 });

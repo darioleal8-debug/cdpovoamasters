@@ -145,7 +145,7 @@ export default function LiveGamePage() {
     startGame, startClock, stopClock,
     recordPlay, pendingShot, confirmShot, cancelShot,
     recordOpponentPoints, recordOpponentMiss, recordOpponentFoul, recordOpponentReb,
-    substitutePlayer, setLineup, undoPlay, nextPeriod, finishGame,
+    substitutePlayer, setLineup, undoPlay, nextPeriod, finishGame, callTimeout,
   } = game;
 
   // ── Dialog state ─────────────────────────────────────────
@@ -160,6 +160,9 @@ export default function LiveGamePage() {
   const [editingOpponent, setEditingOpponent] = useState(false);
   const [activePlayers, setActivePlayers] = useState<ActivePlayer[]>([]);
   const [useActivePlayers, setUseActivePlayers] = useState(false);
+  // A game needs a squad and a full starting five (or every available player when there are fewer than 5).
+  const squadSize = roster.length > 0 ? roster.length : useActivePlayers ? activePlayers.length : 0;
+  const canStart = squadSize > 0 && startingFive.length >= Math.min(5, squadSize);
 
   // Pre-fill opponent from event data
   useEffect(() => {
@@ -293,6 +296,8 @@ export default function LiveGamePage() {
     onSubstitute: substitutePlayer,
     onSetLineup: setLineup,
     onUndoPlay: undoPlay,
+    onTimeout: callTimeout,
+    clubName,
   } : null;
 
   // ── Loading ───────────────────────────────────────────────
@@ -431,7 +436,7 @@ export default function LiveGamePage() {
 
       {/* ── Ecrã de marcação mobile (landscape + fullscreen) ─── */}
       {isMobileScoring && isLive && session && user && (
-        <MobileScoringScreen game={game} userId={user.id} />
+        <MobileScoringScreen game={game} userId={user.id} clubName={clubName} />
       )}
 
       {/* Prompt de rotação (portrait + fullscreen) */}
@@ -457,7 +462,7 @@ export default function LiveGamePage() {
           {session && (
             <div style={{ display: "flex", gap: 32, fontFamily: SANS }}>
               <div style={{ textAlign: "center" }}>
-                <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase" }}>CD PÓVOA</p>
+                <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase" }}>{clubName}</p>
                 <p style={{ fontFamily: MONO, fontSize: 48, fontWeight: 700, color: "var(--text)", margin: 0 }}>{session.home_score}</p>
               </div>
               <span style={{ color: "var(--dim)", fontSize: 24, alignSelf: "center" }}>—</span>
@@ -489,7 +494,7 @@ export default function LiveGamePage() {
             </h2>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 24, marginTop: 16 }}>
               <div style={{ textAlign: "center" }}>
-                <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase", margin: 0 }}>CD PÓVOA</p>
+                <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase", margin: 0 }}>{clubName}</p>
                 <p style={{ fontFamily: MONO, fontSize: 48, fontWeight: 700, color: "var(--text)", margin: 0 }}>{session.home_score}</p>
               </div>
               <span style={{ color: "var(--dim)", fontSize: 24 }}>—</span>
@@ -590,7 +595,7 @@ export default function LiveGamePage() {
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>🏀 Start Game</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            {/* Adversário */}
+            {/* Opponent */}
             <div className="space-y-1.5">
               <Label>Opponent</Label>
               {resolvedOpponent && !editingOpponent ? (
@@ -725,9 +730,9 @@ export default function LiveGamePage() {
             <Button variant="outline" disabled={recording} onClick={() => router.push("/jogos")}>
               Cancel
             </Button>
-            <Button disabled={recording}
+            <Button disabled={recording || !canStart}
               onClick={async () => {
-                const nameToUse = opponentName || resolvedOpponent || "Adversário";
+                const nameToUse = opponentName || resolvedOpponent || "Opponent";
                 const didEditOpponent = editingOpponent && opponentName && opponentName !== resolvedOpponent;
                 const mins = Number(periodMinutes);
                 const periodSecs = Number.isFinite(mins) && mins >= 1 && mins <= 20
