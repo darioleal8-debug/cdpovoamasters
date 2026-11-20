@@ -107,11 +107,49 @@ export async function GET(req: NextRequest) {
     })(),
   ]);
 
-  const nextGame      = nextGameRes.data ?? null;
+  const ourTeamName   = ourTeamRes.data?.name ?? null;
+  let   nextGame      = nextGameRes.data ?? null;
   const nextTraining  = pickNextTraining(nextTrainingRes.data ?? [], now);
   const playerCount   = playersRes.count ?? 0;
   const rosterSize    = rosterSizeRes.count ?? 0;
-  const ourTeamName   = ourTeamRes.data?.name ?? null;
+
+  // Espelho da Liga: clubes associados a uma equipa da Liga (clubs.league_team_id) não têm
+  // os jogos oficiais na sua época (events.is_club_game) — vivem nos eventos partilhados da
+  // Liga (club_id IS NULL). Tal como o calendário do clube, usa-os e fica com o mais próximo.
+  if (ourTeamName) {
+    const { data: ligaEvents } = await supabase.from("events")
+      .select("id,title,event_date,event_time,location,competition,opponent,description")
+      .is("club_id", null)
+      .eq("type", "jogo").eq("competition", "Liga")
+      .is("deleted_at", null)
+      .not("description", "is", null)
+      .gte("event_date", today)
+      .order("event_date", { ascending: true })
+      .order("event_time", { ascending: true });
+
+    for (const ev of ligaEvents ?? []) {
+      let home: string | undefined, away: string | undefined;
+      try {
+        const meta = JSON.parse(ev.description as string) as { home_team?: string; away_team?: string };
+        home = meta.home_team; away = meta.away_team;
+      } catch { continue; }
+      if (home !== ourTeamName && away !== ourTeamName) continue;
+
+      // Em caso de empate de data/hora prevalece o jogo da época do clube (mesmo jogo no CD Póvoa)
+      const own = nextGame;
+      const ligaIsEarlier = !own
+        || ev.event_date < own.event_date
+        || (ev.event_date === own.event_date && (ev.event_time ?? "") < (own.event_time ?? ""));
+      if (ligaIsEarlier) {
+        nextGame = {
+          id: ev.id, title: ev.title, event_date: ev.event_date, event_time: ev.event_time,
+          location: ev.location, competition: ev.competition,
+          opponent: (home === ourTeamName ? away : home) ?? ev.opponent,
+        };
+      }
+      break; // eventos já ordenados por data/hora: o primeiro do clube é o próximo
+    }
+  }
 
   // Vitórias / Derrotas da temporada actual
   let wins = 0, losses = 0;
