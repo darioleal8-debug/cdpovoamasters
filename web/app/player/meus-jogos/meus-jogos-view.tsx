@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  Calendar, Clock, MapPin, Shield, Trophy, ChevronDown,
+  Calendar, Clock, MapPin, Shield, Trophy, ChevronDown, BarChart3, ArrowRight,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -238,12 +238,15 @@ function GameCard({
 
       {/* Jogo terminado: acesso à box score */}
       {game.is_club_game && result && (
-        <Link
-          href={`/player/meus-jogos/${game.id}#box-score`}
-          className="mt-2.5 inline-flex items-center gap-1 text-xs font-semibold text-cdpovoa-primary hover:underline"
-        >
-          📊 Ver box score →
-        </Link>
+        <div className="mt-3 pt-3 border-t">
+          <Button asChild className="w-full min-h-[44px] gap-1.5">
+            <Link href={`/player/meus-jogos/${game.id}#box-score`}>
+              <BarChart3 className="text-cdpovoa-accent" />
+              Ver box score
+              <ArrowRight />
+            </Link>
+          </Button>
+        </div>
       )}
 
       {/* Disponibilidade — só para jogos do clube, futuros, com playerId */}
