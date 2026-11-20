@@ -28,7 +28,7 @@ const pct = (m: number, a: number) => (a > 0 ? `${Math.round((m / a) * 100)}%` :
 
 function Cell({ children, bold, muted }: { children: React.ReactNode; bold?: boolean; muted?: boolean }) {
   return (
-    <td className={`px-2 py-2 text-center tabular-nums ${bold ? "font-bold" : ""} ${muted ? "text-muted-foreground" : ""}`}>
+    <td className={`px-2 md:px-3 py-2 lg:py-2.5 text-center tabular-nums ${bold ? "font-bold" : ""} ${muted ? "text-muted-foreground" : ""}`}>
       {children}
     </td>
   );
@@ -109,12 +109,12 @@ export async function PlayerBoxScore({
       {/* Parciais por período */}
       {partials.length > 0 && (
         <div className="rounded-xl border bg-card overflow-x-auto">
-          <table className="w-full text-sm whitespace-nowrap">
+          <table className="w-full text-sm lg:text-base whitespace-nowrap">
             <thead>
               <tr className="bg-muted/50 text-xs text-muted-foreground">
                 <th className="text-left px-3 py-2 font-semibold">Equipa</th>
                 {partials.map((p) => (
-                  <th key={p.period} className="px-2 py-2 text-center font-semibold">{periodLabel(p.period)}</th>
+                  <th key={p.period} className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">{periodLabel(p.period)}</th>
                 ))}
                 <th className="px-3 py-2 text-center font-semibold">Final</th>
               </tr>
@@ -141,9 +141,9 @@ export async function PlayerBoxScore({
           <thead>
             <tr className="bg-muted/50 text-xs text-muted-foreground">
               <th className="text-left px-3 py-2 font-semibold">Equipa</th>
-              <th className="px-2 py-2 text-center font-semibold">Pontos</th>
-              <th className="px-2 py-2 text-center font-semibold">Reb.</th>
-              <th className="px-2 py-2 text-center font-semibold">Assist.</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">Pontos</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">Reb.</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">Assist.</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -165,28 +165,28 @@ export async function PlayerBoxScore({
 
       {/* Box score individual */}
       <div className="rounded-xl border bg-card overflow-x-auto">
-        <table className="w-full text-xs whitespace-nowrap">
+        <table className="w-full text-xs md:text-sm whitespace-nowrap">
           <thead>
             <tr className="border-b bg-muted/50">
               <th className="text-left px-3 py-2 font-semibold sticky left-0 bg-muted">#</th>
-              <th className="text-left px-2 py-2 font-semibold min-w-[100px]">Jogador</th>
-              <th className="px-2 py-2 text-center font-semibold">MIN</th>
-              <th className="px-2 py-2 text-center font-semibold">PTS</th>
-              <th className="px-2 py-2 text-center font-semibold">2P C/T</th>
-              <th className="px-2 py-2 text-center font-semibold">2P%</th>
-              <th className="px-2 py-2 text-center font-semibold">3P C/T</th>
-              <th className="px-2 py-2 text-center font-semibold">3P%</th>
-              <th className="px-2 py-2 text-center font-semibold">LL C/T</th>
-              <th className="px-2 py-2 text-center font-semibold">LL%</th>
-              <th className="px-2 py-2 text-center font-semibold">REB</th>
-              <th className="px-2 py-2 text-center font-semibold">AST</th>
-              <th className="px-2 py-2 text-center font-semibold">ROU</th>
-              <th className="px-2 py-2 text-center font-semibold">DES</th>
-              <th className="px-2 py-2 text-center font-semibold">PER</th>
-              <th className="px-2 py-2 text-center font-semibold">F</th>
-              <th className="px-2 py-2 text-center font-semibold">FS</th>
-              <th className="px-2 py-2 text-center font-semibold text-cdpovoa-primary">EFF</th>
-              <th className="px-2 py-2 text-center font-semibold">+/-</th>
+              <th className="text-left px-2 md:px-3 py-2 lg:py-2.5 font-semibold min-w-[100px]">Jogador</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">MIN</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">PTS</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">2P C/T</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">2P%</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">3P C/T</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">3P%</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">LL C/T</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">LL%</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">REB</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">AST</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">ROU</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">DES</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">PER</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">F</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">FS</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold text-cdpovoa-primary">EFF</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">+/-</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -198,7 +198,7 @@ export async function PlayerBoxScore({
                   <td className={`px-3 py-2 font-mono font-bold sticky left-0 ${me ? "bg-orange-50 dark:bg-orange-950/20" : "bg-card"}`}>
                     {numberById.get(s.player_id) ?? "–"}
                   </td>
-                  <td className="px-2 py-2 font-medium">
+                  <td className="px-2 md:px-3 py-2 lg:py-2.5 font-medium">
                     {(nameById.get(s.player_id) ?? "—").split(" ").slice(0, 2).join(" ")}
                   </td>
                   <Cell>{formatMinutes(s.seconds_played ?? 0)}</Cell>
@@ -216,10 +216,10 @@ export async function PlayerBoxScore({
                   <Cell>{s.tov}</Cell>
                   <Cell>{s.fouls_committed}</Cell>
                   <Cell>{s.fouls_drawn}</Cell>
-                  <td className="px-2 py-2 text-center font-bold text-cdpovoa-primary tabular-nums">
+                  <td className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-bold text-cdpovoa-primary tabular-nums">
                     {Math.round(Number(s.efficiency ?? 0))}
                   </td>
-                  <td className={`px-2 py-2 text-center tabular-nums font-semibold ${pm > 0 ? "text-green-600" : pm < 0 ? "text-red-500" : ""}`}>
+                  <td className={`px-2 md:px-3 py-2 lg:py-2.5 text-center tabular-nums font-semibold ${pm > 0 ? "text-green-600" : pm < 0 ? "text-red-500" : ""}`}>
                     {pm > 0 ? `+${pm}` : pm}
                   </td>
                 </tr>
@@ -227,7 +227,7 @@ export async function PlayerBoxScore({
             })}
             <tr className="bg-muted/50 font-bold border-t-2">
               <td className="px-3 py-2 sticky left-0 bg-muted">–</td>
-              <td className="px-2 py-2 uppercase tracking-widest text-muted-foreground">Total</td>
+              <td className="px-2 md:px-3 py-2 lg:py-2.5 uppercase tracking-widest text-muted-foreground">Total</td>
               <Cell>–</Cell>
               <Cell bold>{t.pts}</Cell>
               <Cell bold>{t.fg2m}/{t.fg2a}</Cell>
@@ -243,7 +243,7 @@ export async function PlayerBoxScore({
               <Cell bold>{t.tov}</Cell>
               <Cell bold>{t.fc}</Cell>
               <Cell bold>{t.fd}</Cell>
-              <td className="px-2 py-2 text-center font-bold text-cdpovoa-primary">{t.eff}</td>
+              <td className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-bold text-cdpovoa-primary">{t.eff}</td>
               <Cell>–</Cell>
             </tr>
           </tbody>

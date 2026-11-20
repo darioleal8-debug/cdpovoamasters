@@ -62,6 +62,28 @@ const COLS: Col[] = [
   { id: "pm", label: "+/-", title: "Mais/menos por jogo", value: (p) => p.plusMinus, render: (p) => (p.plusMinus == null ? "—" : `${p.plusMinus > 0 ? "+" : ""}${f1(p.plusMinus)}`) },
 ];
 
+function Leaders({ rows }: { rows: ResumoPlayerAverages[] }) {
+  const top = (pick: (p: ResumoPlayerAverages) => number) =>
+    [...rows].sort((a, b) => pick(b) - pick(a) || a.name.localeCompare(b.name))[0];
+  const items = [
+    { label: "Pontos", p: top((x) => x.pts), v: (x: ResumoPlayerAverages) => f1(x.pts) },
+    { label: "Ressaltos", p: top((x) => x.reb), v: (x: ResumoPlayerAverages) => f1(x.reb) },
+    { label: "Assistências", p: top((x) => x.ast), v: (x: ResumoPlayerAverages) => f1(x.ast) },
+    { label: "Eficiência", p: top((x) => x.eff), v: (x: ResumoPlayerAverages) => f1(x.eff) },
+  ];
+  return (
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+      {items.map(({ label, p, v }) => (
+        <div key={label} className="rounded-xl border bg-card px-3 py-3 md:px-4 md:py-4">
+          <p className="text-[11px] md:text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label} / jogo</p>
+          <p className="mt-1 text-2xl md:text-3xl font-black tabular-nums">{v(p)}</p>
+          <p className="truncate text-xs md:text-sm text-muted-foreground">{shortName(p.name)}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function AveragesTable({ rows, highlightKeys }: { rows: ResumoPlayerAverages[]; highlightKeys: Set<string> }) {
   const [sortId, setSortId] = useState("pts");
   const [desc, setDesc] = useState(true);
@@ -84,18 +106,17 @@ function AveragesTable({ rows, highlightKeys }: { rows: ResumoPlayerAverages[]; 
 
   return (
     <div className="rounded-xl border bg-card overflow-x-auto">
-      <table className="w-full text-xs whitespace-nowrap">
+      <table className="w-full text-xs md:text-sm xl:text-[15px] whitespace-nowrap">
         <thead>
           <tr className="border-b bg-muted/50">
-            <th className="text-left px-3 py-2 font-semibold sticky left-0 bg-muted">#</th>
-            <th className="text-left px-2 py-2 font-semibold min-w-[110px]">Jogador</th>
+            <th className="text-left px-3 py-2.5 font-semibold sticky left-0 z-10 bg-muted min-w-[150px] md:min-w-[190px]">Jogador</th>
             {COLS.map((c) => (
               <th key={c.id} className="px-0 py-0 text-center font-semibold" aria-sort={sortId === c.id ? (desc ? "descending" : "ascending") : "none"}>
                 <button
                   type="button"
                   title={c.title}
                   onClick={() => toggle(c.id)}
-                  className={`inline-flex w-full items-center justify-center gap-0.5 px-2 py-2 hover:bg-muted ${sortId === c.id ? "text-cdpovoa-primary" : ""}`}
+                  className={`inline-flex w-full items-center justify-center gap-0.5 px-2 xl:px-3 py-2.5 hover:bg-muted ${sortId === c.id ? "text-cdpovoa-primary" : ""}`}
                 >
                   {c.label}
                   {sortId === c.id && (desc ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />)}
@@ -110,12 +131,14 @@ function AveragesTable({ rows, highlightKeys }: { rows: ResumoPlayerAverages[]; 
             const bg = me ? "bg-orange-50 dark:bg-orange-950/20" : "bg-card";
             return (
               <tr key={p.key} className={me ? "bg-orange-50 dark:bg-orange-950/20" : ""}>
-                <td className={`px-3 py-2 font-mono font-bold sticky left-0 ${bg}`}>{p.number ?? "–"}</td>
-                <td className="px-2 py-2 font-medium">{shortName(p.name)}</td>
+                <td className={`px-3 py-2.5 sticky left-0 z-10 ${bg}`}>
+                  <span className="inline-block w-6 font-mono font-bold">{p.number ?? "–"}</span>
+                  <span className="font-medium">{shortName(p.name)}</span>
+                </td>
                 {COLS.map((c) => (
                   <td
                     key={c.id}
-                    className={`px-2 py-2 text-center tabular-nums ${c.strong ? "font-bold" : ""} ${c.muted ? "text-muted-foreground" : ""}`}
+                    className={`px-2 xl:px-3 py-2.5 text-center tabular-nums ${c.strong ? "font-bold" : ""} ${c.muted ? "text-muted-foreground" : ""}`}
                   >
                     {c.render(p)}
                   </td>
@@ -151,11 +174,10 @@ function TrainingTable({ rows, highlightIds }: { rows: TrainingRow[]; highlightI
       </div>
 
       <div className="rounded-xl border bg-card overflow-x-auto">
-        <table className="w-full text-xs whitespace-nowrap">
+        <table className="w-full text-xs md:text-sm xl:text-[15px] whitespace-nowrap">
           <thead>
             <tr className="border-b bg-muted/50">
-              <th className="text-left px-3 py-2 font-semibold sticky left-0 bg-muted">#</th>
-              <th className="text-left px-2 py-2 font-semibold min-w-[110px]">Jogador</th>
+              <th className="text-left px-3 py-2.5 font-semibold sticky left-0 z-10 bg-muted min-w-[150px] md:min-w-[190px]">Jogador</th>
               <th className="px-2 py-2 text-center font-semibold" title="Treinos registados">Treinos</th>
               <th className="px-2 py-2 text-center font-semibold" title="Presenças">Pres.</th>
               <th className="px-2 py-2 text-center font-semibold" title="Atrasos">Atr.</th>
@@ -171,8 +193,10 @@ function TrainingTable({ rows, highlightIds }: { rows: TrainingRow[]; highlightI
               const color = r.pct >= 75 ? "#16a34a" : "#F97316";
               return (
                 <tr key={r.playerId} className={me ? "bg-orange-50 dark:bg-orange-950/20" : ""}>
-                  <td className={`px-3 py-2 font-mono font-bold sticky left-0 ${bg}`}>{r.number ?? "–"}</td>
-                  <td className="px-2 py-2 font-medium">{shortName(r.name)}</td>
+                  <td className={`px-3 py-2.5 sticky left-0 z-10 ${bg}`}>
+                    <span className="inline-block w-6 font-mono font-bold">{r.number ?? "–"}</span>
+                    <span className="font-medium">{shortName(r.name)}</span>
+                  </td>
                   <td className="px-2 py-2 text-center tabular-nums">{r.total}</td>
                   <td className="px-2 py-2 text-center tabular-nums font-bold">{r.present}</td>
                   <td className="px-2 py-2 text-center tabular-nums">{r.late}</td>
@@ -180,7 +204,7 @@ function TrainingTable({ rows, highlightIds }: { rows: TrainingRow[]; highlightI
                   <td className="px-2 py-2 text-center tabular-nums">{r.absent}</td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-2">
-                      <div className="h-1.5 w-16 rounded-full bg-muted overflow-hidden">
+                      <div className="h-1.5 w-16 md:w-28 rounded-full bg-muted overflow-hidden">
                         <div className="h-full rounded-full" style={{ width: `${Math.min(100, r.pct)}%`, background: color }} />
                       </div>
                       <span className="font-bold tabular-nums" style={{ color }}>{Math.round(r.pct)}%</span>
@@ -221,7 +245,7 @@ export function ResumoEstatisticoClient({
   const highlight = useMemo(() => new Set([myUserId, ...myPlayerIds]), [myUserId, myPlayerIds]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 md:space-y-5">
       <div>
         <h1 className="font-condensed font-bold text-2xl uppercase tracking-display" style={{ color: "var(--ink,#0A1220)" }}>
           Resumo Estatístico
@@ -254,10 +278,11 @@ export function ResumoEstatisticoClient({
         current.length === 0 ? (
           <Empty>Ainda não há jogos oficiais terminados com estatísticas nesta época.</Empty>
         ) : (
-          <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">
+          <div className="space-y-3">
+            <p className="text-xs md:text-sm text-muted-foreground">
               {gamesCurrent} jogo{gamesCurrent !== 1 ? "s" : ""} com estatísticas · toca num cabeçalho para ordenar
             </p>
+            <Leaders rows={current} />
             <AveragesTable rows={current} highlightKeys={highlight} />
           </div>
         )
@@ -268,6 +293,7 @@ export function ResumoEstatisticoClient({
           <p className="text-xs text-muted-foreground">
             Média de {seasonsCount} épocas com jogos · toca num cabeçalho para ordenar
           </p>
+          <Leaders rows={all} />
           <AveragesTable rows={all} highlightKeys={highlight} />
         </div>
       )}
