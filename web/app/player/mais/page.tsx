@@ -29,6 +29,7 @@ const ITEMS: MenuItem[] = [
   { label: "Os Meus Treinos",     href: "/player/meus-treinos",    icon: Dumbbell,      desc: "Presenças e sessões" },
   { label: "A Minha Assiduidade", href: "/player/assiduidade",     icon: BarChart2,     desc: "Treinos e jogos" },
   { label: "Resumo Equipa",        href: "/player/estatisticas",    icon: BarChart3,     desc: "Equipa e calendário" },
+  { label: "Resumo Estatístico",   href: "/player/resumo-estatistico", icon: BarChart3,  desc: "Médias de jogo e treinos" },
   { label: "Laboratório",         href: "/player/laboratorio",     icon: ClipboardList, desc: "Jogadas e táticas" },
   { label: "Pagamentos",          href: "/player/meus-pagamentos", icon: CreditCard,    desc: "Histórico de quotas" },
   { label: "Notícias",            href: "/noticias",               icon: Newspaper,     desc: "Novidades e regulamentos" },

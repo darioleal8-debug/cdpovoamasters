@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home, Dumbbell, Calendar, Users, MoreHorizontal,
-  User, BarChart2, CreditCard, MessageSquare, Trophy, ClipboardList, Globe, X,
+  User, BarChart2, BarChart3, CreditCard, MessageSquare, Trophy, ClipboardList, Globe, X,
 } from "lucide-react";
 import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
 import { useClubLeague } from "@/hooks/use-club-league";
@@ -20,6 +20,7 @@ const PRIMARY_NAV = [
 const SHEET_NAV_BASE = [
   { label: "O Meu Perfil",       href: "/player/meu-perfil",      icon: User          },
   { label: "Assiduidade",        href: "/player/assiduidade",     icon: BarChart2     },
+  { label: "Resumo Estatístico", href: "/player/resumo-estatistico", icon: BarChart3  },
   { label: "Pagamentos",         href: "/player/meus-pagamentos", icon: CreditCard    },
   { label: "Chat",               href: "/player/chat",            icon: MessageSquare },
   { label: "Palmarés",           href: "/player/palmares",        icon: Trophy        },

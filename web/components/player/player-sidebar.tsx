@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart2, Calendar, ClipboardList, CreditCard, Dumbbell,
+  BarChart2, BarChart3, Calendar, ClipboardList, CreditCard, Dumbbell,
   Globe, Home, LogOut, MessageSquare, Trophy, User, Users,
 } from "lucide-react";
 import { logout } from "@/lib/auth/logout";
@@ -20,6 +20,7 @@ const PLAYER_NAV = [
   { href: "/player/meus-jogos",       label: "Os Meus Jogos",       icon: Calendar,      exact: false, pendingKey: "game"        },
   { href: "/player/meus-treinos",     label: "Os Meus Treinos",     icon: Dumbbell,      exact: false, pendingKey: "training"    },
   { href: "/player/assiduidade",      label: "A Minha Assiduidade", icon: BarChart2,     exact: false, pendingKey: null          },
+  { href: "/player/resumo-estatistico", label: "Resumo Estatístico", icon: BarChart3,     exact: false, pendingKey: null          },
   { href: "/player/meus-pagamentos",  label: "Os Meus Pagamentos",  icon: CreditCard,    exact: false, pendingKey: null          },
   { href: "/player/laboratorio",      label: "Laboratório",         icon: ClipboardList, exact: false, pendingKey: null          },
   { href: "/player/palmares",         label: "Palmarés",            icon: Trophy,        exact: false, pendingKey: null          },
