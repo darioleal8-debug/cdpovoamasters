@@ -22,6 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/components/ui/toaster";
 import { CreatePlayerAccountModal } from "@/components/admin/create-player-account-modal";
 import { createClient } from "@/lib/supabase/client";
+import { myClubId } from "@/lib/club/my-club-id";
 
 import { ageLabel } from "@/lib/age";
 
@@ -163,11 +164,12 @@ export default function GestaoDeContasPage() {
 
   useEffect(() => {
     load();
-    createClient()
-      .from("seasons")
-      .select("id, name")
-      .order("created_at", { ascending: false })
-      .then(({ data }) => { if (data) setSeasons(data as { id: string; name: string }[]); });
+    const sb = createClient();
+    myClubId(sb).then((clubId) => {
+      let q = sb.from("seasons").select("id, name").order("created_at", { ascending: false });
+      if (clubId) q = q.eq("club_id", clubId);
+      return q.then(({ data }) => { if (data) setSeasons(data as { id: string; name: string }[]); });
+    });
   }, [load]);
 
   // ── Filtro ────────────────────────────────────────────────
