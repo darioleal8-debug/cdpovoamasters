@@ -5,7 +5,6 @@ import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { todayInClubTz } from "@/lib/time/club-time";
 import { CourtBg } from "@/components/competitions/court-bg";
 import { TeamMono } from "@/components/competitions/team-mono";
-import { teamAbbr } from "@/lib/liga/format";
 import { ScoreTicker } from "@/components/competitions/score-ticker";
 import { ScoreCard } from "@/components/competitions/score-card";
 import { SeriesStandingsTabs } from "@/components/competitions/series-standings-tabs";
@@ -36,10 +35,6 @@ function dayLabel(dateStr: string, todayStr: string, tomorrowStr: string): strin
   if (dateStr === tomorrowStr) return "AMANHÃ";
   const { wd, day, mon } = fmtDay(dateStr);
   return `${wd} ${day} ${mon}`;
-}
-
-function teamAbbrTicker(name: string): string {
-  return teamAbbr(name).slice(0, 2);
 }
 
 export default async function LigaInatelHomePage() {
@@ -115,7 +110,7 @@ export default async function LigaInatelHomePage() {
 
   const tickerItems = approvedGames.map(
     (g) =>
-      `J${g.syntheticJornada} · ${teamAbbrTicker(g.home_team)} ${g.result!.home_score}–${g.result!.away_score} ${teamAbbrTicker(g.away_team)}`
+      `Jornada ${g.syntheticJornada}: ${g.home_team} ${g.result!.home_score}–${g.result!.away_score} ${g.away_team}`
   );
 
   const nextFutureJornada = futureGames.length > 0

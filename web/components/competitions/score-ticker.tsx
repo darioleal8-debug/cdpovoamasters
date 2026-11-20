@@ -1,16 +1,16 @@
 "use client";
 
 interface Props {
-  items: string[]; // ex: ["J4 · PV 72–65 MA", "J4 · BC 88–71 SC"]
+  items: string[]; // ex: ["Jornada 4: CD Póvoa 72–65 BC Barcelos"]
 }
 
 /** Faixa laranja com resultados a desfilar continuamente */
 export function ScoreTicker({ items }: Props) {
   if (items.length === 0) return null;
 
-  const text = items.join("   ·   ");
+  const text = items.join("   ●   ");
   // Duplicar para loop infinito sem corte visual
-  const doubled = text + "      " + text;
+  const doubled = text + "   ●   " + text;
 
   return (
     <div
@@ -47,6 +47,8 @@ export function ScoreTicker({ items }: Props) {
           color: "#15110E",
           paddingLeft: "24px",
           display: "inline-block",
+          // velocidade de leitura constante, independentemente do comprimento do texto
+          animationDuration: `${Math.max(30, Math.round(text.length * 0.1))}s`,
         }}
       >
         {doubled}
