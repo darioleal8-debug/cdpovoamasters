@@ -249,9 +249,9 @@ export function MobileScoringScreen({ game, userId: _userId, clubName = "Home", 
       userSelect: "none",
     } as React.CSSProperties}>
 
-      {/* ── TOP STRIP (52px, always visible) ── */}
+      {/* ── TOP STRIP (64px, always visible) ── */}
       <div style={{
-        height: 52, flexShrink: 0,
+        height: 64, flexShrink: 0,
         background: "var(--panel)", borderBottom: "1px solid var(--line)",
         display: "flex", alignItems: "center", gap: 8, padding: "0 8px",
       }}>
@@ -299,10 +299,10 @@ export function MobileScoringScreen({ game, userId: _userId, clubName = "Home", 
         <button
           onClick={running ? stopClock : startClock}
           style={{
-            height: 44, minWidth: 48, borderRadius: 8, border: "none",
+            height: 56, minWidth: 96, borderRadius: 10, border: "none",
             background: "var(--accent)", color: "var(--accentInk)",
-            cursor: "pointer", fontFamily: SANS, fontSize: 14, fontWeight: 800,
-            flexShrink: 0, padding: "0 8px",
+            cursor: "pointer", fontFamily: SANS, fontSize: 24, fontWeight: 800,
+            flexShrink: 0, padding: "0 14px",
           } as React.CSSProperties}
         >
           {running ? "■" : "▶"}

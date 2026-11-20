@@ -189,8 +189,8 @@ function Scoreboard1a({
           <button
             onClick={running ? onStopClock : onStartClock}
             style={{
-              flex: 1, height: 46, borderRadius: 10, border: "none", cursor: "pointer",
-              fontFamily: SANS, fontSize: 14, fontWeight: 700,
+              flex: 1, height: 64, minWidth: 140, borderRadius: 12, border: "none", cursor: "pointer",
+              fontFamily: SANS, fontSize: 22, fontWeight: 800,
               background: "var(--accent)", color: "var(--accentInk)",
             }}
           >

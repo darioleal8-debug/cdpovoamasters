@@ -121,7 +121,7 @@ export function Layout1c({
           </div>
 
           <button onClick={running ? onStopClock : onStartClock}
-            style={{ height: 46, padding: "0 20px", borderRadius: 10, border: "none", cursor: "pointer", fontFamily: SANS, fontSize: 14, fontWeight: 700, background: "var(--accent)", color: "var(--accentInk)" }}>
+            style={{ height: 64, minWidth: 150, padding: "0 28px", borderRadius: 12, border: "none", cursor: "pointer", fontFamily: SANS, fontSize: 22, fontWeight: 800, background: "var(--accent)", color: "var(--accentInk)" }}>
             {running ? "■ Stop" : "▶ Start"}
           </button>
           <PeriodBar period={session.current_period} homeScore={session.home_score} awayScore={session.away_score}
