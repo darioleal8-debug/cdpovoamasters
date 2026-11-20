@@ -44,7 +44,7 @@ const SECONDARY: RailItem[] = [
   { label: "Treinos",    href: "/treinos",       icon: Dumbbell },
   { label: "Temporadas", href: "/temporadas",    icon: CalendarRange },
   { label: "Contas",     href: "/gestao-contas", icon: UserCog },
-  { label: "Stats",      href: "/estatisticas",  icon: BarChart3 },
+  { label: "Resumo",     href: "/estatisticas",  icon: BarChart3 },
   { label: "Docs",       href: "/documentos",    icon: FolderOpen },
   { label: "Histórico",  href: "/historico",     icon: History },
   { label: "Financeiro", href: "/financeiro",    icon: Landmark },

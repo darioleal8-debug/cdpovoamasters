@@ -44,7 +44,7 @@ const managementItems = [
   { label: "Plantel",           href: "/jogadores",     icon: Users },
   { label: "Jogos",            href: "/jogos",         icon: Calendar },
   { label: "Treinos",          href: "/treinos",       icon: Dumbbell },
-  { label: "Estatísticas",     href: "/estatisticas",  icon: BarChart3 },
+  { label: "Resumo Equipa",     href: "/estatisticas",  icon: BarChart3 },
   { label: "Documentos",       href: "/documentos",    icon: FolderOpen },
   { label: "Histórico",        href: "/historico",     icon: History   },
   { label: "Palmarés",         href: "/palmares",      icon: Trophy    },
@@ -64,7 +64,7 @@ const playerAreaItems = [
 
 const seccionistaItems = [
   { label: "Jogos",        href: "/jogos",        icon: Calendar },
-  { label: "Estatísticas", href: "/estatisticas", icon: BarChart3 },
+  { label: "Resumo Equipa", href: "/estatisticas", icon: BarChart3 },
   { label: "Documentos",   href: "/documentos",   icon: FolderOpen },
   { label: "Palmarés",     href: "/palmares",     icon: Trophy    },
 ];
