@@ -167,7 +167,7 @@ export default async function GameDetailPage({ params }: Props) {
   const isHome = gameMeta?.is_home ?? !((event.title as string).includes("(Fora)"));
 
   return (
-    <div className="space-y-6 max-w-2xl lg:max-w-5xl">
+    <div className="space-y-6 max-w-2xl lg:max-w-5xl xl:max-w-6xl">
 
       {/* Voltar */}
       <div>
