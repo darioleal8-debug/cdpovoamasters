@@ -30,7 +30,7 @@ const ITEMS: MenuItem[] = [
   { label: "Plantel",          href: "/jogadores",     icon: Users,         desc: "Jogadores, fotos e perfis" },
   { label: "Temporadas",       href: "/temporadas",    icon: CalendarRange, desc: "Gerir épocas desportivas" },
   { label: "Treinos",          href: "/treinos",       icon: Dumbbell,      desc: "Sessões e presenças" },
-  { label: "Estatísticas",     href: "/estatisticas",  icon: BarChart3,     desc: "Análise da época" },
+  { label: "Resumo Equipa",     href: "/estatisticas",  icon: BarChart3,     desc: "Equipa, assiduidade e finanças" },
   { label: "Laboratório",      href: "/laboratorio",   icon: ClipboardList, desc: "Jogadas animadas" },
   { label: "Documentos",       href: "/documentos",    icon: FolderOpen,    desc: "Regulamentos e documentos oficiais" },
   { label: "Histórico",        href: "/historico",     icon: History,       desc: "Épocas anteriores" },

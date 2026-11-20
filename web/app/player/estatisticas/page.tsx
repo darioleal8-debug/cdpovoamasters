@@ -17,6 +17,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency } from "@/lib/utils";
+import { buildCalendarData, realGames, activeTrainings, localToday } from "@/lib/stats/team-summary";
 import {
   BarChart3, Calendar, CreditCard, Users,
   Trophy, CheckCircle2, AlertCircle,
@@ -50,23 +51,10 @@ export default function PlayerEstatisticasPage() {
   const basicLoading = eventsLoading || trainingsLoading;
   const posLoading   = playersLoading;
 
-  const attendanceData = useMemo<AttendanceDataPoint[]>(() => {
-    const map = new Map<string, { jogos: number; treinos: number }>();
-    for (const t of trainings) {
-      const m = MONTH_ABBR[new Date(t.date + "T00:00:00").getMonth()];
-      const e = map.get(m) ?? { jogos: 0, treinos: 0 };
-      e.treinos++;
-      map.set(m, e);
-    }
-    for (const ev of events) {
-      if (ev.type !== "jogo") continue;
-      const m = MONTH_ABBR[new Date(ev.event_date).getMonth()];
-      const e = map.get(m) ?? { jogos: 0, treinos: 0 };
-      e.jogos++;
-      map.set(m, e);
-    }
-    return Array.from(map.entries()).map(([month, v]) => ({ month, ...v }));
-  }, [events, trainings]);
+  const attendanceData = useMemo<AttendanceDataPoint[]>(
+    () => buildCalendarData(events, trainings),
+    [events, trainings],
+  );
 
   const positionsData = useMemo<PositionCount[]>(() => {
     const map: Record<string, number> = {};
@@ -81,10 +69,13 @@ export default function PlayerEstatisticasPage() {
     }));
   }, [players]);
 
-  const totalGames     = events.filter((e) => e.type === "jogo").length;
-  const totalTrainings = trainings.length;
-  const today          = new Date().toISOString().slice(0, 10);
-  const trainingsCompleted = trainings.filter((t) => t.date < today).length;
+  const games             = realGames(events);
+  const totalGames        = games.length;
+  const officialGames     = games.filter((g) => g.game_type === "official").length;
+  const liveTrainings     = activeTrainings(trainings);
+  const totalTrainings    = liveTrainings.length;
+  const today             = localToday();
+  const trainingsCompleted = liveTrainings.filter((t) => t.date < today).length;
 
   const pendingCount = myPayments.filter((p) => p.status === "pendente").length;
   const paidCount    = myPayments.filter((p) => p.status === "pago").length;
@@ -108,7 +99,7 @@ export default function PlayerEstatisticasPage() {
           className="font-condensed font-bold text-2xl uppercase tracking-display"
           style={{ color: "var(--ink,#0A1220)" }}
         >
-          Estatísticas
+          Resumo Equipa
         </h1>
         <Select
           value={seasonId ?? ""}
@@ -159,10 +150,10 @@ export default function PlayerEstatisticasPage() {
           Equipa &amp; Calendário
         </p>
         <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
-          <MetricCard title="Jogadores"  value={gameStats?.total_players ?? 0}
+          <MetricCard title="Jogadores"  value={players.length}
             description="No plantel"               icon={Users}    accent="blue"  loading={statsLoading} />
           <MetricCard title="Jogos"      value={totalGames}
-            description="Total na temporada"       icon={Calendar} accent="blue"  loading={basicLoading} />
+            description={officialGames === totalGames ? "Total na temporada" : `${officialGames} oficiais`}       icon={Calendar} accent="blue"  loading={basicLoading} />
           <MetricCard title="Treinos"    value={totalTrainings}
             description={trainingsCompleted > 0 ? `${trainingsCompleted} realizado(s)` : "Sessões marcadas"}
             icon={BarChart3} accent="amber" loading={basicLoading} />
@@ -186,7 +177,7 @@ export default function PlayerEstatisticasPage() {
       >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="hidden md:block text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Estatísticas Desportivas
+            Totais de Jogo (jogos oficiais)
           </p>
           <div className="flex flex-wrap gap-2">
             {(
@@ -215,7 +206,7 @@ export default function PlayerEstatisticasPage() {
         ) : !gameStats || gameStats.games_finished === 0 ? (
           <Card>
             <CardContent className="py-10 text-center text-sm text-muted-foreground">
-              Nenhum jogo terminado com estatísticas registadas.
+              Ainda não há jogos oficiais terminados com estatísticas registadas. As estatísticas por jogador estão em Jogos → estatísticas do jogo.
             </CardContent>
           </Card>
         ) : (

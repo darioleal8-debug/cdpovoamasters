@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import { useSeasons } from "@/hooks/use-seasons";
 import { useRosterPlayers } from "@/hooks/use-players";
 import { useGames } from "@/hooks/use-games";
@@ -17,6 +17,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency } from "@/lib/utils";
+import { buildCalendarData, realGames, activeTrainings, localToday } from "@/lib/stats/team-summary";
 import {
   BarChart3, Calendar, CreditCard, Users,
   Trophy, TrendingUp, CheckCircle2, AlertCircle,
@@ -43,40 +44,29 @@ export default function EstatisticasPage() {
 
   // Each section has its own loading flag — statsLoading must NOT block the basic metrics
   const basicLoading    = eventsLoading || trainingsLoading;
-  const playersLoading_ = statsLoading;   // player count comes from players table via useSeasonStats
   const posLoading      = playersLoading; // position distribution comes from players table
 
   /* ── Calendário por mês ──────────────────────────────── */
-  const attendanceData = useMemo<AttendanceDataPoint[]>(() => {
-    const map = new Map<string, { jogos: number; treinos: number }>();
-    // Trainings from public.trainings (the authoritative table)
-    for (const t of trainings) {
-      const m = MONTH_ABBR[new Date(t.date + "T00:00:00").getMonth()];
-      const e = map.get(m) ?? { jogos: 0, treinos: 0 };
-      e.treinos++;
-      map.set(m, e);
-    }
-    // Games from events table
-    for (const ev of events) {
-      if (ev.type !== "jogo") continue;
-      const m = MONTH_ABBR[new Date(ev.event_date).getMonth()];
-      const e = map.get(m) ?? { jogos: 0, treinos: 0 };
-      e.jogos++;
-      map.set(m, e);
-    }
-    return Array.from(map.entries()).map(([month, v]) => ({ month, ...v }));
-  }, [events, trainings]);
+  const attendanceData = useMemo<AttendanceDataPoint[]>(
+    () => buildCalendarData(events, trainings),
+    [events, trainings],
+  );
 
   /* ── Pagamentos por mês (últimos 8) ──────────────────── */
   const paymentsChartData = useMemo<PaymentDataPoint[]>(() => {
-    const map = new Map<string, { pago: number; pendente: number }>();
+    const map = new Map<number, { label: string; pago: number; pendente: number }>();
     for (const p of payments) {
-      const key = `${MONTH_ABBR[p.month - 1]}/${String(p.reference_year).slice(2)}`;
-      const e = map.get(key) ?? { pago: 0, pendente: 0 };
+      const order = p.reference_year * 12 + p.month;
+      const e = map.get(order) ?? {
+        label: `${MONTH_ABBR[p.month - 1]}/${String(p.reference_year).slice(2)}`, pago: 0, pendente: 0,
+      };
       if (p.status === "pago") e.pago += Number(p.amount); else e.pendente += Number(p.amount);
-      map.set(key, e);
+      map.set(order, e);
     }
-    return Array.from(map.entries()).slice(-8).map(([month, v]) => ({ month, ...v }));
+    return Array.from(map.entries())
+      .sort((a, b) => a[0] - b[0])
+      .slice(-8)
+      .map(([, v]) => ({ month: v.label, pago: v.pago, pendente: v.pendente }));
   }, [payments]);
 
   /* ── Resumo financeiro do mês corrente ───────────────── */
@@ -121,10 +111,13 @@ export default function EstatisticasPage() {
     }));
   }, [players]);
 
-  const totalGames     = events.filter(e => e.type === "jogo").length;
-  const totalTrainings = trainings.length;
-  const today          = new Date().toISOString().slice(0, 10);
-  const trainingsCompleted = trainings.filter((t) => t.date < today).length;
+  const games             = realGames(events);
+  const totalGames        = games.length;
+  const officialGames     = games.filter((g) => g.game_type === "official").length;
+  const liveTrainings     = activeTrainings(trainings);
+  const totalTrainings    = liveTrainings.length;
+  const today             = localToday();
+  const trainingsCompleted = liveTrainings.filter((t) => t.date < today).length;
 
   // Tabs de secção (mobile)
   type Tab = "equipa" | "desportivo" | "financeiro" | "assiduidade" | "treinos";
@@ -144,7 +137,7 @@ export default function EstatisticasPage() {
       <div className="flex items-center justify-between gap-3">
         <h1 className="font-condensed font-bold text-2xl uppercase tracking-display"
           style={{ color: "var(--text,#0A1220)" }}>
-          Estatísticas
+          Resumo Equipa
         </h1>
         <Select value={seasonId ?? ""} onValueChange={setSelectedSeasonId} disabled={seasonsLoading}>
           <SelectTrigger className="w-36 md:w-48 h-9 text-sm">
@@ -193,10 +186,10 @@ export default function EstatisticasPage() {
         </p>
         {/* Métricas 2×2 mobile, 4 cols tablet+ */}
         <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
-          <MetricCard title="Jogadores" value={gameStats?.total_players ?? 0}
-            description="No plantel" icon={Users} accent="blue" loading={playersLoading_} />
+          <MetricCard title="Jogadores" value={players.length}
+            description="No plantel" icon={Users} accent="blue" loading={playersLoading} />
           <MetricCard title="Jogos" value={totalGames}
-            description="Total na temporada" icon={Calendar} accent="blue" loading={basicLoading} />
+            description={officialGames === totalGames ? "Total na temporada" : `${officialGames} oficiais`} icon={Calendar} accent="blue" loading={basicLoading} />
           <MetricCard title="Treinos" value={totalTrainings}
             description={trainingsCompleted > 0 ? `${trainingsCompleted} realizado(s)` : "Sessões marcadas"}
             icon={BarChart3} accent="amber" loading={basicLoading} />
@@ -220,7 +213,7 @@ export default function EstatisticasPage() {
       >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="hidden md:block text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Estatísticas Desportivas
+            Totais de Jogo (jogos oficiais)
           </p>
           {/* Só jogos oficiais; filtro opcional por competição */}
           <div className="flex flex-wrap gap-2">
@@ -253,7 +246,7 @@ export default function EstatisticasPage() {
         ) : !gameStats || gameStats.games_finished === 0 ? (
           <Card>
             <CardContent className="py-10 text-center text-sm text-muted-foreground">
-              Nenhum jogo terminado com estatísticas registadas.
+              Ainda não há jogos oficiais terminados com estatísticas registadas. As estatísticas por jogador estão em Jogos → estatísticas do jogo.
             </CardContent>
           </Card>
         ) : (
