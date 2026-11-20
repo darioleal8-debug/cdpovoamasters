@@ -6,6 +6,9 @@ import Link from "next/link";
 import { ArrowLeft, User } from "lucide-react";
 import { POSITION_LABELS } from "@/lib/utils";
 import { calculateAge } from "@/lib/age";
+import { aggregateAverages, type GameStatRow, type PlayerAverages } from "@/lib/stats/team-averages";
+import { COLS } from "@/lib/stats/columns";
+import { abbr } from "@/lib/stats/terminology";
 
 export const dynamic = "force-dynamic";
 
@@ -60,7 +63,7 @@ export default async function PlayerPublicProfilePage({
 
   // ── 4. Estatísticas de jogo ───────────────────────────────
   // Só jogos oficiais contam (exclui treinos/amigáveis, testes e eliminados)
-  const officialSessionIds = await getOfficialGameSessionIds(admin, player.season_id);
+  const officialSessionIds = await getOfficialGameSessionIds(admin, player.season_id, { finishedOnly: true });
   const { data: statsRaw } = await admin
     .from("player_game_stats")
     .select("id, game_session_id, pts, reb_off, reb_def, ast, stl, blk, tov, fg2_made, fg2_att, fg3_made, fg3_att, ft_made, ft_att, seconds_played, efficiency") // minutes_played nunca é escrito (STA-10)
@@ -130,6 +133,38 @@ export default async function PlayerPublicProfilePage({
   const avgAst = avgStat("ast");
   const avgEff = avgStat("efficiency");
 
+  // ── 4b. Médias completas: época deste jogador e todas as temporadas (mesma conta) ──
+  type PgsRow = Omit<GameStatRow, "key">;
+  const { data: sameUser } = player.user_id
+    ? await admin.from("players").select("id, season_id").eq("user_id", player.user_id)
+    : { data: [] as { id: string; season_id: string }[] };
+  const myRecords = ((sameUser ?? []) as { id: string; season_id: string }[]);
+  if (!myRecords.some((r) => r.id === playerId)) myRecords.push({ id: playerId, season_id: player.season_id as string });
+  const { data: seasonRows } = await admin
+    .from("seasons")
+    .select("id, name, start_date")
+    .in("id", [...new Set(myRecords.map((r) => r.season_id))])
+    .order("start_date", { ascending: true });
+
+  const seasonAverages: { id: string; name: string; avg: PlayerAverages }[] = [];
+  const allRows: GameStatRow[] = [];
+  for (const se of (seasonRows ?? []) as { id: string; name: string }[]) {
+    const sessionIds = await getOfficialGameSessionIds(admin, se.id, { finishedOnly: true });
+    if (!sessionIds.length) continue;
+    const { data: rows } = await admin
+      .from("player_game_stats")
+      .select("pts, fg2_made, fg2_att, fg3_made, fg3_att, ft_made, ft_att, reb_off, reb_def, ast, stl, blk, tov, fouls_committed, fouls_drawn, efficiency, seconds_played, plus_minus")
+      .eq("season_id", se.id)
+      .in("player_id", myRecords.filter((r) => r.season_id === se.id).map((r) => r.id))
+      .in("game_session_id", sessionIds);
+    const keyed = ((rows ?? []) as PgsRow[]).map((r) => ({ ...r, key: "me" }));
+    if (!keyed.length) continue;
+    allRows.push(...keyed);
+    seasonAverages.push({ id: se.id, name: se.name, avg: aggregateAverages(keyed)[0] });
+  }
+  const currentAvg = seasonAverages.find((x) => x.id === player.season_id)?.avg ?? null;
+  const careerAvg = allRows.length ? aggregateAverages(allRows)[0] : null;
+
   // ── 5. Presença nos treinos (só a percentagem) ────────────
   const { data: attStats } = await admin
     .from("player_attendance_stats")
@@ -143,7 +178,7 @@ export default async function PlayerPublicProfilePage({
     : null;
 
   return (
-    <div className="space-y-5 max-w-lg">
+    <div className="space-y-5 max-w-lg lg:max-w-5xl">
 
       {/* Back */}
       <Link
@@ -203,10 +238,10 @@ export default async function PlayerPublicProfilePage({
       {n > 0 && (
         <div className="grid grid-cols-4 gap-2">
           {[
-            { label: "PTS", val: avgPts },
-            { label: "REB", val: avgReb },
-            { label: "AST", val: avgAst },
-            { label: "EFF", val: avgEff },
+            { label: abbr("ppg"), val: avgPts },
+            { label: abbr("rpg"), val: avgReb },
+            { label: abbr("apg"), val: avgAst },
+            { label: abbr("eff"), val: avgEff },
           ].map(({ label, val }) => (
             <div
               key={label}
@@ -222,6 +257,71 @@ export default async function PlayerPublicProfilePage({
             </div>
           ))}
         </div>
+      )}
+
+      {/* Estatísticas completas da época (médias por jogo, terminologia NBA) */}
+      {currentAvg && (
+        <section className="space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted-text,#5A6478)" }}>
+            Estatísticas da época · {season?.name ?? "—"} · médias por jogo
+          </p>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7">
+            {COLS.map((c) => (
+              <div
+                key={c.id}
+                title={c.title}
+                className="flex flex-col items-center rounded-xl py-2.5 gap-0.5"
+                style={{ background: "var(--paper,#F6F7F9)", border: "1px solid var(--line,#E4E7EE)" }}
+              >
+                <span className="text-[11px] font-semibold" style={{ color: "var(--muted-text,#5A6478)" }}>{c.label}</span>
+                <span className={`text-lg lg:text-xl tabular-nums ${c.strong ? "font-black" : "font-bold"}`} style={{ color: "var(--ink,#0A1220)" }}>
+                  {c.render(currentAvg)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Todas as temporadas */}
+      {seasonAverages.length > 1 && careerAvg && (
+        <section className="space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted-text,#5A6478)" }}>
+            Todas as temporadas · médias por jogo
+          </p>
+          <div className="rounded-2xl border overflow-x-auto" style={{ background: "var(--paper,#F6F7F9)", borderColor: "var(--line,#E4E7EE)" }}>
+            <table className="w-full text-xs md:text-sm whitespace-nowrap">
+              <thead>
+                <tr className="border-b" style={{ borderColor: "var(--line,#E4E7EE)" }}>
+                  <th className="text-left px-3 py-2.5 font-semibold sticky left-0 z-10 min-w-[130px]" style={{ background: "var(--paper,#F6F7F9)" }}>Temporada</th>
+                  {COLS.map((c) => (
+                    <th key={c.id} title={c.title} className="px-2 md:px-2.5 py-2.5 text-center font-semibold">{c.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y" style={{ borderColor: "var(--line,#E4E7EE)" }}>
+                {[...seasonAverages.map((x) => ({ key: x.id, label: x.name, avg: x.avg, total: false })),
+                  { key: "career", label: "Carreira (todas)", avg: careerAvg, total: true }].map((r) => (
+                  <tr key={r.key} className={r.total ? "font-bold" : r.key === player.season_id ? "bg-orange-50" : ""}>
+                    <td className="px-3 py-2.5 sticky left-0 z-10" style={{ background: r.total ? "#fff" : r.key === player.season_id ? "#fff7ed" : "var(--paper,#F6F7F9)" }}>
+                      {r.label}
+                    </td>
+                    {COLS.map((c) => (
+                      <td key={c.id} className={`px-2 md:px-2.5 py-2.5 text-center tabular-nums ${c.muted ? "text-muted-foreground" : ""}`}>
+                        {c.render(r.avg)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+      {seasonAverages.length === 1 && (
+        <p className="text-xs" style={{ color: "var(--muted-text,#5A6478)" }}>
+          Só há uma temporada com jogos registados; as médias de todas as temporadas aparecem quando houver mais.
+        </p>
       )}
 
       {/* Presença nos treinos */}

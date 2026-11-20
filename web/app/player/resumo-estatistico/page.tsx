@@ -74,8 +74,9 @@ export default async function ResumoEstatisticoPage() {
     if (rows.length) rowsBySeason.set(s.id, rows);
   }
 
-  const decorate = (a: PlayerAverages, p: { number: number | null; position: string | null; user_id: string | null }): ResumoPlayerAverages => ({
+  const decorate = (a: PlayerAverages, p: { id: string; number: number | null; position: string | null; user_id: string | null }): ResumoPlayerAverages => ({
     ...a,
+    playerId: p.id,
     name: nameOf(p),
     number: p.number,
     position: p.position,
@@ -99,7 +100,7 @@ export default async function ResumoEstatisticoPage() {
       }
     }
     // Número/posição: os da época mais recente em que o jogador consta
-    const latestByKey = new Map<string, { number: number | null; position: string | null; user_id: string | null }>();
+    const latestByKey = new Map<string, { id: string; number: number | null; position: string | null; user_id: string | null }>();
     for (const s of [...seasonsWithStats].reverse()) {
       for (const p of players.filter((x) => x.season_id === s.id)) latestByKey.set(p.user_id ?? p.id, p);
     }
