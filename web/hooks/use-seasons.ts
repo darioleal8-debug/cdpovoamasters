@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { myClubId } from "@/lib/club/my-club-id";
 import { toast } from "@/components/ui/toaster";
 import type { Season, SeasonFormData } from "@/types/database";
 
@@ -13,10 +14,11 @@ export function useSeasons() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("seasons")
-      .select("*")
-      .order("start_date", { ascending: false });
+    // Só as temporadas do clube do utilizador (o Master Admin vê as de todos os clubes por RLS)
+    const clubId = await myClubId(supabase);
+    let query = supabase.from("seasons").select("*").order("start_date", { ascending: false });
+    if (clubId) query = query.eq("club_id", clubId);
+    const { data } = await query;
 
     if (data) {
       setSeasons(data);
@@ -63,10 +65,17 @@ export function useSeasons() {
   }
 
   async function activateSeason(id: string): Promise<boolean> {
-    // Arquiva todas as temporadas ativas primeiro (evita violação do índice único)
+    // Arquiva as temporadas ativas DO CLUBE primeiro (evita violação do índice único).
+    // Sem filtro de clube, o Master Admin arquivava também as temporadas ativas dos outros clubes.
+    const clubId = await myClubId(supabase);
+    if (!clubId) {
+      toast({ title: "Erro ao ativar temporada", description: "Clube não identificado.", variant: "destructive" });
+      return false;
+    }
     const { error: e1 } = await supabase
       .from("seasons")
       .update({ status: "arquivada" })
+      .eq("club_id", clubId)
       .eq("status", "ativa");
 
     if (e1) {
@@ -78,7 +87,8 @@ export function useSeasons() {
     const { error: e2 } = await supabase
       .from("seasons")
       .update({ status: "ativa" })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("club_id", clubId);
 
     if (e2) {
       toast({ title: "Erro ao ativar temporada", description: e2.message, variant: "destructive" });

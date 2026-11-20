@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { activeSeasonForClub, clubIdForUser } from "@/lib/auth/club";
 
 export const runtime = "nodejs";
 
@@ -37,11 +38,8 @@ export async function GET() {
   }
 
   // Obter a época ativa
-  const { data: season } = await supabase
-    .from("seasons")
-    .select("id, name")
-    .eq("status", "ativa")
-    .maybeSingle();
+  // (do clube do utilizador: o Master Admin vê as temporadas de todos os clubes por RLS)
+  const season = await activeSeasonForClub(supabase, await clubIdForUser(supabase, user.id), "id, name");
 
   if (!season) {
     return new NextResponse("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//HoopHub//PT\r\nEND:VCALENDAR", {

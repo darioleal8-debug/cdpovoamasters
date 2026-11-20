@@ -17,6 +17,27 @@ export async function clubIdForUser(db: Db, userId: string): Promise<string | nu
   return (data?.club_id as string | undefined) ?? null;
 }
 
+/**
+ * Temporada ativa do clube. Obrigatório com o cliente de SESSÃO: para o Master Admin o RLS devolve as
+ * temporadas de todos os clubes, e `.eq("status","ativa").maybeSingle()` sem clube falha quando há
+ * mais de um clube com temporada ativa (devolvia null → ecrã "Primeiros passos").
+ */
+export async function activeSeasonForClub<T = { id: string; name: string; year: string; start_date: string; end_date: string; status: string }>(
+  db: Db,
+  clubId: string | null,
+  columns: string = "id,name,year,start_date,end_date,status",
+): Promise<T | null> {
+  if (!clubId) return null;
+  const { data } = await db
+    .from("seasons")
+    .select(columns)
+    .eq("club_id", clubId)
+    .eq("status", "ativa")
+    .limit(1)
+    .maybeSingle();
+  return (data as T | null) ?? null;
+}
+
 /** club_id de uma linha existente (ex.: treino, jogador) — herdar em registos filhos. */
 export async function clubIdOfRow(db: Db, table: string, id: string): Promise<string | null> {
   const { data } = await db.from(table).select("club_id").eq("id", id).maybeSingle();

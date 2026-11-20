@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useClubName } from "@/lib/club-context";
 import { createClient } from "@/lib/supabase/client";
+import { myClubId } from "@/lib/club/my-club-id";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -178,15 +179,15 @@ export default function ImportarCalendarioPage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    supabase
-      .from("seasons")
-      .select("*")
-      .order("start_date", { ascending: false })
-      .then(({ data }) => {
+    myClubId(supabase).then((clubId) => {
+      let q = supabase.from("seasons").select("*").order("start_date", { ascending: false });
+      if (clubId) q = q.eq("club_id", clubId);
+      return q.then(({ data }) => {
         setSeasons(data ?? []);
         const active = (data ?? []).find((s) => s.status === "ativa");
         if (active) setSeasonId(active.id);
       });
+    });
     fetchHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -2,6 +2,7 @@ import { redirect }     from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 import { OverviewClient } from "../overview-client";
+import { activeSeasonForClub, clubIdForUser } from "@/lib/auth/club";
 
 export const metadata: Metadata = { title: "Hoje — CD Póvoa Masters" };
 
@@ -10,11 +11,9 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: activeSeason } = await supabase
-    .from("seasons")
-    .select("id, name, year, status")
-    .eq("status", "ativa")
-    .maybeSingle();
+  // Temporada ativa do clube do utilizador (o Master Admin vê as de todos os clubes por RLS)
+  const clubId = await clubIdForUser(supabase, user.id);
+  const activeSeason = await activeSeasonForClub(supabase, clubId, "id, name, year, status");
 
   return <OverviewClient seasonId={activeSeason?.id ?? null} />;
 }

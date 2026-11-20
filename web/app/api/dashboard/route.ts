@@ -1,5 +1,5 @@
 import { todayInClubTz } from "@/lib/time/club-time";
-import { clubIdForUser, leagueTeamNameForClub } from "@/lib/auth/club";
+import { activeSeasonForClub, clubIdForUser, leagueTeamNameForClub } from "@/lib/auth/club";
 import { pickNextTraining } from "@/lib/time/pick-next-training";
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/auth/guards";
@@ -38,12 +38,13 @@ export async function GET(req: NextRequest) {
   const yesterday = todayInClubTz(new Date(now.getTime() - 86_400_000));
   const ago14     = todayInClubTz(new Date(Date.now() - 14 * 86_400_000));
 
-  // Temporada de contexto (ou activa)
-  const seasonRes = seasonId
-    ? await supabase.from("seasons").select("id,name,year,start_date,end_date,status").eq("id", seasonId).single()
-    : await supabase.from("seasons").select("id,name,year,start_date,end_date,status").eq("status", "ativa").maybeSingle();
+  // Clube do utilizador: a temporada ativa tem de ser a DESTE clube (o Master Admin vê todos os clubes por RLS)
+  const clubId = await clubIdForUser(supabase, user.id);
 
-  const season = seasonRes.data ?? null;
+  // Temporada de contexto (ou activa do clube)
+  const season = seasonId
+    ? ((await supabase.from("seasons").select("id,name,year,start_date,end_date,status").eq("id", seasonId).maybeSingle()).data ?? null)
+    : await activeSeasonForClub(supabase, clubId);
   const sid    = season?.id ?? seasonId ?? null;
 
   if (!sid) {
@@ -100,8 +101,7 @@ export async function GET(req: NextRequest) {
 
     // Nome da equipa do clube na liga (para V/D)
     (async () => {
-      const cid = await clubIdForUser(supabase, user.id);
-      const n = cid ? await leagueTeamNameForClub(supabase, cid) : null;
+      const n = clubId ? await leagueTeamNameForClub(supabase, clubId) : null;
       if (n) return { data: { name: n } };
       return supabase.from("league_teams").select("name").eq("is_our_team", true).maybeSingle();
     })(),
