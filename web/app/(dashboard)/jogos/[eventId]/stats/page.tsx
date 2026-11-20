@@ -463,10 +463,10 @@ export default function GameStatsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/50">
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Equipa</th>
-                  <th className="text-center px-3 py-2 text-xs font-semibold">Pontos</th>
-                  <th className="text-center px-3 py-2 text-xs font-semibold">Reb.</th>
-                  <th className="text-center px-3 py-2 text-xs font-semibold">Assist.</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Team</th>
+                  <th className="text-center px-3 py-2 text-xs font-semibold">PTS</th>
+                  <th className="text-center px-3 py-2 text-xs font-semibold">REB</th>
+                  <th className="text-center px-3 py-2 text-xs font-semibold">AST</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -496,17 +496,17 @@ export default function GameStatsPage() {
             <p className="text-xs text-muted-foreground mb-2">Detalhes <ClubName /></p>
             <div className="grid grid-cols-4 gap-2 text-center">
               {[
-                { label: "Assist.",   value: totAst },
-                { label: "Roubos",    value: totStl },
-                { label: "Desarmes",  value: totBlk },
-                { label: "Turnovers", value: totTov },
-                { label: "F.Sof.",    value: totFD  },
-                { label: "2P C/T", value: `${tot2M}/${tot2A}` },
+                { label: "AST",   value: totAst },
+                { label: "STL",    value: totStl },
+                { label: "BLK",  value: totBlk },
+                { label: "TOV", value: totTov },
+                { label: "PFD",    value: totFD  },
+                { label: "2P M/A", value: `${tot2M}/${tot2A}` },
                 { label: "2P %",  value: pct(tot2M, tot2A) },
-                { label: "3P C/T", value: `${tot3M}/${tot3A}` },
+                { label: "3P M/A", value: `${tot3M}/${tot3A}` },
                 { label: "3P %",  value: pct(tot3M, tot3A) },
-                { label: "LL C/T", value: `${totFtM}/${totFtA}` },
-                { label: "LL %",  value: pct(totFtM, totFtA) },
+                { label: "FT M/A", value: `${totFtM}/${totFtA}` },
+                { label: "FT %",  value: pct(totFtM, totFtA) },
                 { label: "FG %",  value: pct(tot2M + tot3M, tot2A + tot3A) },
               ].map((stat) => (
                 <div key={stat.label} className="bg-muted/50 rounded-lg p-2">
@@ -528,7 +528,7 @@ export default function GameStatsPage() {
               <thead>
                 <tr className="border-b bg-muted/50">
                   <th className="text-left px-3 py-2 font-semibold sticky left-0 bg-muted/50">#</th>
-                  <th className="text-left px-2 py-2 font-semibold min-w-[90px]">Jogador</th>
+                  <th className="text-left px-2 py-2 font-semibold min-w-[90px]">Player</th>
                   <th className="px-2 py-2 text-center font-semibold">MIN</th>
                   <th className="px-2 py-2 text-center font-semibold">PTS</th>
                   <th className="px-2 py-2 text-center font-semibold">REB</th>
@@ -536,14 +536,14 @@ export default function GameStatsPage() {
                   <th className="px-2 py-2 text-center font-semibold">STL</th>
                   <th className="px-2 py-2 text-center font-semibold">BLK</th>
                   <th className="px-2 py-2 text-center font-semibold">TOV</th>
-                  <th className="px-2 py-2 text-center font-semibold">FD</th>
-                  <th className="px-2 py-2 text-center font-semibold">FS</th>
-                  <th className="px-2 py-2 text-center font-semibold" title="Lançamentos de 2 pontos convertidos/tentados">2P C/T</th>
+                  <th className="px-2 py-2 text-center font-semibold" title="Personal fouls">PF</th>
+                  <th className="px-2 py-2 text-center font-semibold" title="Personal fouls drawn">PFD</th>
+                  <th className="px-2 py-2 text-center font-semibold" title="2-point field goals made/attempted">2P M/A</th>
                   <th className="px-2 py-2 text-center font-semibold">2P%</th>
-                  <th className="px-2 py-2 text-center font-semibold" title="Lançamentos de 3 pontos convertidos/tentados">3P C/T</th>
+                  <th className="px-2 py-2 text-center font-semibold" title="3-point field goals made/attempted">3P M/A</th>
                   <th className="px-2 py-2 text-center font-semibold">3P%</th>
-                  <th className="px-2 py-2 text-center font-semibold" title="Lances livres convertidos/tentados">LL C/T</th>
-                  <th className="px-2 py-2 text-center font-semibold">LL%</th>
+                  <th className="px-2 py-2 text-center font-semibold" title="Free throws made/attempted">FT M/A</th>
+                  <th className="px-2 py-2 text-center font-semibold">FT%</th>
                   <th className="px-2 py-2 text-center font-semibold text-cdpovoa-primary">EFF</th>
                   <th className="px-2 py-2 text-center font-semibold">+/-</th>
                 </tr>

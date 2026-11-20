@@ -18,13 +18,13 @@ function pct(made: number, att: number) {
 const EVENT_LABELS: Record<string, string> = {
   "2pt_made": "2P ✓", "2pt_miss": "2P ✗",
   "3pt_made": "3P ✓", "3pt_miss": "3P ✗",
-  "ft_made": "LL ✓", "ft_miss": "LL ✗",
-  "rebound_off": "Res.Of.", "rebound_def": "Res.Def.",
-  "assist": "Assist.", "steal": "Roubo", "block": "Desarme",
-  "turnover": "Turnover", "foul_committed": "F.Cometida",
-  "foul_def": "Falta defensiva", "foul_of": "Falta ofensiva",
-  "foul_tec": "Falta técnica", "foul_anti": "Falta antidesportiva",
-  "foul_drawn": "F.Sofrida", "substitution_in": "Substituição",
+  "ft_made": "FT ✓", "ft_miss": "FT ✗",
+  "rebound_off": "OREB", "rebound_def": "DREB",
+  "assist": "AST", "steal": "STL", "block": "BLK",
+  "turnover": "TOV", "foul_committed": "PF",
+  "foul_def": "Defensive foul", "foul_of": "Offensive foul",
+  "foul_tec": "Technical foul", "foul_anti": "Unsportsmanlike foul",
+  "foul_drawn": "PFD", "substitution_in": "Substituição",
   "timeout": "Timeout", "game_start": "🏀 Início",
   "period_end": "Fim Período", "game_end": "🏁 Fim Jogo",
 };
@@ -197,8 +197,8 @@ export default function SpectatorPage() {
                   <th className="px-2 py-2 text-center text-white/60 font-medium">STL</th>
                   <th className="px-2 py-2 text-center text-white/60 font-medium">BLK</th>
                   <th className="px-2 py-2 text-center text-white/60 font-medium">TOV</th>
-                  <th className="px-2 py-2 text-center text-white/60 font-medium">F</th>
-                  <th className="px-2 py-2 text-center text-white/60 font-medium">FS</th>
+                  <th className="px-2 py-2 text-center text-white/60 font-medium">PF</th>
+                  <th className="px-2 py-2 text-center text-white/60 font-medium">PFD</th>
                   <th className="px-2 py-2 text-center text-white/60 font-medium">2P%</th>
                   <th className="px-2 py-2 text-center text-white/60 font-medium">3P%</th>
                   <th className="px-2 py-2 text-center text-white/60 font-medium">EFF</th>

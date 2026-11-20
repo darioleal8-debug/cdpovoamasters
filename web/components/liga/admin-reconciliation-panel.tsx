@@ -44,7 +44,7 @@ const SEV: Record<string, { label: string; color: string }> = {
 const DOC_STATUS: Record<string, string> = {
   processing: "a analisar", needs_review: "por rever", ready_to_confirm: "por confirmar", confirmed: "confirmado pela equipa", published: "publicado", failed: "falhou",
 };
-const PCOLS: [StatKey, string][] = [["secs", "Min"], ["pts", "Pts"], ["fg2m", "2PC"], ["fg2a", "2PT"], ["fg3m", "3PC"], ["fg3a", "3PT"], ["ftm", "LLC"], ["fta", "LLT"], ["oreb", "RO"], ["dreb", "RD"], ["reb", "Res"], ["ast", "Ass"], ["stl", "Rou"], ["tov", "TO"], ["blk", "DL"], ["pf", "F"], ["fd", "FS"], ["eff", "Ef"]];
+const PCOLS: [StatKey, string][] = [["secs", "MIN"], ["pts", "PTS"], ["fg2m", "2PM"], ["fg2a", "2PA"], ["fg3m", "3PM"], ["fg3a", "3PA"], ["ftm", "FTM"], ["fta", "FTA"], ["oreb", "OREB"], ["dreb", "DREB"], ["reb", "REB"], ["ast", "AST"], ["stl", "STL"], ["tov", "TOV"], ["blk", "BLK"], ["pf", "PF"], ["fd", "PFD"], ["eff", "EFF"]];
 
 const card: React.CSSProperties = { border: "1px solid #E8E0D6", borderRadius: "8px", padding: "10px 12px", background: "#FFFDFA", marginBottom: "10px" };
 const h4: React.CSSProperties = { fontSize: "12px", fontWeight: 800, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: "0.06em", color: "#5C534A" };

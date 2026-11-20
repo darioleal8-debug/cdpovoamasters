@@ -40,42 +40,42 @@ type Col = {
 };
 
 const COLS: Col[] = [
-  { id: "games", label: "J", title: "Jogos", value: (p) => p.games, render: (p) => String(p.games) },
-  { id: "min", label: "MIN", title: "Minutos por jogo", value: (p) => p.min, render: (p) => f1(p.min) },
-  { id: "pts", label: "PTS", title: "Pontos por jogo", value: (p) => p.pts, render: (p) => f1(p.pts), strong: true },
-  { id: "fg2", label: "2P C/T", title: "Lançamentos de 2 pontos: convertidos/tentados por jogo", value: (p) => p.fg2m, render: (p) => `${f1(p.fg2m)}/${f1(p.fg2a)}` },
-  { id: "fg2p", label: "2P%", title: "Percentagem de 2 pontos", value: (p) => p.fg2Pct, render: (p) => pctTxt(p.fg2Pct), muted: true },
-  { id: "fg3", label: "3P C/T", title: "Triplos: convertidos/tentados por jogo", value: (p) => p.fg3m, render: (p) => `${f1(p.fg3m)}/${f1(p.fg3a)}` },
-  { id: "fg3p", label: "3P%", title: "Percentagem de triplos", value: (p) => p.fg3Pct, render: (p) => pctTxt(p.fg3Pct), muted: true },
-  { id: "ft", label: "LL C/T", title: "Lances livres: convertidos/tentados por jogo", value: (p) => p.ftm, render: (p) => `${f1(p.ftm)}/${f1(p.fta)}` },
-  { id: "ftp", label: "LL%", title: "Percentagem de lances livres", value: (p) => p.ftPct, render: (p) => pctTxt(p.ftPct), muted: true },
-  { id: "rebo", label: "RO", title: "Ressaltos ofensivos por jogo", value: (p) => p.rebOff, render: (p) => f1(p.rebOff) },
-  { id: "rebd", label: "RD", title: "Ressaltos defensivos por jogo", value: (p) => p.rebDef, render: (p) => f1(p.rebDef) },
-  { id: "reb", label: "REB", title: "Ressaltos por jogo", value: (p) => p.reb, render: (p) => f1(p.reb), strong: true },
-  { id: "ast", label: "AST", title: "Assistências por jogo", value: (p) => p.ast, render: (p) => f1(p.ast), strong: true },
-  { id: "stl", label: "ROU", title: "Roubos de bola por jogo", value: (p) => p.stl, render: (p) => f1(p.stl) },
-  { id: "blk", label: "DES", title: "Desarmes por jogo", value: (p) => p.blk, render: (p) => f1(p.blk) },
-  { id: "tov", label: "PER", title: "Perdas de bola por jogo", value: (p) => p.tov, render: (p) => f1(p.tov) },
-  { id: "fouls", label: "F", title: "Faltas cometidas por jogo", value: (p) => p.fouls, render: (p) => f1(p.fouls) },
-  { id: "fd", label: "FS", title: "Faltas sofridas por jogo", value: (p) => p.foulsDrawn, render: (p) => f1(p.foulsDrawn) },
-  { id: "eff", label: "EFF", title: "Eficiência por jogo", value: (p) => p.eff, render: (p) => f1(p.eff), strong: true },
-  { id: "pm", label: "+/-", title: "Mais/menos por jogo", value: (p) => p.plusMinus, render: (p) => (p.plusMinus == null ? "—" : `${p.plusMinus > 0 ? "+" : ""}${f1(p.plusMinus)}`) },
+  { id: "games", label: "GP", title: "Games played", value: (p) => p.games, render: (p) => String(p.games) },
+  { id: "min", label: "MIN", title: "Minutes per game", value: (p) => p.min, render: (p) => f1(p.min) },
+  { id: "pts", label: "PTS", title: "Points per game", value: (p) => p.pts, render: (p) => f1(p.pts), strong: true },
+  { id: "fg2", label: "2P M/A", title: "2-point field goals made/attempted per game", value: (p) => p.fg2m, render: (p) => `${f1(p.fg2m)}/${f1(p.fg2a)}` },
+  { id: "fg2p", label: "2P%", title: "2-point field goal percentage", value: (p) => p.fg2Pct, render: (p) => pctTxt(p.fg2Pct), muted: true },
+  { id: "fg3", label: "3P M/A", title: "3-point field goals made/attempted per game", value: (p) => p.fg3m, render: (p) => `${f1(p.fg3m)}/${f1(p.fg3a)}` },
+  { id: "fg3p", label: "3P%", title: "3-point field goal percentage", value: (p) => p.fg3Pct, render: (p) => pctTxt(p.fg3Pct), muted: true },
+  { id: "ft", label: "FT M/A", title: "Free throws made/attempted per game", value: (p) => p.ftm, render: (p) => `${f1(p.ftm)}/${f1(p.fta)}` },
+  { id: "ftp", label: "FT%", title: "Free throw percentage", value: (p) => p.ftPct, render: (p) => pctTxt(p.ftPct), muted: true },
+  { id: "oreb", label: "OREB", title: "Offensive rebounds per game", value: (p) => p.rebOff, render: (p) => f1(p.rebOff) },
+  { id: "dreb", label: "DREB", title: "Defensive rebounds per game", value: (p) => p.rebDef, render: (p) => f1(p.rebDef) },
+  { id: "reb", label: "REB", title: "Rebounds per game", value: (p) => p.reb, render: (p) => f1(p.reb), strong: true },
+  { id: "ast", label: "AST", title: "Assists per game", value: (p) => p.ast, render: (p) => f1(p.ast), strong: true },
+  { id: "stl", label: "STL", title: "Steals per game", value: (p) => p.stl, render: (p) => f1(p.stl) },
+  { id: "blk", label: "BLK", title: "Blocks per game", value: (p) => p.blk, render: (p) => f1(p.blk) },
+  { id: "tov", label: "TOV", title: "Turnovers per game", value: (p) => p.tov, render: (p) => f1(p.tov) },
+  { id: "pf", label: "PF", title: "Personal fouls per game", value: (p) => p.fouls, render: (p) => f1(p.fouls) },
+  { id: "pfd", label: "PFD", title: "Personal fouls drawn per game", value: (p) => p.foulsDrawn, render: (p) => f1(p.foulsDrawn) },
+  { id: "eff", label: "EFF", title: "Efficiency per game", value: (p) => p.eff, render: (p) => f1(p.eff), strong: true },
+  { id: "pm", label: "+/-", title: "Plus/minus per game", value: (p) => p.plusMinus, render: (p) => (p.plusMinus == null ? "—" : `${p.plusMinus > 0 ? "+" : ""}${f1(p.plusMinus)}`) },
 ];
 
 function Leaders({ rows }: { rows: ResumoPlayerAverages[] }) {
   const top = (pick: (p: ResumoPlayerAverages) => number) =>
     [...rows].sort((a, b) => pick(b) - pick(a) || a.name.localeCompare(b.name))[0];
   const items = [
-    { label: "Pontos", p: top((x) => x.pts), v: (x: ResumoPlayerAverages) => f1(x.pts) },
-    { label: "Ressaltos", p: top((x) => x.reb), v: (x: ResumoPlayerAverages) => f1(x.reb) },
-    { label: "Assistências", p: top((x) => x.ast), v: (x: ResumoPlayerAverages) => f1(x.ast) },
-    { label: "Eficiência", p: top((x) => x.eff), v: (x: ResumoPlayerAverages) => f1(x.eff) },
+    { label: "PPG", p: top((x) => x.pts), v: (x: ResumoPlayerAverages) => f1(x.pts) },
+    { label: "RPG", p: top((x) => x.reb), v: (x: ResumoPlayerAverages) => f1(x.reb) },
+    { label: "APG", p: top((x) => x.ast), v: (x: ResumoPlayerAverages) => f1(x.ast) },
+    { label: "EFF", p: top((x) => x.eff), v: (x: ResumoPlayerAverages) => f1(x.eff) },
   ];
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
       {items.map(({ label, p, v }) => (
         <div key={label} className="rounded-xl border bg-card px-3 py-3 md:px-4 md:py-4">
-          <p className="text-[11px] md:text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label} / jogo</p>
+          <p className="text-[11px] md:text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
           <p className="mt-1 text-2xl md:text-3xl font-black tabular-nums">{v(p)}</p>
           <p className="truncate text-xs md:text-sm text-muted-foreground">{shortName(p.name)}</p>
         </div>
@@ -109,7 +109,7 @@ function AveragesTable({ rows, highlightKeys }: { rows: ResumoPlayerAverages[]; 
       <table className="w-full text-xs md:text-sm xl:text-[15px] whitespace-nowrap">
         <thead>
           <tr className="border-b bg-muted/50">
-            <th className="text-left px-3 py-2.5 font-semibold sticky left-0 z-10 bg-muted min-w-[150px] md:min-w-[190px]">Jogador</th>
+            <th className="text-left px-3 py-2.5 font-semibold sticky left-0 z-10 bg-muted min-w-[150px] md:min-w-[190px]">Player</th>
             {COLS.map((c) => (
               <th key={c.id} className="px-0 py-0 text-center font-semibold" aria-sort={sortId === c.id ? (desc ? "descending" : "ascending") : "none"}>
                 <button
@@ -177,7 +177,7 @@ function TrainingTable({ rows, highlightIds }: { rows: TrainingRow[]; highlightI
         <table className="w-full text-xs md:text-sm xl:text-[15px] whitespace-nowrap">
           <thead>
             <tr className="border-b bg-muted/50">
-              <th className="text-left px-3 py-2.5 font-semibold sticky left-0 z-10 bg-muted min-w-[150px] md:min-w-[190px]">Jogador</th>
+              <th className="text-left px-3 py-2.5 font-semibold sticky left-0 z-10 bg-muted min-w-[150px] md:min-w-[190px]">Player</th>
               <th className="px-2 py-2 text-center font-semibold" title="Treinos registados">Treinos</th>
               <th className="px-2 py-2 text-center font-semibold" title="Presenças">Pres.</th>
               <th className="px-2 py-2 text-center font-semibold" title="Atrasos">Atr.</th>

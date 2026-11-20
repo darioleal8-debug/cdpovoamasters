@@ -252,14 +252,14 @@ export default function EstatisticasPage() {
         ) : (
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
             {[
-              { label: "Pontos",      value: gameStats.total_pts },
-              { label: "Ressaltos",   value: gameStats.total_reb },
-              { label: "Assist.",     value: gameStats.total_ast },
-              { label: "Roubos",      value: gameStats.total_stl },
-              { label: "Desarmes",    value: gameStats.total_blk },
+              { label: "Points",      value: gameStats.total_pts },
+              { label: "Rebounds",    value: gameStats.total_reb },
+              { label: "Assists",     value: gameStats.total_ast },
+              { label: "Steals",      value: gameStats.total_stl },
+              { label: "Blocks",      value: gameStats.total_blk },
               { label: "Turnovers",   value: gameStats.total_tov },
-              { label: "F. Dadas",    value: gameStats.total_fouls_committed },
-              { label: "F. Sofridas", value: gameStats.total_fouls_drawn },
+              { label: "Fouls (PF)",  value: gameStats.total_fouls_committed },
+              { label: "Fouls drawn (PFD)", value: gameStats.total_fouls_drawn },
             ].map(({ label, value }) => (
               <Card key={label}>
                 <CardContent className="py-4 px-3 text-center">

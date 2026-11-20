@@ -357,10 +357,10 @@ function ScreenLive() {
           { label: "LL",  sub: "acertou", color: "#12855B" },
           { label: "2PT", sub: "falhado", color: "#D92D20" },
           { label: "3PT", sub: "falhado", color: "#D92D20" },
-          { label: "Assist", sub: "",     color: ORANGE     },
-          { label: "Reb.Of", sub: "",     color: GRAY       },
-          { label: "Reb.Def",sub: "",     color: GRAY       },
-          { label: "Roubo", sub: "",      color: GRAY       },
+          { label: "AST", sub: "",     color: ORANGE     },
+          { label: "OREB", sub: "",     color: GRAY       },
+          { label: "DREB",sub: "",     color: GRAY       },
+          { label: "STL", sub: "",      color: GRAY       },
         ].map(({ label, sub, color }, i) => (
           <div
             key={i}

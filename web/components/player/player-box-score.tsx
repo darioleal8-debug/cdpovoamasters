@@ -100,7 +100,7 @@ export async function PlayerBoxScore({
 
   const partials = toPeriodPartials((periodsRes.data ?? []) as { period: number; home_score: number; away_score: number }[]);
   const oppReb = (sessRes.data?.away_reb_off ?? 0) + (sessRes.data?.away_reb_def ?? 0);
-  const periodLabel = (p: number) => (p <= 4 ? `${p}º` : `P${p - 4}`);
+  const periodLabel = (p: number) => (p <= 4 ? `Q${p}` : `OT${p - 4}`);
 
   return (
     <section id="box-score" className="space-y-3 scroll-mt-20">
@@ -112,7 +112,7 @@ export async function PlayerBoxScore({
           <table className="w-full text-sm lg:text-base whitespace-nowrap">
             <thead>
               <tr className="bg-muted/50 text-xs text-muted-foreground">
-                <th className="text-left px-3 py-2 font-semibold">Equipa</th>
+                <th className="text-left px-3 py-2 font-semibold">Team</th>
                 {partials.map((p) => (
                   <th key={p.period} className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">{periodLabel(p.period)}</th>
                 ))}
@@ -140,10 +140,10 @@ export async function PlayerBoxScore({
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-muted/50 text-xs text-muted-foreground">
-              <th className="text-left px-3 py-2 font-semibold">Equipa</th>
-              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">Pontos</th>
-              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">Reb.</th>
-              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">Assist.</th>
+              <th className="text-left px-3 py-2 font-semibold">Team</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">PTS</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">REB</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">AST</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -169,22 +169,22 @@ export async function PlayerBoxScore({
           <thead>
             <tr className="border-b bg-muted/50">
               <th className="text-left px-3 py-2 font-semibold sticky left-0 bg-muted">#</th>
-              <th className="text-left px-2 md:px-3 py-2 lg:py-2.5 font-semibold min-w-[100px]">Jogador</th>
+              <th className="text-left px-2 md:px-3 py-2 lg:py-2.5 font-semibold min-w-[100px]">Player</th>
               <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">MIN</th>
               <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">PTS</th>
-              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">2P C/T</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold" title="2-point field goals made/attempted">2P M/A</th>
               <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">2P%</th>
-              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">3P C/T</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold" title="3-point field goals made/attempted">3P M/A</th>
               <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">3P%</th>
-              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">LL C/T</th>
-              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">LL%</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold" title="Free throws made/attempted">FT M/A</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">FT%</th>
               <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">REB</th>
               <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">AST</th>
-              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">ROU</th>
-              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">DES</th>
-              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">PER</th>
-              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">F</th>
-              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">FS</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold" title="Steals">STL</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold" title="Blocks">BLK</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold" title="Turnovers">TOV</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold" title="Personal fouls">PF</th>
+              <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold" title="Personal fouls drawn">PFD</th>
               <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold text-cdpovoa-primary">EFF</th>
               <th className="px-2 md:px-3 py-2 lg:py-2.5 text-center font-semibold">+/-</th>
             </tr>
@@ -250,7 +250,7 @@ export async function PlayerBoxScore({
         </table>
       </div>
       <p className="text-[11px] text-muted-foreground">
-        C/T = convertidos/tentados · F = faltas · FS = faltas sofridas · EFF = eficiência
+        M/A = made/attempted · PF = personal fouls · PFD = fouls drawn · TOV = turnovers · EFF = efficiency
       </p>
     </section>
   );

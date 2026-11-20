@@ -19,10 +19,10 @@ type ApiResponse = {
 type TabKey = "season" | "last5";
 
 const METRICS: { key: keyof StatBlock; label: string }[] = [
-  { key: "pontos",       label: "Pontos/Jogo"  },
-  { key: "ressaltos",    label: "Ressaltos"     },
-  { key: "assistencias", label: "Assistências"  },
-  { key: "jogos",        label: "Jogos"         },
+  { key: "pontos",       label: "PPG"  },
+  { key: "ressaltos",    label: "RPG"     },
+  { key: "assistencias", label: "APG"  },
+  { key: "jogos",        label: "GP"         },
 ];
 
 export function StatsSection({ seasonId }: { seasonId: string | null }) {
