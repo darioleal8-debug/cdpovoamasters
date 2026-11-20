@@ -8,6 +8,8 @@ import type { DerivedPlayerStats } from "@/lib/live/derive-stats";
 import { formatClock } from "@/hooks/use-live-game";
 import { EVENT_LABELS } from "./layout-1a";
 import { MONO, SANS } from "./tokens";
+import { PeriodBar } from "@/components/live/period-bar";
+import { liveName } from "@/lib/live/player-name";
 
 type FoulType = "foul_def" | "foul_of" | "foul_tec" | "foul_anti";
 type FoulSel = "Def" | "Of" | "Tec" | "Anti" | "Sofr";
@@ -34,6 +36,7 @@ export interface Layout1cProps {
   onStartClock: () => Promise<void>;
   onStopClock: () => Promise<void>;
   onNextPeriod: () => void;
+  onFinish: () => void;
   onSubstitute: (inId: string, outId: string) => Promise<void>;
   onSetLineup: (ids: string[]) => Promise<boolean>;
   onUndoPlay: (id: string) => Promise<boolean>;
@@ -64,7 +67,7 @@ export function Layout1c({
   session, roster, onCourt, bench, plays, derivedStats, clockSecs, recording,
   homeFouls, awayFouls, awayRebOff, awayRebDef,
   onRecordPlay, onRecordOpponentPoints, onRecordOpponentMiss, onRecordOpponentFoul, onRecordOpponentReb,
-  onStartClock, onStopClock, onNextPeriod, onSubstitute, onSetLineup, onUndoPlay,
+  onStartClock, onStopClock, onNextPeriod, onFinish, onSubstitute, onSetLineup, onUndoPlay,
 }: Layout1cProps) {
   const [foulSel, setFoulSel] = useState<FoulSel>("Def");
 
@@ -121,10 +124,8 @@ export function Layout1c({
             style={{ height: 46, padding: "0 20px", borderRadius: 10, border: "none", cursor: "pointer", fontFamily: SANS, fontSize: 14, fontWeight: 700, background: "var(--accent)", color: "var(--accentInk)" }}>
             {running ? "■ Stop" : "▶ Start"}
           </button>
-          <button onClick={onNextPeriod}
-            style={{ height: 46, padding: "0 16px", borderRadius: 10, cursor: "pointer", fontFamily: SANS, fontSize: 14, fontWeight: 700, background: "var(--panel)", border: "1px solid var(--line)", color: "var(--text)" }}>
-            Period +
-          </button>
+          <PeriodBar period={session.current_period} homeScore={session.home_score} awayScore={session.away_score}
+            onNextPeriod={onNextPeriod} onFinish={onFinish} disabled={recording} />
 
           <div style={{ flex: 1 }} />
           <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
@@ -375,7 +376,7 @@ export function Layout1c({
                 <span style={{ fontFamily: MONO, fontSize: 12, color: "var(--muted)", minWidth: 50 }}>{p.game_clock || "—"}</span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", flex: 1 }}>
                   {!p.is_home_team && <span style={{ color: "var(--muted)" }}>Opponent · </span>}
-                  {player && <span>#{player.jersey_number} {player.user.name.split(" ")[0]} · </span>}
+                  {player && <span>#{player.jersey_number} {liveName(player.user.name)} · </span>}
                   {label}
                 </span>
                 <span style={{ fontFamily: MONO, fontSize: 11, color: "var(--muted)", minWidth: 60, textAlign: "right" }}>

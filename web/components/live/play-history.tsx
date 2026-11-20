@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { PlayByPlay, PlayerWithUser } from "@/types/database";
 import { EVENT_LABELS } from "./layout-1a";
 import { isBlockedShot } from "@/lib/live/shot-zones";
+import { liveName } from "@/lib/live/player-name";
 
 const SANS = "var(--font-sans, system-ui, sans-serif)";
 const MONO = "var(--font-mono, ui-monospace, monospace)";
@@ -106,10 +107,10 @@ export function PlayHistory({ plays, roster, recording, onUndoPlay, onClose }: P
                 <span style={{ fontFamily: MONO, fontSize: 12, color: "var(--muted)", minWidth: 46 }}>{p.game_clock || "—"}</span>
                 <span style={{ flex: 1, fontSize: 13, fontWeight: 700 }}>
                   {!p.is_home_team && <span style={{ color: "var(--muted)" }}>Opponent · </span>}
-                  {player && <span>#{player.jersey_number} {player.user.name.split(" ")[0]} · </span>}
+                  {player && <span>#{player.jersey_number} {liveName(player.user.name)} · </span>}
                   {EVENT_LABELS[p.event_type] ?? p.event_type}
                   {isBlockedShot(p) && <span style={{ color: "var(--danger, #ef4444)" }}> · blocked</span>}
-                  {assist && <span style={{ color: "var(--muted)", fontWeight: 600 }}> (ast #{assist.jersey_number} {assist.user.name.split(" ")[0]})</span>}
+                  {assist && <span style={{ color: "var(--muted)", fontWeight: 600 }}> (ast #{assist.jersey_number} {liveName(assist.user.name)})</span>}
                 </span>
                 <span style={{ fontFamily: MONO, fontSize: 11, color: "var(--muted)", minWidth: 52, textAlign: "right" }}>
                   {p.home_score_after}–{p.away_score_after}

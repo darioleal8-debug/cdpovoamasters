@@ -293,6 +293,7 @@ export default function LiveGamePage() {
     onStartClock: startClock,
     onStopClock: stopClock,
     onNextPeriod: handleNextPeriod,
+    onFinish: () => setFinishDialog(true),
     onSubstitute: substitutePlayer,
     onSetLineup: setLineup,
     onUndoPlay: undoPlay,
@@ -436,7 +437,8 @@ export default function LiveGamePage() {
 
       {/* ── Ecrã de marcação mobile (landscape + fullscreen) ─── */}
       {isMobileScoring && isLive && session && user && (
-        <MobileScoringScreen game={game} userId={user.id} clubName={clubName} />
+        <MobileScoringScreen game={game} userId={user.id} clubName={clubName}
+          onNextPeriod={handleNextPeriod} onFinish={() => setFinishDialog(true)} />
       )}
 
       {/* Prompt de rotação (portrait + fullscreen) */}

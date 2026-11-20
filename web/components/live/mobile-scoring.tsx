@@ -7,6 +7,8 @@ import { deriveStats, withSecondsPlayed } from "@/lib/live/derive-stats";
 import { computeSecondsPlayed, formatMinutes, type CourtStint } from "@/lib/live/minutes";
 import { formatClock } from "@/hooks/use-live-game";
 import { MONO, SANS } from "./tokens";
+import { PeriodBar } from "@/components/live/period-bar";
+import { liveName } from "@/lib/live/player-name";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -40,6 +42,9 @@ export interface MobileScoringScreenProps {
   userId: string;
   /** Name of the club using the scorer (never hard-coded). */
   clubName?: string;
+  /** Fim de período / fim de jogo: abrem os diálogos da página (iguais aos do ecrã normal). */
+  onNextPeriod?: () => void;
+  onFinish?: () => void;
 }
 
 // ── Module-level constants ────────────────────────────────────────────────────
@@ -120,7 +125,7 @@ function PlayerRow({ player, pts, fouls, secs, isSelected, isSubTarget, isPendin
         fontSize: 12, fontWeight: 600, color: "var(--text)", flex: 1,
         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
       }}>
-        {player.user.name.split(" ")[0]}
+        {liveName(player.user.name)}
       </span>
       <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
         <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 600, color: "var(--muted)" }} title="Time played">{formatMinutes(secs)}</span>
@@ -183,7 +188,7 @@ function ActionButton({ event: _event, label, sub, actionStyle, enabled, onClick
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function MobileScoringScreen({ game, userId: _userId, clubName = "Home" }: MobileScoringScreenProps) {
+export function MobileScoringScreen({ game, userId: _userId, clubName = "Home", onNextPeriod, onFinish }: MobileScoringScreenProps) {
   const {
     session, roster, onCourt, bench, plays, stints, clockSecs, recording,
     recordPlay, recordOpponentPoints, recordOpponentMiss, recordOpponentFoul, recordOpponentReb,
@@ -302,6 +307,13 @@ export function MobileScoringScreen({ game, userId: _userId, clubName = "Home" }
         >
           {running ? "■" : "▶"}
         </button>
+
+        {/* Fim de período / fim de jogo */}
+        {onNextPeriod && onFinish && (
+          <PeriodBar compact period={session?.current_period ?? 1}
+            homeScore={session?.home_score ?? 0} awayScore={session?.away_score ?? 0}
+            onNextPeriod={onNextPeriod} onFinish={onFinish} />
+        )}
 
         {/* Opponent toggle */}
         <button
@@ -529,7 +541,7 @@ export function MobileScoringScreen({ game, userId: _userId, clubName = "Home" }
                   background: "var(--chip)", color: "var(--text)",
                   cursor: "pointer", fontFamily: SANS, fontSize: 12, fontWeight: 600,
                 } as React.CSSProperties}>
-                  #{p.jersey_number} {p.user.name.split(" ")[0]} {st?.pts ?? 0}P
+                  #{p.jersey_number} {liveName(p.user.name)} {st?.pts ?? 0}P
                 </button>
               );
             })}

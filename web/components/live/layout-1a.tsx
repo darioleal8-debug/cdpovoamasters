@@ -7,6 +7,8 @@ import type { PlayerWithUser } from "@/types/database";
 import type { DerivedPlayerStats } from "@/lib/live/derive-stats";
 import { formatClock } from "@/hooks/use-live-game";
 import { MONO, SANS } from "./tokens";
+import { PeriodBar } from "@/components/live/period-bar";
+import { liveName } from "@/lib/live/player-name";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -33,6 +35,7 @@ export interface Layout1aProps {
   onStartClock: () => Promise<void>;
   onStopClock: () => Promise<void>;
   onNextPeriod: () => void;
+  onFinish: () => void;
   onSubstitute: (inId: string, outId: string) => Promise<void>;
   onSetLineup: (ids: string[]) => Promise<boolean>;
   onUndoPlay: (id: string) => Promise<boolean>;
@@ -124,11 +127,11 @@ function Panel({ children, style }: { children: React.ReactNode; style?: React.C
 
 function Scoreboard1a({
   session, clockSecs, homeFouls, awayFouls, awayRebOff, awayRebDef,
-  onStartClock, onStopClock, onNextPeriod, onTimeout, clubName,
+  onStartClock, onStopClock, onNextPeriod, onFinish, onTimeout, clubName,
 }: {
   session: GameSession; clockSecs: number; homeFouls: number; awayFouls: number;
   awayRebOff: number; awayRebDef: number;
-  onStartClock: () => void; onStopClock: () => void; onNextPeriod: () => void;
+  onStartClock: () => void; onStopClock: () => void; onNextPeriod: () => void; onFinish: () => void;
   onTimeout?: (team: "home" | "away") => void; clubName?: string;
 }) {
   const running = session.clock_running;
@@ -193,16 +196,8 @@ function Scoreboard1a({
           >
             {running ? "■ Stop" : "▶ Start"}
           </button>
-          <button
-            onClick={onNextPeriod}
-            style={{
-              height: 46, padding: "0 16px", borderRadius: 10, cursor: "pointer",
-              fontFamily: SANS, fontSize: 14, fontWeight: 700,
-              background: "var(--panel)", border: "1px solid var(--line)", color: "var(--text)",
-            }}
-          >
-            Period +
-          </button>
+          <PeriodBar period={session.current_period} homeScore={session.home_score} awayScore={session.away_score}
+            onNextPeriod={onNextPeriod} onFinish={onFinish} />
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase", fontFamily: SANS }}>
@@ -432,7 +427,7 @@ function PlayLog({
               </span>
               <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", flex: 1, fontFamily: SANS }}>
                 {!p.is_home_team && <span style={{ color: "var(--muted)" }}>Opponent · </span>}
-                {player && <span>#{player.jersey_number} {player.user.name.split(" ")[0]} · </span>}
+                {player && <span>#{player.jersey_number} {liveName(player.user.name)} · </span>}
                 {label}
               </span>
               <span style={{ fontFamily: MONO, fontSize: 11, color: "var(--muted)", minWidth: 60, textAlign: "right" }}>
@@ -469,7 +464,7 @@ export function Layout1a({
   session, roster, onCourt, bench, plays, derivedStats, clockSecs, recording,
   homeFouls, awayFouls, awayRebOff, awayRebDef,
   onRecordPlay, onRecordOpponentPoints, onRecordOpponentMiss, onRecordOpponentFoul, onRecordOpponentReb,
-  onStartClock, onStopClock, onNextPeriod, onSubstitute, onSetLineup, onUndoPlay, onTimeout, clubName,
+  onStartClock, onStopClock, onNextPeriod, onFinish, onSubstitute, onSetLineup, onUndoPlay, onTimeout, clubName,
 }: Layout1aProps) {
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerWithUser | null>(null);
   const [pendingIn, setPendingIn] = useState<string | null>(null);
@@ -528,7 +523,7 @@ export function Layout1a({
       <Scoreboard1a
         session={session} clockSecs={clockSecs} homeFouls={homeFouls}
         awayFouls={awayFouls} awayRebOff={awayRebOff} awayRebDef={awayRebDef}
-        onStartClock={onStartClock} onStopClock={onStopClock} onNextPeriod={onNextPeriod}
+        onStartClock={onStartClock} onStopClock={onStopClock} onNextPeriod={onNextPeriod} onFinish={onFinish}
         onTimeout={onTimeout} clubName={clubName}
       />
 
@@ -621,7 +616,7 @@ export function Layout1a({
                           transition: "all 0.1s",
                         }}
                       >
-                        #{player.jersey_number} {player.user.name.split(" ")[0]}{" "}
+                        #{player.jersey_number} {liveName(player.user.name)}{" "}
                         {stats?.pts ?? 0} pts · {stats?.fouls_total ?? 0} F · {formatMinutes(stats?.secs_played)} ↑
                       </button>
                     );

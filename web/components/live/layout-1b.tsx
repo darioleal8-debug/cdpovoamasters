@@ -8,6 +8,8 @@ import type { DerivedPlayerStats } from "@/lib/live/derive-stats";
 import { formatClock } from "@/hooks/use-live-game";
 import { EVENT_LABELS } from "./layout-1a";
 import { MONO, SANS } from "./tokens";
+import { PeriodBar } from "@/components/live/period-bar";
+import { liveName } from "@/lib/live/player-name";
 
 type FoulType = "foul_def" | "foul_of" | "foul_tec" | "foul_anti";
 
@@ -32,6 +34,7 @@ export interface Layout1bProps {
   onStartClock: () => Promise<void>;
   onStopClock: () => Promise<void>;
   onNextPeriod: () => void;
+  onFinish: () => void;
   onSubstitute: (inId: string, outId: string) => Promise<void>;
   onSetLineup: (ids: string[]) => Promise<boolean>;
   onUndoPlay: (id: string) => Promise<boolean>;
@@ -75,7 +78,7 @@ export function Layout1b({
   session, roster, onCourt, bench, plays, derivedStats, clockSecs, recording,
   homeFouls, awayFouls, awayRebOff, awayRebDef,
   onRecordPlay, onRecordOpponentPoints, onRecordOpponentMiss, onRecordOpponentFoul, onRecordOpponentReb,
-  onStartClock, onStopClock, onNextPeriod, onSubstitute, onSetLineup, onUndoPlay,
+  onStartClock, onStopClock, onNextPeriod, onFinish, onSubstitute, onSetLineup, onUndoPlay,
 }: Layout1bProps) {
   const [selectedAction, setSelectedAction] = useState<PlayEventType | null>(null);
   const [pendingIn, setPendingIn] = useState<string | null>(null);
@@ -164,10 +167,8 @@ export function Layout1b({
             style={{ height: 46, padding: "0 20px", borderRadius: 10, border: "none", cursor: "pointer", fontFamily: SANS, fontSize: 14, fontWeight: 700, background: "var(--accent)", color: "var(--accentInk)" }}>
             {running ? "■ Stop" : "▶ Start"}
           </button>
-          <button onClick={onNextPeriod}
-            style={{ height: 46, padding: "0 16px", borderRadius: 10, cursor: "pointer", fontFamily: SANS, fontSize: 14, fontWeight: 700, background: "var(--panel)", border: "1px solid var(--line)", color: "var(--text)" }}>
-            Period +
-          </button>
+          <PeriodBar period={session.current_period} homeScore={session.home_score} awayScore={session.away_score}
+            onNextPeriod={onNextPeriod} onFinish={onFinish} disabled={recording} />
 
           <div style={{ flex: 1 }} />
 
@@ -299,7 +300,7 @@ export function Layout1b({
                   #{player.jersey_number ?? "–"}
                 </span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", textAlign: "center" }}>
-                  {player.user.name.split(" ")[0]}
+                  {liveName(player.user.name)}
                 </span>
                 <span style={{ fontSize: 11, color: "var(--muted)" }}>{pts} pts · {reb} res</span>
                 <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "var(--text)" }} title="Time played">⏱ {formatMinutes(stats?.secs_played)}</span>
@@ -330,7 +331,7 @@ export function Layout1b({
                     background: "var(--chip)", color: "var(--text)", fontFamily: SANS,
                     border: isPendingIn ? "2px solid var(--accent)" : "1px solid var(--line)",
                   }}>
-                  #{player.jersey_number} {player.user.name.split(" ")[0]} · {formatMinutes(stats?.secs_played)} ↑
+                  #{player.jersey_number} {liveName(player.user.name)} · {formatMinutes(stats?.secs_played)} ↑
                 </button>
               );
             })}
@@ -359,7 +360,7 @@ export function Layout1b({
                 <span style={{ fontFamily: MONO, fontSize: 12, color: "var(--muted)", minWidth: 50 }}>{p.game_clock || "—"}</span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", flex: 1 }}>
                   {!p.is_home_team && <span style={{ color: "var(--muted)" }}>Opponent · </span>}
-                  {player && <span>#{player.jersey_number} {player.user.name.split(" ")[0]} · </span>}
+                  {player && <span>#{player.jersey_number} {liveName(player.user.name)} · </span>}
                   {label}
                 </span>
                 <span style={{ fontFamily: MONO, fontSize: 11, color: "var(--muted)", minWidth: 60, textAlign: "right" }}>
