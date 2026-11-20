@@ -30,16 +30,16 @@ function SeasonRow({
   const isActive = season.status === "ativa";
 
   return (
-    <div className={`flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between ${isActive ? "border-cdpovoa-primary/40 bg-cdpovoa-primary/5" : ""}`}>
+    <div className={`flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between ${isActive ? "border-cdpovoa-accent/40 bg-cdpovoa-accent/5" : ""}`}>
       <div className="flex items-start gap-3">
-        <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${isActive ? "bg-cdpovoa-primary text-white" : "bg-muted text-muted-foreground"}`}>
+        <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${isActive ? "bg-cdpovoa-accent text-white" : "bg-muted text-muted-foreground"}`}>
           <CalendarRange className="h-4 w-4" />
         </div>
         <div>
           <div className="flex items-center gap-2">
             <span className="font-semibold">{season.name}</span>
             {isActive && (
-              <Badge className="bg-cdpovoa-primary text-white text-[0.65rem]">Ativa</Badge>
+              <Badge className="bg-cdpovoa-accent text-white text-[0.65rem]">Ativa</Badge>
             )}
           </div>
           <p className="text-sm text-muted-foreground">{season.year}</p>
@@ -56,7 +56,7 @@ function SeasonRow({
           <Button
             size="sm"
             variant="outline"
-            className="border-cdpovoa-primary text-cdpovoa-primary hover:bg-cdpovoa-primary hover:text-white"
+            className="border-cdpovoa-accent text-cdpovoa-accent hover:bg-cdpovoa-accent hover:text-white"
             onClick={() => onActivate(season)}
           >
             <Zap className="mr-1.5 h-3.5 w-3.5" />
@@ -287,7 +287,7 @@ export default function TemporadasPage() {
             <Button variant="outline" onClick={() => setConfirmActivate(null)}>
               Cancelar
             </Button>
-            <Button onClick={handleActivate} disabled={saving} className="bg-cdpovoa-primary hover:bg-cdpovoa-primary-mid">
+            <Button onClick={handleActivate} disabled={saving} className="bg-cdpovoa-accent hover:bg-cdpovoa-accent-dark">
               <Zap className="mr-2 h-4 w-4" />
               Ativar
             </Button>
