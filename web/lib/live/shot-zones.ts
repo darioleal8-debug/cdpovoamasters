@@ -74,6 +74,75 @@ export function isThreePointArea(x: number, y: number): boolean {
   return Math.hypot(mx, my) > THREE_RADIUS_M || Math.abs(mx) > THREE_CORNER_X_M;
 }
 
+/** A tap this close (m) to the wrong side of the 3-point line is snapped to the right side (finger tolerance). */
+export const LINE_TOLERANCE_M = 0.3;
+/** How far (m) past the line a snapped tap is placed. */
+export const LINE_SNAP_MARGIN_M = 0.05;
+
+export const SHOT_SPOT_MESSAGES = {
+  inside_three_line: "A 3-pointer must be taken from behind the 3-point line.",
+  outside_two_area: "A 2-pointer must be taken from inside the 3-point line.",
+} as const;
+
+export type ShotSpotResult =
+  | { ok: true; x: number; y: number; snapped: boolean }
+  | { ok: false; reason: keyof typeof SHOT_SPOT_MESSAGES };
+
+function fromMeters(mx: number, my: number) {
+  return {
+    x: ((mx + COURT_W_M / 2) / COURT_W_M) * 100,
+    y: ((my + BASKET_Y_M) / COURT_L_M) * 100,
+  };
+}
+
+/**
+ * Validates a tapped spot against the shot type: a 3PT must be outside the 3-point line and a 2PT
+ * inside it (the line itself counts as 2PT, as in FIBA). A tap within LINE_TOLERANCE_M of the wrong
+ * side is snapped just past the line; anything further is rejected. Free throws are always valid.
+ */
+export function resolveShotSpot(kind: ShotKind, x: number, y: number): ShotSpotResult {
+  if (kind === "ft") return { ok: true, x, y, snapped: false };
+  const wantThree = kind === "3";
+  if (isThreePointArea(x, y) === wantThree) return { ok: true, x, y, snapped: false };
+
+  const reason = wantThree ? "inside_three_line" : "outside_two_area";
+  const { mx, my } = toMeters(x, y);
+  const dist = Math.hypot(mx, my);
+  const sign = mx < 0 ? -1 : 1;
+  let nx = mx;
+  let ny = my;
+
+  if (wantThree) {
+    // Tap is inside the arc: leave through the nearest boundary.
+    const gapArc = THREE_RADIUS_M - dist;
+    const gapCorner = THREE_CORNER_X_M - Math.abs(mx);
+    if (Math.min(gapArc, gapCorner) > LINE_TOLERANCE_M) return { ok: false, reason };
+    if (gapCorner <= gapArc) {
+      nx = sign * (THREE_CORNER_X_M + LINE_SNAP_MARGIN_M);
+    } else {
+      const k = (THREE_RADIUS_M + LINE_SNAP_MARGIN_M) / dist;
+      nx = mx * k; ny = my * k;
+    }
+  } else {
+    // Tap is behind the line: come back inside both the arc and the corner line.
+    const overArc = Math.max(0, dist - THREE_RADIUS_M);
+    const overCorner = Math.max(0, Math.abs(mx) - THREE_CORNER_X_M);
+    if (Math.max(overArc, overCorner) > LINE_TOLERANCE_M) return { ok: false, reason };
+    if (overCorner > 0) nx = sign * (THREE_CORNER_X_M - LINE_SNAP_MARGIN_M);
+    const d2 = Math.hypot(nx, ny);
+    if (d2 > THREE_RADIUS_M - LINE_SNAP_MARGIN_M) {
+      const k = (THREE_RADIUS_M - LINE_SNAP_MARGIN_M) / d2;
+      nx *= k; ny *= k;
+    }
+  }
+
+  const p = fromMeters(nx, ny);
+  const px = Number(Math.min(100, Math.max(0, p.x)).toFixed(2));
+  const py = Number(Math.min(100, Math.max(0, p.y)).toFixed(2));
+  if (isThreePointArea(px, py) !== wantThree) return { ok: false, reason };
+  return { ok: true, x: px, y: py, snapped: true };
+}
+
 export function classifyShotZone(x: number, y: number): ShotZoneId {
   const { mx, my } = toMeters(x, y);
   const dist = Math.hypot(mx, my);

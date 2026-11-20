@@ -106,8 +106,8 @@ export function Layout1b({
     }
 
     if (!selectedAction) return;
-    await onRecordPlay(selectedAction, player.user_id);
-    setSelectedAction(null);
+    const ok = await onRecordPlay(selectedAction, player.user_id);
+    if (ok) setSelectedAction(null); // keep the action selected if the tap was not accepted
   }
 
   const actionBtnStyle = (a: ActionDef): React.CSSProperties => {
@@ -190,7 +190,7 @@ export function Layout1b({
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 16 }}>
           <div style={{ minWidth: 160 }}>
             <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", color: "var(--text)" }}>OPPONENT · PTS</div>
-            <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{session.away_score} no jogo · sem registo individual</div>
+            <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{session.away_score} in game · no individual tracking</div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase" }}>POINTS</span>

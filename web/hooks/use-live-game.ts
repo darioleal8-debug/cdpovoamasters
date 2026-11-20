@@ -18,7 +18,8 @@ import type {
 } from "@/types/database";
 import type { PlayerWithUser } from "@/types/database";
 import type { CourtStint } from "@/lib/live/minutes";
-import { isShotEvent, isMadeShot, shotKindOf, classifyShotZone, FREE_THROW_POINT, BLOCKED_DESC } from "@/lib/live/shot-zones";
+import { isShotEvent, isMadeShot, shotKindOf, classifyShotZone, resolveShotSpot, SHOT_SPOT_MESSAGES, FREE_THROW_POINT, BLOCKED_DESC } from "@/lib/live/shot-zones";
+import { useClubName } from "@/lib/club-context";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -27,11 +28,14 @@ export function formatClock(secs: number): string {
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 }
 
+/** Device clock minus server clock (ms), measured when the scorer starts/stops the clock. Only set when the skew is large. */
+let clockOffsetMs = 0;
+
 export function computeClockSecs(session: GameSession | null): number {
   if (!session) return DEFAULT_PERIOD_SECS;
   let elapsed = session.clock_elapsed_secs ?? 0;
   if (session.clock_running && session.clock_started_at) {
-    elapsed += (Date.now() - new Date(session.clock_started_at).getTime()) / 1000;
+    elapsed += (Date.now() + clockOffsetMs - new Date(session.clock_started_at).getTime()) / 1000;
   }
   return Math.max(0, (session.period_duration_secs ?? DEFAULT_PERIOD_SECS) - elapsed);
 }
@@ -54,6 +58,7 @@ export function useLiveGame(
   opts: UseLiveGameOptions = {}
 ) {
   const supabase = createClient();
+  const clubName = useClubName();
   const [seasonId, setSeasonId] = useState<string | null>(null);
   const [session, setSession] = useState<GameSession | null>(null);
   const [roster, setRoster] = useState<PlayerWithUser[]>([]);
@@ -69,7 +74,7 @@ export function useLiveGame(
   const myClubIdsRef = useRef<string[] | null>(null);
   sessionRef.current = session;
   /** Shot waiting for the scorer to pick the court zone (and the assist on made 2PT/3PT). */
-  const [pendingShot, setPendingShot] = useState<{ event_type: PlayEventType; player_id: string; opponent?: boolean } | null>(null);
+  const [pendingShot, setPendingShot] = useState<{ event_type: PlayEventType; player_id: string; opponent?: boolean; clock_secs?: number; game_clock?: string } | null>(null);
   /** Jogo terminado → nenhuma estatística pode ser alterada. */
   const locked = () => {
     if (sessionRef.current?.status === "live") return false;
@@ -288,10 +293,18 @@ export function useLiveGame(
   }, [seasonId, loadAll]);
 
   // ── Client-side clock tick ──────────────────────────────
+  const autoStopped = useRef(false);
   useEffect(() => {
-    if (!session?.clock_running) return;
+    if (!session?.clock_running || opts.realtimeOnly) return;
+    autoStopped.current = false;
     const interval = setInterval(() => {
-      setClockSecs(computeClockSecs(sessionRef.current));
+      const secs = computeClockSecs(sessionRef.current);
+      setClockSecs(secs);
+      // The period is over: stop the clock by itself so the end-of-period flow can start.
+      if (secs <= 0 && !autoStopped.current) {
+        autoStopped.current = true;
+        void stopClock().then(() => liveNotice("⏱ 00:00 — clock stopped", "info"));
+      }
     }, 500);
     return () => clearInterval(interval);
   }, [session?.clock_running]);
@@ -370,10 +383,39 @@ export function useLiveGame(
     setSession(data as GameSession);
   }
 
+  function isMissingFn(error: { code?: string; message?: string }): boolean {
+    return error.code === "PGRST202" || error.code === "42883" || /Could not find the function|does not exist/i.test(error.message ?? "");
+  }
+
+  /** Start/stop the clock on the server (uses the database clock, so devices with a wrong time stay in sync).
+   *  Returns null when the functions are not installed yet, so callers fall back to the client-side update. */
+  async function clockViaRpc(fn: "live_start_clock" | "live_stop_clock", optimistic: Partial<GameSession>, rollback: GameSession): Promise<boolean | null> {
+    setSession((s) => (s ? { ...s, ...optimistic } : s));
+    const { data, error } = await supabase.rpc(fn, { p_session_id: rollback.id });
+    if (error) {
+      setSession(rollback);
+      if (isMissingFn(error)) return null;
+      toast({ title: "Clock not updated", description: error.message, variant: "destructive" });
+      loadSession();
+      return false;
+    }
+    const row = data as GameSession | null;
+    if (row?.id) {
+      if (row.updated_at) {
+        const off = Date.now() - new Date(row.updated_at).getTime();
+        clockOffsetMs = Math.abs(off) > 2000 ? -off : 0;
+      }
+      setSession(row);
+    }
+    return true;
+  }
+
   async function startClock(): Promise<void> {
     if (sessionRef.current && sessionRef.current.status !== "live") return;
     const cur = sessionRef.current;
     if (!cur || cur.clock_running) return;
+    const viaRpc = await clockViaRpc("live_start_clock", { clock_running: true, clock_started_at: new Date().toISOString() }, cur);
+    if (viaRpc !== null) { if (viaRpc) liveNotice("▶ Clock started", "info"); return; }
     await writeClock(
       { clock_running: true, clock_started_at: new Date().toISOString() },
       cur
@@ -388,14 +430,10 @@ export function useLiveGame(
     const started = cur.clock_started_at ? new Date(cur.clock_started_at).getTime() : Date.now();
     const elapsed = (cur.clock_elapsed_secs ?? 0) + (Date.now() - started) / 1000;
     const maxSecs = cur.period_duration_secs ?? DEFAULT_PERIOD_SECS;
-    await writeClock(
-      {
-        clock_running: false,
-        clock_elapsed_secs: Math.min(maxSecs, Math.floor(elapsed)),
-        clock_started_at: null,
-      },
-      cur
-    );
+    const stopped = { clock_running: false, clock_elapsed_secs: Math.min(maxSecs, Math.round(elapsed)), clock_started_at: null };
+    const viaRpc = await clockViaRpc("live_stop_clock", stopped, cur);
+    if (viaRpc === null) await writeClock(stopped, cur);
+    else if (!viaRpc) return;
     liveNotice("⏸ Clock stopped", "info");
   }
 
@@ -423,9 +461,13 @@ export function useLiveGame(
     try {
       let rosterToUse = roster;
       if (callupPlayerIds && callupPlayerIds.length > 0) {
-        await supabase.from("game_callups").insert(
+        const { error: callupErr } = await supabase.from("game_callups").insert(
           callupPlayerIds.map((pid) => ({ game_id: eventId, player_id: pid }))
         );
+        if (callupErr) {
+          toast({ title: "Could not save the call-up", description: callupErr.message, variant: "destructive" });
+          return false;
+        }
         rosterToUse = await loadRoster(seasonId);
       }
       const { data, error } = await supabase
@@ -433,7 +475,7 @@ export function useLiveGame(
         .insert({
           event_id: eventId,
           season_id: seasonId,
-          opponent_name: opponentName || "Adversário",
+          opponent_name: opponentName || "Opponent",
           status: "live",
           started_at: new Date().toISOString(),
           period_duration_secs: Math.round(periodDurationSecs),
@@ -446,7 +488,7 @@ export function useLiveGame(
         return false;
       }
 
-      await Promise.all([
+      const initResults = await Promise.all([
         supabase.from("play_by_play").insert({
           game_session_id: data.id,
           season_id: seasonId,
@@ -473,9 +515,11 @@ export function useLiveGame(
         }),
       ]);
 
+      let initError = initResults.map((r) => (r as { error?: { message: string } | null }).error).find(Boolean) ?? null;
+
       // Open stints for starting 5
-      if (startingFiveIds.length > 0) {
-        await supabase.from("player_court_stints").insert(
+      if (!initError && startingFiveIds.length > 0) {
+        const { error: stintErr } = await supabase.from("player_court_stints").insert(
           startingFiveIds.slice(0, 5).map((pid) => ({
             game_session_id: data.id,
             player_id: pid,
@@ -485,6 +529,17 @@ export function useLiveGame(
             entry_away_score: 0,
           }))
         );
+        initError = stintErr;
+      }
+
+      if (initError) {
+        // Do not leave a half-initialised live session behind: remove it so the game can be started again.
+        for (const table of ["play_by_play", "player_game_stats", "game_current_lineup", "player_court_stints", "game_period_scores"]) {
+          await supabase.from(table).delete().eq("game_session_id", data.id);
+        }
+        await supabase.from("game_sessions").delete().eq("id", data.id);
+        toast({ title: "Could not start the game", description: initError.message, variant: "destructive" });
+        return false;
       }
 
       setSession(data as GameSession);
@@ -499,10 +554,44 @@ export function useLiveGame(
 
   // ── Record event ────────────────────────────────────────
 
+  // Stable client ids: a retry of the same action (e.g. after a lost response) reuses the same id, so
+  // record_play ignores the duplicate instead of logging the play twice.
+  const clientIds = useRef(new Map<string, string>());
+  function clientIdFor(sig: string): string | null {
+    if (typeof crypto === "undefined" || typeof crypto.randomUUID !== "function") return null;
+    let id = clientIds.current.get(sig);
+    if (!id) { id = crypto.randomUUID(); clientIds.current.set(sig, id); }
+    return id;
+  }
+  function clientIdDone(sig: string) { clientIds.current.delete(sig); }
+
+  /** A tap that arrives while the previous action is still saving is not silently dropped. */
+  function busy(): false {
+    liveNotice("⏳ Still saving the previous action — tap again", "error");
+    return false;
+  }
+
+  function playError(message: string): string {
+    return message.includes("shot_spot_mismatch")
+      ? "The shot spot does not match the shot type (3PT behind the line, 2PT inside it)."
+      : message;
+  }
+
+  /** Validates the spot of a 2PT / 3PT before saving (the court UI already blocks it; this is the safety net). */
+  function spotError(kind: ReturnType<typeof shotKindOf>, spot: { x: number; y: number } | null): string | null {
+    if (kind !== "2" && kind !== "3") return null;
+    if (!spot) return "Pick the shot location on the court.";
+    const check = resolveShotSpot(kind, spot.x, spot.y);
+    if (!check.ok) return SHOT_SPOT_MESSAGES[check.reason];
+    if (check.snapped) return SHOT_SPOT_MESSAGES[kind === "3" ? "inside_three_line" : "outside_two_area"];
+    return null;
+  }
+
   /**
    * Public entry point used by every live layout. Shots (2PT / 3PT / FT, made or
    * missed) are not saved straight away: the scorer first picks the court zone
    * and, for made 2PT/3PT, who assisted (see ShotFlow). Everything else is saved at once.
+   * The game clock is captured when the scorer taps, not when the dialog is confirmed.
    */
   async function recordPlay(input: {
     event_type: PlayEventType;
@@ -512,15 +601,19 @@ export function useLiveGame(
     description?: string;
   }): Promise<boolean> {
     if (locked()) return false;
+    if (!session) return false;
+    if (recording) return busy();
     if (isShotEvent(input.event_type) && input.player_id) {
-      if (!session || recording) return false;
-      setPendingShot({ event_type: input.event_type, player_id: input.player_id });
+      setPendingShot({
+        event_type: input.event_type, player_id: input.player_id,
+        clock_secs: Math.round(clockSecs), game_clock: formatClock(clockSecs),
+      });
       return true;
     }
     return recordPlayNow(input);
   }
 
-  /** Called by ShotFlow once the scorer has chosen a zone (or skipped it) and the assist. */
+  /** Called by ShotFlow once the scorer has chosen a valid zone and the assist. */
   async function confirmShot(
     spot: { x: number; y: number } | null,
     assistPlayerId: string | null,
@@ -528,12 +621,18 @@ export function useLiveGame(
   ): Promise<boolean> {
     const shot = pendingShot;
     if (!shot) return false;
+    const kind = shotKindOf(shot.event_type);
+    const problem = spotError(kind, spot);
+    if (problem) {
+      toast({ title: "Shot not saved", description: problem, variant: "destructive" });
+      return false;
+    }
+    const at = shot.clock_secs !== undefined ? { clock_secs: shot.clock_secs, game_clock: shot.game_clock ?? formatClock(shot.clock_secs) } : undefined;
     if (shot.opponent) {
-      const done = await recordOpponentShotNow(shot.event_type, spot);
+      const done = await recordOpponentShotNow(shot.event_type, spot, at);
       if (done) setPendingShot(null);
       return done;
     }
-    const kind = shotKindOf(shot.event_type);
     const point = kind === "ft" ? (spot ?? FREE_THROW_POINT) : spot;
     const ok = await recordPlayNow({
       event_type: shot.event_type,
@@ -543,6 +642,8 @@ export function useLiveGame(
       shot_y: point?.y,
       shot_zone: kind === "ft" ? "free_throw" : point ? classifyShotZone(point.x, point.y) : undefined,
       description: blocked && !isMadeShot(shot.event_type) && kind !== "ft" ? BLOCKED_DESC : undefined,
+      clock_secs: at?.clock_secs,
+      game_clock: at?.game_clock,
     });
     if (ok) setPendingShot(null);
     return ok;
@@ -559,31 +660,37 @@ export function useLiveGame(
     shot_x?: number;
     shot_y?: number;
     shot_zone?: string;
+    clock_secs?: number;
   }): Promise<boolean> {
     if (locked()) return false;
-    if (!session || recording) return false;
+    if (!session) return false;
+    if (recording) return busy();
+    const secs = input.clock_secs ?? Math.round(clockSecs);
+    const sig = `${input.event_type}|${input.player_id ?? ""}|${input.secondary_player_id ?? ""}|${input.shot_x ?? ""}|${input.shot_y ?? ""}|${input.description ?? ""}`;
     setRecording(true);
     try {
       const { error } = await supabase.rpc("record_play", {
         p_game_session_id:     session.id,
         p_event_type:          input.event_type,
         p_period:              session.current_period,
-        p_clock_time_secs:     Math.round(clockSecs),
+        p_clock_time_secs:     secs,
         p_is_home_team:        true,
         p_points_delta:        POINTS_MAP[input.event_type] ?? 0,
         p_player_id:           input.player_id ?? null,
         p_secondary_player_id: input.secondary_player_id ?? null,
-        p_game_clock:          input.game_clock ?? formatClock(clockSecs),
+        p_game_clock:          input.game_clock ?? formatClock(secs),
         p_shot_x:              input.shot_x ?? null,
         p_shot_y:              input.shot_y ?? null,
         p_shot_zone:           input.shot_zone ?? null,
         p_description:         input.description ?? null,
+        p_client_id:           clientIdFor(sig),
       });
 
       if (error) {
-        toast({ title: "Error", description: error.message, variant: "destructive" });
+        toast({ title: "Error", description: playError(error.message), variant: "destructive" });
         return false;
       }
+      clientIdDone(sig);
 
       await Promise.all([loadPlays(session.id), loadPlayerStats(session.id), loadSession()]);
       const who = roster.find((p) => p.user_id === input.player_id);
@@ -610,13 +717,15 @@ export function useLiveGame(
    *  2PT / 3PT first ask the court zone through ShotFlow. */
   async function startOpponentShot(pts: 1 | 2 | 3, result: "made" | "miss"): Promise<void> {
     if (locked()) return;
-    if (!session || recording) return;
+    if (!session) return;
+    if (recording) { busy(); return; }
     const event_type = OPP_SHOT_TYPES[result][pts];
+    const at = { clock_secs: Math.round(clockSecs), game_clock: formatClock(clockSecs) };
     if (pts === 1) {
-      await recordOpponentShotNow(event_type, null);
+      await recordOpponentShotNow(event_type, null, at);
       return;
     }
-    setPendingShot({ event_type, player_id: "", opponent: true });
+    setPendingShot({ event_type, player_id: "", opponent: true, ...at });
   }
 
   async function recordOpponentPoints(pts: number): Promise<void> {
@@ -629,31 +738,42 @@ export function useLiveGame(
 
   async function recordOpponentShotNow(
     eventType: PlayEventType,
-    spot: { x: number; y: number } | null
+    spot: { x: number; y: number } | null,
+    at?: { clock_secs: number; game_clock: string }
   ): Promise<boolean> {
     if (locked()) return false;
-    if (!session || recording) return false;
+    if (!session) return false;
+    if (recording) return busy();
     const kind = shotKindOf(eventType);
+    const problem = spotError(kind, spot);
+    if (problem) {
+      toast({ title: "Shot not saved", description: problem, variant: "destructive" });
+      return false;
+    }
     const made = isMadeShot(eventType);
     const pts = kind === "3" ? 3 : kind === "2" ? 2 : 1;
     const point = kind === "ft" ? FREE_THROW_POINT : spot;
     const label = made ? `Opponent +${pts}` : `Opponent ${kind === "ft" ? "FT" : `${pts}PT`} missed`;
+    const secs = at?.clock_secs ?? Math.round(clockSecs);
+    const sig = `opp|${eventType}|${point?.x ?? ""}|${point?.y ?? ""}`;
     setRecording(true);
     try {
       const { error: oppErr } = await supabase.rpc("record_play", {
         p_game_session_id: session.id,
         p_event_type:      eventType,
         p_period:          session.current_period,
-        p_clock_time_secs: Math.round(clockSecs),
+        p_clock_time_secs: secs,
         p_is_home_team:    false,
         p_points_delta:    made ? pts : 0,
-        p_game_clock:      formatClock(clockSecs),
+        p_game_clock:      at?.game_clock ?? formatClock(secs),
         p_shot_x:          point?.x ?? null,
         p_shot_y:          point?.y ?? null,
         p_shot_zone:       kind === "ft" ? "free_throw" : point ? classifyShotZone(point.x, point.y) : null,
         p_description:     label,
+        p_client_id:       clientIdFor(sig),
       });
-      if (oppErr) { toast({ title: "Error", description: oppErr.message, variant: "destructive" }); return false; }
+      if (oppErr) { toast({ title: "Error", description: playError(oppErr.message), variant: "destructive" }); return false; }
+      clientIdDone(sig);
       await Promise.all([loadPlays(session.id), loadSession()]);
       liveNotice(`✓ ${label}`);
       return true;
@@ -668,7 +788,8 @@ export function useLiveGame(
     type: "foul_def" | "foul_of" | "foul_tec" | "foul_anti"
   ): Promise<void> {
     if (locked()) return;
-    if (!session || recording) return;
+    if (!session) return;
+    if (recording) { busy(); return; }
     setRecording(true);
     try {
       const foulDesc = type === "foul_def" ? "Defensive foul" : type === "foul_of" ? "Offensive foul" : type === "foul_tec" ? "Technical foul" : "Unsportsmanlike foul";
@@ -681,8 +802,10 @@ export function useLiveGame(
         p_points_delta:    0,
         p_game_clock:      formatClock(clockSecs),
         p_description:     `Opponent · ${foulDesc}`,
+        p_client_id:       clientIdFor(`opp-foul:${type}`),
       });
       if (foulErr) { toast({ title: "Error", description: foulErr.message, variant: "destructive" }); return; }
+      clientIdDone(`opp-foul:${type}`);
       await Promise.all([loadPlays(session.id), loadSession()]);
       liveNotice(`✓ Opponent · ${foulDesc}`);
     } finally {
@@ -694,7 +817,8 @@ export function useLiveGame(
 
   async function recordOpponentReb(type: "reb_off" | "reb_def"): Promise<void> {
     if (locked()) return;
-    if (!session || recording) return;
+    if (!session) return;
+    if (recording) { busy(); return; }
     setRecording(true);
     try {
       const { error: rebErr } = await supabase.rpc("record_play", {
@@ -706,8 +830,10 @@ export function useLiveGame(
         p_points_delta:    0,
         p_game_clock:      formatClock(clockSecs),
         p_description:     `Opponent · ${type === "reb_off" ? "Offensive rebound" : "Defensive rebound"}`,
+        p_client_id:       clientIdFor(`opp-reb:${type}`),
       });
       if (rebErr) { toast({ title: "Error", description: rebErr.message, variant: "destructive" }); return; }
+      clientIdDone(`opp-reb:${type}`);
       await Promise.all([loadPlays(session.id), loadSession()]);
       liveNotice(`✓ Opponent · ${type === "reb_off" ? "Offensive rebound" : "Defensive rebound"}`);
     } finally {
@@ -717,7 +843,43 @@ export function useLiveGame(
 
   // ── Substitution ────────────────────────────────────────
 
+  /** Atomic substitution (one database transaction). Falls back to the step-by-step version if the
+   *  substitute_player function is not installed yet. Ignores taps while another action is saving. */
   async function substitutePlayer(inId: string, outId: string): Promise<void> {
+    if (locked()) return;
+    if (!session) return;
+    if (recording) { busy(); return; }
+    setRecording(true);
+    try {
+      const pIn = roster.find((p) => p.user_id === inId);
+      const pOut = roster.find((p) => p.user_id === outId);
+      const { error } = await supabase.rpc("substitute_player", {
+        p_game_session_id: session.id,
+        p_in: inId,
+        p_out: outId,
+        p_period: session.current_period,
+        p_clock_time_secs: Math.round(clockSecs),
+        p_game_clock: formatClock(clockSecs),
+        p_description: `Sub: in #${pIn?.jersey_number} out #${pOut?.jersey_number}`,
+      });
+      if (!error) {
+        setOnCourtIds(onCourtIds.filter((id) => id !== outId).concat(inId));
+        await Promise.all([loadPlays(session.id), loadSession(), loadStints(session.id), loadLineup(session.id)]);
+        liveNotice(`↔ Sub · #${pIn?.jersey_number} ${pIn?.user.name.split(" ")[0] ?? ""} in, #${pOut?.jersey_number} ${pOut?.user.name.split(" ")[0] ?? ""} out`);
+        return;
+      }
+      if (!isMissingFn(error)) {
+        toast({ title: "Substitution not saved", description: error.message, variant: "destructive" });
+        await loadLineup(session.id);
+        return;
+      }
+    } finally {
+      setRecording(false);
+    }
+    await substituteLegacy(inId, outId);
+  }
+
+  async function substituteLegacy(inId: string, outId: string): Promise<void> {
     if (locked()) return;
     if (!session) return;
     const newLineup = onCourtIds.filter((id) => id !== outId).concat(inId);
@@ -741,7 +903,7 @@ export function useLiveGame(
       points_delta: 0,
       home_score_after: session.home_score,
       away_score_after: session.away_score,
-      description: `Sub: entra #${roster.find((p) => p.user_id === inId)?.jersey_number} sai #${roster.find((p) => p.user_id === outId)?.jersey_number}`,
+      description: `Sub: in #${roster.find((p) => p.user_id === inId)?.jersey_number} out #${roster.find((p) => p.user_id === outId)?.jersey_number}`,
     });
 
     // Close outgoing player's stint
@@ -840,11 +1002,11 @@ export function useLiveGame(
         p_is_home_team:    team === "home",
         p_points_delta:    0,
         p_game_clock:      formatClock(clockSecs),
-        p_description:     `Timeout ${team === "home" ? "CD Póvoa" : "Opponent"}`,
+        p_description:     `Timeout ${team === "home" ? clubName : "Opponent"}`,
       });
       if (!error) {
         await Promise.all([loadPlays(session.id), loadSession()]);
-        toast({ title: `Timeout ${team === "home" ? "CD Póvoa" : "Opponent"}` });
+        toast({ title: `Timeout ${team === "home" ? clubName : "Opponent"}` });
       }
     } finally {
       setRecording(false);
@@ -1087,7 +1249,7 @@ export function useLiveGame(
       points_delta: 0,
       home_score_after: session.home_score,
       away_score_after: session.away_score,
-      description: `Final — CD Póvoa ${session.home_score} vs ${session.away_score} ${session.opponent_name}`,
+      description: `Final — ${clubName} ${session.home_score} vs ${session.away_score} ${session.opponent_name}`,
     });
 
     const { error: finishErr } = await supabase.from("game_sessions").update({

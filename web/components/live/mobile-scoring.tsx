@@ -32,11 +32,14 @@ interface LiveGameHandle {
   substitutePlayer: (inId: string, outId: string) => Promise<void>;
   setLineup: (ids: string[]) => Promise<boolean>;
   undoPlay: (id: string) => Promise<boolean>;
+  callTimeout?: (team: "home" | "away") => Promise<void>;
 }
 
 export interface MobileScoringScreenProps {
   game: LiveGameHandle;
   userId: string;
+  /** Name of the club using the scorer (never hard-coded). */
+  clubName?: string;
 }
 
 // ── Module-level constants ────────────────────────────────────────────────────
@@ -180,11 +183,11 @@ function ActionButton({ event: _event, label, sub, actionStyle, enabled, onClick
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScreenProps) {
+export function MobileScoringScreen({ game, userId: _userId, clubName = "Home" }: MobileScoringScreenProps) {
   const {
     session, roster, onCourt, bench, plays, stints, clockSecs, recording,
     recordPlay, recordOpponentPoints, recordOpponentMiss, recordOpponentFoul, recordOpponentReb,
-    startClock, stopClock, substitutePlayer, setLineup, undoPlay,
+    startClock, stopClock, substitutePlayer, setLineup, undoPlay, callTimeout,
   } = game;
 
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerWithUser | null>(null);
@@ -229,8 +232,8 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
 
   async function handleAction(event: PlayEventType) {
     if (!selectedPlayer) return;
-    await recordPlay({ event_type: event, player_id: selectedPlayer.user_id });
-    setSelectedPlayer(null);
+    const ok = await recordPlay({ event_type: event, player_id: selectedPlayer.user_id });
+    if (ok) setSelectedPlayer(null); // keep the player selected if the tap was not accepted
   }
 
   return (
@@ -414,7 +417,7 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
                 textTransform: "uppercase", padding: "4px 4px 2px", flexShrink: 0,
                 borderTop: "1px solid var(--line)", marginTop: 4,
               }}>
-                BANCO
+                BENCH
               </div>
               {bench.map((p) => {
                 const st = playerMap.get(p.user_id);
@@ -592,7 +595,7 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
           }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: "var(--text)" }}>
               {session?.opponent_name
-                ? `CDP vs ${session.opponent_name}`
+                ? `${clubName} vs ${session.opponent_name}`
                 : "Live game"
               }
             </div>
@@ -603,7 +606,7 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
               fontFamily: SANS, fontSize: 13, fontWeight: 600,
               textAlign: "left", padding: "0 12px",
             } as React.CSSProperties}>
-              ✕ Fechar
+              ✕ Close
             </button>
 
             <div style={{ borderTop: "1px solid var(--line)", paddingTop: 12 }}>
@@ -626,6 +629,28 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
               </div>
             </div>
 
+            {callTimeout && (
+              <div style={{ borderTop: "1px solid var(--line)", paddingTop: 12 }}>
+                <div style={{
+                  fontSize: 9, fontWeight: 800, letterSpacing: "0.1em",
+                  color: "var(--muted)", textTransform: "uppercase", marginBottom: 8,
+                }}>
+                  TIMEOUT
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {(["home", "away"] as const).map((team) => (
+                    <button key={team} onClick={() => { void callTimeout(team); setDrawerOpen(false); }} style={{
+                      height: 44, flex: 1, borderRadius: 8, border: "1px solid var(--line)",
+                      background: "var(--chip)", color: "var(--text)", cursor: "pointer",
+                      fontFamily: SANS, fontSize: 11, fontWeight: 700,
+                    } as React.CSSProperties}>
+                      {team === "home" ? "US" : "OPP"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div style={{ borderTop: "1px solid var(--line)", paddingTop: 12 }}>
               <div style={{
                 fontSize: 9, fontWeight: 800, letterSpacing: "0.1em",
@@ -635,7 +660,7 @@ export function MobileScoringScreen({ game, userId: _userId }: MobileScoringScre
               </div>
               <div style={{ display: "flex", gap: 16, fontFamily: SANS }}>
                 <div>
-                  <div style={{ fontSize: 10, color: "var(--muted)" }}>CDP</div>
+                  <div style={{ fontSize: 10, color: "var(--muted)", maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{clubName}</div>
                   <div style={{
                     fontFamily: MONO, fontSize: 24, fontWeight: 700,
                     color: homeFouls >= 4 ? "var(--danger)" : "var(--text)",

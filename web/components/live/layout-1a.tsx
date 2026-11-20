@@ -36,6 +36,9 @@ export interface Layout1aProps {
   onSubstitute: (inId: string, outId: string) => Promise<void>;
   onSetLineup: (ids: string[]) => Promise<boolean>;
   onUndoPlay: (id: string) => Promise<boolean>;
+  onTimeout?: (team: "home" | "away") => Promise<void>;
+  /** Name of the club using the scorer (never hard-coded). */
+  clubName?: string;
 }
 
 // ── Event labels ──────────────────────────────────────────────────────────────
@@ -121,11 +124,12 @@ function Panel({ children, style }: { children: React.ReactNode; style?: React.C
 
 function Scoreboard1a({
   session, clockSecs, homeFouls, awayFouls, awayRebOff, awayRebDef,
-  onStartClock, onStopClock, onNextPeriod,
+  onStartClock, onStopClock, onNextPeriod, onTimeout, clubName,
 }: {
   session: GameSession; clockSecs: number; homeFouls: number; awayFouls: number;
   awayRebOff: number; awayRebDef: number;
   onStartClock: () => void; onStopClock: () => void; onNextPeriod: () => void;
+  onTimeout?: (team: "home" | "away") => void; clubName?: string;
 }) {
   const running = session.clock_running;
   return (
@@ -135,7 +139,7 @@ function Scoreboard1a({
         <div style={{ display: "flex", alignItems: "flex-end", gap: 24 }}>
           <div style={{ display: "flex", flexDirection: "column" }}>
             <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase", fontFamily: SANS }}>
-              CD PÓVOA
+              {clubName ?? "HOME"}
             </span>
             <span style={{ fontFamily: MONO, fontSize: 48, fontWeight: 700, lineHeight: 1, color: "var(--text)" }}>
               {session.home_score}
@@ -206,6 +210,23 @@ function Scoreboard1a({
           </span>
           <Pips count={homeFouls} />
         </div>
+        {onTimeout && (
+          <div style={{ display: "flex", gap: 8 }}>
+            {(["home", "away"] as const).map((team) => (
+              <button
+                key={team}
+                onClick={() => onTimeout(team)}
+                style={{
+                  flex: 1, height: 38, borderRadius: 10, cursor: "pointer",
+                  fontFamily: SANS, fontSize: 12, fontWeight: 700,
+                  background: "var(--chip)", border: "1px solid var(--line)", color: "var(--text)",
+                }}
+              >
+                Timeout {team === "home" ? "us" : "opp."}
+              </button>
+            ))}
+          </div>
+        )}
       </Panel>
     </div>
   );
@@ -246,7 +267,7 @@ function OpponentBar({
             OPPONENT · PTS
           </div>
           <div style={{ fontSize: 11, color: "var(--muted)", fontFamily: SANS, marginTop: 2 }}>
-            {session.away_score} no jogo · sem registo individual
+            {session.away_score} in game · no individual tracking
           </div>
         </div>
 
@@ -448,7 +469,7 @@ export function Layout1a({
   session, roster, onCourt, bench, plays, derivedStats, clockSecs, recording,
   homeFouls, awayFouls, awayRebOff, awayRebDef,
   onRecordPlay, onRecordOpponentPoints, onRecordOpponentMiss, onRecordOpponentFoul, onRecordOpponentReb,
-  onStartClock, onStopClock, onNextPeriod, onSubstitute, onSetLineup, onUndoPlay,
+  onStartClock, onStopClock, onNextPeriod, onSubstitute, onSetLineup, onUndoPlay, onTimeout, clubName,
 }: Layout1aProps) {
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerWithUser | null>(null);
   const [pendingIn, setPendingIn] = useState<string | null>(null);
@@ -478,8 +499,9 @@ export function Layout1a({
 
   async function handleAction(event: PlayEventType) {
     if (!selectedPlayer) return;
-    await onRecordPlay(event, selectedPlayer.user_id);
-    setSelectedPlayer(null);
+    const ok = await onRecordPlay(event, selectedPlayer.user_id);
+    // keep the player selected if the tap was not accepted (e.g. previous action still saving)
+    if (ok) setSelectedPlayer(null);
   }
 
   const playerCardStyle = (p: PlayerWithUser): React.CSSProperties => {
@@ -507,6 +529,7 @@ export function Layout1a({
         session={session} clockSecs={clockSecs} homeFouls={homeFouls}
         awayFouls={awayFouls} awayRebOff={awayRebOff} awayRebDef={awayRebDef}
         onStartClock={onStartClock} onStopClock={onStopClock} onNextPeriod={onNextPeriod}
+        onTimeout={onTimeout} clubName={clubName}
       />
 
       {/* Opponent bar */}

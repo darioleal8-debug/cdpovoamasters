@@ -36,6 +36,26 @@ function CourtLines({ lineOpacity = 0.7 }: { lineOpacity?: number }) {
   );
 }
 
+/** Hatches the area where a shot of this kind is NOT allowed (inside the 3-point line for a 3PT, outside it for a 2PT). */
+function ForbiddenArea({ kind }: { kind: "2" | "3" }) {
+  const cornerY = by + Math.sqrt(THREE_RADIUS_M ** 2 - THREE_CORNER_X_M ** 2) * U;
+  const rx = THREE_CORNER_X_M * U;
+  const r = THREE_RADIUS_M * U;
+  const inside = `M${cx - rx},0 L${cx - rx},${cornerY} A${r},${r} 0 0 0 ${cx + rx},${cornerY} L${cx + rx},0 Z`;
+  const d = kind === "3" ? inside : `M0,0 H${W} V${H} H0 Z ${inside}`;
+  return (
+    <g style={{ pointerEvents: "none" }}>
+      <defs>
+        <pattern id="shot-forbidden-hatch" patternUnits="userSpaceOnUse" width={4} height={4} patternTransform="rotate(45)">
+          <rect width={4} height={4} fill="#ef4444" fillOpacity={0.08} />
+          <line x1={0} y1={0} x2={0} y2={4} stroke="#ef4444" strokeOpacity={0.35} strokeWidth={1.2} />
+        </pattern>
+      </defs>
+      <path d={d} fill="url(#shot-forbidden-hatch)" fillRule="evenodd" />
+    </g>
+  );
+}
+
 function pctToSvg(x: number, y: number) {
   return { sx: (x / 100) * W, sy: (y / 100) * H };
 }
@@ -75,9 +95,11 @@ interface BaseProps {
  * Also used read-only with markers (shot chart).
  */
 export function ShotCourt({
-  onPick, selected, markers, className, style, label,
+  onPick, selected, markers, restrict, className, style, label,
 }: BaseProps & {
   onPick?: (x: number, y: number) => void;
+  /** Hatch the area where this kind of shot is not allowed. */
+  restrict?: "2" | "3";
   selected?: { x: number; y: number } | null;
   markers?: ShotPoint[];
 }) {
@@ -102,6 +124,7 @@ export function ShotCourt({
       onPointerDown={handle}
     >
       <rect x={0} y={0} width={W} height={H} rx={2} fill="var(--court-bg, rgba(127,127,127,0.07))" />
+      {restrict && <ForbiddenArea kind={restrict} />}
       <CourtLines />
       {markers?.map((m, i) => {
         const { sx, sy } = pctToSvg(m.x, m.y);

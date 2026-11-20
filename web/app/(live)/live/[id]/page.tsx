@@ -22,6 +22,8 @@ const EVENT_LABELS: Record<string, string> = {
   "rebound_off": "Res.Of.", "rebound_def": "Res.Def.",
   "assist": "Assist.", "steal": "Roubo", "block": "Desarme",
   "turnover": "Turnover", "foul_committed": "F.Cometida",
+  "foul_def": "Falta defensiva", "foul_of": "Falta ofensiva",
+  "foul_tec": "Falta técnica", "foul_anti": "Falta antidesportiva",
   "foul_drawn": "F.Sofrida", "substitution_in": "Substituição",
   "timeout": "Timeout", "game_start": "🏀 Início",
   "period_end": "Fim Período", "game_end": "🏁 Fim Jogo",
@@ -48,6 +50,7 @@ export default function SpectatorPage() {
       supabase.from("game_sessions").select("*").eq("id", params.id).single(),
       supabase.from("player_game_stats").select("*").eq("game_session_id", params.id),
       supabase.from("play_by_play").select("*").eq("game_session_id", params.id)
+        .is("deleted_at", null) // plays undone by the scorer must not show in the public feed
         .order("created_at", { ascending: false }).limit(20),
       supabase.from("player_court_stints")
         .select("player_id, period, entry_clock_secs, exit_clock_secs")
@@ -85,9 +88,10 @@ export default function SpectatorPage() {
         { event: "*", schema: "public", table: "player_game_stats", filter: `game_session_id=eq.${params.id}` },
         () => { loadAll(); })
       .on("postgres_changes",
-        { event: "INSERT", schema: "public", table: "play_by_play", filter: `game_session_id=eq.${params.id}` },
+        { event: "*", schema: "public", table: "play_by_play", filter: `game_session_id=eq.${params.id}` }, // UPDATE = play undone
         () => {
           supabase.from("play_by_play").select("*").eq("game_session_id", params.id)
+            .is("deleted_at", null)
             .order("created_at", { ascending: false }).limit(20)
             .then(({ data }) => setPlays(data ?? []));
         })
@@ -116,6 +120,7 @@ export default function SpectatorPage() {
   }, [session?.clock_elapsed_secs, session?.clock_running]);
 
   const isLive = session?.status === "live";
+  const nameByPlayer = new Map(stats.map((p) => [p.player_id, (p.user?.name ?? "").split(" ")[0]]));
   const sorted = [...stats].sort((a, b) => b.pts - a.pts);
   const secsById = computeSecondsPlayed(stints, session?.current_period ?? 1, Math.floor(clockSecs), isLive);
 
@@ -241,6 +246,9 @@ export default function SpectatorPage() {
                   <span className="shrink-0 text-white/30 font-mono">{p.game_clock}</span>
                 )}
                 <span className={`flex-1 ${p.is_home_team ? "text-white/80" : "text-white/40 italic"}`}>
+                  {p.is_home_team && p.player_id && nameByPlayer.get(p.player_id) && (
+                    <span className="text-white/50">{nameByPlayer.get(p.player_id)} · </span>
+                  )}
                   {p.description ?? (EVENT_LABELS[p.event_type] ?? p.event_type)}
                 </span>
                 {p.points_delta > 0 && (
