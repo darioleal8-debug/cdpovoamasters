@@ -120,7 +120,7 @@ export function PlayerHistoryTable() {
                         <thead>
                           <tr className="border-b">
                             <th className="text-left px-6 py-2 font-semibold text-muted-foreground">Temporada</th>
-                            <th className="px-3 py-2 text-center font-semibold">Jg.</th>
+                            <th className="px-3 py-2 text-center font-semibold">GP</th>
                             <th className="px-3 py-2 text-center font-semibold">PTS</th>
                             <th className="px-3 py-2 text-center font-semibold">REB</th>
                             <th className="px-3 py-2 text-center font-semibold">AST</th>

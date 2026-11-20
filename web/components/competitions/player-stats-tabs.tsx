@@ -83,10 +83,10 @@ export function PlayerStatsTabs({ homeName, awayName, stats }: Props) {
             <tr>
               <th style={{ ...TH, textAlign: "left" }}>#</th>
               <th style={{ ...TH, textAlign: "left", paddingLeft: "0" }}>Jogador</th>
-              <th style={TH}>Pts</th>
-              <th style={TH}>3P</th>
-              <th style={TH}>LL</th>
-              <th style={TH}>Fts</th>
+              <th style={TH}>PTS</th>
+              <th style={TH} title="3-point field goals made">3PM</th>
+              <th style={TH} title="Free throws made">FTM</th>
+              <th style={TH} title="Personal fouls">PF</th>
             </tr>
           </thead>
           <tbody>

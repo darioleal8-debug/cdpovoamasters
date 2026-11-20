@@ -683,8 +683,8 @@ export function SubmitResultFlow({ games, teamName, preselectedGameId = null }: 
                         <tr>
                           <th style={{ textAlign: "left", padding: "2px 4px", color: "var(--muted,#6F675F)", fontWeight: 600, fontSize: "10px" }}>#</th>
                           <th style={{ textAlign: "left", padding: "2px 4px", color: "var(--muted,#6F675F)", fontWeight: 600, fontSize: "10px" }}>Nome</th>
-                          <th style={{ textAlign: "center", padding: "2px 4px", color: "var(--muted,#6F675F)", fontWeight: 600, fontSize: "10px" }}>Pts</th>
-                          <th style={{ textAlign: "center", padding: "2px 4px", color: "var(--muted,#6F675F)", fontWeight: 600, fontSize: "10px" }}>F</th>
+                          <th style={{ textAlign: "center", padding: "2px 4px", color: "var(--muted,#6F675F)", fontWeight: 600, fontSize: "10px" }}>PTS</th>
+                          <th style={{ textAlign: "center", padding: "2px 4px", color: "var(--muted,#6F675F)", fontWeight: 600, fontSize: "10px" }}>PF</th>
                         </tr>
                       </thead>
                       <tbody>

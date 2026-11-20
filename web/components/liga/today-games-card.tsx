@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { periodLabel } from "@/lib/stats/terminology";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { TeamMono } from "@/components/competitions/team-mono";
@@ -158,7 +159,7 @@ function TodayGameRow({ game: g, session, first }: { game: TodayGame; session: L
   const statusLabel = g.result
     ? "FINAL"
     : isLiveSession
-      ? `AO VIVO${session?.current_period ? ` · ${session.current_period}º P` : ""}`
+      ? `AO VIVO${session?.current_period ? ` · ${periodLabel(session.current_period)}` : ""}`
       : isFinishedSession
         ? "TERMINADO"
         : g.event_time

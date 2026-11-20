@@ -1,5 +1,6 @@
 import type { GameSession, PlayerGameStatsWithUser, GamePeriodScore } from "@/types/database";
 import { toPeriodPartials } from "@/lib/live/period-scores";
+import { periodLabel } from "@/lib/stats/terminology";
 import {
   BASKET_Y_M, COURT_L_M, COURT_W_M, FT_RADIUS_M, KEY_HALF_W_M, KEY_LENGTH_M,
   RESTRICTED_RADIUS_M, SHOT_ZONE_LABELS, THREE_CORNER_X_M, THREE_RADIUS_M,
@@ -243,7 +244,7 @@ export function renderBoxScore(
   const partials = toPeriodPartials(periodScores);
   const leftW = 128;
   if (partials.length > 0) {
-    const lbl = (p: number) => (p <= 4 ? `${p}º P` : `PROL.${p > 5 ? ` ${p - 4}` : ""}`);
+    const lbl = (p: number) => periodLabel(p);
     autoTable(doc, {
       startY: y,
       head: [["PARCIAIS", ...partials.map((p) => lbl(p.period)), "FINAL"]],
@@ -278,10 +279,10 @@ export function renderBoxScore(
     return best && f(best) > 0 ? { name: shortName(best.user?.name ?? "—"), v: f(best), n: best.jersey_number } : null;
   };
   const cards: { label: string; l: ReturnType<typeof leader> }[] = [
-    { label: "PONTOS", l: leader((p) => p.pts) },
-    { label: "RESSALTOS", l: leader((p) => p.reb_off + p.reb_def) },
-    { label: "ASSISTÊNCIAS", l: leader((p) => p.ast) },
-    { label: "EFICIÊNCIA", l: leader((p) => Number(p.efficiency ?? 0)) },
+    { label: "POINTS", l: leader((p) => p.pts) },
+    { label: "REBOUNDS", l: leader((p) => p.reb_off + p.reb_def) },
+    { label: "ASSISTS", l: leader((p) => p.ast) },
+    { label: "EFFICIENCY", l: leader((p) => Number(p.efficiency ?? 0)) },
   ];
   const rx = M + leftW + 8;
   const rw = W - M - rx;
@@ -289,7 +290,7 @@ export function renderBoxScore(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
   doc.setTextColor(...MUTED);
-  doc.text("DESTAQUES CD PÓVOA", rx, y + 3);
+  doc.text("CD PÓVOA LEADERS", rx, y + 3);
   cards.forEach((c, i) => {
     const x = rx + i * (cw + 4);
     const top = y + 6;
@@ -318,7 +319,7 @@ export function renderBoxScore(
   const oppReb = (session.away_reb_off ?? 0) + (session.away_reb_def ?? 0);
   autoTable(doc, {
     startY: y,
-    head: [["EQUIPA", "PTS", "2P C/T", "2P%", "3P C/T", "3P%", "LL C/T", "LL%", "RES OF", "RES DEF", "RES", "AST", "ROU", "DES", "PER", "F", "FS", "EFF"]],
+    head: [["TEAM", "PTS", "2P M/A", "2P%", "3P M/A", "3P%", "FT M/A", "FT%", "OREB", "DREB", "REB", "AST", "STL", "BLK", "TOV", "PF", "PFD", "EFF"]],
     body: [
       [ctx.clubName || "CD Póvoa", T.pts, `${T.fg2m}/${T.fg2a}`, pct(T.fg2m, T.fg2a), `${T.fg3m}/${T.fg3a}`, pct(T.fg3m, T.fg3a),
         `${T.ftm}/${T.fta}`, pct(T.ftm, T.fta), T.ro, T.rd, T.ro + T.rd, T.ast, T.stl, T.blk, T.tov, T.fc, T.fd, T.eff],
@@ -352,7 +353,7 @@ export function renderBoxScore(
 
   autoTable(doc, {
     startY: y,
-    head: [["#", "JOGADOR", "MIN", "PTS", "2P C/T", "2P%", "3P C/T", "3P%", "LL C/T", "LL%", "RO", "RD", "RES", "AST", "ROU", "DES", "PER", "F", "FS", "EFF", "+/-"]],
+    head: [["#", "PLAYER", "MIN", "PTS", "2P M/A", "2P%", "3P M/A", "3P%", "FT M/A", "FT%", "OREB", "DREB", "REB", "AST", "STL", "BLK", "TOV", "PF", "PFD", "EFF", "+/-"]],
     body: sorted.map((p) => {
       const pm = Number(p.plus_minus ?? 0);
       return [
@@ -421,7 +422,7 @@ export function renderBoxScore(
     doc.setFontSize(6.5);
     doc.setTextColor(...MUTED);
     doc.text(
-      "C/T convertidos/tentados · RO/RD ressaltos ofensivos/defensivos · ROU roubos · DES desarmes · PER perdas de bola · F faltas · FS faltas sofridas · EFF eficiência · a laranja: melhor valor da equipa",
+      "M/A made/attempted · OREB/DREB offensive/defensive rebounds · STL steals · BLK blocks · TOV turnovers · PF personal fouls · PFD fouls drawn · EFF efficiency · orange: team best",
       M, H - 6
     );
     doc.setFont("helvetica", "bold");

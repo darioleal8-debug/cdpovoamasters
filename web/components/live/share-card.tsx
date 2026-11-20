@@ -4,6 +4,7 @@
 // Never use CSS variables or oklch() in this file or its children.
 
 import React, { forwardRef } from "react";
+import { periodLabel } from "@/lib/stats/terminology";
 import type { GameSession, PlayByPlay } from "@/types/database";
 import type { PlayerWithUser } from "@/types/database";
 import type { DerivedPlayerStats } from "@/lib/live/derive-stats";
@@ -82,10 +83,10 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
 
     // ── Stat boxes ──────────────────────────────────────────────────────
     const boxes = [
-      { label: "RESSALTOS",   value: totReb,  note: `Adv. ${awayReb}` },
-      { label: "ASSISTÊNCIAS",value: totAst,  note: "" },
-      { label: "ROUBOS",      value: totStl,  note: "" },
-      { label: "TRIPLOS",     value: tot3pm,  note: "" },
+      { label: "REBOUNDS",   value: totReb,  note: `Opp. ${awayReb}` },
+      { label: "ASSISTS",value: totAst,  note: "" },
+      { label: "STEALS",      value: totStl,  note: "" },
+      { label: "3PM",     value: tot3pm,  note: "" },
     ];
 
     return (
@@ -155,7 +156,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
             ● {result}
           </span>
           <span style={{ fontFamily: MONO, fontSize: 14, color: C.muted }}>
-            {session.current_period}º PERÍODO · {formatClock(clockSecs)}
+            {periodLabel(session.current_period)} · {formatClock(clockSecs)}
           </span>
         </div>
 

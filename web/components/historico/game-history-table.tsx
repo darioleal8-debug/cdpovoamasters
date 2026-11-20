@@ -117,7 +117,7 @@ export function GameHistoryTable() {
                         <th className="text-left px-4 py-2 font-semibold">Data</th>
                         <th className="text-left px-3 py-2 font-semibold">Adversário</th>
                         <th className="px-3 py-2 font-semibold text-center">Resultado</th>
-                        <th className="px-3 py-2 font-semibold text-center">Jog.</th>
+                        <th className="px-3 py-2 font-semibold text-center">GP</th>
                         <th className="text-left px-3 py-2 font-semibold">Competição</th>
                       </tr>
                     </thead>

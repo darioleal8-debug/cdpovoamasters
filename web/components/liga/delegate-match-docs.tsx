@@ -39,7 +39,7 @@ const VALIDATION_COLORS: Record<string, string> = {
   validated: "#15803D", pending_submission: "#A16207", analyzing: "#1D4ED8", discrepancies: "#B91C1C", manual_review: "#C2410C",
 };
 /** Colunas mostradas na revisão (as restantes ficam guardadas mesmo sem aparecer). */
-const COLS: [StatKey, string][] = [["pts", "Pts"], ["fg2m", "2PC"], ["fg2a", "2PT"], ["fg3m", "3PC"], ["fg3a", "3PT"], ["ftm", "LLC"], ["fta", "LLT"], ["oreb", "RO"], ["dreb", "RD"], ["reb", "Res"], ["ast", "Ass"], ["stl", "Rou"], ["tov", "TO"], ["blk", "DL"], ["pf", "F"]];
+const COLS: [StatKey, string][] = [["pts", "PTS"], ["fg2m", "2PM"], ["fg2a", "2PA"], ["fg3m", "3PM"], ["fg3a", "3PA"], ["ftm", "FTM"], ["fta", "FTA"], ["oreb", "OREB"], ["dreb", "DREB"], ["reb", "REB"], ["ast", "AST"], ["stl", "STL"], ["tov", "TOV"], ["blk", "BLK"], ["pf", "PF"]];
 
 const btn = (primary = false, disabled = false): React.CSSProperties => ({
   padding: "9px 12px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
@@ -154,7 +154,7 @@ function ProStatsReview({ docId, game, onChanged }: { docId: string; game: { hom
                 <table style={{ borderCollapse: "collapse", fontSize: "11px", minWidth: "640px", width: "100%" }}>
                   <thead>
                     <tr style={{ background: "var(--bg,#F6F2EC)" }}>
-                      <th style={{ textAlign: "left", padding: "5px 6px", position: "sticky", left: 0, background: "var(--bg,#F6F2EC)" }}>Jogador</th>
+                      <th style={{ textAlign: "left", padding: "5px 6px", position: "sticky", left: 0, background: "var(--bg,#F6F2EC)" }}>Player</th>
                       {COLS.map(([, l]) => <th key={l} style={{ padding: "5px 3px" }}>{l}</th>)}
                     </tr>
                   </thead>

@@ -22,10 +22,10 @@ export type StatKey = (typeof STAT_KEYS)[number];
 export type StatLine = Record<StatKey, number | null>;
 
 export const STAT_LABELS: Record<StatKey, string> = {
-  secs: "Minutos", pts: "Pontos", fg2m: "2P conv.", fg2a: "2P tent.", fg3m: "3P conv.", fg3a: "3P tent.",
-  ftm: "LL conv.", fta: "LL tent.", oreb: "Ress. ofensivos", dreb: "Ress. defensivos", reb: "Ressaltos",
-  ast: "Assistências", stl: "Roubos", tov: "Perdas de bola", blk: "Desarmes", pf: "Faltas", fd: "Faltas sofridas",
-  pm: "+/-", eff: "Eficiência",
+  secs: "Minutes", pts: "Points", fg2m: "2PM", fg2a: "2PA", fg3m: "3PM", fg3a: "3PA",
+  ftm: "FTM", fta: "FTA", oreb: "OREB", dreb: "DREB", reb: "REB",
+  ast: "AST", stl: "STL", tov: "TOV", blk: "BLK", pf: "PF", fd: "PFD",
+  pm: "+/-", eff: "EFF",
 };
 
 export function emptyStatLine(): StatLine {

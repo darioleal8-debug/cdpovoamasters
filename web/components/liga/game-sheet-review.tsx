@@ -496,7 +496,7 @@ export function GameSheetReview({ importId, backHref }: { importId: string; back
                     <td style={cell}>
                       <select aria-label="Tipo de lançamento" disabled={!editable} value={e.shotType ?? ""} style={inp(62)}
                         onChange={(ev) => updateEvent(e.id, { shotType: (ev.target.value || null) as ShotType | null, points: null })}>
-                        <option value="">—</option><option value="FT">LL</option><option value="2PT">2P</option><option value="3PT">3P</option>
+                        <option value="">—</option><option value="FT">FT</option><option value="2PT">2P</option><option value="3PT">3P</option>
                       </select>
                     </td>
                     <td style={{ ...cell, color: e.confidence !== null && e.confidence < 0.6 ? C.warn : C.muted }}>{e.userVerified ? "✓" : pct(e.confidence)}</td>
@@ -534,8 +534,8 @@ export function GameSheetReview({ importId, backHref }: { importId: string; back
           <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 560 }}>
             <thead>
               <tr>
-                <th style={th}>N.º</th><th style={th}>Nome</th><th style={th}>Pts</th><th style={th}>LL</th><th style={th}>2P</th>
-                <th style={th}>3P</th><th style={th}>Por período</th><th style={th}>% eq.</th><th style={th}>Faltas</th><th style={th} />
+                <th style={th}>N.º</th><th style={th}>Nome</th><th style={th}>PTS</th><th style={th}>FT</th><th style={th}>2P</th>
+                <th style={th}>3P</th><th style={th}>Por período</th><th style={th}>% eq.</th><th style={th}>PF</th><th style={th} />
               </tr>
             </thead>
             <tbody>

@@ -328,7 +328,7 @@ export function ImportStatsModal({
                       <th className="px-2 py-2 font-semibold text-center">TOV</th>
                       <th className="px-2 py-2 font-semibold text-center">2P</th>
                       <th className="px-2 py-2 font-semibold text-center">3P</th>
-                      <th className="px-2 py-2 font-semibold text-center">LL</th>
+                      <th className="px-2 py-2 font-semibold text-center">FT</th>
                       <th className="px-2 py-2 font-semibold text-center">✓</th>
                     </tr>
                   </thead>

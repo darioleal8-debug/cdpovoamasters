@@ -7,6 +7,7 @@ import { CourtBg } from "@/components/competitions/court-bg";
 import { TeamMono } from "@/components/competitions/team-mono";
 import { PlayerStatsTabs } from "@/components/competitions/player-stats-tabs";
 import { PlayerBoxScore } from "@/components/player/player-box-score";
+import { periodLabel } from "@/lib/stats/terminology";
 
 export const revalidate = 60;
 
@@ -271,7 +272,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ eve
                     </span>
                     {overtime && (
                       <span style={{ fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "10px", letterSpacing: "0.1em", color: "#F97316", fontWeight: 600 }}>
-                        · PROL.
+                        · OT
                       </span>
                     )}
                   </div>
@@ -337,7 +338,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ eve
                   </th>
                   {periods.map((p) => (
                     <th key={p.periodo} style={{ padding: "6px 10px", textAlign: "center", fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "10px", letterSpacing: "0.08em", color: "var(--muted-foreground, #8C837A)", fontWeight: 600, borderBottom: "1px solid var(--border, #E9E2D8)" }}>
-                      {p.periodo > 4 ? `PR${p.periodo > 5 ? p.periodo - 4 : ""}` : `Q${p.periodo}`}
+                      {periodLabel(p.periodo)}
                     </th>
                   ))}
                   {overtime && (

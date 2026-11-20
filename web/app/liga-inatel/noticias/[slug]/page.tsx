@@ -403,8 +403,8 @@ export default async function LigaNoticiaDetailPage({ params }: Props) {
                             <tr>
                               <th style={{ textAlign: "left", padding: "3px 4px", fontWeight: 600, fontSize: "10px", color: "#8C837A", width: "28px" }}>#</th>
                               <th style={{ textAlign: "left", padding: "3px 4px", fontWeight: 600, fontSize: "10px", color: "#8C837A" }}>Nome</th>
-                              <th style={{ textAlign: "center", padding: "3px 4px", fontWeight: 600, fontSize: "10px", color: "#8C837A", width: "32px" }}>Pts</th>
-                              <th style={{ textAlign: "center", padding: "3px 4px", fontWeight: 600, fontSize: "10px", color: "#8C837A", width: "28px" }}>F</th>
+                              <th style={{ textAlign: "center", padding: "3px 4px", fontWeight: 600, fontSize: "10px", color: "#8C837A", width: "32px" }}>PTS</th>
+                              <th style={{ textAlign: "center", padding: "3px 4px", fontWeight: 600, fontSize: "10px", color: "#8C837A", width: "28px" }}>PF</th>
                             </tr>
                           </thead>
                           <tbody>

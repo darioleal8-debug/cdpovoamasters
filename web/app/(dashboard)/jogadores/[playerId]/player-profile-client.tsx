@@ -213,7 +213,7 @@ export function PlayerProfileClient({
           sub={gamesWithStats > 0 ? `${gamesWithStats} c/ stats` : undefined}
         />
         <StatCard
-          label="Média Pontos"
+          label="PPG"
           value={avgPts ?? "—"}
           sub={gamesWithStats > 0 ? `em ${gamesWithStats} jogo${gamesWithStats !== 1 ? "s" : ""}` : "sem dados"}
         />

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { AI_TERMINOLOGY_RULE } from "@/lib/stats/terminology";
 import { authorize } from "@/lib/auth/guards";
 import { MANAGERS } from "@/lib/auth/roles";
 import { createAdminClient } from "@/lib/supabase/server";
@@ -221,7 +222,7 @@ Regras obrigatórias:
 - Jogadores com availability=false NUNCA podem aparecer em recommended_players.
 - Máximo 12 jogadores em recommended_players.
 - Baseia as tuas decisões em stats reais — nunca inventes dados.
-- Justificações em português europeu, concisas e objetivas (máx. 2 frases).
+- Justificações em português europeu, concisas e objetivas (máx. 2 frases). ${AI_TERMINOLOGY_RULE}
 - Devolve APENAS JSON válido, sem texto adicional, sem markdown.`;
 
   const userPrompt = `Analisa os dados e recomenda a melhor convocatória para o jogo contra "${opponentDisplay}".

@@ -125,18 +125,18 @@ export function StandingsTable({ standings, ourTeamName, limit, mini, teamLogos 
         <thead>
           <tr>
             <TH sticky={mini ? undefined : "pos"}>#</TH>
-            <TH sticky={mini ? undefined : "team"}>Equipa</TH>
-            <TH right title="Jogos">J</TH>
-            {!mini && <TH right title="Vitórias">V</TH>}
-            {!mini && hasDraws && <TH right title="Empates">E</TH>}
-            {!mini && <TH right title="Derrotas">D</TH>}
-            {!mini && <TH right title="Pontos marcados">PM</TH>}
-            {!mini && <TH right title="Pontos sofridos">PS</TH>}
-            {!mini && <TH right title="Diferença de pontos">Dif</TH>}
-            <TH right title="Pontos na classificação">PTS</TH>
-            {!mini && hasForm && <TH center title="Últimos 5 jogos (o mais recente à direita)">Últ. 5</TH>}
-            {!mini && hasSplit && <TH center title="Vitórias-derrotas em casa">Casa</TH>}
-            {!mini && hasSplit && <TH center title="Vitórias-derrotas fora">Fora</TH>}
+            <TH sticky={mini ? undefined : "team"}>Team</TH>
+            <TH right title="Games played">GP</TH>
+            {!mini && <TH right title="Wins">W</TH>}
+            {!mini && hasDraws && <TH right title="Ties">T</TH>}
+            {!mini && <TH right title="Losses">L</TH>}
+            {!mini && <TH right title="Points for">PF</TH>}
+            {!mini && <TH right title="Points against">PA</TH>}
+            {!mini && <TH right title="Point differential">DIFF</TH>}
+            <TH right title="Standings points">PTS</TH>
+            {!mini && hasForm && <TH center title="Last 5 games (most recent on the right)">L5</TH>}
+            {!mini && hasSplit && <TH center title="Home record (W-L)">Home</TH>}
+            {!mini && hasSplit && <TH center title="Away record (W-L)">Away</TH>}
           </tr>
         </thead>
         <tbody>

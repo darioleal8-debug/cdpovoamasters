@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { periodLabel } from "@/lib/stats/terminology";
 import { ClubName } from "@/lib/club-context";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -157,7 +158,7 @@ export default function SpectatorPage() {
             {isLive ? "● AO VIVO" : session.status === "finished" ? "FINAL" : "Por iniciar"}
           </Badge>
           {session.current_period && (
-            <span className="text-sm text-white/60">{session.current_period}º Período</span>
+            <span className="text-sm text-white/60">{periodLabel(session.current_period)}</span>
           )}
           {isLive && (
             <span className={`text-sm font-mono font-bold ${clockSecs <= 30 ? "text-red-400" : "text-white/80"}`}>

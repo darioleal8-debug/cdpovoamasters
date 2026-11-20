@@ -1,6 +1,7 @@
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { toPeriodPartials } from "@/lib/live/period-scores";
 import { formatMinutes } from "@/lib/live/minutes";
+import { periodLabel } from "@/lib/stats/terminology";
 
 /**
  * Box score de um jogo terminado para a área do jogador (sem play-by-play).
@@ -100,7 +101,6 @@ export async function PlayerBoxScore({
 
   const partials = toPeriodPartials((periodsRes.data ?? []) as { period: number; home_score: number; away_score: number }[]);
   const oppReb = (sessRes.data?.away_reb_off ?? 0) + (sessRes.data?.away_reb_def ?? 0);
-  const periodLabel = (p: number) => (p <= 4 ? `Q${p}` : `OT${p - 4}`);
 
   return (
     <section id="box-score" className="space-y-3 scroll-mt-20">

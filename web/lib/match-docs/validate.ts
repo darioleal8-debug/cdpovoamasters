@@ -65,7 +65,7 @@ export function validateTeam(team: ProTeam, side: Side, opts: { docId?: string; 
       if (sum !== team.totals[k]) {
         // Qualquer coluna cujo total não bate com a soma indica uma leitura errada (linha ou coluna desalinhada)
         out.push({ code: "totals_vs_players", severity: "error", path: `${side}.totals.${k}`, side, docId: opts.docId,
-          message: `${name}: total de ${STAT_LABELS[k].toLowerCase()} (${team.totals[k]}) ≠ soma dos jogadores (${sum}).`, expected: sum, actual: team.totals[k] });
+          message: `${name}: total de ${STAT_LABELS[k]} (${team.totals[k]}) ≠ soma dos jogadores (${sum}).`, expected: sum, actual: team.totals[k] });
       }
     }
     const allPts = team.players.every((p) => p.stats.pts !== null);

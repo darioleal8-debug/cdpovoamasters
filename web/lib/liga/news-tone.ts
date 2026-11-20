@@ -1,3 +1,4 @@
+import { AI_TERMINOLOGY_RULE } from "@/lib/stats/terminology";
 /**
  * Tom editorial das notícias da Liga INATEL: amistoso e respeitador.
  * Uma vitória dilatada descreve-se pela vantagem, nunca pela "humilhação" do adversário.
@@ -44,4 +45,5 @@ export const NEWS_TONE_RULES = `TOM AMISTOSO (obrigatório):
 - Escreve com respeito por todas as equipas — é uma liga amadora de veteranos, de convívio e fair-play.
 - NUNCA uses termos agressivos ou ofensivos, como: atropelar, esmagar, arrasar, massacrar, humilhar, trucidar, aniquilar, destroçar, demolir, cilindrar, triturar, goleada/cabazada, abada, "passeio", "sem piedade", KO.
 - Para uma vantagem dilatada usa formulações positivas centradas no vencedor: "vitória folgada", "triunfo claro", "vence com autoridade", "impõe-se com clareza", "vantagem confortável", "exibição convincente", "vence com margem confortável".
+- ${AI_TERMINOLOGY_RULE}
 - Sobre a equipa derrotada, sê respeitoso (ex.: "não conseguiu travar", "lutou até ao fim", "procurará reagir na próxima jornada"); nunca a ridicularizes.`;

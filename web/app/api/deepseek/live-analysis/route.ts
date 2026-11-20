@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
 
   const system = `You are an experienced basketball assistant coach analysing a game for the head coach.
 Use ONLY the data given; never invent numbers, plays or players. If the sample is small (early in the game), say so.
-Be concrete and actionable, in plain English, short sentences.
+Be concrete and actionable, in plain English, short sentences. Use NBA terminology for stats (PTS, REB, OREB/DREB, AST, STL, BLK, TOV, PF, PFD, FG%, 3P%, FT%, EFF, +/-).
 Reply with a single json object: {"headline": string, "what_happened": string[], "strengths": string[], "concerns": string[], "suggestions": string[], "player_notes": [{"player": string, "note": string}], "conclusion": string}.
 Each list has 2-5 items; "suggestions" are tactical adjustments for the next minutes/games (rotations, shot selection by zone, foul trouble, rebounding, turnovers).`;
 
