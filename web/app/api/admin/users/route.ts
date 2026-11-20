@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { clubIdForUser, clubIdOfRow } from "@/lib/auth/club";
 import { banDurationFor } from "@/lib/auth/session-revocation";
 import { authorize } from "@/lib/auth/guards";
+import { sanitizeRolesExtra } from "@/lib/auth/roles";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
@@ -350,11 +351,19 @@ export async function PATCH(req: NextRequest) {
     updates.role = role;
   }
   if (active !== undefined) updates.active = Boolean(active);
+  let rolesExtraClean: string[] | undefined;
   if (roles_extra !== undefined) {
-    if (!Array.isArray(roles_extra)) return fail("roles_extra deve ser um array");
-    const VALID_EXTRAS = ["jogador", "treinador"];
-    if (roles_extra.some((r) => !VALID_EXTRAS.includes(r))) return fail("Papel extra inválido");
-    updates.roles_extra = roles_extra;
+    // A função principal efetiva é a do pedido (se vier) ou a atual da conta.
+    let primaryRole = role !== undefined ? String(role) : undefined;
+    if (primaryRole === undefined) {
+      const { data: target } = await admin.from("users").select("role").eq("id", user_id).maybeSingle();
+      if (!target) return fail("Utilizador não encontrado", 404);
+      primaryRole = String((target as { role: string }).role);
+    }
+    const clean = sanitizeRolesExtra(primaryRole, roles_extra);
+    if (!clean) return fail("Função adicional inválida");
+    rolesExtraClean = clean;
+    updates.roles_extra = clean;
   }
   if (Object.keys(updates).length === 0) return fail("Nenhum campo para actualizar");
 
@@ -364,8 +373,8 @@ export async function PATCH(req: NextRequest) {
   // Se "jogador" foi adicionado como papel extra e foi fornecida uma temporada,
   // criar/actualizar o registo de jogador para esta época
   if (
-    roles_extra !== undefined &&
-    roles_extra.includes("jogador") &&
+    rolesExtraClean !== undefined &&
+    rolesExtraClean.includes("jogador") &&
     season_id
   ) {
     const { data: existing } = await admin

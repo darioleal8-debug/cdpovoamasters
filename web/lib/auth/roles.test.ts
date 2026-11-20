@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { hasAnyRole, isActiveProfile, MANAGERS, FINANCE, ADMIN } from "./roles";
+import { hasAnyRole, isActiveProfile, MANAGERS, FINANCE, ADMIN, sanitizeRolesExtra } from "./roles";
 
 describe("hasAnyRole", () => {
   it("aceita papel primário no grupo", () => {
@@ -51,5 +51,23 @@ describe("evaluateAccess", () => {
   });
   it("ok para treinador numa ação de gestão", () => {
     expect(evaluateAccess(true, { ...ativo, role: "treinador" }, MANAGERS)).toEqual({ ok: true });
+  });
+});
+
+describe("sanitizeRolesExtra", () => {
+  it("permite a um jogador acumular qualquer função de gestão", () => {
+    expect(sanitizeRolesExtra("jogador", ["admin", "treinador", "seccionista", "tesoureiro"]))
+      .toEqual(["admin", "treinador", "seccionista", "tesoureiro"]);
+  });
+  it("remove duplicados e a função principal", () => {
+    expect(sanitizeRolesExtra("treinador", ["treinador", "jogador", "jogador"])).toEqual(["jogador"]);
+  });
+  it("aceita lista vazia (retirar funções)", () => {
+    expect(sanitizeRolesExtra("jogador", [])).toEqual([]);
+  });
+  it("rejeita valores desconhecidos ou tipos inválidos", () => {
+    expect(sanitizeRolesExtra("jogador", ["superadmin"])).toBeNull();
+    expect(sanitizeRolesExtra("jogador", "admin")).toBeNull();
+    expect(sanitizeRolesExtra("jogador", [1])).toBeNull();
   });
 });

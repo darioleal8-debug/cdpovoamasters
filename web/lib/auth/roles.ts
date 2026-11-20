@@ -45,3 +45,21 @@ export function evaluateAccess(
   }
   return { ok: true };
 }
+
+/** Funções que um administrador de clube pode atribuir a qualquer conta (incl. jogadores). */
+export const ASSIGNABLE_ROLES = ["admin", "treinador", "seccionista", "tesoureiro", "jogador"] as const satisfies readonly UserRole[];
+
+/**
+ * Valida as funções adicionais pedidas para uma conta: só valores atribuíveis, sem duplicados
+ * e sem repetir a função principal. Devolve `null` se o pedido for inválido.
+ */
+export function sanitizeRolesExtra(primary: string, extras: unknown): string[] | null {
+  if (!Array.isArray(extras)) return null;
+  const allowed: readonly string[] = ASSIGNABLE_ROLES;
+  const out: string[] = [];
+  for (const r of extras) {
+    if (typeof r !== "string" || !allowed.includes(r)) return null;
+    if (r !== primary && !out.includes(r)) out.push(r);
+  }
+  return out;
+}

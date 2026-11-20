@@ -38,7 +38,7 @@ interface UserRow {
   id:          string;
   name:        string;
   email:       string;
-  role:        "admin" | "treinador" | "jogador" | "seccionista";
+  role:        "admin" | "treinador" | "jogador" | "seccionista" | "tesoureiro";
   roles_extra: string[];
   birth_date:  string | null;
   active:      boolean;
@@ -60,6 +60,7 @@ const ROLE_COLORS: Record<string, string> = {
   treinador:   "bg-blue-100 text-blue-800",
   jogador:     "bg-green-100 text-green-800",
   seccionista: "bg-purple-100 text-purple-800",
+  tesoureiro:  "bg-amber-100 text-amber-800",
 };
 
 function Avatar({ name }: { name: string }) {
@@ -204,7 +205,7 @@ export default function GestaoDeContasPage() {
         name:        editName.trim(),
         role:        editRole,
         active:      editActive,
-        roles_extra: editRole === "jogador" ? [] : editRolesExtra,
+        roles_extra: editRolesExtra.filter((r) => r !== editRole),
       };
       if (isAlsoPlayer && editSeasonId) {
         body.season_id     = editSeasonId;
@@ -592,8 +593,8 @@ export default function GestaoDeContasPage() {
                 <Label>Tipo principal</Label>
                 <Select value={editRole} onValueChange={(v) => {
                   setEditRole(v);
-                  // Jogador não tem papéis extra
-                  if (v === "jogador") setEditRolesExtra([]);
+                  // A função principal não pode repetir-se como adicional
+                  setEditRolesExtra((prev) => prev.filter((r) => r !== v));
                 }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -606,33 +607,38 @@ export default function GestaoDeContasPage() {
                 </Select>
               </div>
 
-              {/* Papéis adicionais — só para contas não-jogador */}
-              {editRole !== "jogador" && (
-                <div className="space-y-2">
-                  <Label>Papéis adicionais</Label>
-                  <div className="rounded-lg border p-3 space-y-2">
-                    {[
-                      { value: "jogador",  label: "Também é Jogador" },
-                      ...(editRole !== "treinador" ? [{ value: "treinador", label: "Também é Treinador" }] : []),
-                    ].map(({ value, label }) => (
-                      <div key={value} className="flex items-center gap-2">
-                        <Checkbox
-                          id={`extra-${value}`}
-                          checked={editRolesExtra.includes(value)}
-                          onCheckedChange={(checked) =>
-                            setEditRolesExtra((prev) =>
-                              checked ? [...prev, value] : prev.filter((r) => r !== value)
-                            )
-                          }
-                        />
-                        <Label htmlFor={`extra-${value}`} className="font-normal cursor-pointer">
-                          {label}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
+              {/* Funções adicionais — qualquer conta (incl. jogadores) pode acumular funções */}
+              <div className="space-y-2">
+                <Label>Funções adicionais</Label>
+                <div className="rounded-lg border p-3 space-y-2">
+                  {[
+                    { value: "admin",       label: "Também é Administrador" },
+                    { value: "treinador",   label: "Também é Treinador" },
+                    { value: "seccionista", label: "Também é Seccionista" },
+                    { value: "tesoureiro",  label: "Também é Tesoureiro" },
+                    { value: "jogador",     label: "Também é Jogador" },
+                  ].filter(({ value }) => value !== editRole).map(({ value, label }) => (
+                    <div key={value} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`extra-${value}`}
+                        checked={editRolesExtra.includes(value)}
+                        onCheckedChange={(checked) =>
+                          setEditRolesExtra((prev) =>
+                            checked ? [...prev.filter((r) => r !== value), value] : prev.filter((r) => r !== value)
+                          )
+                        }
+                      />
+                      <Label htmlFor={`extra-${value}`} className="font-normal cursor-pointer">
+                        {label}
+                      </Label>
+                    </div>
+                  ))}
                 </div>
-              )}
+                <p className="text-xs text-muted-foreground">
+                  A conta mantém a função principal e ganha o acesso de cada função adicional
+                  (alterna entre funções no seletor de função).
+                </p>
+              </div>
 
               {/* Campos de jogador — quando "Jogador" é papel extra */}
               {editRole !== "jogador" && editRolesExtra.includes("jogador") && (
