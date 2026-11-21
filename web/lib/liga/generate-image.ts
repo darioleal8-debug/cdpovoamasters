@@ -127,14 +127,6 @@ export async function generateNewsImage(ctx: NewsImageContext): Promise<Generate
 }
 
 async function _generateNewsImage(ctx: NewsImageContext): Promise<GenerateResult> {
-  const deepseekKey = process.env.DEEPSEEK_API_KEY;
-  const falKey = process.env.FAL_KEY;
-
-  if (!falKey) {
-    await setImageFailed(ctx.newsId, "AUTH", "FAL_KEY não configurada");
-    return { ok: false, errorType: "AUTH" };
-  }
-
   const admin = await createUnscopedAdminClient();
   const tTotal = Date.now();
 
@@ -173,71 +165,21 @@ async function _generateNewsImage(ctx: NewsImageContext): Promise<GenerateResult
     }
   }
 
-  // ── Passo 1: gerar prompt com dados reais ─────────────────────────────────
-  let prompt: string;
-  let negativePrompt: string;
-
-  if (deepseekKey) {
-    const t0 = Date.now();
-    console.log(`[generateNewsImage] deepseek:start ${ctx.newsId} model=${process.env.DEEPSEEK_TEXT_MODEL ?? "deepseek-chat"}`);
-    try {
-      const result = await buildImagePrompt(ctx, gameData);
-      if (!validatePrompt(result.prompt)) {
-        console.warn(`[generateNewsImage] deepseek:banned_terms — usando fallback`);
-        const fb = buildFallbackPrompt(ctx, gameData);
-        prompt = fb.prompt; negativePrompt = fb.negativePrompt;
-      } else {
-        prompt = result.prompt; negativePrompt = result.negativePrompt;
-        console.log(`[generateNewsImage] deepseek:ok ${Date.now() - t0}ms`);
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[generateNewsImage] deepseek:fail ${Date.now() - t0}ms — ${msg}`);
-      const fb = buildFallbackPrompt(ctx, gameData);
-      prompt = fb.prompt; negativePrompt = fb.negativePrompt;
-    }
-  } else {
-    const fb = buildFallbackPrompt(ctx, gameData);
-    prompt = fb.prompt; negativePrompt = fb.negativePrompt;
+  // ── Passo 0b: sem foto real → scoreboard com resultado e nomes das equipas ─
+  // (as imagens geradas por IA foram abandonadas por falta de credibilidade;
+  //  a IA só é usada se não houver resultado para compor o scoreboard)
+  if (await renderScoreboardCover(ctx, oldImageUrl)) {
+    console.log(`[generateNewsImage] scoreboard total=${Date.now() - tTotal}ms ${ctx.newsId}`);
+    return { ok: true };
   }
 
-  await admin.from("news").update({ image_prompt: prompt }).eq("id", ctx.newsId);
-
-  // ── Passo 2: gerar e compor imagem ────────────────────────────────────────
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    const t1 = Date.now();
-    console.log(`[generateNewsImage] fal:start attempt=${attempt} ${ctx.newsId}`);
-    try {
-      const { buffer: rawBuffer, seed } = await callFalApi(prompt, negativePrompt, falKey);
-      console.log(`[generateNewsImage] fal:ok seed=${seed} ${Date.now() - t1}ms`);
-
-      const webpBuffer = await buildFinalImage(rawBuffer, ctx, gameData);
-
-      const { publicUrl } = await saveImageToStorage(admin, ctx.newsId, webpBuffer);
-
-      const { error: updateErr } = await admin
-        .from("news")
-        .update({ cover_image_url: publicUrl, image_source: "ai", image_status: "ready", image_seed: seed, image_error: null, image_error_type: null })
-        .eq("id", ctx.newsId);
-
-      if (updateErr) throw new Error(`DB update: ${updateErr.message}`);
-
-      await deletePreviousImage(admin, oldImageUrl);
-      console.log(`[generateNewsImage] done total=${Date.now() - tTotal}ms ${ctx.newsId}`);
-      return { ok: true };
-    } catch (err) {
-      const errorType = (err as Partial<FalError>).errorType ?? "UNKNOWN";
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[generateNewsImage] fail attempt=${attempt} type=${errorType} ${Date.now() - t1}ms — ${msg}`);
-
-      if (errorType === "BILLING" || errorType === "AUTH" || errorType === "CONTENT" || attempt === 2) {
-        return await scoreboardFallback(ctx, oldImageUrl, { type: errorType, msg });
-      }
-      const delay = errorType === "RATE_LIMIT" ? 10_000 : 5_000;
-      await new Promise((r) => setTimeout(r, delay));
-    }
+  // ── Passo 0c: sem equipas (notícia geral) → cartão simples com o título ───
+  if (await renderTitleCover(ctx, oldImageUrl)) {
+    console.log(`[generateNewsImage] title card total=${Date.now() - tTotal}ms ${ctx.newsId}`);
+    return { ok: true };
   }
-  return await scoreboardFallback(ctx, oldImageUrl, { type: "UNKNOWN", msg: "geração falhou" });
+  await setImageFailed(ctx.newsId, "TRANSIENT", "não foi possível compor a imagem da notícia");
+  return { ok: false, errorType: "TRANSIENT" };
 }
 
 // Brief criativo do admin → DeepSeek interpreta → gera prompt Flux
@@ -541,10 +483,10 @@ function buildOverlaySvg(d: OverlayData): Buffer {
 
   // Panel geometry — layout de duas linhas (casa / fora)
   const PX = 80, PY = 185, PW = 1440;
-  const HEADER_H = 52;
+  const HEADER_H = 56;
   const ROW_H = 213;
   const SEP_H = 2;
-  const FOOTER_H = 50;
+  const FOOTER_H = 72;
   const PH = HEADER_H + ROW_H + SEP_H + ROW_H + FOOTER_H; // 530
 
   const PANEL_CX = PX + PW / 2; // 800
@@ -576,8 +518,8 @@ function buildOverlaySvg(d: OverlayData): Buffer {
   const AWAY_SCORE_Y = AWAY_ROW_TOP + Math.round(ROW_H * 0.62) + 18; // ~600
 
   const hasResult = d.homeScore != null && d.awayScore != null;
-  const statusLabel = hasResult ? "RESULTADO FINAL" : "PRÓXIMO JOGO";
-  const statusBadgeW = hasResult ? 196 : 168;
+  const statusLabel = hasResult ? "RESULTADO FINAL" : "JOGO";
+  const statusBadgeW = hasResult ? 280 : 120;
 
   const homeWins = hasResult && d.homeScore! > d.awayScore!;
   const awayWins = hasResult && d.awayScore! > d.homeScore!;
@@ -620,8 +562,8 @@ function buildOverlaySvg(d: OverlayData): Buffer {
     : "";
 
   // Rodapé: linha 1 = jornada (ou data), linha 2 = parciais (se disponíveis)
-  const FOOTER_LINE1_Y = FOOTER_TOP + 18;
-  const FOOTER_LINE2_Y = FOOTER_TOP + 38;
+  const FOOTER_LINE1_Y = FOOTER_TOP + 30;
+  const FOOTER_LINE2_Y = FOOTER_TOP + 58;
 
   const periodsStr = d.periods?.length
     ? d.periods.map((p) => `P${p.period}: ${p.home}-${p.away}`).join("  ·  ")
@@ -639,10 +581,10 @@ function buildOverlaySvg(d: OverlayData): Buffer {
 
   const jornadaEl = [
     footerLine1
-      ? `<text x="${PANEL_CX}" y="${FOOTER_LINE1_Y}" font-family="${FONT}" font-size="12" font-weight="600" fill="${GOLD}" text-anchor="middle" letter-spacing="2.0" opacity="0.82">${escXml(footerLine1)}</text>`
+      ? `<text x="${PANEL_CX}" y="${FOOTER_LINE1_Y}" font-family="${FONT}" font-size="22" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="2.5" opacity="0.95">${escXml(footerLine1)}</text>`
       : "",
     periodsStr
-      ? `<text x="${PANEL_CX}" y="${FOOTER_LINE2_Y}" font-family="${FONT}" font-size="11" font-weight="600" fill="white" text-anchor="middle" letter-spacing="1.5" opacity="0.65">${escXml(periodsStr)}</text>`
+      ? `<text x="${PANEL_CX}" y="${FOOTER_LINE2_Y}" font-family="${FONT}" font-size="20" font-weight="700" fill="white" text-anchor="middle" letter-spacing="1.5" opacity="0.8">${escXml(periodsStr)}</text>`
       : "",
   ].join("");
 
@@ -696,19 +638,19 @@ function buildOverlaySvg(d: OverlayData): Buffer {
   <line x1="${PX + 24}" y1="${FOOTER_TOP}" x2="${PX + PW - 24}" y2="${FOOTER_TOP}" stroke="${GOLD}" stroke-width="1" opacity="0.40"/>
 
   <!-- HEADER: Liga INATEL badge (esquerda) -->
-  <rect x="${PX + 16}" y="${PY + 11}" width="130" height="30" rx="3" fill="${GOLD}" opacity="0.14"/>
-  <rect x="${PX + 16}" y="${PY + 11}" width="130" height="30" rx="3" fill="none" stroke="${GOLD}" stroke-width="1" opacity="0.72"/>
-  <text x="${PX + 81}" y="${PY + 31}" font-family="${FONT}" font-size="11" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="2.5">LIGA INATEL</text>
+  <rect x="${PX + 16}" y="${PY + 11}" width="190" height="34" rx="3" fill="${GOLD}" opacity="0.14"/>
+  <rect x="${PX + 16}" y="${PY + 11}" width="190" height="34" rx="3" fill="none" stroke="${GOLD}" stroke-width="1" opacity="0.72"/>
+  <text x="${PX + 111}" y="${PY + 34}" font-family="${FONT}" font-size="16" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="2.5">LIGA INATEL</text>
 
   <!-- HEADER: Status badge (centro) -->
-  <rect x="${PANEL_CX - statusBadgeW / 2}" y="${PY + 11}" width="${statusBadgeW}" height="30" rx="3" fill="${GOLD}" opacity="0.14"/>
-  <rect x="${PANEL_CX - statusBadgeW / 2}" y="${PY + 11}" width="${statusBadgeW}" height="30" rx="3" fill="none" stroke="${GOLD}" stroke-width="1" opacity="0.85"/>
-  <text x="${PANEL_CX}" y="${PY + 31}" font-family="${FONT}" font-size="11" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="2.5">${escXml(statusLabel)}</text>
+  <rect x="${PANEL_CX - statusBadgeW / 2}" y="${PY + 11}" width="${statusBadgeW}" height="34" rx="3" fill="${GOLD}" opacity="0.14"/>
+  <rect x="${PANEL_CX - statusBadgeW / 2}" y="${PY + 11}" width="${statusBadgeW}" height="34" rx="3" fill="none" stroke="${GOLD}" stroke-width="1" opacity="0.85"/>
+  <text x="${PANEL_CX}" y="${PY + 34}" font-family="${FONT}" font-size="16" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="2.5">${escXml(statusLabel)}</text>
 
   <!-- HEADER: Modalidade badge (direita) -->
-  <rect x="${PX + PW - 16 - 224}" y="${PY + 11}" width="224" height="30" rx="3" fill="${GOLD}" opacity="0.14"/>
-  <rect x="${PX + PW - 16 - 224}" y="${PY + 11}" width="224" height="30" rx="3" fill="none" stroke="${GOLD}" stroke-width="1" opacity="0.72"/>
-  <text x="${PX + PW - 16 - 112}" y="${PY + 31}" font-family="${FONT}" font-size="11" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="2.0">BASQUETEBOL VETERANOS</text>
+  <rect x="${PX + PW - 16 - 330}" y="${PY + 11}" width="330" height="34" rx="3" fill="${GOLD}" opacity="0.14"/>
+  <rect x="${PX + PW - 16 - 330}" y="${PY + 11}" width="330" height="34" rx="3" fill="none" stroke="${GOLD}" stroke-width="1" opacity="0.72"/>
+  <text x="${PX + PW - 16 - 165}" y="${PY + 34}" font-family="${FONT}" font-size="16" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="2.0">BASQUETEBOL VETERANOS</text>
 
   <!-- LINHA CASA: logo -->
   ${homeLogoEl}
@@ -810,32 +752,85 @@ async function pickRealCoverPhoto(admin: SupabaseClient, gameId: string): Promis
 // ─── Último recurso: scoreboard com o resultado final ─────────────────────────
 
 /** Scoreboard (fundo liso + placard com equipas e resultado final) quando não há foto nem imagem IA. */
-async function scoreboardFallback(ctx: NewsImageContext, oldImageUrl: string | null, failure: { type: FalErrorType; msg: string }): Promise<GenerateResult> {
+async function renderScoreboardCover(ctx: NewsImageContext, oldImageUrl: string | null, source: "scoreboard" | "fallback" = "fallback"): Promise<boolean> {
   try {
     const admin = await createUnscopedAdminClient();
     const gameData = await fetchGameImageData(ctx.newsId, admin);
-    const hasScore = (gameData?.homeScore != null && gameData?.awayScore != null) || !!ctx.scoreStr;
-    if (!hasScore) throw new Error("sem resultado final para o scoreboard");
+    // Basta existirem as duas equipas: o scoreboard mostra o resultado quando existe.
+    // Só sem equipas (ex.: notícia geral) se recorre ao caminho de IA.
+    const home = (ctx.homeTeamName || gameData?.homeTeamName || "").trim();
+    const away = (ctx.awayTeamName || gameData?.awayTeamName || "").trim();
+    if (!home || !away) return false;
     const base = await sharp({ create: { width: 1600, height: 900, channels: 3, background: "#0B1626" } }).png().toBuffer();
     const svg = buildOverlaySvg(await buildOverlayData(ctx, gameData));
     const webp = await sharp(base).composite([{ input: svg, blend: "over" }]).webp({ quality: 88 }).toBuffer();
     const { publicUrl } = await saveImageToStorage(admin, ctx.newsId, webp);
+    // image_source mantém 'fallback' (constraint da BD) — significa "imagem gerada sem fotografia"
     const { error } = await admin.from("news").update({
-      cover_image_url: publicUrl, image_source: "fallback", image_status: "ready",
-      image_error: null, image_error_type: null,
+      cover_image_url: publicUrl, image_source: source, image_status: "ready",
+      image_prompt: null, image_error: null, image_error_type: null,
     }).eq("id", ctx.newsId);
     if (error) throw new Error(error.message);
     await deletePreviousImage(admin, oldImageUrl);
-    console.info(`[generateNewsImage] scoreboard com resultado final usado (IA falhou: ${failure.type}) ${ctx.newsId}`);
-    return { ok: true };
+    return true;
   } catch (e) {
-    console.error(`[generateNewsImage] scoreboard fallback falhou: ${(e as Error).message}`);
-    await setImageFailed(ctx.newsId, failure.type, failure.msg);
-    return { ok: false, errorType: failure.type };
+    console.error(`[generateNewsImage] scoreboard falhou: ${(e as Error).message}`);
+    return false;
   }
 }
 
-// ─── DB helpers ───────────────────────────────────────────────────────────────
+async function renderTitleCover(ctx: NewsImageContext, oldImageUrl: string | null): Promise<boolean> {
+  try {
+    const admin = await createUnscopedAdminClient();
+    const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const words = (ctx.title || "Liga INATEL").trim().split(/\s+/);
+    const lines: string[] = [];
+    let cur = "";
+    for (const w of words) {
+      if ((cur + " " + w).trim().length > 26 && cur) { lines.push(cur); cur = w; } else cur = (cur + " " + w).trim();
+    }
+    if (cur) lines.push(cur);
+    const shown = lines.slice(0, 4);
+    if (lines.length > 4) shown[3] = shown[3].replace(/.{0,2}$/, "…");
+    const fontB64 = getInterBoldB64();
+    const FONT = fontB64 ? "'Inter', sans-serif" : "sans-serif";
+    const style = fontB64 ? `<style>@font-face { font-family: 'Inter'; src: url('data:font/woff;base64,${fontB64}'); font-weight: 700; }</style>` : "";
+    const GOLD = "#C8A852";
+    const startY = 450 - ((shown.length - 1) * 60) + 20;
+    const text = shown.map((l, i) => `<text x="800" y="${startY + i * 120}" font-family="${FONT}" font-size="84" font-weight="700" fill="white" text-anchor="middle">${esc(l)}</text>`).join("");
+    const svg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900">${style}
+      <rect width="1600" height="900" fill="#0B1626"/>
+      <rect x="80" y="80" width="1440" height="740" rx="6" fill="none" stroke="${GOLD}" stroke-width="2" opacity="0.88"/>
+      <rect x="650" y="120" width="300" height="48" rx="3" fill="${GOLD}" opacity="0.14"/>
+      <rect x="650" y="120" width="300" height="48" rx="3" fill="none" stroke="${GOLD}" stroke-width="1" opacity="0.8"/>
+      <text x="800" y="153" font-family="${FONT}" font-size="22" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="4">LIGA INATEL</text>
+      ${text}
+      <text x="800" y="770" font-family="${FONT}" font-size="22" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="3" opacity="0.8">BASQUETEBOL VETERANOS</text>
+    </svg>`);
+    const base = await sharp({ create: { width: 1600, height: 900, channels: 3, background: "#0B1626" } }).png().toBuffer();
+    const webp = await sharp(base).composite([{ input: svg, blend: "over" }]).webp({ quality: 88 }).toBuffer();
+    const { publicUrl } = await saveImageToStorage(admin, ctx.newsId, webp);
+    const { error } = await admin.from("news").update({
+      cover_image_url: publicUrl, image_source: "fallback", image_status: "ready",
+      image_prompt: null, image_error: null, image_error_type: null,
+    }).eq("id", ctx.newsId);
+    if (error) throw new Error(error.message);
+    await deletePreviousImage(admin, oldImageUrl);
+    return true;
+  } catch (e) {
+    console.error(`[generateNewsImage] title card falhou: ${(e as Error).message}`);
+    return false;
+  }
+}
+
+async function scoreboardFallback(ctx: NewsImageContext, oldImageUrl: string | null, failure: { type: FalErrorType; msg: string }): Promise<GenerateResult> {
+  if (await renderScoreboardCover(ctx, oldImageUrl)) {
+    console.info(`[generateNewsImage] scoreboard com resultado final usado (IA falhou: ${failure.type}) ${ctx.newsId}`);
+    return { ok: true };
+  }
+  await setImageFailed(ctx.newsId, failure.type, failure.msg);
+  return { ok: false, errorType: failure.type };
+}
 
 async function setImageFailed(newsId: string, errorType: FalErrorType, errorMsg: string) {
   try {
