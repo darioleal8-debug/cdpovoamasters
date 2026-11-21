@@ -9,6 +9,7 @@ import { formatClock } from "@/hooks/use-live-game";
 import { MONO, SANS } from "./tokens";
 import { PeriodBar } from "@/components/live/period-bar";
 import { liveName } from "@/lib/live/player-name";
+import { clockButtonColors } from "@/lib/live/clock-button";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -191,7 +192,7 @@ function Scoreboard1a({
             style={{
               flex: 1, height: 64, minWidth: 140, borderRadius: 12, border: "none", cursor: "pointer",
               fontFamily: SANS, fontSize: 22, fontWeight: 800,
-              background: "var(--accent)", color: "var(--accentInk)",
+              ...clockButtonColors(running),
             }}
           >
             {running ? "■ Stop" : "▶ Start"}

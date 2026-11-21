@@ -9,6 +9,7 @@ import { formatClock } from "@/hooks/use-live-game";
 import { MONO, SANS } from "./tokens";
 import { PeriodBar } from "@/components/live/period-bar";
 import { liveName } from "@/lib/live/player-name";
+import { clockButtonColors } from "@/lib/live/clock-button";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -300,7 +301,7 @@ export function MobileScoringScreen({ game, userId: _userId, clubName = "Home", 
           onClick={running ? stopClock : startClock}
           style={{
             height: 56, minWidth: 96, borderRadius: 10, border: "none",
-            background: "var(--accent)", color: "var(--accentInk)",
+            ...clockButtonColors(running),
             cursor: "pointer", fontFamily: SANS, fontSize: 24, fontWeight: 800,
             flexShrink: 0, padding: "0 14px",
           } as React.CSSProperties}

@@ -10,6 +10,7 @@ import { EVENT_LABELS } from "./layout-1a";
 import { MONO, SANS } from "./tokens";
 import { PeriodBar } from "@/components/live/period-bar";
 import { liveName } from "@/lib/live/player-name";
+import { clockButtonColors } from "@/lib/live/clock-button";
 
 type FoulType = "foul_def" | "foul_of" | "foul_tec" | "foul_anti";
 
@@ -164,7 +165,7 @@ export function Layout1b({
 
           {/* Clock controls */}
           <button onClick={running ? onStopClock : onStartClock}
-            style={{ height: 64, minWidth: 150, padding: "0 28px", borderRadius: 12, border: "none", cursor: "pointer", fontFamily: SANS, fontSize: 22, fontWeight: 800, background: "var(--accent)", color: "var(--accentInk)" }}>
+            style={{ height: 64, minWidth: 150, padding: "0 28px", borderRadius: 12, border: "none", cursor: "pointer", fontFamily: SANS, fontSize: 22, fontWeight: 800, ...clockButtonColors(running) }}>
             {running ? "■ Stop" : "▶ Start"}
           </button>
           <PeriodBar period={session.current_period} homeScore={session.home_score} awayScore={session.away_score}
