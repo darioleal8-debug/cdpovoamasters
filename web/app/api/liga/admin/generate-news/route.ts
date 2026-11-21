@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Prompt demasiado longo (máx. ${MAX_PROMPT_CHARS} caracteres)` }, { status: 400 });
   }
 
-  const result = await generateLigaNews(body.game_id, { systemPrompt, userPrompt });
+  const result = await generateLigaNews(body.game_id, { systemPrompt, userPrompt, keepPublished: true });
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 502 });
 
   const { news_id, newsContext } = result;

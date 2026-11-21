@@ -127,14 +127,6 @@ export async function generateNewsImage(ctx: NewsImageContext): Promise<Generate
 }
 
 async function _generateNewsImage(ctx: NewsImageContext): Promise<GenerateResult> {
-  const deepseekKey = process.env.DEEPSEEK_API_KEY;
-  const falKey = process.env.FAL_KEY;
-
-  if (!falKey) {
-    await setImageFailed(ctx.newsId, "AUTH", "FAL_KEY não configurada");
-    return { ok: false, errorType: "AUTH" };
-  }
-
   const admin = await createUnscopedAdminClient();
   const tTotal = Date.now();
 
@@ -181,71 +173,13 @@ async function _generateNewsImage(ctx: NewsImageContext): Promise<GenerateResult
     return { ok: true };
   }
 
-  // ── Passo 1: gerar prompt com dados reais ─────────────────────────────────
-  let prompt: string;
-  let negativePrompt: string;
-
-  if (deepseekKey) {
-    const t0 = Date.now();
-    console.log(`[generateNewsImage] deepseek:start ${ctx.newsId} model=${process.env.DEEPSEEK_TEXT_MODEL ?? "deepseek-chat"}`);
-    try {
-      const result = await buildImagePrompt(ctx, gameData);
-      if (!validatePrompt(result.prompt)) {
-        console.warn(`[generateNewsImage] deepseek:banned_terms — usando fallback`);
-        const fb = buildFallbackPrompt(ctx, gameData);
-        prompt = fb.prompt; negativePrompt = fb.negativePrompt;
-      } else {
-        prompt = result.prompt; negativePrompt = result.negativePrompt;
-        console.log(`[generateNewsImage] deepseek:ok ${Date.now() - t0}ms`);
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[generateNewsImage] deepseek:fail ${Date.now() - t0}ms — ${msg}`);
-      const fb = buildFallbackPrompt(ctx, gameData);
-      prompt = fb.prompt; negativePrompt = fb.negativePrompt;
-    }
-  } else {
-    const fb = buildFallbackPrompt(ctx, gameData);
-    prompt = fb.prompt; negativePrompt = fb.negativePrompt;
+  // ── Passo 0c: sem equipas (notícia geral) → cartão simples com o título ───
+  if (await renderTitleCover(ctx, oldImageUrl)) {
+    console.log(`[generateNewsImage] title card total=${Date.now() - tTotal}ms ${ctx.newsId}`);
+    return { ok: true };
   }
-
-  await admin.from("news").update({ image_prompt: prompt }).eq("id", ctx.newsId);
-
-  // ── Passo 2: gerar e compor imagem ────────────────────────────────────────
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    const t1 = Date.now();
-    console.log(`[generateNewsImage] fal:start attempt=${attempt} ${ctx.newsId}`);
-    try {
-      const { buffer: rawBuffer, seed } = await callFalApi(prompt, negativePrompt, falKey);
-      console.log(`[generateNewsImage] fal:ok seed=${seed} ${Date.now() - t1}ms`);
-
-      const webpBuffer = await buildFinalImage(rawBuffer, ctx, gameData);
-
-      const { publicUrl } = await saveImageToStorage(admin, ctx.newsId, webpBuffer);
-
-      const { error: updateErr } = await admin
-        .from("news")
-        .update({ cover_image_url: publicUrl, image_source: "ai", image_status: "ready", image_seed: seed, image_error: null, image_error_type: null })
-        .eq("id", ctx.newsId);
-
-      if (updateErr) throw new Error(`DB update: ${updateErr.message}`);
-
-      await deletePreviousImage(admin, oldImageUrl);
-      console.log(`[generateNewsImage] done total=${Date.now() - tTotal}ms ${ctx.newsId}`);
-      return { ok: true };
-    } catch (err) {
-      const errorType = (err as Partial<FalError>).errorType ?? "UNKNOWN";
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[generateNewsImage] fail attempt=${attempt} type=${errorType} ${Date.now() - t1}ms — ${msg}`);
-
-      if (errorType === "BILLING" || errorType === "AUTH" || errorType === "CONTENT" || attempt === 2) {
-        return await scoreboardFallback(ctx, oldImageUrl, { type: errorType, msg });
-      }
-      const delay = errorType === "RATE_LIMIT" ? 10_000 : 5_000;
-      await new Promise((r) => setTimeout(r, delay));
-    }
-  }
-  return await scoreboardFallback(ctx, oldImageUrl, { type: "UNKNOWN", msg: "geração falhou" });
+  await setImageFailed(ctx.newsId, "TRANSIENT", "não foi possível compor a imagem da notícia");
+  return { ok: false, errorType: "TRANSIENT" };
 }
 
 // Brief criativo do admin → DeepSeek interpreta → gera prompt Flux
@@ -841,6 +775,50 @@ async function renderScoreboardCover(ctx: NewsImageContext, oldImageUrl: string 
     return true;
   } catch (e) {
     console.error(`[generateNewsImage] scoreboard falhou: ${(e as Error).message}`);
+    return false;
+  }
+}
+
+async function renderTitleCover(ctx: NewsImageContext, oldImageUrl: string | null): Promise<boolean> {
+  try {
+    const admin = await createUnscopedAdminClient();
+    const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const words = (ctx.title || "Liga INATEL").trim().split(/\s+/);
+    const lines: string[] = [];
+    let cur = "";
+    for (const w of words) {
+      if ((cur + " " + w).trim().length > 26 && cur) { lines.push(cur); cur = w; } else cur = (cur + " " + w).trim();
+    }
+    if (cur) lines.push(cur);
+    const shown = lines.slice(0, 4);
+    if (lines.length > 4) shown[3] = shown[3].replace(/.{0,2}$/, "…");
+    const fontB64 = getInterBoldB64();
+    const FONT = fontB64 ? "'Inter', sans-serif" : "sans-serif";
+    const style = fontB64 ? `<style>@font-face { font-family: 'Inter'; src: url('data:font/woff;base64,${fontB64}'); font-weight: 700; }</style>` : "";
+    const GOLD = "#C8A852";
+    const startY = 450 - ((shown.length - 1) * 60) + 20;
+    const text = shown.map((l, i) => `<text x="800" y="${startY + i * 120}" font-family="${FONT}" font-size="84" font-weight="700" fill="white" text-anchor="middle">${esc(l)}</text>`).join("");
+    const svg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900">${style}
+      <rect width="1600" height="900" fill="#0B1626"/>
+      <rect x="80" y="80" width="1440" height="740" rx="6" fill="none" stroke="${GOLD}" stroke-width="2" opacity="0.88"/>
+      <rect x="650" y="120" width="300" height="48" rx="3" fill="${GOLD}" opacity="0.14"/>
+      <rect x="650" y="120" width="300" height="48" rx="3" fill="none" stroke="${GOLD}" stroke-width="1" opacity="0.8"/>
+      <text x="800" y="153" font-family="${FONT}" font-size="22" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="4">LIGA INATEL</text>
+      ${text}
+      <text x="800" y="770" font-family="${FONT}" font-size="22" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="3" opacity="0.8">BASQUETEBOL VETERANOS</text>
+    </svg>`);
+    const base = await sharp({ create: { width: 1600, height: 900, channels: 3, background: "#0B1626" } }).png().toBuffer();
+    const webp = await sharp(base).composite([{ input: svg, blend: "over" }]).webp({ quality: 88 }).toBuffer();
+    const { publicUrl } = await saveImageToStorage(admin, ctx.newsId, webp);
+    const { error } = await admin.from("news").update({
+      cover_image_url: publicUrl, image_source: "fallback", image_status: "ready",
+      image_prompt: null, image_error: null, image_error_type: null,
+    }).eq("id", ctx.newsId);
+    if (error) throw new Error(error.message);
+    await deletePreviousImage(admin, oldImageUrl);
+    return true;
+  } catch (e) {
+    console.error(`[generateNewsImage] title card falhou: ${(e as Error).message}`);
     return false;
   }
 }

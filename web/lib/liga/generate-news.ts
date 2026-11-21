@@ -57,6 +57,8 @@ export type NewsPromptOverrides = {
   systemPrompt?: string;
   /** Substitui o pedido completo (factos + regras) enviado ao modelo. */
   userPrompt?: string;
+  /** Regeneração manual pelo admin: não despublica uma notícia que já estava publicada. */
+  keepPublished?: boolean;
 };
 
 async function prepareNews(gameId: string) {
@@ -347,7 +349,7 @@ export async function generateLigaNews(
 
   const { data: existing } = await adminClient
     .from("news")
-    .select("id")
+    .select("id, is_published")
     .eq("game_id", gameId)
     .maybeSingle();
 
@@ -365,7 +367,8 @@ export async function generateLigaNews(
         source_submission_id: submission?.id ?? null,
         image_status: "pending",
         // Dados com divergências por resolver: volta a rascunho até o admin validar
-        ...(draft ? { is_published: false } : {}),
+        // (exceto quando o admin regenera à mão uma notícia que já estava publicada)
+        ...(draft && !(overrides.keepPublished && existing.is_published) ? { is_published: false } : {}),
       })
       .eq("id", existing.id);
     if (error) {
