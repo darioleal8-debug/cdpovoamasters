@@ -46,7 +46,6 @@ const managementItems = [
   { label: "Treinos",          href: "/treinos",       icon: Dumbbell },
   { label: "Resumo Equipa",     href: "/estatisticas",  icon: BarChart3 },
   { label: "Documentos",       href: "/documentos",    icon: FolderOpen },
-  { label: "Histórico",        href: "/historico",     icon: History   },
   { label: "Palmarés",         href: "/palmares",      icon: Trophy    },
   { label: "Laboratório",      href: "/laboratorio",   icon: ClipboardList },
 ];
@@ -77,6 +76,7 @@ const communicationItems = [
 const accountItems: { label: string; href: string; icon: typeof Settings; adminOnly?: boolean }[] = [
   { label: "Configurações",       href: "/configuracoes",          icon: Settings },
   { label: "Gestão de Contas",    href: "/gestao-contas",          icon: UserCog, adminOnly: true },
+  { label: "Histórico Stats",     href: "/historico",              icon: History },
   { label: "Importar Calendário", href: "/configuracoes/importar", icon: FileUp },
 ];
 
