@@ -48,7 +48,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/chat":            "Chat",
   "/temporadas":      "Temporadas",
   "/gestao-contas":   "Contas",
-  "/historico":       "Histórico",
+  "/historico":       "Histórico Stats",
   "/financeiro":      "Financeiro",
   "/configuracoes":   "Definições",
   "/utilizacao":      "Utilização",
