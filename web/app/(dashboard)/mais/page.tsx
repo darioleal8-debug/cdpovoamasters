@@ -33,9 +33,9 @@ const ITEMS: MenuItem[] = [
   { label: "Resumo Equipa",     href: "/estatisticas",  icon: BarChart3,     desc: "Equipa, assiduidade e finanças" },
   { label: "Laboratório",      href: "/laboratorio",   icon: ClipboardList, desc: "Jogadas animadas" },
   { label: "Documentos",       href: "/documentos",    icon: FolderOpen,    desc: "Regulamentos e documentos oficiais" },
-  { label: "Histórico",        href: "/historico",     icon: History,       desc: "Épocas anteriores" },
   { label: "Financeiro",       href: "/financeiro",    icon: Landmark,      desc: "Caixa e entradas" },
   { label: "Gestão de Contas", href: "/gestao-contas", icon: UserCog,       desc: "Contas de utilizador" },
+  { label: "Histórico Stats",  href: "/historico",     icon: History,       desc: "Épocas anteriores" },
   { label: "Configurações",    href: "/configuracoes", icon: Settings,      desc: "Preferências do clube" },
 ];
 
