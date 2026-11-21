@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { deepseekJSON } from "@/lib/deepseek";
 import { isDocumentNotPhoto } from "@/lib/match-docs/classify";
+import { svgTextToPaths } from "@/lib/liga/svg-text";
 
 // ─── Font loading (Inter Bold WOFF — embutida no SVG para librsvg no Vercel) ─
 let _fontB64: string | null | undefined;
@@ -670,7 +671,7 @@ function buildOverlaySvg(d: OverlayData): Buffer {
   ${jornadaEl}
 </svg>`;
 
-  return Buffer.from(svg);
+  return Buffer.from(svgTextToPaths(svg));
 }
 
 async function fetchImageAsBase64(url: string): Promise<string | null> {
@@ -798,7 +799,7 @@ async function renderTitleCover(ctx: NewsImageContext, oldImageUrl: string | nul
     const GOLD = "#C8A852";
     const startY = 450 - ((shown.length - 1) * 60) + 20;
     const text = shown.map((l, i) => `<text x="800" y="${startY + i * 120}" font-family="${FONT}" font-size="84" font-weight="700" fill="white" text-anchor="middle">${esc(l)}</text>`).join("");
-    const svg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900">${style}
+    const svg = Buffer.from(svgTextToPaths(`<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900">${style}
       <rect width="1600" height="900" fill="#0B1626"/>
       <rect x="80" y="80" width="1440" height="740" rx="6" fill="none" stroke="${GOLD}" stroke-width="2" opacity="0.88"/>
       <rect x="650" y="120" width="300" height="48" rx="3" fill="${GOLD}" opacity="0.14"/>
@@ -806,7 +807,7 @@ async function renderTitleCover(ctx: NewsImageContext, oldImageUrl: string | nul
       <text x="800" y="153" font-family="${FONT}" font-size="22" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="4">LIGA INATEL</text>
       ${text}
       <text x="800" y="770" font-family="${FONT}" font-size="22" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="3" opacity="0.8">BASQUETEBOL VETERANOS</text>
-    </svg>`);
+    </svg>`));
     const base = await sharp({ create: { width: 1600, height: 900, channels: 3, background: "#0B1626" } }).png().toBuffer();
     const webp = await sharp(base).composite([{ input: svg, blend: "over" }]).webp({ quality: 88 }).toBuffer();
     const { publicUrl } = await saveImageToStorage(admin, ctx.newsId, webp);
