@@ -584,8 +584,8 @@ function buildOverlaySvg(d: OverlayData): Buffer {
   const AWAY_SCORE_Y = AWAY_ROW_TOP + Math.round(ROW_H * 0.62) + 18; // ~600
 
   const hasResult = d.homeScore != null && d.awayScore != null;
-  const statusLabel = hasResult ? "RESULTADO FINAL" : "PRÓXIMO JOGO";
-  const statusBadgeW = hasResult ? 280 : 240;
+  const statusLabel = hasResult ? "RESULTADO FINAL" : "JOGO";
+  const statusBadgeW = hasResult ? 280 : 120;
 
   const homeWins = hasResult && d.homeScore! > d.awayScore!;
   const awayWins = hasResult && d.awayScore! > d.homeScore!;
@@ -822,8 +822,11 @@ async function renderScoreboardCover(ctx: NewsImageContext, oldImageUrl: string 
   try {
     const admin = await createUnscopedAdminClient();
     const gameData = await fetchGameImageData(ctx.newsId, admin);
-    const hasScore = (gameData?.homeScore != null && gameData?.awayScore != null) || !!ctx.scoreStr;
-    if (!hasScore) return false;
+    // Basta existirem as duas equipas: o scoreboard mostra o resultado quando existe.
+    // Só sem equipas (ex.: notícia geral) se recorre ao caminho de IA.
+    const home = (ctx.homeTeamName || gameData?.homeTeamName || "").trim();
+    const away = (ctx.awayTeamName || gameData?.awayTeamName || "").trim();
+    if (!home || !away) return false;
     const base = await sharp({ create: { width: 1600, height: 900, channels: 3, background: "#0B1626" } }).png().toBuffer();
     const svg = buildOverlaySvg(await buildOverlayData(ctx, gameData));
     const webp = await sharp(base).composite([{ input: svg, blend: "over" }]).webp({ quality: 88 }).toBuffer();
