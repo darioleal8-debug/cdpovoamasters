@@ -17,48 +17,28 @@ export async function GET(req: NextRequest) {
   const days = Math.min(365, Math.max(7, parseInt(sp.get("days") ?? "30") || 30));
 
   const admin = await createAdminClient();
-  const since = new Date(Date.now() - days * 86_400_000).toISOString();
-  const today = new Date().toISOString().slice(0, 10);
-  const startOfToday  = today + "T00:00:00.000Z";
-  const startOfWeek   = new Date(Date.now() - 7  * 86_400_000).toISOString();
-  const startOfMonth  = new Date(Date.now() - 30 * 86_400_000).toISOString();
 
-  // ── 1. Todos os utilizadores (nome, role, last_sign_in) ──────
-  const [
-    { data: users },
-    { data: activityRaw },
-    { data: pageCounts },
-    { data: dowCounts },
-    { data: monthlyCounts },
-  ] = await Promise.all([
+  // ── 1. Utilizadores + agregados de atividade (calculados na BD) ──
+  // A função analytics_usage_summary agrega no Postgres; ler linhas no servidor
+  // truncava os resultados nas 1000 linhas por pedido do Supabase.
+  const [{ data: users }, { data: summary, error: summaryErr }] = await Promise.all([
     admin.from("users").select("id, name, email, role, active"),
-
-    // Actividade no período (para ranking + last_seen + daily chart)
-    admin
-      .from("user_activity_logs")
-      .select("user_id, page, created_at")
-      .gte("created_at", since)
-      .order("created_at", { ascending: true }),
-
-    // Top páginas no período
-    admin
-      .from("user_activity_logs")
-      .select("page")
-      .gte("created_at", since)
-      .not("page", "is", null),
-
-    // Actividade por dia da semana (0=Dom … 6=Sáb) — últimos 90d max
-    admin
-      .from("user_activity_logs")
-      .select("created_at")
-      .gte("created_at", new Date(Date.now() - 90 * 86_400_000).toISOString()),
-
-    // Actividade mensal — últimos 12 meses
-    admin
-      .from("user_activity_logs")
-      .select("created_at")
-      .gte("created_at", new Date(Date.now() - 365 * 86_400_000).toISOString()),
+    admin.rpc("analytics_usage_summary", { p_days: days }),
   ]);
+  if (summaryErr) return fail(summaryErr.message, 500);
+
+  type Summary = {
+    total_events: number;
+    active_today: number;
+    active_week: number;
+    active_month: number;
+    daily: Array<{ date: string; count: number }>;
+    dow: number[];
+    monthly: Array<{ ym: string; count: number }>;
+    pages: Array<{ page: string; count: number }>;
+    users: Array<{ user_id: string; events: number; last_seen: string }>;
+  };
+  const sum = summary as Summary;
 
   // ── 2. Últimos logins via Auth Admin API (com paginação) ──────
   const authUsers: Array<{ id: string; last_sign_in_at: string | null }> = [];
@@ -80,72 +60,24 @@ export async function GET(req: NextRequest) {
   }
   const lastLoginMap = new Map(authUsers.map((u) => [u.id, u.last_sign_in_at]));
 
-  // ── 3. Agregar actividade ─────────────────────────────────────
-  const logs = activityRaw ?? [];
+  // ── 3. Formatar agregados ─────────────────────────────────────
+  const dailyChart = sum.daily;
 
-  // Active counts
-  const activeToday = new Set(logs.filter((l) => l.created_at >= startOfToday).map((l) => l.user_id)).size;
-  const activeWeek  = new Set(logs.filter((l) => l.created_at >= startOfWeek).map((l) => l.user_id)).size;
-  const activeMonth = new Set(logs.filter((l) => l.created_at >= startOfMonth).map((l) => l.user_id)).size;
-
-  // Daily chart: events per day
-  const dailyMap = new Map<string, number>();
-  for (let d = 0; d < days; d++) {
-    const dt = new Date(Date.now() - (days - 1 - d) * 86_400_000).toISOString().slice(0, 10);
-    dailyMap.set(dt, 0);
-  }
-  for (const l of logs) {
-    const dt = l.created_at.slice(0, 10);
-    if (dailyMap.has(dt)) dailyMap.set(dt, (dailyMap.get(dt) ?? 0) + 1);
-  }
-  const dailyChart = Array.from(dailyMap.entries()).map(([date, count]) => ({ date, count }));
-
-  // Day of week (0=Dom, 1=Seg … 6=Sáb)
+  // Dia da semana (0=Dom, 1=Seg … 6=Sáb)
   const DOW_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-  const dowMap = new Array(7).fill(0);
-  for (const l of (dowCounts ?? [])) {
-    const dow = new Date(l.created_at).getDay();
-    dowMap[dow]++;
-  }
-  const dowChart = DOW_LABELS.map((label, i) => ({ label, count: dowMap[i] }));
+  const dowChart = DOW_LABELS.map((label, i) => ({ label, count: sum.dow[i] ?? 0 }));
 
-  // Monthly (last 12 months)
-  const monthMap = new Map<string, number>();
-  for (let m = 11; m >= 0; m--) {
-    const d = new Date();
-    d.setDate(1);
-    d.setMonth(d.getMonth() - m);
-    monthMap.set(d.toISOString().slice(0, 7), 0);
-  }
-  for (const l of (monthlyCounts ?? [])) {
-    const ym = l.created_at.slice(0, 7);
-    if (monthMap.has(ym)) monthMap.set(ym, (monthMap.get(ym) ?? 0) + 1);
-  }
+  // Mensal (últimos 12 meses)
   const PT_MONTHS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-  const monthlyChart = Array.from(monthMap.entries()).map(([ym, count]) => ({
+  const monthlyChart = sum.monthly.map(({ ym, count }) => ({
     label: PT_MONTHS[parseInt(ym.slice(5, 7)) - 1] + " " + ym.slice(2, 4),
     count,
   }));
 
-  // Page ranking
-  const pageMap = new Map<string, number>();
-  for (const l of (pageCounts ?? [])) {
-    if (!l.page) continue;
-    pageMap.set(l.page, (pageMap.get(l.page) ?? 0) + 1);
-  }
-  const pageRanking = Array.from(pageMap.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 15)
-    .map(([page, count]) => ({ page, count }));
+  const pageRanking = sum.pages;
 
-  // User ranking
-  const userEventMap   = new Map<string, number>();
-  const userLastSeen   = new Map<string, string>();
-  for (const l of logs) {
-    userEventMap.set(l.user_id, (userEventMap.get(l.user_id) ?? 0) + 1);
-    const cur = userLastSeen.get(l.user_id);
-    if (!cur || l.created_at > cur) userLastSeen.set(l.user_id, l.created_at);
-  }
+  const userEventMap = new Map(sum.users.map((u) => [u.user_id, u.events]));
+  const userLastSeen = new Map(sum.users.map((u) => [u.user_id, u.last_seen]));
 
   const usersList = (users ?? []).map((u) => {
     const uid        = u.id as string;
@@ -170,10 +102,10 @@ export async function GET(req: NextRequest) {
     overview: {
       total_users:   (users ?? []).length,
       active_users:  (users ?? []).filter((u) => u.active).length,
-      active_today:  activeToday,
-      active_week:   activeWeek,
-      active_month:  activeMonth,
-      total_events:  logs.length,
+      active_today:  sum.active_today,
+      active_week:   sum.active_week,
+      active_month: sum.active_month,
+      total_events:  sum.total_events,
     },
     daily_chart:   dailyChart,
     dow_chart:     dowChart,
