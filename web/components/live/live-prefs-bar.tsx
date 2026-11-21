@@ -17,9 +17,10 @@ interface LivePrefsBarProps {
   onOpenSummary: () => void;
   onOpenShare: () => void;
   onOpenHistory?: () => void;
+  onOpenTutorial?: () => void;
 }
 
-export function LivePrefsBar({ prefs, onSetLayout, onSetDark, onToggleFullscreen, onOpenSummary, onOpenShare, onOpenHistory }: LivePrefsBarProps) {
+export function LivePrefsBar({ prefs, onSetLayout, onSetDark, onToggleFullscreen, onOpenSummary, onOpenShare, onOpenHistory, onOpenTutorial }: LivePrefsBarProps) {
   const groupStyle: React.CSSProperties = {
     display: "flex", alignItems: "center", gap: 4,
     background: "oklch(0.94 0.006 250)", borderRadius: 13, padding: 5,
@@ -83,6 +84,16 @@ export function LivePrefsBar({ prefs, onSetLayout, onSetDark, onToggleFullscreen
           ☾ Escuro
         </button>
       </div>
+
+      {onOpenTutorial && (
+        <button onClick={onOpenTutorial} title="Tutorial: como usar o live e tirar dúvidas"
+          style={{
+            ...btnBase, background: "oklch(1 0 0)", border: "1px solid oklch(0.8 0.01 250)",
+            color: "oklch(0.3 0.02 250)",
+          }}>
+          ❓ Tutorial
+        </button>
+      )}
 
       {/* Summary + share + fullscreen icon buttons */}
       {onOpenHistory && (

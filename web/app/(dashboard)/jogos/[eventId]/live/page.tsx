@@ -20,6 +20,7 @@ import { MobileScoringScreen } from "@/components/live/mobile-scoring";
 import { ShotFlow } from "@/components/live/shot-flow";
 import { PlayHistory } from "@/components/live/play-history";
 import { LiveNotices } from "@/components/live/live-notices";
+import { TutorialOverlay } from "@/components/live/tutorial-overlay";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,6 +88,7 @@ export default function LiveGamePage() {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
 
   // ── Orientação do dispositivo ─────────────────────────────
   const [isLandscape, setIsLandscape] = useState(() =>
@@ -370,6 +372,16 @@ export default function LiveGamePage() {
             </button>
           )}
           <button
+            onClick={() => setTutorialOpen(true)}
+            style={{
+              height: 44, padding: "0 16px", borderRadius: 10, cursor: "pointer",
+              fontFamily: SANS, fontSize: 13, fontWeight: 700,
+              background: "var(--panel)", border: "1px solid var(--line)", color: "var(--text)",
+            }}
+          >
+            ❓ Tutorial
+          </button>
+          <button
             onClick={() => setShareOpen(true)}
             style={{
               height: 44, padding: "0 16px", borderRadius: 10, cursor: "pointer",
@@ -391,6 +403,7 @@ export default function LiveGamePage() {
           onOpenSummary={() => setSummaryOpen(true)}
           onOpenShare={() => setShareOpen(true)}
           onOpenHistory={session ? () => setHistoryOpen(true) : undefined}
+          onOpenTutorial={() => setTutorialOpen(true)}
         />
       )}
 
@@ -438,7 +451,8 @@ export default function LiveGamePage() {
       {/* ── Ecrã de marcação mobile (landscape + fullscreen) ─── */}
       {isMobileScoring && isLive && session && user && (
         <MobileScoringScreen game={game} userId={user.id} clubName={clubName}
-          onNextPeriod={handleNextPeriod} onFinish={() => setFinishDialog(true)} />
+          onNextPeriod={handleNextPeriod} onFinish={() => setFinishDialog(true)}
+          onOpenTutorial={() => setTutorialOpen(true)} />
       )}
 
       {/* Prompt de rotação (portrait + fullscreen) */}
@@ -558,6 +572,9 @@ export default function LiveGamePage() {
       {historyOpen && session && (
         <PlayHistory plays={plays} roster={roster} recording={recording} onUndoPlay={undoPlay} onClose={() => setHistoryOpen(false)} />
       )}
+
+      {/* ── Tutorial + dúvidas (IA) ─────────────────────────── */}
+      {tutorialOpen && <TutorialOverlay onClose={() => setTutorialOpen(false)} />}
 
       {/* ── Summary overlay ────────────────────────────────── */}
       {summaryOpen && session && (

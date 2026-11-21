@@ -46,6 +46,8 @@ export interface MobileScoringScreenProps {
   /** Fim de período / fim de jogo: abrem os diálogos da página (iguais aos do ecrã normal). */
   onNextPeriod?: () => void;
   onFinish?: () => void;
+  /** Abre o tutorial do live (janela da página). */
+  onOpenTutorial?: () => void;
 }
 
 // ── Module-level constants ────────────────────────────────────────────────────
@@ -189,7 +191,7 @@ function ActionButton({ event: _event, label, sub, actionStyle, enabled, onClick
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function MobileScoringScreen({ game, userId: _userId, clubName = "Home", onNextPeriod, onFinish }: MobileScoringScreenProps) {
+export function MobileScoringScreen({ game, userId: _userId, clubName = "Home", onNextPeriod, onFinish, onOpenTutorial }: MobileScoringScreenProps) {
   const {
     session, roster, onCourt, bench, plays, stints, clockSecs, recording,
     recordPlay, recordOpponentPoints, recordOpponentMiss, recordOpponentFoul, recordOpponentReb,
@@ -612,6 +614,16 @@ export function MobileScoringScreen({ game, userId: _userId, clubName = "Home", 
                 : "Live game"
               }
             </div>
+
+            {onOpenTutorial && (
+              <button onClick={() => { setDrawerOpen(false); onOpenTutorial(); }} style={{
+                height: 48, borderRadius: 8, border: "1px solid var(--line)",
+                background: "var(--chip)", color: "var(--text)", cursor: "pointer",
+                fontFamily: SANS, fontSize: 13, fontWeight: 800,
+              } as React.CSSProperties}>
+                ❓ Tutorial
+              </button>
+            )}
 
             <button onClick={() => setDrawerOpen(false)} style={{
               height: 44, borderRadius: 8, border: "1px solid var(--line)",
