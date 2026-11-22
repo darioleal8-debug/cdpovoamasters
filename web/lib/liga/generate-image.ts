@@ -6,6 +6,7 @@ import sharp from "sharp";
 import { deepseekJSON } from "@/lib/deepseek";
 import { isDocumentNotPhoto } from "@/lib/match-docs/classify";
 import { svgTextToPaths } from "@/lib/liga/svg-text";
+import { coverBackground } from "@/lib/liga/court-watermark";
 
 // ─── Font loading (Inter Bold WOFF — embutida no SVG para librsvg no Vercel) ─
 let _fontB64: string | null | undefined;
@@ -762,7 +763,7 @@ async function renderScoreboardCover(ctx: NewsImageContext, oldImageUrl: string 
     const home = (ctx.homeTeamName || gameData?.homeTeamName || "").trim();
     const away = (ctx.awayTeamName || gameData?.awayTeamName || "").trim();
     if (!home || !away) return false;
-    const base = await sharp({ create: { width: 1600, height: 900, channels: 3, background: "#0B1626" } }).png().toBuffer();
+    const base = await coverBackground();
     const svg = buildOverlaySvg(await buildOverlayData(ctx, gameData));
     const webp = await sharp(base).composite([{ input: svg, blend: "over" }]).webp({ quality: 88 }).toBuffer();
     const { publicUrl } = await saveImageToStorage(admin, ctx.newsId, webp);
@@ -808,7 +809,7 @@ async function renderTitleCover(ctx: NewsImageContext, oldImageUrl: string | nul
       ${text}
       <text x="800" y="770" font-family="${FONT}" font-size="22" font-weight="700" fill="${GOLD}" text-anchor="middle" letter-spacing="3" opacity="0.8">BASQUETEBOL VETERANOS</text>
     </svg>`));
-    const base = await sharp({ create: { width: 1600, height: 900, channels: 3, background: "#0B1626" } }).png().toBuffer();
+    const base = await coverBackground();
     const webp = await sharp(base).composite([{ input: svg, blend: "over" }]).webp({ quality: 88 }).toBuffer();
     const { publicUrl } = await saveImageToStorage(admin, ctx.newsId, webp);
     const { error } = await admin.from("news").update({
