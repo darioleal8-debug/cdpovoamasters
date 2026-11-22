@@ -55,7 +55,7 @@ function halfCourtDashed(): string {
  * SVG do campo inteiro, centrado e a ocupar a largura útil de `w × h`, em linhas brancas
  * com a opacidade pedida.
  */
-export function courtWatermarkSvg(w: number, h: number, opacity = 0.14): Buffer {
+export function courtWatermarkSvg(w: number, h: number, opacity = 0.26): Buffer {
   const margin = 60;
   const scale = Math.min((w - 2 * margin) / COURT_L, (h - 2 * margin) / COURT_W);
   const x0 = (w - COURT_L * scale) / 2;
