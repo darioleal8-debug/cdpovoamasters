@@ -30,6 +30,8 @@ export interface TodayGame {
   homeLogo: string | null;
   awayLogo: string | null;
   jornada: number | null;
+  /** jogo da Taça da Liga INATEL (competição à parte da Liga) */
+  cup?: { round: string } | null;
   /** resultado oficial já aprovado */
   result: { home_score: number; away_score: number } | null;
   /** lado do CD Póvoa neste jogo; null se não for jogo de equipa HoopHub */
@@ -185,7 +187,11 @@ function TodayGameRow({ game: g, session, first }: { game: TodayGame; session: L
           }}
         >
           {statusLabel}
-          {g.jornada ? <span style={{ color: "#8C837A" }}>{` · J${g.jornada}`}</span> : null}
+          {g.cup ? (
+            <span style={{ background: "#F97316", color: "#1A1612", padding: "2px 7px", borderRadius: "999px", marginLeft: "6px", fontWeight: 700 }}>
+              🏆 TAÇA · {g.cup.round}
+            </span>
+          ) : g.jornada ? <span style={{ color: "#8C837A" }}>{` · J${g.jornada}`}</span> : null}
         </span>
         {!isLiveSession && !g.result && !isFinishedSession && (
           <LiveBadge date={g.event_date} time={g.event_time} />

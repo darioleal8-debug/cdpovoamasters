@@ -9,6 +9,7 @@ import { ScoreTicker } from "@/components/competitions/score-ticker";
 import { ScoreCard } from "@/components/competitions/score-card";
 import { SeriesStandingsTabs } from "@/components/competitions/series-standings-tabs";
 import type { PublicGame } from "@/types/competitions";
+import { getCupBracket, type CupGame } from "@/lib/cup";
 import { NoticiasSection } from "@/components/liga/noticias-section";
 import { LiveBadge } from "@/components/competitions/live-badge";
 import { InstallBanner } from "@/components/liga/pwa/install-entry";
@@ -56,12 +57,13 @@ export default async function LigaInatelHomePage() {
 
   const supabase = await createUnscopedAdminClient();
 
-  const [games, standingsBySeries, noticias, seasonRes, teamsRes] = await Promise.all([
+  const [games, standingsBySeries, noticias, seasonRes, teamsRes, cup] = await Promise.all([
     getCompetitionGames(competition.competition_key ?? "Liga", competition.season_id),
     getStandingsBySeries(competition.id),
     getLatestNoticias(4),
     supabase.from("seasons").select("name").eq("id", competition.season_id).single(),
     supabase.from("league_teams").select("name, logo_url").not("logo_url", "is", null),
+    getCupBracket().catch(() => null),
   ]);
 
   const season = seasonRes.data;
@@ -97,6 +99,31 @@ export default async function LigaInatelHomePage() {
         ourSide: homeIsOurs ? "home" : awayIsOurs ? "away" : g.is_our_game ? "home" : null,
       };
     });
+
+  // ── Taça da Liga INATEL (competição à parte): jogos de hoje e próximos ──
+  const cupGames: CupGame[] = (cup?.rounds ?? []).flatMap((r) => r.games);
+  const cupUpcoming = cupGames
+    .filter((g) => g.status !== "finished" && g.date >= todayStr)
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? "99").localeCompare(b.time ?? "99") || a.num - b.num);
+  const cupToday: TodayGame[] = cupUpcoming
+    .concat(cupGames.filter((g) => g.status === "finished" && g.date === todayStr))
+    .filter((g) => g.date === todayStr && g.time)
+    .map((g) => ({
+      id: g.id,
+      event_date: g.date,
+      event_time: g.time,
+      location: g.venue,
+      home_team: g.home.name,
+      away_team: g.away.name,
+      homeLogo: g.home.logoUrl,
+      awayLogo: g.away.logoUrl,
+      jornada: null,
+      result: g.result ? { home_score: g.result.home, away_score: g.result.away } : null,
+      ourSide: g.isOurGame ? (/póvoa/i.test(g.home.name) ? "home" : "away") : null,
+      cup: { round: g.roundName.split(" · ")[0] },
+    }));
+  const todayAll: TodayGame[] = [...todayGames, ...cupToday]
+    .sort((a, b) => (a.event_time ?? "99").localeCompare(b.event_time ?? "99"));
 
   const maxResultJornada = approvedGames.length > 0
     ? Math.max(...approvedGames.map((g) => g.syntheticJornada))
@@ -194,8 +221,8 @@ export default async function LigaInatelHomePage() {
             </div>
 
             {/* Jogos de hoje (todos) ou, se não houver, o próximo jogo */}
-            {todayGames.length > 0 ? (
-              <TodayGamesCard games={todayGames} />
+            {todayAll.length > 0 ? (
+              <TodayGamesCard games={todayAll} />
             ) : nextGame && (
               <div className="liga-next-card">
                 <div
@@ -537,6 +564,109 @@ export default async function LigaInatelHomePage() {
                         )}
                       </div>
                     </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Próximos jogos da Taça — desenho próprio para não confundir com a Liga */}
+          {cupUpcoming.length > 0 && (
+            <div>
+              <SectionTitle
+                title="Próximos jogos · Taça"
+                href="/liga-inatel/taca"
+                linkLabel="Quadro da Taça →"
+              />
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "16px" }}>
+                {cupUpcoming.slice(0, 5).map((g) => {
+                  const { day, mon } = fmtDay(g.date);
+                  const label = dayLabel(g.date, todayStr, tomorrowStr);
+                  return (
+                    <Link
+                      key={g.id}
+                      href="/liga-inatel/taca"
+                      style={{
+                        display: "block",
+                        textDecoration: "none",
+                        background: "linear-gradient(135deg, #1A1612 0%, #2A1F16 100%)",
+                        border: "1px solid rgba(249,115,22,.55)",
+                        borderLeft: "5px solid #F97316",
+                        borderRadius: "8px",
+                        padding: "12px 14px",
+                        boxShadow: "0 6px 18px -8px rgba(249,115,22,.35)",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                        <span
+                          style={{
+                            fontFamily: "var(--font-ibm-mono, monospace)",
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            letterSpacing: "0.1em",
+                            background: "#F97316",
+                            color: "#1A1612",
+                            padding: "3px 8px",
+                            borderRadius: "999px",
+                          }}
+                        >
+                          🏆 JOGO DA TAÇA
+                        </span>
+                        <span
+                          style={{
+                            fontFamily: "var(--font-ibm-mono, monospace)",
+                            fontSize: "10px",
+                            letterSpacing: "0.06em",
+                            color: "#F6C9A0",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          {g.roundName.split(" · ")[0]}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: "var(--font-barlow-condensed, sans-serif)",
+                          fontWeight: 700,
+                          fontSize: "16px",
+                          letterSpacing: "0.03em",
+                          textTransform: "uppercase",
+                          color: "#F6F2EC",
+                          marginTop: "8px",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {g.home.name}
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: "var(--font-barlow, sans-serif)",
+                          fontSize: "13px",
+                          color: "#B9AFA4",
+                          marginTop: "2px",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        vs {g.away.name}
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: "var(--font-ibm-mono, monospace)",
+                          fontSize: "11px",
+                          color: "#F97316",
+                          marginTop: "8px",
+                          letterSpacing: "0.04em",
+                        }}
+                      >
+                        {label === "HOJE" || label === "AMANHÃ" ? label : `${day} ${mon}`.toUpperCase()}
+                        {g.time ? ` · ${g.time}` : " · hora a definir"}
+                        {g.venue ? ` · ${g.venue}` : ""}
+                      </div>
+                    </Link>
                   );
                 })}
               </div>
