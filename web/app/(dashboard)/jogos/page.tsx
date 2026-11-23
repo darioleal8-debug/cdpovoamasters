@@ -5,6 +5,8 @@ import { ClubName } from "@/lib/club-context";
 import { useSeasons } from "@/hooks/use-seasons";
 import { useGames } from "@/hooks/use-games";
 import { useLeagueCalendar } from "@/hooks/use-league-calendar";
+import { useClubLeague } from "@/hooks/use-club-league";
+import { CupPanel } from "@/components/competitions/cup-panel";
 import { useTeamKits } from "@/hooks/use-team-kits";
 import { GamesTable } from "@/components/games/games-table";
 import type { GameSessionSummary } from "@/components/games/games-table";
@@ -20,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/toaster";
 import { createClient } from "@/lib/supabase/client";
-import { Trophy, CalendarDays } from "lucide-react";
+import { Trophy, CalendarDays, Medal } from "lucide-react";
 import type { Event } from "@/types/database";
 
 export default function JogosPage() {
@@ -36,6 +38,9 @@ export default function JogosPage() {
   } = useLeagueCalendar(seasonId);
 
   const { kitsByTeam } = useTeamKits();
+  // Taça da Liga INATEL: só para clubes afetos à Liga INATEL
+  const { league } = useClubLeague();
+  const hasCup = !!league && !league.external;
 
   // ── Separador activo com persistência no URL ─────────────
   const [activeTab, setActiveTab] = useState("calendario");
@@ -44,7 +49,7 @@ export default function JogosPage() {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const tab = params.get("tab");
-    if (tab === "calendario" || tab === "agenda") setActiveTab(tab);
+    if (tab === "calendario" || tab === "agenda" || tab === "taca") setActiveTab(tab);
   }, []);
 
   // ── Detecção de papel (jogador vs treinador/admin) ───────
@@ -249,8 +254,13 @@ export default function JogosPage() {
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList>
           <TabsTrigger value="calendario" className="gap-2">
-            <Trophy className="h-4 w-4" />Calendário Liga
+            <Trophy className="h-4 w-4" />Calendário Liga INATEL
           </TabsTrigger>
+          {hasCup && (
+            <TabsTrigger value="taca" className="gap-2">
+              <Medal className="h-4 w-4" />Taça da Liga INATEL
+            </TabsTrigger>
+          )}
           <TabsTrigger value="agenda" className="gap-2">
             <CalendarDays className="h-4 w-4" />Agenda
           </TabsTrigger>
@@ -269,6 +279,13 @@ export default function JogosPage() {
             kitsByTeam={kitsByTeam}
           />
         </TabsContent>
+
+        {/* ── Taça da Liga INATEL (competição à parte da Liga) ── */}
+        {hasCup && (
+          <TabsContent value="taca">
+            <CupPanel />
+          </TabsContent>
+        )}
 
         {/* ── Agenda: vista de jogador vs treinador/admin ── */}
         <TabsContent value="agenda" className="space-y-4">

@@ -65,7 +65,7 @@ async function prepareNews(gameId: string) {
   const adminClient = await createUnscopedAdminClient();
 
   const [eventRes, resultRes, compRes, periodsRes, playerStatsRes] = await Promise.all([
-    adminClient.from("events").select("id, title, event_date, location, description").eq("id", gameId).single(),
+    adminClient.from("events").select("id, title, event_date, location, description, competition").eq("id", gameId).single(),
     adminClient.from("league_game_results").select("*").eq("event_id", gameId).maybeSingle(),
     adminClient.from("competitions").select("id, name").eq("slug", "liga-inatel").single(),
     adminClient.from("league_game_periods").select("periodo, home_points, away_points").eq("event_id", gameId).order("periodo"),
@@ -79,6 +79,9 @@ async function prepareNews(gameId: string) {
 
   const event = eventRes.data;
   const result = resultRes.data;
+  if (event?.competition === "Taça") {
+    return { ok: false as const, error: "As notícias automáticas são só da Liga INATEL; para a Taça publica uma notícia manual." };
+  }
   if (!event || !result) {
     console.error(`[generateLigaNews] jogo ou resultado não encontrado para game_id=${gameId}`);
     return { ok: false as const, error: "Jogo ou resultado não encontrado" };

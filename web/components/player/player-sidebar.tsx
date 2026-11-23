@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BarChart2, BarChart3, Calendar, ClipboardList, CreditCard, Dumbbell,
-  Globe, Home, LogOut, MessageSquare, Trophy, User, Users,
+  Globe, Home, LogOut, Medal, MessageSquare, Trophy, User, Users,
 } from "lucide-react";
 import { logout } from "@/lib/auth/logout";
 import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
@@ -18,6 +18,7 @@ const PLAYER_NAV = [
   { href: "/player/plantel",          label: "Plantel",             icon: Users,         exact: false, pendingKey: null          },
   { href: "/player/meu-perfil",       label: "O Meu Perfil",        icon: User,          exact: false, pendingKey: null          },
   { href: "/player/meus-jogos",       label: "Os Meus Jogos",       icon: Calendar,      exact: false, pendingKey: "game"        },
+  { href: "/player/taca",             label: "Taça da Liga INATEL", icon: Medal,         exact: false, pendingKey: null          },
   { href: "/player/meus-treinos",     label: "Os Meus Treinos",     icon: Dumbbell,      exact: false, pendingKey: "training"    },
   { href: "/player/assiduidade",      label: "A Minha Assiduidade", icon: BarChart2,     exact: false, pendingKey: null          },
   { href: "/player/resumo-estatistico", label: "Resumo Estatístico", icon: BarChart3,     exact: false, pendingKey: null          },

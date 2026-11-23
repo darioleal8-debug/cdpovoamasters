@@ -73,6 +73,8 @@ function parseMeta(event: Event): GameMeta | null {
 // ourTeamName: if known, derive is_our_game + is_home from team names (robust)
 // otherwise fall back to stored JSON flags
 function eventToLeagueGame(event: Event, ourTeamName: string | null): LeagueGame | null {
+  // A Taça da Liga INATEL tem o seu próprio calendário: nunca misturada com o da Liga
+  if (event.competition && event.competition !== "Liga") return null;
   const meta = parseMeta(event);
   if (!meta) return null;
 

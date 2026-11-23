@@ -159,6 +159,8 @@ function IconWhatsApp() {
 export default function LigaAdminPage() {
   const router = useRouter();
   const [games, setGames]             = useState<AdminGame[]>([]);
+  // Competição em gestão: Liga INATEL ou Taça da Liga INATEL (nunca misturadas)
+  const [compScope, setCompScope]       = useState<"liga" | "taca">("liga");
   const [competitionId, setCompId]    = useState<string | null>(null);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
@@ -259,7 +261,7 @@ export default function LigaAdminPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/liga/admin/games");
+      const res = await fetch(compScope === "taca" ? "/api/liga/admin/games?competition=taca" : "/api/liga/admin/games");
       if (res.status === 401 || res.status === 403) {
         router.push("/liga-inatel/equipa/login?msg=admin_required");
         return;
@@ -270,7 +272,7 @@ export default function LigaAdminPage() {
       setCompId(json.competition_id ?? null);
     } catch { setError("Erro de rede."); }
     finally { setLoading(false); }
-  }, [router]);
+  }, [router, compScope]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -903,6 +905,22 @@ export default function LigaAdminPage() {
       </div>
 
       {activeTab === "games" && <>
+
+      {/* ── Competição: Liga ou Taça (calendários separados) ── */}
+      <div style={{ display: "flex", gap: "8px", marginBottom: "16px", flexWrap: "wrap" }}>
+        {([["liga", "Liga INATEL"], ["taca", "Taça da Liga INATEL"]] as const).map(([key, label]) => (
+          <button key={key} onClick={() => { setFilterJornada("all"); setFilterStatus("all"); setFilterTeam("all"); setCompScope(key); }}
+            style={{
+              padding: "8px 16px", borderRadius: "999px", cursor: "pointer", fontWeight: 700, fontSize: "12px",
+              letterSpacing: "0.06em", textTransform: "uppercase",
+              border: `1.5px solid ${compScope === key ? "#F97316" : "#E8E0D6"}`,
+              background: compScope === key ? "#F97316" : "#FFFDFA",
+              color: compScope === key ? "#15110E" : "#6F675F",
+            }}>
+            {label}
+          </button>
+        ))}
+      </div>
 
       {/* ── Filters ── */}
       <div style={{

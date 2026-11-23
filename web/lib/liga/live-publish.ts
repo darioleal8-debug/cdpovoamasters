@@ -28,18 +28,23 @@ export async function publishLiveSessionToLeague(sessionId: string, actorUserId:
   if (!session) return { ok: false, status: 404, error: "Jogo ao vivo não encontrado" };
   if (session.status !== "finished") return { ok: false, status: 409, error: "O jogo ainda não foi finalizado" };
 
-  const [eventRes, compRes] = await Promise.all([
-    db.from("events")
-      .select("id, description, opponent, competition, season_id, is_test, deleted_at, game_type")
-      .eq("id", session.event_id).maybeSingle(),
-    db.from("competitions").select("id, competition_key").eq("slug", "liga-inatel").maybeSingle(),
-  ]);
+  const eventRes = await db.from("events")
+    .select("id, description, opponent, competition, season_id, is_test, deleted_at, game_type")
+    .eq("id", session.event_id).maybeSingle();
   const event = eventRes.data;
   if (!event || event.deleted_at) return { ok: false, status: 404, error: "Evento do jogo não encontrado" };
-  const leagueKey = compRes.data?.competition_key ?? "Liga";
-  if (event.competition !== leagueKey) {
-    return { ok: false, status: 422, error: "Este jogo não pertence à Liga INATEL" };
+  // Competição do jogo: Liga INATEL ou Taça da Liga INATEL (cada uma com a sua classificação/quadro)
+  const compRes = await db.from("competitions")
+    .select("id, competition_key")
+    .eq("competition_key", event.competition ?? "")
+    .or(`season_id.eq.${event.season_id},season_id.is.null`)
+    .order("season_id", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+  if (!compRes.data) {
+    return { ok: false, status: 422, error: "Este jogo não pertence à Liga INATEL nem à Taça da Liga INATEL" };
   }
+  const isCup = event.competition === "Taça";
   if (event.game_type && event.game_type !== "official") {
     return { ok: false, status: 422, error: "Jogos de treino/amigáveis não contam para a liga" };
   }
@@ -156,12 +161,12 @@ export async function publishLiveSessionToLeague(sessionId: string, actorUserId:
   });
 
   // Marcadores "Vencedor Jogo N" em jogos futuros (taça/play-off)
-  if (!isTest && meta?.jogo_num && event.season_id && built.homeScore !== built.awayScore) {
+  if (!isTest && !isCup && meta?.jogo_num && event.season_id && built.homeScore !== built.awayScore) {
     const placeholder = `Vencedor Jogo ${meta.jogo_num}`;
     const winner = built.homeScore > built.awayScore ? homeName : awayName;
     const { data: futureEvents } = await db.from("events")
       .select("id, description, opponent")
-      .eq("season_id", event.season_id).eq("game_type", "official").neq("id", event.id);
+      .eq("season_id", event.season_id).eq("game_type", "official").eq("competition", event.competition ?? "Liga").neq("id", event.id);
     for (const fe of futureEvents ?? []) {
       if (!fe.description) continue;
       let parsed: Record<string, unknown>;

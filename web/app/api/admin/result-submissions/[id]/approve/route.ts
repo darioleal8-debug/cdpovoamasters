@@ -33,9 +33,23 @@ export async function POST(
     // Fetch event details for jornada/volta
     const { data: event } = await admin
       .from("events")
-      .select("id, description, opponent, season_id")
+      .select("id, description, opponent, season_id, competition")
       .eq("id", submission.event_id)
       .single();
+
+    // A competição segue o jogo (Liga ou Taça)
+    let competitionId = submission.competition_id;
+    if (event?.competition) {
+      const { data: comp } = await admin
+        .from("competitions")
+        .select("id")
+        .eq("competition_key", event.competition)
+        .or(`season_id.eq.${event.season_id},season_id.is.null`)
+        .order("season_id", { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+      if (comp?.id) competitionId = comp.id;
+    }
 
     const meta = parseGameMeta(event?.description ?? null);
 
@@ -44,7 +58,7 @@ export async function POST(
       .from("league_game_results")
       .insert({
         event_id:       submission.event_id,
-        competition_id: submission.competition_id,
+        competition_id: competitionId,
         home_team_name: submission.home_team_name,
         away_team_name: submission.away_team_name,
         home_score:     submission.home_score,

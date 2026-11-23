@@ -336,7 +336,7 @@ export function SubmitResultFlow({ games, teamName, preselectedGameId = null }: 
                       {opponent}{g.is_test && <span style={{ marginLeft: 8, fontSize: "10px", color: "#F97316", fontWeight: 700 }}>[TESTE]</span>}
                     </p>
                     <p style={{ fontSize: "12px", color: "var(--muted,#6F675F)", margin: 0 }}>
-                      {fmt(g.event_date)} · J{g.jornada ?? "?"} {isHome ? "(Casa)" : "(Fora)"}
+                      {fmt(g.event_date)} · {g.competition === "Taça" ? "Taça da Liga INATEL" : `J${g.jornada ?? "?"}`} {isHome ? "(Casa)" : "(Fora)"}
                       {g.result_status === "pending" && <span style={{ marginLeft: 6, color: "#B45309" }}>· já há uma submissão — a tua entra na validação cruzada</span>}
                     </p>
                   </button>

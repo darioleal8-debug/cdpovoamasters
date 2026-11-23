@@ -221,6 +221,7 @@ export async function getCompetitionGames(
       live_game_url: liveSession ? `/live/${liveSession.id}` : null,
       is_our_game: isOurGame,
       is_test: meta?.is_test === true,
+      competition: e.competition,
     };
   });
 }

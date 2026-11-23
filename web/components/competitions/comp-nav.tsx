@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/liga-inatel/classificacao", label: "CLASSIFICAÇÃO" },
   { href: "/liga-inatel/calendario",    label: "CALENDÁRIO" },
   { href: "/liga-inatel/resultados",    label: "RESULTADOS" },
+  { href: "/liga-inatel/taca",          label: "TAÇA" },
   { href: "/liga-inatel/equipas",       label: "EQUIPAS" },
 ];
 

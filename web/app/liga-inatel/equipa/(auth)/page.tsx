@@ -98,7 +98,7 @@ function GameRow({ game, teamName, today }: { game: PublicGame; teamName: string
           {isHome ? "Casa" : "Fora"}
         </p>
         <p style={{ fontSize: "11px", color: "var(--muted, #6F675F)", margin: 0 }}>
-          J{game.jornada ?? "?"}
+          {game.competition === "Taça" ? "TAÇA" : `J${game.jornada ?? "?"}`}
         </p>
       </div>
 
@@ -242,6 +242,14 @@ export default async function DelegateDashboardPage({
     games = all.filter(
       (g) => g.home_team === team.name || g.away_team === team.name
     );
+  }
+
+  // Taça da Liga INATEL: competição à parte, mas o delegado submete os resultados no mesmo sítio
+  const cup = await getCompetitionBySlug("taca-liga-inatel");
+  if (cup?.season_id) {
+    const cupAll = await getCompetitionGames(cup.competition_key ?? "Taça", cup.season_id);
+    games = [...games, ...cupAll.filter((g) => g.home_team === team.name || g.away_team === team.name)]
+      .sort((a, b) => a.event_date.localeCompare(b.event_date) || (a.event_time ?? "").localeCompare(b.event_time ?? ""));
   }
 
   // Boletins importados com IA ainda em revisão / a aguardar aprovação (RLS: só os da equipa)

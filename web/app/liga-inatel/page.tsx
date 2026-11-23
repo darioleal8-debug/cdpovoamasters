@@ -327,6 +327,34 @@ export default async function LigaInatelHomePage() {
         </section>
       )}
 
+      {/* ── TAÇA DA LIGA INATEL (competição à parte) ── */}
+      <section style={{ ...maxW, padding: "40px 20px 0" }}>
+        <Link
+          href="/liga-inatel/taca"
+          style={{
+            display: "flex", alignItems: "center", gap: 16, padding: "18px 20px", borderRadius: 10,
+            background: "#15110E", border: "1px solid rgba(249,115,22,.35)", textDecoration: "none",
+          }}
+        >
+          <svg width="40" height="40" viewBox="0 0 48 48" fill="none" aria-hidden style={{ flexShrink: 0 }}>
+            <path d="M14 6h20v10a10 10 0 0 1-20 0V6Z" fill="#F97316" />
+            <path d="M14 9H7v3a7 7 0 0 0 7 7M34 9h7v3a7 7 0 0 1-7 7" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M24 26v7M17 41h14M19 33h10v8H19z" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ margin: 0, fontFamily: "var(--font-bc-heavy, var(--font-barlow-condensed, sans-serif))", fontWeight: 800, fontSize: 22, letterSpacing: ".08em", textTransform: "uppercase", color: "#F6F2EC", lineHeight: 1 }}>
+              Taça da Liga <span style={{ color: "#F97316" }}>INATEL</span>
+            </p>
+            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#B9AFA4" }}>
+              Quadro, calendário e resultados da Taça — competição à parte da Liga
+            </p>
+          </div>
+          <span style={{ fontFamily: "var(--font-ibm-mono, monospace)", fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: "#F97316", whiteSpace: "nowrap" }}>
+            Ver quadro →
+          </span>
+        </Link>
+      </section>
+
       {/* ── CLASSIFICAÇÃO + PRÓXIMA JORNADA ── */}
       <section style={{ ...maxW, padding: "48px 20px" }}>
         <div className="liga-section-grid">

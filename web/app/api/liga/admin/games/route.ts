@@ -22,7 +22,7 @@ function gameIsOver(date: string, time: string | null, now: string): boolean {
   return `${endDate} ${String(Math.floor(em / 60)).padStart(2, "0")}:${String(em % 60).padStart(2, "0")}` <= now;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const auth = await authorizeAsLigaAdmin();
   if (!auth.ok) return auth.response;
 
@@ -31,7 +31,8 @@ export async function GET() {
   const { data: competition } = await adminClient
     .from("competitions")
     .select("id, competition_key, season_id")
-    .eq("slug", "liga-inatel")
+    // ?competition=taca → Taça da Liga INATEL; por omissão a Liga INATEL (nunca misturadas)
+    .eq("slug", new URL(req.url).searchParams.get("competition") === "taca" ? "taca-liga-inatel" : "liga-inatel")
     .single();
 
   if (!competition?.season_id) {

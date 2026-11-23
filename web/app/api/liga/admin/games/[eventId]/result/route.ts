@@ -28,10 +28,9 @@ export async function POST(
   const adminClient = await createUnscopedAdminClient();
 
   // Ler evento + resultado atual
-  const [eventRes, currentResultRes, compRes] = await Promise.all([
+  const [eventRes, currentResultRes] = await Promise.all([
     adminClient.from("events").select("id, description, opponent, competition, season_id").eq("id", eventId).single(),
     adminClient.from("league_game_results").select("*").eq("event_id", eventId).maybeSingle(),
-    adminClient.from("competitions").select("id").eq("slug", "liga-inatel").single(),
   ]);
 
   if (!eventRes.data) {
@@ -44,7 +43,26 @@ export async function POST(
 
   const homeTeamName = meta?.home_team ?? ourTeam;
   const awayTeamName = meta?.away_team ?? (eventRes.data.opponent ?? "Adversário");
-  const competitionId = compRes.data?.id ?? null;
+  // A competição segue o jogo (Liga ou Taça) — nunca fixa na Liga
+  const { data: compRow } = await adminClient
+    .from("competitions")
+    .select("id")
+    .eq("competition_key", eventRes.data.competition ?? "Liga")
+    .or(`season_id.eq.${eventRes.data.season_id},season_id.is.null`)
+    .order("season_id", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+  const competitionId =
+    compRow?.id ??
+    (await adminClient.from("competitions").select("id").eq("slug", "liga-inatel").single()).data?.id ??
+    null;
+  const isCup = eventRes.data.competition === "Taça";
+  if (isCup && (/^Vencedor Taça/i.test(homeTeamName) || /^Vencedor Taça/i.test(awayTeamName))) {
+    return NextResponse.json({ error: "As equipas deste jogo da Taça ainda não estão definidas" }, { status: 400 });
+  }
+  if (isCup && home_score === away_score) {
+    return NextResponse.json({ error: "Na Taça não há empates: o jogo tem de ter um vencedor (prolongamento)" }, { status: 400 });
+  }
 
   const valorAntigo = currentResultRes.data
     ? { home_score: currentResultRes.data.home_score, away_score: currentResultRes.data.away_score }
@@ -80,7 +98,7 @@ export async function POST(
 
   // Resolver marcadores: se este jogo tem jogo_num, actualiza eventos futuros que
   // referenciam 'Vencedor Jogo N' como home_team ou away_team.
-  if (meta?.jogo_num && eventRes.data.season_id) {
+  if (!isCup && meta?.jogo_num && eventRes.data.season_id) {
     const placeholder = `Vencedor Jogo ${meta.jogo_num}`;
     const winner = home_score > away_score ? homeTeamName : awayTeamName;
 
@@ -89,6 +107,7 @@ export async function POST(
       .select("id, description, opponent")
       .eq("season_id", eventRes.data.season_id)
       .eq("game_type", "official")
+      .eq("competition", eventRes.data.competition ?? "Liga")
       .neq("id", eventId);
 
     if (futureEvents) {

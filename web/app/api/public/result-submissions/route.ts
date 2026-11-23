@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     // Verify the event exists and is a valid league game
     const { data: event } = await supabase
       .from("events")
-      .select("id, type, competition, event_date")
+      .select("id, type, competition, event_date, season_id")
       .eq("id", event_id)
       .eq("type", "jogo")
       .single();
@@ -89,11 +89,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Demasiadas submissões. Tenta mais tarde." }, { status: 429 });
     }
 
+    // A competição segue o jogo (Liga ou Taça), nunca o que o cliente enviar
+    const { data: compRow } = await supabase
+      .from("competitions")
+      .select("id")
+      .eq("competition_key", event.competition ?? "Liga")
+      .or(`season_id.eq.${event.season_id},season_id.is.null`)
+      .order("season_id", { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+
     const { data: submission, error } = await supabase
       .from("result_submissions")
       .insert({
         event_id,
-        competition_id: competition_id ?? null,
+        competition_id: compRow?.id ?? competition_id ?? null,
         home_team_name: String(home_team_name).trim(),
         away_team_name: String(away_team_name).trim(),
         home_score: Number(home_score),

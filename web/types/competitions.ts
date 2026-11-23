@@ -106,6 +106,7 @@ export interface PublicGame {
   live_game_url: string | null; // /live/[session_id] se ao vivo
   is_our_game: boolean;         // envolve CD Póvoa Masters
   is_test: boolean;             // jogo de teste — não mostrar em páginas públicas
+  competition?: string | null;  // events.competition ('Liga' | 'Taça')
 }
 
 // ─── Utilitários ─────────────────────────────────────────────────────────────

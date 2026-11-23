@@ -13,6 +13,7 @@ const NAV_LINKS = [
   { href: "/liga-inatel/classificacao", label: "Classificação" },
   { href: "/liga-inatel/calendario",    label: "Calendário" },
   { href: "/liga-inatel/resultados",    label: "Resultados" },
+  { href: "/liga-inatel/taca",          label: "Taça da Liga INATEL" },
   { href: "/liga-inatel/equipas",       label: "Equipas" },
 ];
 

@@ -37,6 +37,8 @@ async function getPublicLeagues(): Promise<PublicLeague[]> {
       .from("competitions")
       .select("id, name, slug, logo_url")
       .eq("is_public", true)
+      // A Taça da Liga INATEL vive dentro do site da Liga (/liga-inatel/taca): sem cartão próprio
+      .or("competition_key.is.null,competition_key.neq.Taça")
       .order("created_at", { ascending: true })
       .limit(10);
 
