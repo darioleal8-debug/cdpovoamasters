@@ -112,6 +112,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Quota por defeito = a quota mensal definida pelo clube
+  let monthlyFee = 10;
+  if (amount_due == null) {
+    const { data: cs } = await supabase.from("club_settings").select("monthly_fee").eq("club_id", clubId).maybeSingle();
+    if (cs?.monthly_fee != null) monthlyFee = Number(cs.monthly_fee);
+  }
+
   const { data, error } = await supabase
     .from("player_payments")
     .upsert(
@@ -122,7 +129,7 @@ export async function POST(req: NextRequest) {
         month,
         reference_year,
         amount:       amount       ?? 0,
-        amount_due:   amount_due   ?? 20,
+        amount_due:   amount_due   ?? monthlyFee,
         status:       status       ?? "paid",
         method:       (method && method !== "none" ? method : null) as string | null,
         notes:        notes        || null,

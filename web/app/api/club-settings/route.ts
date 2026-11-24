@@ -48,11 +48,11 @@ export async function PATCH(req: Request) {
   if (!auth.ok) return auth.response;
   const { supabase, user } = auth;
 
-  let body: Record<string, string> & { slug?: string | null; is_public?: boolean };
+  let body: Record<string, string> & { slug?: string | null; is_public?: boolean; monthly_fee?: number | string };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "JSON inválido" }, { status: 400 }); }
 
   const allowed = ["club_name", "primary_color", "secondary_color", "accent_color"];
-  const updates: Record<string, string | boolean | null> = { updated_at: new Date().toISOString() };
+  const updates: Record<string, string | number | boolean | null> = { updated_at: new Date().toISOString() };
   for (const key of allowed) {
     if (body[key] !== undefined) updates[key] = body[key];
   }
@@ -65,6 +65,14 @@ export async function PATCH(req: Request) {
     updates.slug = slug;
   }
   if (typeof body.is_public === "boolean") updates.is_public = body.is_public;
+  // Quota mensal do clube (€): pode ser alterada a qualquer momento; só afeta meses ainda sem registo
+  if (body.monthly_fee !== undefined) {
+    const fee = Number(body.monthly_fee);
+    if (!Number.isFinite(fee) || fee < 0 || fee > 1000) {
+      return NextResponse.json({ error: "Quota mensal inválida (0 a 1000 €)." }, { status: 400 });
+    }
+    updates.monthly_fee = Math.round(fee * 100) / 100;
+  }
 
   const clubId = await clubIdForUser(supabase, user.id);
   if (!clubId) return NextResponse.json({ error: "Sem clube associado" }, { status: 403 });

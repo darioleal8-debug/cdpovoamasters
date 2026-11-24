@@ -34,6 +34,7 @@ interface Props {
   summary:     PlayerPaymentSummary[];
   loading:     boolean;
   season:      Season | null;
+  monthlyFee:  number;
   onCellClick: (info: ActiveCellInfo) => void;
   onHistory:   (player: RosterEntry) => void;
 }
@@ -41,7 +42,7 @@ interface Props {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function PaymentsGrid({
-  players, payments, summary, loading, season, onCellClick, onHistory,
+  players, payments, summary, loading, season, monthlyFee, onCellClick, onHistory,
 }: Props) {
   const today   = useMemo(() => new Date(), []);
   const months  = useMemo(() => (season ? getSeasonMonths(season) : []), [season]);
@@ -87,13 +88,13 @@ export function PaymentsGrid({
       rows = rows.filter(p =>
         months.some(m => {
           const pay = payIndex.get(p.player_id ?? "")?.get(`${m.month}-${m.year}`) ?? null;
-          const cell = deriveCellState(m.month, m.year, pay, today);
+          const cell = deriveCellState(m.month, m.year, pay, today, monthlyFee);
           return activeFilters.has(cell.status);
         })
       );
     }
     return rows;
-  }, [players, search, activeFilters, months, payIndex, today]);
+  }, [players, search, activeFilters, months, payIndex, today, monthlyFee]);
 
   // ── Month totals (bottom row) ─────────────────────────────────────────────
   const monthTotals = useMemo(() =>
@@ -121,7 +122,7 @@ export function PaymentsGrid({
     const rows = filteredPlayers.map(p => {
       const cells = months.map(m => {
         const pay  = payIndex.get(p.player_id ?? "")?.get(`${m.month}-${m.year}`) ?? null;
-        const cell = deriveCellState(m.month, m.year, pay, today);
+        const cell = deriveCellState(m.month, m.year, pay, today, monthlyFee);
         return CELL_STATUS_LABELS[cell.status] + (cell.amountPaid > 0 ? ` ${cell.amountPaid}€` : "");
       });
       const s = sumIndex.get(p.player_id ?? "");
@@ -326,7 +327,7 @@ export function PaymentsGrid({
                     {/* Month cells */}
                     {months.map(m => {
                       const pay  = payIndex.get(player.player_id ?? "")?.get(`${m.month}-${m.year}`) ?? null;
-                      const cell = deriveCellState(m.month, m.year, pay, today);
+                      const cell = deriveCellState(m.month, m.year, pay, today, monthlyFee);
                       const colors = CELL_COLORS[cell.status];
                       const dimmed = activeFilters.size > 0 && !activeFilters.has(cell.status);
 

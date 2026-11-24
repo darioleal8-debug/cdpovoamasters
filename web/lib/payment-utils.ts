@@ -106,12 +106,15 @@ export interface GridCell {
   isFuture:   boolean;
 }
 
+/** Quota mensal por defeito (cada clube pode alterá-la em Pagamentos → Quota mensal). */
+export const DEFAULT_MONTHLY_FEE = 10;
+
 export function deriveCellState(
   month: number,
   year: number,
   payment: PlayerPaymentWithPlayer | null,
   today: Date,
-  defaultAmountDue = 20,
+  defaultAmountDue = DEFAULT_MONTHLY_FEE,
 ): GridCell {
   const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const cellMonthStart = new Date(year, month - 1, 1);
