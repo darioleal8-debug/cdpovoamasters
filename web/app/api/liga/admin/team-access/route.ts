@@ -3,6 +3,7 @@ import { authorizeAsLigaAdmin } from "@/lib/auth/liga-admin-guard";
 import { createUnscopedAdminClient } from "@/lib/supabase/server";
 import { generateSecurePassword } from "@/lib/liga/password";
 import { sendLigaCredentialsEmail } from "@/lib/liga/email-credentials";
+import { findAuthUserByEmail, linkExistingAccountToTeam } from "@/lib/auth/link-existing-account";
 
 // GET /api/liga/admin/team-access
 export async function GET() {
@@ -81,6 +82,23 @@ export async function POST(req: Request) {
 
   if (!team || team.is_placeholder) {
     return NextResponse.json({ error: "Equipa não encontrada" }, { status: 404 });
+  }
+
+  // Conta que já existe (ex.: administrador de clube na app de gestão): associa-a a esta equipa.
+  // Mantém a password atual, por isso não há email de credenciais.
+  const existing = await findAuthUserByEmail(adminClient, body.email);
+  if (existing) {
+    const linked = await linkExistingAccountToTeam(adminClient, {
+      userId: existing.id, teamId: body.team_id, createdBy: auth.user.id,
+    });
+    if (!linked.ok) return NextResponse.json({ error: linked.error }, { status: linked.status });
+    return NextResponse.json({
+      ok: true,
+      linked_existing: true,
+      user_id: existing.id,
+      email: existing.email,
+      team_name: team.name,
+    });
   }
 
   const password = generateSecurePassword();
