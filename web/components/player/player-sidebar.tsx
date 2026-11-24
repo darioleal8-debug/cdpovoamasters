@@ -4,10 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BarChart2, BarChart3, Calendar, ClipboardList, CreditCard, Dumbbell,
-  Globe, Home, LogOut, Medal, MessageSquare, Trophy, User, Users,
+  Globe, Home, LogOut, Medal, Megaphone, Trophy, User, Users,
 } from "lucide-react";
 import { logout } from "@/lib/auth/logout";
-import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
+import { useUnreadAnnouncements } from "@/hooks/use-unread-announcements";
 import { useClubLeague } from "@/hooks/use-club-league";
 import { usePlayerPending } from "./player-pending-context";
 import { toast } from "@/components/ui/toaster";
@@ -25,7 +25,7 @@ const PLAYER_NAV = [
   { href: "/player/meus-pagamentos",  label: "Os Meus Pagamentos",  icon: CreditCard,    exact: false, pendingKey: null          },
   { href: "/player/laboratorio",      label: "Laboratório",         icon: ClipboardList, exact: false, pendingKey: null          },
   { href: "/player/palmares",         label: "Palmarés",            icon: Trophy,        exact: false, pendingKey: null          },
-  { href: "/player/chat",             label: "Chat",                icon: MessageSquare, exact: false, pendingKey: null          },
+  { href: "/player/comunicados",      label: "Comunicados",         icon: Megaphone,     exact: false, pendingKey: null          },
 ] as const;
 
 function initials(name: string) {
@@ -46,7 +46,7 @@ export function PlayerSidebar({
   playerPosition?: string | null;
 }) {
   const pathname  = usePathname();
-  const chatBadge = useUnreadChatCount();
+  const chatBadge = useUnreadAnnouncements();
   const pending   = usePlayerPending();
   const { league } = useClubLeague();
   type NavItem = { href: string; label: string; icon: React.ElementType; exact: boolean; pendingKey: string | null; external?: boolean };
@@ -118,7 +118,7 @@ export function PlayerSidebar({
         <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
           {navItems.map((item) => {
             const active = isActive(item.href, item.exact);
-            const badge  = item.href === "/player/chat" ? chatBadge : 0;
+            const badge  = item.href === "/player/comunicados" ? chatBadge : 0;
             const hasPendingDot =
               item.pendingKey === "training" ? pending.training :
               item.pendingKey === "game"     ? pending.game     : false;

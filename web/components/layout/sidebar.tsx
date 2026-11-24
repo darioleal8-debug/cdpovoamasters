@@ -10,7 +10,7 @@ import {
   Dumbbell,
   History,
   LayoutDashboard,
-  MessageSquare,
+  Megaphone,
   Settings,
   Trophy,
   Users,
@@ -30,7 +30,7 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { useClubSettings } from "@/lib/club-context";
-import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
+import { useUnreadAnnouncements } from "@/hooks/use-unread-announcements";
 import { useClubLeague } from "@/hooks/use-club-league";
 import type { UserRole } from "@/types/database";
 import { NavLink } from "@/components/layout/nav-link";
@@ -69,7 +69,7 @@ const seccionistaItems = [
 ];
 
 const communicationItems = [
-  { label: "Chat Interno", href: "/chat", icon: MessageSquare },
+  { label: "Comunicados", href: "/comunicados", icon: Megaphone },
 ];
 
 
@@ -90,7 +90,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export function Sidebar({ role, rolesExtra = [], isMaster = false }: { role?: UserRole; rolesExtra?: string[]; isMaster?: boolean }) {
   const { settings } = useClubSettings();
-  const unreadChatCount = useUnreadChatCount();
+  const unreadChatCount = useUnreadAnnouncements();
   // Liga do clube (Liga INATEL ou outra); sem liga → sem link
   const { league } = useClubLeague();
   const ligaSite = league ? <NavLink href={league.href} external={league.external} icon={Globe} label="Site da Liga" /> : null;

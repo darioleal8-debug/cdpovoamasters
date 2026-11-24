@@ -2,6 +2,8 @@ import type { UserRole } from "@/types/database";
 
 /** Gestão desportiva: jogos, convocatória, plantel, treinos, presenças, calendário. */
 export const MANAGERS = ["admin", "treinador", "seccionista"] as const satisfies readonly UserRole[];
+/** Publicar comunicados do clube: administradores e treinador (nunca seccionista, tesoureiro ou jogador). */
+export const ANNOUNCERS = ["admin", "treinador"] as const satisfies readonly UserRole[];
 /** Quotas, pagamentos, recibos e finanças. */
 export const FINANCE = ["admin", "tesoureiro"] as const satisfies readonly UserRole[];
 /** Contas, definições do clube, temporadas. */

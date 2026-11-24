@@ -6,7 +6,9 @@ import { AlertTriangle } from "lucide-react";
 import { NextGameDashboard }  from "@/components/dashboard/next-game-dashboard";
 import { TasksCard }          from "@/components/dashboard/tasks-card";
 import { NextTrainingCard }   from "@/components/dashboard/next-training-card";
-import { ClubNoticesCard }    from "@/components/dashboard/club-notices-card";
+import { AnnouncementsHighlight } from "@/components/announcements/highlight-card";
+import { PushPrompt }          from "@/components/push/push-prompt";
+import type { AnnouncementDTO } from "@/lib/announcements/types";
 import { PlayerSeasonCard }   from "@/components/dashboard/player-season-card";
 import { BirthdayBanner }     from "@/components/birthday/birthday-banner";
 import { NextBirthdayNotice } from "@/components/birthday/next-birthday-notice";
@@ -37,7 +39,7 @@ interface DashboardData {
     deadline: string | null; count: number;
   }>;
   tasks_total:  number;
-  notices:      Array<{ id: string; title: string; body: string; date: string; pinned?: boolean }>;
+  announcements: AnnouncementDTO[];
   playerData:   {
     games_played: number; avg_points: number | null;
     attendance_pct: number | null; payment_status: string;
@@ -292,6 +294,8 @@ interface TrainerViewProps {
 
 function TrainerView({ data }: TrainerViewProps) {
   return (
+    <div className="flex flex-col gap-5">
+    <AnnouncementsHighlight items={data.announcements} href="/comunicados" />
     <div className="grid gap-5 md:grid-cols-[1fr_340px]">
       <div className="flex flex-col gap-5 order-2 md:order-1">
         <TrainingConflictWarning seasonId={data.season?.id} />
@@ -305,8 +309,8 @@ function TrainerView({ data }: TrainerViewProps) {
       <div className="flex flex-col gap-4 order-1 md:order-2">
         <NextTrainingCard training={data.nextTraining} />
         <LigaLinkCard />
-        {data.notices.length > 0 && <ClubNoticesCard notices={data.notices} />}
       </div>
+    </div>
     </div>
   );
 }
@@ -318,6 +322,9 @@ interface PlayerViewProps {
 
 function PlayerView({ data }: PlayerViewProps) {
   return (
+    <div className="flex flex-col gap-5">
+    <AnnouncementsHighlight items={data.announcements} href="/comunicados" />
+    <PushPrompt />
     <div className="grid gap-5 md:grid-cols-[1fr_340px]">
       <div className="flex flex-col gap-5">
         <NextGameDashboard
@@ -330,8 +337,8 @@ function PlayerView({ data }: PlayerViewProps) {
       <div className="flex flex-col gap-4">
         <PlayerSeasonCard data={data.playerData} />
         <LigaLinkCard />
-        {data.notices.length > 0 && <ClubNoticesCard notices={data.notices} />}
       </div>
+    </div>
     </div>
   );
 }

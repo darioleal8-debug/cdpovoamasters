@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/auth/guards";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getOfficialGameSessionIds } from "@/lib/stats/official-games";
+import { listHighlighted } from "@/lib/announcements/load";
 
 export const runtime = "nodejs";
 
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       season: null, nextGame: null, nextTraining: null,
       metrics: { players: 0, wins: 0, losses: 0, draws: 0 },
-      tasks: [], tasks_total: 0, notices: [], playerData: null, isPlayer: false,
+      tasks: [], tasks_total: 0, announcements: [], playerData: null, isPlayer: false,
     });
   }
 
@@ -387,6 +388,12 @@ export async function GET(req: NextRequest) {
     }
   } catch { /* não crítico — ignora se admin query falhar */ }
 
+  // Comunicados em destaque: soltos 72h; afetos a jogo/treino até ao final dele
+  let announcements: Awaited<ReturnType<typeof listHighlighted>> = [];
+  try {
+    announcements = await listHighlighted(await createAdminClient(), { userId: user.id });
+  } catch { /* não crítico — o painel abre sem comunicados */ }
+
   // ── Resposta ─────────────────────────────────────────────
   return NextResponse.json({
     season,
@@ -424,7 +431,7 @@ export async function GET(req: NextRequest) {
     },
     tasks:               tasks.slice(0, 5),
     tasks_total:         tasks.length,
-    notices:             [],
+    announcements,
     playerData,
     isPlayer,
     playerId,

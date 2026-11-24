@@ -5,23 +5,23 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Calendar,
-  MessageSquare,
+  Megaphone,
   CreditCard,
   MoreHorizontal as Users,
 } from "lucide-react";
-import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
+import { useUnreadAnnouncements } from "@/hooks/use-unread-announcements";
 
 const NAV_ITEMS = [
   { label: "Hoje",   href: "/dashboard",  icon: LayoutDashboard, exact: true  },
   { label: "Agenda", href: "/jogos",      icon: Calendar,        exact: false },
-  { label: "Chat",   href: "/chat",       icon: MessageSquare,   exact: false },
+  { label: "Avisos", href: "/comunicados", icon: Megaphone,      exact: false },
   { label: "Quotas", href: "/pagamentos", icon: CreditCard,      exact: false },
   { label: "Mais",   href: "/mais",       icon: Users,           exact: false },
 ] as const;
 
 export function BottomNav() {
   const pathname     = usePathname();
-  const chatBadge    = useUnreadChatCount();
+  const chatBadge    = useUnreadAnnouncements();
 
   function isActive(href: string, exact: boolean) {
     return exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
@@ -41,7 +41,7 @@ export function BottomNav() {
     >
       {NAV_ITEMS.map(({ label, href, icon: Icon, exact }) => {
         const active = isActive(href, exact);
-        const badge  = href === "/chat" ? chatBadge : 0;
+        const badge  = href === "/comunicados" ? chatBadge : 0;
 
         return (
           <Link

@@ -4,9 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home, Dumbbell, Calendar, Users, MoreHorizontal,
-  User, BarChart2, BarChart3, CreditCard, MessageSquare, Trophy, ClipboardList, Globe, X,
+  User, BarChart2, BarChart3, CreditCard, Megaphone, Trophy, ClipboardList, Globe, X,
 } from "lucide-react";
-import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
+import { useUnreadAnnouncements } from "@/hooks/use-unread-announcements";
 import { useClubLeague } from "@/hooks/use-club-league";
 import { useState } from "react";
 
@@ -22,14 +22,14 @@ const SHEET_NAV_BASE = [
   { label: "Assiduidade",        href: "/player/assiduidade",     icon: BarChart2     },
   { label: "Resumo Estatístico", href: "/player/resumo-estatistico", icon: BarChart3  },
   { label: "Pagamentos",         href: "/player/meus-pagamentos", icon: CreditCard    },
-  { label: "Chat",               href: "/player/chat",            icon: MessageSquare },
+  { label: "Comunicados",        href: "/player/comunicados",     icon: Megaphone     },
   { label: "Palmarés",           href: "/player/palmares",        icon: Trophy        },
   { label: "Laboratório",        href: "/player/laboratorio",     icon: ClipboardList },
 ] as const;
 
 export function PlayerBottomNav() {
   const pathname  = usePathname();
-  const chatBadge = useUnreadChatCount();
+  const chatBadge = useUnreadAnnouncements();
   const { league } = useClubLeague();
   type SheetItem = { label: string; href: string; icon: React.ElementType; external?: boolean };
   const SHEET_NAV: SheetItem[] = [...SHEET_NAV_BASE];
@@ -209,7 +209,7 @@ export function PlayerBottomNav() {
         >
           {SHEET_NAV.map(({ label, href, icon: Icon, external }) => {
             const active = isActive(href, false);
-            const badge  = href === "/player/chat" ? chatBadge : 0;
+            const badge  = href === "/player/comunicados" ? chatBadge : 0;
             return (
               <Link
                 key={href}

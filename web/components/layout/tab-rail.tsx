@@ -10,7 +10,7 @@ import {
   CreditCard,
   Dumbbell,
   BarChart3,
-  MessageSquare,
+  Megaphone,
   Users,
   UserCog,
   Settings,
@@ -19,7 +19,7 @@ import {
   Shield,
   FolderOpen,
 } from "lucide-react";
-import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
+import { useUnreadAnnouncements } from "@/hooks/use-unread-announcements";
 import { useClubSettings } from "@/lib/club-context";
 import { useClubLeague } from "@/hooks/use-club-league";
 import type { UserRole } from "@/types/database";
@@ -35,7 +35,7 @@ interface RailItem {
 const PRIMARY: RailItem[] = [
   { label: "Hoje",    href: "/dashboard",  icon: LayoutDashboard, exact: true },
   { label: "Agenda",  href: "/jogos",      icon: Calendar },
-  { label: "Chat",    href: "/chat",       icon: MessageSquare },
+  { label: "Avisos",  href: "/comunicados", icon: Megaphone },
   { label: "Quotas",  href: "/pagamentos", icon: CreditCard },
   { label: "Plantel", href: "/jogadores",  icon: Users },
 ];
@@ -96,7 +96,7 @@ function RailLink({ item, badge }: { item: RailItem; badge?: number }) {
 
 export function TabRail({ role, rolesExtra = [] }: { role?: UserRole; rolesExtra?: string[] }) {
   const { settings }  = useClubSettings();
-  const chatBadge     = useUnreadChatCount();
+  const chatBadge     = useUnreadAnnouncements();
   const { league }    = useClubLeague();
   const rolesAll      = [role, ...rolesExtra].filter(Boolean) as string[];
   const isManager     = rolesAll.includes("admin") || rolesAll.includes("treinador");
@@ -141,7 +141,7 @@ export function TabRail({ role, rolesExtra = [] }: { role?: UserRole; rolesExtra
           <RailLink
             key={item.href}
             item={item}
-            badge={item.href === "/chat" ? chatBadge : undefined}
+            badge={item.href === "/comunicados" ? chatBadge : undefined}
           />
         ))}
       </div>

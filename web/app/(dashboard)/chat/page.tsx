@@ -1,7 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { ChatLayout } from "@/components/chat/chat-layout";
-
-export default function ChatPage() {
-  return <ChatLayout />;
+// O chat foi substituído pelos Comunicados (links e ícones antigos continuam a funcionar).
+export default function ChatRedirect() {
+  redirect("/comunicados");
 }

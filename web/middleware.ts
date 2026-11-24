@@ -7,7 +7,7 @@ import { safeNextPath } from "@/lib/auth/safe-next";
 const PROTECTED_PREFIXES = [
   "/dashboard", "/jogadores", "/jogos", "/pagamentos", "/estatisticas",
   "/configuracoes", "/temporadas", "/treinos", "/financeiro",
-  "/gestao-contas", "/historico", "/chat", "/mais", "/player",
+  "/gestao-contas", "/historico", "/comunicados", "/chat", "/mais", "/player",
   "/alterar-password", "/resultados", "/liga",
 ];
 
@@ -150,6 +150,6 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     // Corre apenas em rotas de página; exclui assets estáticos, APIs e imagens
-    "/((?!_next/static|_next/image|favicon.ico|manifest.json|liga-inatel\\.webmanifest|liga-inatel-sw\\.js|liga-inatel-offline\\.html|pwa/|icons/|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.json|liga-inatel\\.webmanifest|liga-inatel-sw\\.js|hoophub-sw\\.js|liga-inatel-offline\\.html|pwa/|icons/|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
   ],
 };

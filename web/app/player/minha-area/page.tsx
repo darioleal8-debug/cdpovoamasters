@@ -4,7 +4,7 @@ import { authorize } from "@/lib/auth/guards";
 import { redirect } from "next/navigation";
 import {
   AlertTriangle, BarChart2, Calendar, CreditCard,
-  Dumbbell, MessageSquare, Trophy, User,
+  Dumbbell, Megaphone, Trophy, User,
 } from "lucide-react";
 import { StatsSection } from "@/components/player/stats-section";
 import { lisbonDateTime } from "@/lib/event-time";
@@ -19,6 +19,10 @@ import { NextBirthdayNotice } from "@/components/birthday/next-birthday-notice";
 import { LigaLinkCard } from "@/components/liga/liga-link-card";
 import Link from "next/link";
 import { MinhaAreaTop, type TrainingData, type GameData } from "@/components/player/minha-area-top";
+import { AnnouncementsHighlight } from "@/components/announcements/highlight-card";
+import { PushPrompt } from "@/components/push/push-prompt";
+import { listAnnouncements, listHighlighted } from "@/lib/announcements/load";
+import type { AnnouncementDTO } from "@/lib/announcements/types";
 
 export const metadata = { title: "Minha Área" };
 
@@ -34,14 +38,6 @@ type TrainingRow = {
   notes:      string | null;
   rsvp_deadline_hours: number | null;
   deleted_at: string | null;
-};
-
-type ComunicadoRow = {
-  id:          string;
-  content:     string | null;
-  created_at:  string;
-  sender_name: string;
-  sender_role: string;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -265,56 +261,16 @@ export default async function MinhaAreaPage() {
     : null;
 
   // ── Comunicados ───────────────────────────────────────────
-  let comunicados: ComunicadoRow[] = [];
+  // Em destaque: soltos 72h; afetos a jogo/treino até ao final dele. Cartão: os 3 mais recentes.
+  let highlighted: AnnouncementDTO[] = [];
+  let latest: AnnouncementDTO[] = [];
   try {
     const admin = await createAdminClient();
-    const { data: teamChat } = await admin
-      .from("chats")
-      .select("id")
-      .eq("type", "announcement")
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (teamChat?.id) {
-      const { data: msgs } = await admin
-        .from("chat_messages")
-        .select("id, content, created_at, sender_id")
-        .eq("chat_id", teamChat.id)
-        .eq("is_system", false)
-        .is("hidden_at", null)
-        .order("created_at", { ascending: false })
-        .limit(3);
-
-      if (msgs && msgs.length > 0) {
-        const senderIds = [
-          ...new Set(
-            (msgs as Array<{ sender_id: string | null }>)
-              .map((m) => m.sender_id)
-              .filter((id): id is string => id !== null)
-          ),
-        ];
-        const { data: senders } = senderIds.length > 0
-          ? await supabase.from("user_display_names").select("id, name, role").in("id", senderIds)
-          : { data: [] };
-        const senderById = new Map(
-          ((senders ?? []) as Array<{ id: string; name: string; role: string }>)
-            .map((s) => [s.id, s])
-        );
-        comunicados = (msgs as Array<{ id: string; content: string | null; created_at: string; sender_id: string | null }>)
-          .map((m) => {
-            const sender = m.sender_id ? senderById.get(m.sender_id) : undefined;
-            return {
-              id:          m.id,
-              content:     m.content,
-              created_at:  m.created_at,
-              sender_name: sender?.name ?? "Equipa",
-              sender_role: sender?.role ?? "",
-            };
-          });
-      }
-    }
-  } catch { /* Comunicados não-fatal */ }
+    [highlighted, latest] = await Promise.all([
+      listHighlighted(admin, { userId: user.id }),
+      listAnnouncements(admin, { userId: user.id, limit: 3 }).then((r) => r.announcements),
+    ]);
+  } catch { /* Comunicados não-fatais */ }
 
   const name = profile?.name || user.email || "Jogador";
   const firstName = name.split(" ").filter(Boolean)[0] ?? name;
@@ -342,6 +298,10 @@ export default async function MinhaAreaPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+
+      {/* ── Comunicados em destaque (72h, ou até ao final do jogo/treino afeto) ── */}
+      <AnnouncementsHighlight items={highlighted} href="/player/comunicados" />
+      <PushPrompt />
 
       {/* ── Cartões de evento (client component com disponibilidade) ── */}
       <MinhaAreaTop
@@ -498,13 +458,13 @@ export default async function MinhaAreaPage() {
             }}
           >
             <div style={{ padding: "14px 16px 10px", borderBottom: "1px solid rgba(26,22,18,.06)", display: "flex", alignItems: "center", gap: "8px" }}>
-              <MessageSquare size={14} style={{ color: "#8C837A" }} />
+              <Megaphone size={14} style={{ color: "#8C837A" }} />
               <span style={{ fontFamily: "var(--font-barlow-condensed, sans-serif)", fontWeight: 700, fontSize: "14px", letterSpacing: ".04em", textTransform: "uppercase", color: "#1A1612" }}>
                 Comunicados
               </span>
             </div>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-              {comunicados.length === 0 ? (
+              {latest.length === 0 ? (
                 <div style={{ padding: "16px", flex: 1, display: "flex", alignItems: "center" }}>
                   <p style={{ fontFamily: "var(--font-barlow, sans-serif)", fontSize: "13px", color: "#8C837A" }}>
                     Sem comunicados recentes.
@@ -512,12 +472,12 @@ export default async function MinhaAreaPage() {
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column" }}>
-                  {comunicados.map((c, i) => (
+                  {latest.map((c, i) => (
                     <div
                       key={c.id}
                       style={{
                         padding: "12px 16px",
-                        borderBottom: i < comunicados.length - 1 ? "1px solid rgba(26,22,18,.06)" : undefined,
+                        borderBottom: i < latest.length - 1 ? "1px solid rgba(26,22,18,.06)" : undefined,
                       }}
                     >
                       <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
@@ -538,19 +498,19 @@ export default async function MinhaAreaPage() {
                             letterSpacing: ".04em",
                           }}
                         >
-                          {initials(c.sender_name)}
+                          {initials(c.author?.name ?? "Equipa")}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", justifyContent: "space-between", gap: "4px" }}>
                             <p style={{ fontFamily: "var(--font-barlow, sans-serif)", fontSize: "12px", fontWeight: 600, color: "#1A1612", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {c.sender_name}
+                              {c.title}
                             </p>
                             <p style={{ fontFamily: "var(--font-ibm-mono, monospace)", fontSize: "10px", color: "#8C837A", flexShrink: 0 }}>
                               {relTime(c.created_at)}
                             </p>
                           </div>
                           <p style={{ fontFamily: "var(--font-barlow, sans-serif)", fontSize: "12px", color: "#6F675F", marginTop: "4px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                            {c.content}
+                            {c.author?.name ? `${c.author.name} · ` : ""}{c.body}
                           </p>
                         </div>
                       </div>
@@ -560,8 +520,8 @@ export default async function MinhaAreaPage() {
               )}
             </div>
             <div style={{ padding: "10px 16px", borderTop: "1px solid rgba(26,22,18,.06)" }}>
-              <Link href="/player/chat" style={{ fontFamily: "var(--font-barlow, sans-serif)", fontSize: "12px", fontWeight: 600, color: "#C2530A" }}>
-                Ver tudo no chat →
+              <Link href="/player/comunicados" style={{ fontFamily: "var(--font-barlow, sans-serif)", fontSize: "12px", fontWeight: 600, color: "#C2530A" }}>
+                Ver todos os comunicados →
               </Link>
             </div>
           </div>

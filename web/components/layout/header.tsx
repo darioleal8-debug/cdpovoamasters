@@ -45,7 +45,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/pagamentos":      "Pagamentos",
   "/jogadores":       "Plantel",
   "/estatisticas":    "Resumo Equipa",
-  "/chat":            "Chat",
+  "/comunicados":     "Comunicados",
   "/temporadas":      "Temporadas",
   "/gestao-contas":   "Contas",
   "/historico":       "Histórico Stats",

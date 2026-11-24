@@ -10,7 +10,7 @@ export const SCOPED_TABLES = new Set([
   "training_recurrence_rules", "events", "game_callups", "game_availability", "game_sessions",
   "financial_entries", "financial_expenses", "financial_cash_movements", "player_payments",
   "player_payments_history", "payment_receipts", "documents", "chats", "birthday_messages", "plays",
-  "team_kits", "club_events", "access_requests", "palmares",
+  "team_kits", "club_events", "access_requests", "palmares", "announcements",
   "hist_seasons", "hist_games", "hist_players", "hist_player_stats",
   // tabelas filhas (club_id herdado do pai por trigger — migração 129)
   "calendar_imports", "chat_messages", "chat_participants", "game_current_lineup", "game_period_scores",
