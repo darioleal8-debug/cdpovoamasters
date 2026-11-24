@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { clubIdOfRow } from "@/lib/auth/club";
+import { clubIdOfRow, clubIdForUser } from "@/lib/auth/club";
 import { authorize } from "@/lib/auth/guards";
 import { FINANCE } from "@/lib/auth/roles";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
@@ -71,6 +71,10 @@ export async function POST(req: NextRequest) {
   // Resolver player_id: se não foi enviado mas user_id está disponível,
   // encontrar ou criar o registo de jogador para esta época.
   const clubId = await clubIdOfRow(supabase, "seasons", season_id);
+  // Só no clube a que o utilizador está afeto (nem o Master Admin regista noutros clubes)
+  if (!clubId || clubId !== (await clubIdForUser(supabase, user.id))) {
+    return NextResponse.json({ error: "Temporada não encontrada." }, { status: 404 });
+  }
   let player_id = bodyPlayerId as string | null;
   if (!player_id && user_id && season_id) {
     try {

@@ -1,9 +1,12 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Settings2 } from "lucide-react";
 import { useSeasons }          from "@/hooks/use-seasons";
-import { useRoster }           from "@/hooks/use-roster";
+import { usePaymentPlayers }   from "@/hooks/use-payment-players";
+import { usePaymentTypes }     from "@/hooks/use-payment-types";
+import { ChargesView }         from "@/components/payments/charges-view";
+import { PaymentTypesManager } from "@/components/payments/payment-types-manager";
 import { usePlayerPayments }   from "@/hooks/use-player-payments";
 import { PaymentsIndicators }  from "@/components/payments/payments-indicators";
 import { PaymentsGrid }        from "@/components/payments/payments-grid";
@@ -36,7 +39,15 @@ export default function PagamentosPage() {
     [seasons, seasonId]
   );
 
-  const { players, loading: playersLoading } = useRoster(seasonId);
+  // Só os jogadores do clube do utilizador (nem o Master Admin vê outros clubes)
+  const { players, loading: playersLoading } = usePaymentPlayers(seasonId);
+
+  // ── Tipos de pagamento: quotas mensais + os que o clube define ──────────
+  const { types, addType, updateType, removeType } = usePaymentTypes();
+  const [tab, setTab] = useState<string>("quotas"); // "quotas" | id do tipo
+  const [typesOpen, setTypesOpen] = useState(false);
+  const activeType = types.find(t => t.id === tab) ?? null;
+  const showQuotas = !activeType; // tipo apagado → volta às quotas
   const {
     payments, summary, loading: paymentsLoading,
     upsertPayment, updatePayment, deletePayment,
@@ -165,8 +176,8 @@ export default function PagamentosPage() {
   const subtitle = useMemo(() => {
     if (!season) return "Seleciona uma temporada";
     const nPlayers = players.length;
-    return `${season.name} · quotas mensais · ${nPlayers} jogador${nPlayers !== 1 ? "es" : ""}`;
-  }, [season, players.length]);
+    return `${season.name} · ${activeType ? activeType.name : "quotas mensais"} · ${nPlayers} jogador${nPlayers !== 1 ? "es" : ""}`;
+  }, [season, players.length, activeType]);
 
   return (
     <div className="space-y-4">
@@ -197,23 +208,59 @@ export default function PagamentosPage() {
             </SelectContent>
           </Select>
           {/* Botão visível só a partir de tablet — em mobile usa FAB */}
-          <Button
-            className="hidden md:flex h-9 gap-1.5"
-            onClick={() => openRegister()}
-            disabled={!seasonId}
-          >
-            + Registar
-          </Button>
+          {showQuotas && (
+            <Button
+              className="hidden md:flex h-9 gap-1.5"
+              onClick={() => openRegister()}
+              disabled={!seasonId}
+            >
+              + Registar
+            </Button>
+          )}
         </div>
       </div>
 
+      {/* ── Tipos de pagamento ───────────────────────────────────────── */}
+      <div className="flex items-center gap-2">
+        <div className="flex flex-1 gap-1.5 overflow-x-auto pb-1" role="tablist" aria-label="Tipo de pagamento">
+          {[{ id: "quotas", name: "Quotas mensais" }, ...types].map(t => {
+            const on = (t.id === "quotas" && showQuotas) || t.id === activeType?.id;
+            return (
+              <button key={t.id} type="button" role="tab" aria-selected={on} onClick={() => setTab(t.id)}
+                className="shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors"
+                style={on
+                  ? { background: "var(--action,#F97316)", color: "#fff", borderColor: "var(--action,#F97316)" }
+                  : { background: "#fff", color: "var(--text,#0A1220)" }}>
+                {t.name}
+              </button>
+            );
+          })}
+        </div>
+        <Button variant="outline" size="sm" className="h-8 shrink-0 gap-1.5" onClick={() => setTypesOpen(true)}>
+          <Settings2 className="h-3.5 w-3.5" /><span className="hidden sm:inline">Tipos</span>
+        </Button>
+      </div>
+
+      <PaymentTypesManager
+        open={typesOpen}
+        onClose={() => setTypesOpen(false)}
+        types={types}
+        onAdd={addType}
+        onUpdate={updateType}
+        onRemove={async id => { const ok = await removeType(id); if (ok && tab === id) setTab("quotas"); return ok; }}
+      />
+
+      {activeType && (
+        <ChargesView type={activeType} seasonId={seasonId} players={players} playersLoading={playersLoading} />
+      )}
+
       {/* ── Indicadores ──────────────────────────────────────────────── */}
-      <PaymentsIndicators values={indicators} loading={loading} />
+      {showQuotas && <PaymentsIndicators values={indicators} loading={loading} />}
 
       {/* ── Grelha (tablet+) — lista (mobile) ────────────────────────── */}
 
       {/* Mobile: lista por jogador com dots */}
-      <div className="md:hidden">
+      {showQuotas && <div className="md:hidden">
         <PaymentsPlayerList
           players={players}
           payments={payments}
@@ -223,10 +270,10 @@ export default function PagamentosPage() {
           onPlayer={(player) => { setHistoryPlayer(player); setHistoryOpen(true); }}
           onDot={(player, month, year) => openRegister(player, month, year)}
         />
-      </div>
+      </div>}
 
       {/* Tablet+: grelha original */}
-      <div className="hidden md:block">
+      {showQuotas && <div className="hidden md:block">
         <PaymentsGrid
           players={players}
           payments={payments}
@@ -236,7 +283,7 @@ export default function PagamentosPage() {
           onCellClick={info => setActiveCell(info)}
           onHistory={player => { setHistoryPlayer(player); setHistoryOpen(true); }}
         />
-      </div>
+      </div>}
 
       {/* ── Popover de célula (só tablet+) ───────────────────────────── */}
       {seasonId && (
@@ -284,7 +331,7 @@ export default function PagamentosPage() {
       />
 
       {/* ── FAB mobile "+ Registar" — acima da bottom-nav ────────────── */}
-      <button
+      {showQuotas && <button
         type="button"
         onClick={() => openRegister()}
         disabled={!seasonId}
@@ -299,7 +346,7 @@ export default function PagamentosPage() {
       >
         <Plus className="h-5 w-5" />
         Registar
-      </button>
+      </button>}
     </div>
   );
 }
