@@ -14,6 +14,7 @@ interface Props {
   summary:   PlayerPaymentSummary[];
   loading:   boolean;
   season:    Season | null;
+  monthlyFee: number;
   onPlayer:  (player: RosterEntry) => void;
   onDot:     (player: RosterEntry, month: number, year: number) => void;
 }
@@ -22,7 +23,7 @@ function initials(name: string): string {
   return name.trim().split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 }
 
-export function PaymentsPlayerList({ players, payments, summary, loading, season, onPlayer, onDot }: Props) {
+export function PaymentsPlayerList({ players, payments, summary, loading, season, monthlyFee, onPlayer, onDot }: Props) {
   const today  = useMemo(() => new Date(), []);
   const months = useMemo(() => (season ? getSeasonMonths(season) : []), [season]);
   const [search, setSearch] = useState("");
@@ -119,7 +120,7 @@ export function PaymentsPlayerList({ players, payments, summary, loading, season
 
         const cells: Array<GridCell & { month: number; year: number }> = months.map((m) => {
           const pay  = playerPays?.get(`${m.month}-${m.year}`) ?? null;
-          const cell = deriveCellState(m.month, m.year, pay, today);
+          const cell = deriveCellState(m.month, m.year, pay, today, monthlyFee);
           return { ...cell, month: m.month, year: m.year };
         });
 

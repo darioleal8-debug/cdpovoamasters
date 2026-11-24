@@ -20,7 +20,7 @@ import type {
 import {
   PLAYER_PAYMENT_STATUS_LABELS, PLAYER_PAYMENT_METHOD_LABELS, MONTH_NAMES_PT,
 } from "@/types/database";
-import { getSeasonMonths, statusBadgeClass } from "@/lib/payment-utils";
+import { getSeasonMonths, statusBadgeClass, DEFAULT_MONTHLY_FEE } from "@/lib/payment-utils";
 
 export interface SavePaymentData {
   player_id:      string;
@@ -41,6 +41,8 @@ interface Props {
   onDelete?:  () => Promise<boolean>;
   players:    RosterEntry[];
   season:     Season | null;
+  /** Quota mensal do clube — valor sugerido ao registar um novo pagamento. */
+  monthlyFee?: number;
   prefill?: {
     playerId?:        string;
     month?:           number;
@@ -56,7 +58,7 @@ const STATUS_COLORS: Record<PlayerPaymentStatus, string> = {
   exempt:  "text-slate-600",
 };
 
-export function RegisterPaymentModal({ open, onClose, onSave, onDelete, players, season, prefill }: Props) {
+export function RegisterPaymentModal({ open, onClose, onSave, onDelete, players, season, monthlyFee = DEFAULT_MONTHLY_FEE, prefill }: Props) {
   const seasonMonths = season ? getSeasonMonths(season) : [];
   const today        = new Date();
   const existing     = prefill?.existingPayment;
@@ -74,8 +76,8 @@ export function RegisterPaymentModal({ open, onClose, onSave, onDelete, players,
 
   const [playerId,    setPlayerId]    = useState(prefill?.playerId ?? "");
   const [monthKey,    setMonthKey]    = useState(computeDefaultMonthKey());
-  const [amount,      setAmount]      = useState(existing?.amount?.toString() ?? "20");
-  const [amountDue,   setAmountDue]   = useState(existing?.amount_due?.toString() ?? "20");
+  const [amount,      setAmount]      = useState(existing?.amount?.toString() ?? String(monthlyFee));
+  const [amountDue,   setAmountDue]   = useState(existing?.amount_due?.toString() ?? String(monthlyFee));
   const [status,      setStatus]      = useState<PlayerPaymentStatus>(existing?.status ?? "paid");
   const [method,      setMethod]      = useState<PlayerPaymentMethod | "">(existing?.method ?? "");
   const [notes,       setNotes]       = useState(existing?.notes ?? "");
@@ -90,8 +92,8 @@ export function RegisterPaymentModal({ open, onClose, onSave, onDelete, players,
     const ex = prefill?.existingPayment;
     setPlayerId(prefill?.playerId ?? "");
     setMonthKey(computeDefaultMonthKey());
-    setAmount(ex?.amount?.toString()     ?? "20");
-    setAmountDue(ex?.amount_due?.toString() ?? "20");
+    setAmount(ex?.amount?.toString()     ?? String(monthlyFee));
+    setAmountDue(ex?.amount_due?.toString() ?? String(monthlyFee));
     setStatus(ex?.status ?? "paid");
     setMethod(ex?.method ?? "");
     setNotes(ex?.notes   ?? "");

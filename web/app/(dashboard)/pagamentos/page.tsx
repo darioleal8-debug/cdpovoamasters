@@ -5,6 +5,9 @@ import { Plus, Settings2 } from "lucide-react";
 import { useSeasons }          from "@/hooks/use-seasons";
 import { usePaymentPlayers }   from "@/hooks/use-payment-players";
 import { usePaymentTypes }     from "@/hooks/use-payment-types";
+import { useMonthlyFee }       from "@/hooks/use-monthly-fee";
+import { useCurrentUser }      from "@/hooks/use-current-user";
+import { MonthlyFeeEditor }    from "@/components/payments/monthly-fee-editor";
 import { ChargesView }         from "@/components/payments/charges-view";
 import { PaymentTypesManager } from "@/components/payments/payment-types-manager";
 import { usePlayerPayments }   from "@/hooks/use-player-payments";
@@ -41,6 +44,11 @@ export default function PagamentosPage() {
 
   // Só os jogadores do clube do utilizador (nem o Master Admin vê outros clubes)
   const { players, loading: playersLoading } = usePaymentPlayers(seasonId);
+
+  // ── Quota mensal do clube (editável pelo administrador) ─────────────────
+  const { fee: monthlyFee, saveFee } = useMonthlyFee();
+  const { user: me } = useCurrentUser();
+  const isAdmin = me?.role === "admin" || !!me?.available_roles?.includes("admin");
 
   // ── Tipos de pagamento: quotas mensais + os que o clube define ──────────
   const { types, addType, updateType, removeType } = usePaymentTypes();
@@ -128,7 +136,7 @@ export default function PagamentosPage() {
         const pay = payments.find(
           p => p.player_id === player.player_id && p.month === m.month && p.reference_year === m.year
         );
-        const cell = deriveCellState(m.month, m.year, pay ?? null, today);
+        const cell = deriveCellState(m.month, m.year, pay ?? null, today, monthlyFee);
 
         if (cell.status === "exempt") continue;
 
@@ -170,7 +178,7 @@ export default function PagamentosPage() {
       atrasoMedioDias,
       piorMes,
     };
-  }, [players, payments, season]);
+  }, [players, payments, season, monthlyFee]);
 
   // ── Season subtitle ─────────────────────────────────────────────────────
   const subtitle = useMemo(() => {
@@ -254,6 +262,8 @@ export default function PagamentosPage() {
         <ChargesView type={activeType} seasonId={seasonId} players={players} playersLoading={playersLoading} />
       )}
 
+      {showQuotas && <MonthlyFeeEditor fee={monthlyFee} canEdit={isAdmin} onSave={saveFee} />}
+
       {/* ── Indicadores ──────────────────────────────────────────────── */}
       {showQuotas && <PaymentsIndicators values={indicators} loading={loading} />}
 
@@ -267,6 +277,7 @@ export default function PagamentosPage() {
           summary={summary}
           loading={loading}
           season={season}
+          monthlyFee={monthlyFee}
           onPlayer={(player) => { setHistoryPlayer(player); setHistoryOpen(true); }}
           onDot={(player, month, year) => openRegister(player, month, year)}
         />
@@ -280,6 +291,7 @@ export default function PagamentosPage() {
           summary={summary}
           loading={loading}
           season={season}
+          monthlyFee={monthlyFee}
           onCellClick={info => setActiveCell(info)}
           onHistory={player => { setHistoryPlayer(player); setHistoryOpen(true); }}
         />
@@ -311,6 +323,7 @@ export default function PagamentosPage() {
         onDelete={existingPayment ? handleDelete : undefined}
         players={players}
         season={season}
+        monthlyFee={monthlyFee}
         prefill={{
           playerId:        registerPlayer?.player_id ?? undefined,
           month:           registerMonth,

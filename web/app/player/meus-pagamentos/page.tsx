@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { CreditCard, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Season } from "@/types/database";
+import { clubIdForUser } from "@/lib/auth/club";
 
 export const metadata = { title: "Os Meus Pagamentos" };
 
@@ -12,8 +13,6 @@ function fmt(v: number) {
   return v.toLocaleString("pt-PT", { style: "currency", currency: "EUR" });
 }
 
-// Default monthly quota when no record exists
-const DEFAULT_AMOUNT_DUE = 20;
 
 type DbPayment = {
   id: string;
@@ -69,6 +68,14 @@ export default async function MeusPagamentosPage() {
 
   const playerIds  = (myPlayers ?? []).map((p: { id: string }) => p.id);
   const seasonIds  = [...new Set((myPlayers ?? []).map((p: { season_id: string }) => p.season_id).filter(Boolean))] as string[];
+
+  // Quota mensal do clube (por defeito quando não há registo)
+  const clubId = await clubIdForUser(supabase, user.id);
+  let DEFAULT_AMOUNT_DUE = 10;
+  if (clubId) {
+    const { data: cs } = await supabase.from("club_settings").select("monthly_fee").eq("club_id", clubId).maybeSingle();
+    if (cs?.monthly_fee != null) DEFAULT_AMOUNT_DUE = Number(cs.monthly_fee);
+  }
 
   // Seasons the player belongs to
   type SeasonRow = { id: string; name: string; start_date: string; end_date: string; status: string };
