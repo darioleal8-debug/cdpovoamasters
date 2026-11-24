@@ -25,12 +25,14 @@ import {
   Building2,
   Sparkles,
   Globe,
+  Inbox,
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { useClubSettings } from "@/lib/club-context";
 import { useUnreadAnnouncements } from "@/hooks/use-unread-announcements";
+import { usePendingAccessRequests } from "@/hooks/use-pending-access-requests";
 import { useClubLeague } from "@/hooks/use-club-league";
 import type { UserRole } from "@/types/database";
 import { NavLink } from "@/components/layout/nav-link";
@@ -91,6 +93,8 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 export function Sidebar({ role, rolesExtra = [], isMaster = false }: { role?: UserRole; rolesExtra?: string[]; isMaster?: boolean }) {
   const { settings } = useClubSettings();
   const unreadChatCount = useUnreadAnnouncements();
+  // Pedidos de acesso pendentes (só o Master Admin)
+  const pendingRequests = usePendingAccessRequests(isMaster);
   // Liga do clube (Liga INATEL ou outra); sem liga → sem link
   const { league } = useClubLeague();
   const ligaSite = league ? <NavLink href={league.href} external={league.external} icon={Globe} label="Site da Liga" /> : null;
@@ -187,6 +191,7 @@ export function Sidebar({ role, rolesExtra = [], isMaster = false }: { role?: Us
               <>
                 <SectionLabel>Plataforma</SectionLabel>
                 <div className="space-y-0.5">
+                  <NavLink href="/master-pedidos" icon={Inbox} label="Pedidos de acesso" badge={pendingRequests} />
                   <NavLink href="/master-clubes" icon={Building2} label="Clubes" />
                   <NavLink href="/master-ia" icon={Sparkles} label="Consumo de IA" />
                 </div>

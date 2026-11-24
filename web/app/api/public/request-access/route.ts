@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createUnscopedAdminClient } from "@/lib/supabase/server";
+import { sendAccessRequestNotification } from "@/lib/email-access-request";
 import crypto from "crypto";
 
 export const runtime = "nodejs";
@@ -77,8 +78,7 @@ export async function POST(req: NextRequest) {
   // ── Inserção ─────────────────────────────────────────────────────────────────
   // Pedidos de acesso são geridos pelo clube da plataforma (CD Póvoa Masters).
   const { data: platformClub } = await supabase.from("clubs").select("id").eq("slug", "cd-povoa-masters").maybeSingle();
-  const { error } = await supabase.from("access_requests").insert({
-    club_id:      platformClub?.id ?? null,
+  const record = {
     club_name:    String(body.club_name).trim(),
     city:         String(body.city).trim(),
     category:     String(body.category),
@@ -88,14 +88,25 @@ export async function POST(req: NextRequest) {
     contact_role: String(body.contact_role),
     email,
     phone:        body.phone ? String(body.phone).trim() : null,
-    ip_hash:      ipHash,
-    honeypot:     null,
-    status:       "pendente",
+  };
+  const { error } = await supabase.from("access_requests").insert({
+    club_id:  platformClub?.id ?? null,
+    ...record,
+    ip_hash:  ipHash,
+    honeypot: null,
+    status:   "pendente",
   });
 
   if (error) {
     console.error("[request-access]", error);
     return fail("Erro interno. Tenta novamente.", 500);
+  }
+
+  // ── Aviso ao Master Admin por email ──────────────────────────────────────────
+  // O pedido já está guardado: se o email falhar, não falha a resposta ao utilizador.
+  const notified = await sendAccessRequestNotification(record);
+  if (!notified.success) {
+    console.error("[request-access] aviso por email falhou:", notified.error);
   }
 
   return ok("Pedido recebido. Falamos contigo em 48 horas.");
