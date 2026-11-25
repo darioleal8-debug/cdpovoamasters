@@ -13,3 +13,11 @@ export { createRawServiceClient };
 export function createServiceClient() {
   return scopeClient(createRawServiceClient());
 }
+
+/**
+ * Igual a createServiceClient, mas a tabela `users` inclui as contas desativadas do clube
+ * (só para a Gestão de Contas: o administrador tem de as ver e poder reativar).
+ */
+export function createServiceClientWithInactiveUsers() {
+  return scopeClient(createRawServiceClient(), { includeInactiveUsers: true });
+}
