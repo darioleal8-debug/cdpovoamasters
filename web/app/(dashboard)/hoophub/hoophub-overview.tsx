@@ -129,12 +129,12 @@ export function HoopHubOverview() {
         <div className="flex items-center gap-2 border-b px-5 py-4">
           <Trophy className="h-4 w-4 text-orange-500" />
           <h2 className="text-sm font-semibold">Ligas</h2>
-          <Link href="/liga" className="ml-auto text-xs underline">Equipas da Liga INATEL</Link>
+          <Link href="/hoophub/ligas" className="ml-auto text-xs underline">Analytics por equipa</Link>
         </div>
         <div className="divide-y">
           {leagues.map((l) => (
             <div key={l.name} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
-              <span className="font-medium">{l.name}</span>
+              <Link href={`/hoophub/ligas/${encodeURIComponent(l.name)}`} className="font-medium hover:underline">{l.name} →</Link>
               <span className="text-xs text-muted-foreground">
                 {l.teams !== undefined && <>{l.teams} equipas · {l.teams_without_club} sem clube na app · </>}
                 {l.clubs} clube(s) na app ({l.active_clubs} ativos) · {l.members} utilizador(es)
