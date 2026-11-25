@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "@/components/ui/toaster";
 import type { Event } from "@/types/database";
+import { opponentIfTeamPlays } from "@/lib/league-mirror";
 
 // ─── Tipos ────────────────────────────────────────────────
 
@@ -112,6 +113,8 @@ function eventToLeagueGame(event: Event, ourTeamName: string | null): LeagueGame
 export function useLeagueCalendar(seasonId: string | null) {
   const [rawGames, setRawGames] = useState<LeagueGame[]>([]);
   const [loading, setLoading]   = useState(true);
+  // Jogos da equipa do clube vindos só do espelho da Liga (só de leitura)
+  const [mirrorEvents, setMirrorEvents] = useState<Event[]>([]);
 
   // Filtro por jornada (ainda exposto para o seletor no UI)
   const [selectedJornada, setSelectedJornada] = useState<number | "all">("all");
@@ -149,16 +152,36 @@ export function useLeagueCalendar(seasonId: string | null) {
       ourTeamName = teamRes.data?.name ?? null;
     }
 
-    // Espelho da Liga: clube associado a uma equipa da Liga sem jogos próprios na época
-    if (rows.length === 0) {
-      try {
-        const res = await fetch("/api/club/league-calendar");
-        if (res.ok) {
-          const j = (await res.json()) as { team_name: string | null; events: Event[] };
-          if (j.team_name) { rows = j.events ?? []; ourTeamName = j.team_name; }
+    // Espelho da Liga: clube associado a uma equipa da Liga lê sempre os jogos partilhados da Liga,
+    // mesmo que já tenha eventos próprios na época (ex.: jogos de treino) — os próprios têm prioridade
+    // na deduplicação abaixo.
+    let mirrored: Event[] = [];
+    try {
+      const res = await fetch("/api/club/league-calendar");
+      if (res.ok) {
+        const j = (await res.json()) as { team_name: string | null; events: Event[] };
+        if (j.team_name) {
+          mirrored = j.events ?? [];
+          ourTeamName = j.team_name;
+          rows = [...rows, ...mirrored];
         }
-      } catch { /* sem espelho */ }
+      }
+    } catch { /* sem espelho */ }
+
+    // Jogos da nossa equipa que vêm só do espelho (não existem como eventos do clube): a Agenda mostra-os só de leitura
+    const ownKeys = new Set(
+      (rows.filter((r) => !mirrored.includes(r))).map((r) => `${r.event_date}|${(r.event_time ?? "").slice(0, 5)}`),
+    );
+    const mirrorOnly: Event[] = [];
+    if (ourTeamName) {
+      for (const ev of mirrored) {
+        const own = opponentIfTeamPlays(ev.description, ourTeamName);
+        if (!own) continue;
+        if (ownKeys.has(`${ev.event_date}|${(ev.event_time ?? "").slice(0, 5)}`)) continue;
+        mirrorOnly.push({ ...ev, opponent: own.opponent });
+      }
     }
+    setMirrorEvents(mirrorOnly);
 
     const games = rows
       .map((e) => eventToLeagueGame(e, ourTeamName))
@@ -261,6 +284,7 @@ export function useLeagueCalendar(seasonId: string | null) {
     allJornadas,
     jornadaMeta,
     rawGames,   // exposto para a LeagueAgenda
+    mirrorEvents, // jogos do clube vindos do espelho da Liga (Agenda do admin, só leitura)
     stats,
     loading,
     selectedJornada, setSelectedJornada,

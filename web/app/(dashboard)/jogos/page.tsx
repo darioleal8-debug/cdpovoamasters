@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ClubName } from "@/lib/club-context";
 import { useSeasons } from "@/hooks/use-seasons";
 import { useGames } from "@/hooks/use-games";
@@ -33,9 +33,16 @@ export default function JogosPage() {
   const { events, loading: eventsLoading, createGame, createTraining, updateEvent, deleteEvent } = useGames(seasonId);
 
   const {
-    jornadas, allJornadas, jornadaMeta, rawGames, stats, loading: ligaLoading,
+    jornadas, allJornadas, jornadaMeta, rawGames, mirrorEvents, stats, loading: ligaLoading,
     selectedJornada, setSelectedJornada,
   } = useLeagueCalendar(seasonId);
+
+  // Agenda do admin: eventos do clube + jogos da Liga vindos do espelho (só de leitura)
+  const agendaEvents = useMemo(
+    () => [...events, ...mirrorEvents].sort((a, b) => a.event_date.localeCompare(b.event_date)),
+    [events, mirrorEvents],
+  );
+  const mirrorIds = useMemo(() => new Set(mirrorEvents.map((e) => e.id)), [mirrorEvents]);
 
   const { kitsByTeam } = useTeamKits();
   // Taça da Liga INATEL: só para clubes afetos à Liga INATEL
@@ -301,7 +308,8 @@ export default function JogosPage() {
           ) : (
             <>
               <GamesTable
-                events={events}
+                events={agendaEvents}
+                readOnlyIds={mirrorIds}
                 loading={eventsLoading}
                 onAdd={openAdd}
                 onEdit={openEdit}

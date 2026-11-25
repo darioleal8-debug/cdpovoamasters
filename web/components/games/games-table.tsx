@@ -37,6 +37,8 @@ interface GamesTableProps {
   onCallups?: (event: Event) => void;
   gameSessions?: Record<string, GameSessionSummary>;
   onResult?: (event: Event) => void;
+  /** Eventos só de leitura (espelho do calendário da Liga): sem convocatória, live, resultado, edição nem remoção. */
+  readOnlyIds?: ReadonlySet<string>;
 }
 
 const TYPE_BADGE: Record<EventType, "default" | "secondary" | "outline"> = {
@@ -45,7 +47,7 @@ const TYPE_BADGE: Record<EventType, "default" | "secondary" | "outline"> = {
   outro:  "outline",
 };
 
-export function GamesTable({ events, loading, onAdd, onEdit, onDelete, onCallups, gameSessions = {}, onResult }: GamesTableProps) {
+export function GamesTable({ events, loading, onAdd, onEdit, onDelete, onCallups, gameSessions = {}, onResult, readOnlyIds }: GamesTableProps) {
   const today = new Date().toISOString().slice(0, 10);
   const [sorting, setSorting] = useState<SortingState>([{ id: "event_date", desc: false }]);
   const [globalFilter, setGlobalFilter] = useState("");
@@ -165,6 +167,22 @@ export function GamesTable({ events, loading, onAdd, onEdit, onDelete, onCallups
           const session = gameSessions[row.original.id];
           const hasFinishedSession = session?.status === "finished";
           const showResultBtn = isPast;
+          if (readOnlyIds?.has(row.original.id)) {
+            const mapsUrl = buildMapsUrl(row.original.location);
+            return (
+              <div className="flex items-center justify-end gap-2">
+                <span className="text-[0.65rem] text-muted-foreground whitespace-nowrap">Calendário da Liga</span>
+                {mapsUrl && (
+                  <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
+                    <Button variant="ghost" size="sm" className="h-8 gap-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50 px-2">
+                      <Map className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline text-xs">Mapa</span>
+                    </Button>
+                  </a>
+                )}
+              </div>
+            );
+          }
           return (
           <TooltipProvider delayDuration={400}>
             <div className="flex items-center justify-end gap-1">
@@ -268,7 +286,7 @@ export function GamesTable({ events, loading, onAdd, onEdit, onDelete, onCallups
         size: 140,
       },
     ],
-    [onEdit, onDelete, onCallups, gameSessions, onResult, today]
+    [onEdit, onDelete, onCallups, gameSessions, onResult, today, readOnlyIds]
   );
 
   const table = useReactTable({

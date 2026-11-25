@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { authorizeMaster, slugify } from "@/lib/auth/master";
+import { findLeagueTeamIdForClubName } from "@/lib/auth/club-league-autolink";
 
 const fail = (error: string, status = 400) => NextResponse.json({ error }, { status });
 
@@ -45,9 +46,12 @@ export async function POST(req: NextRequest) {
   const slug = slugify(body.slug?.trim() || name);
   if (!slug) return fail("Slug inválido");
 
+  // Sem equipa indicada: associa automaticamente a equipa da Liga com o mesmo nome (se existir e estiver livre)
+  const leagueTeamId = body.league_team_id || (await findLeagueTeamIdForClubName(admin, name));
+
   const { data: club, error } = await admin
     .from("clubs")
-    .insert({ name, slug, league_team_id: body.league_team_id || null, active: false })
+    .insert({ name, slug, league_team_id: leagueTeamId, active: false })
     .select("id, name, slug, active, league_team_id, created_at")
     .single();
   if (error) {

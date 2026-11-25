@@ -25,6 +25,7 @@ export async function GET() {
     .is("club_id", null)
     .eq("type", "jogo")
     .eq("competition", "Liga")
+    .is("deleted_at", null)
     .not("description", "is", null)
     .order("event_date", { ascending: true })
     .order("event_time", { ascending: true });
