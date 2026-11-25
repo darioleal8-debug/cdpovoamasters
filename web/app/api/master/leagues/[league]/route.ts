@@ -3,7 +3,7 @@ import { authorizeMaster } from "@/lib/auth/master";
 
 export const dynamic = "force-dynamic";
 
-export const INATEL = "Liga INATEL";
+const INATEL = "Liga INATEL";
 
 type UsageUser = { user_id: string; events: number; last_seen: string };
 type SiteRow = { team_id: string; delegate_views: number; active_delegates: number; last_seen: string | null; team_page_views: number };
