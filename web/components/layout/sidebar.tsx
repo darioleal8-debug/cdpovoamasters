@@ -17,15 +17,10 @@ import {
   UserCog,
   FileUp,
   Landmark,
-  ActivitySquare,
   Shield,
-  Newspaper,
   FolderOpen,
   ClipboardList,
-  Building2,
-  Sparkles,
   Globe,
-  Inbox,
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -52,11 +47,8 @@ const managementItems = [
   { label: "Laboratório",      href: "/laboratorio",   icon: ClipboardList },
 ];
 
-const adminOnlyItems = [
-  { label: "Utilização",       href: "/utilizacao",    icon: ActivitySquare },
-  { label: "Notícias",         href: "/noticias-admin", icon: Newspaper },
-  { label: "Delegados Liga",   href: "/liga/delegados", icon: UserCog },
-];
+// Todas as páginas da área "Gestão HoopHub" (Master Admin): o item do menu fica ativo em qualquer uma
+const HOOPHUB_PREFIXES = ["/hoophub", "/master-clubes", "/master-pedidos", "/master-ia", "/liga", "/utilizacao", "/noticias-admin"];
 
 const playerAreaItems = [
   { label: "Os Meus Jogos",   href: "/player/meus-jogos",   icon: Calendar },
@@ -167,7 +159,6 @@ export function Sidebar({ role, rolesExtra = [], isMaster = false }: { role?: Us
               {managementItems.map((item) => (
                 <NavLink key={item.href} {...item} />
               ))}
-              {isMaster && <NavLink href="/liga" icon={Shield} label="Liga INATEL" />}
             </div>
 
             <SectionLabel>Financeiro</SectionLabel>
@@ -178,22 +169,9 @@ export function Sidebar({ role, rolesExtra = [], isMaster = false }: { role?: Us
 
             {isMaster && (
               <>
-                <SectionLabel>Analytics</SectionLabel>
-                <div className="space-y-0.5">
-                  {adminOnlyItems.map((item) => (
-                    <NavLink key={item.href} {...item} />
-                  ))}
-                </div>
-              </>
-            )}
-
-            {isMaster && (
-              <>
                 <SectionLabel>Plataforma</SectionLabel>
                 <div className="space-y-0.5">
-                  <NavLink href="/master-pedidos" icon={Inbox} label="Pedidos de acesso" badge={pendingRequests} />
-                  <NavLink href="/master-clubes" icon={Building2} label="Clubes" />
-                  <NavLink href="/master-ia" icon={Sparkles} label="Consumo de IA" />
+                  <NavLink href="/hoophub" icon={Shield} label="Gestão HoopHub" badge={pendingRequests} matchPrefixes={HOOPHUB_PREFIXES} />
                 </div>
               </>
             )}
