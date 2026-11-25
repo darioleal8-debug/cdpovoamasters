@@ -90,17 +90,20 @@ export async function resolveScope(): Promise<Scope> {
   return scope;
 }
 
-async function memberIdsOf(clubId: string): Promise<string[]> {
+/** `includeInactive`: contas desativadas continuam a pertencer ao clube (Gestão de Contas tem de as listar e reativar). */
+async function memberIdsOf(clubId: string, includeInactive = false): Promise<string[]> {
   if (clubId === NO_CLUB) return [];
-  const { data } = await createRawServiceClient().from("club_members").select("user_id").eq("club_id", clubId).eq("active", true);
+  let q = createRawServiceClient().from("club_members").select("user_id").eq("club_id", clubId);
+  if (!includeInactive) q = q.eq("active", true);
+  const { data } = await q;
   return (data ?? []).map((r) => r.user_id as string);
 }
 
-function lazyBuilder(client: Fromable, table: string) {
+function lazyBuilder(client: Fromable, table: string, includeInactive = false) {
   const steps: Step[] = [];
   const run = async () => {
     const scope = await resolveScope();
-    const ids = table === "users" && scope ? await memberIdsOf(scope.clubId) : null;
+    const ids = table === "users" && scope ? await memberIdsOf(scope.clubId, includeInactive) : null;
     return replay(client, table, steps, scope, ids);
   };
   const proxy: unknown = new Proxy({}, {
@@ -114,12 +117,12 @@ function lazyBuilder(client: Fromable, table: string) {
 }
 
 /** Envolve um cliente service-role para isolar por clube as tabelas com club_id (e `users`). */
-export function scopeClient<T extends Fromable>(client: T): T {
+export function scopeClient<T extends Fromable>(client: T, opts: { includeInactiveUsers?: boolean } = {}): T {
   return new Proxy(client, {
     get(target, prop, receiver) {
       if (prop === "from") {
         return (table: string) =>
-          SCOPED_TABLES.has(table) || table === "users" ? lazyBuilder(target, table) : target.from(table);
+          SCOPED_TABLES.has(table) || table === "users" ? lazyBuilder(target, table, !!opts.includeInactiveUsers) : target.from(table);
       }
       const v = Reflect.get(target, prop, target);
       return typeof v === "function" ? v.bind(target) : v;

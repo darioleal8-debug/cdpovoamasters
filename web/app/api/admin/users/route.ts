@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/service";
+import { createServiceClientWithInactiveUsers } from "@/lib/supabase/service";
 import { clubIdForUser, clubIdOfRow } from "@/lib/auth/club";
 import { banDurationFor } from "@/lib/auth/session-revocation";
 import { authorize } from "@/lib/auth/guards";
@@ -18,7 +18,7 @@ function stripBom(v: string | undefined): string {
 }
 
 function adminClient() {
-  return createServiceClient(); // isolado por clube (ver lib/supabase/club-scope.ts)
+  return createServiceClientWithInactiveUsers(); // isolado por clube, incluindo contas desativadas (ver lib/supabase/club-scope.ts)
 }
 
 async function getAuthUser() {
