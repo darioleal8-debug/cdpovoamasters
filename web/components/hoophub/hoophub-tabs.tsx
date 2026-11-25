@@ -10,6 +10,7 @@ import { usePendingAccessRequests } from "@/hooks/use-pending-access-requests";
 export const HOOPHUB_SECTIONS: { label: string; href: string; exact?: boolean }[] = [
   { label: "Visão geral",      href: "/hoophub", exact: true },
   { label: "Clubes",           href: "/master-clubes" },
+  { label: "Ligas",            href: "/hoophub/ligas" },
   { label: "Equipas da Liga",  href: "/liga", exact: true },
   { label: "Delegados Liga",   href: "/liga/delegados" },
   { label: "Notícias",         href: "/noticias-admin" },
