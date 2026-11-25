@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -21,12 +22,14 @@ interface Overview {
 interface ChartPoint   { date?: string; label?: string; count: number }
 interface PageRow       { page: string; count: number }
 interface UserRow {
-  id: string; name: string; email: string; role: string; active: boolean;
+  id: string; name: string; email: string; role: string; active: boolean; clubs: string[];
   events_period: number; last_seen: string | null; last_login: string | null;
 }
 
 interface DashboardData {
   period_days:   number;
+  club_id:       string | null;
+  clubs:         { id: string; name: string; active: boolean }[];
   overview:      Overview;
   daily_chart:   ChartPoint[];
   dow_chart:     (ChartPoint & { label: string })[];
@@ -101,7 +104,10 @@ const PERIODS = [
 ];
 
 export default function UtilizacaoPage() {
+  const searchParams = useSearchParams();
   const [days,    setDays]    = useState(30);
+  // Clube filtrado ("" = todos os clubes); pode vir de ?club=<id> (ligação da Visão geral)
+  const [club,    setClub]    = useState(searchParams.get("club") ?? "");
   const [data,    setData]    = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
@@ -110,7 +116,7 @@ export default function UtilizacaoPage() {
     setLoading(true);
     setError(null);
     try {
-      const res  = await fetch(`/api/analytics/dashboard?days=${days}`);
+      const res  = await fetch(`/api/analytics/dashboard?days=${days}${club ? `&club=${club}` : ""}`);
       const json = await res.json();
       if (!res.ok) { setError(json.error ?? "Erro ao carregar"); return; }
       setData(json);
@@ -119,7 +125,7 @@ export default function UtilizacaoPage() {
     } finally {
       setLoading(false);
     }
-  }, [days]);
+  }, [days, club]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -176,7 +182,17 @@ export default function UtilizacaoPage() {
           </p>
         </div>
 
-        {/* Period selector */}
+        {/* Club filter + period selector */}
+        <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={club}
+          onChange={(e) => setClub(e.target.value)}
+          aria-label="Clube"
+          className="h-9 rounded-lg border bg-background px-3 text-xs font-semibold"
+        >
+          <option value="">Todos os clubes</option>
+          {data.clubs.map((c) => <option key={c.id} value={c.id}>{c.name}{c.active ? "" : " (inativo)"}</option>)}
+        </select>
         <div className="flex gap-1 rounded-lg border p-1 bg-muted/40">
           {PERIODS.map((p) => (
             <button
@@ -191,6 +207,7 @@ export default function UtilizacaoPage() {
               {p.label}
             </button>
           ))}
+        </div>
         </div>
       </div>
 
@@ -312,6 +329,9 @@ export default function UtilizacaoPage() {
                     <td className="px-4 py-2.5">
                       <p className="font-medium truncate max-w-[160px]">{u.name}</p>
                       <p className="text-xs text-muted-foreground truncate max-w-[160px]">{u.email}</p>
+                      {!club && u.clubs.length > 0 && (
+                        <p className="text-[11px] text-muted-foreground truncate max-w-[160px]">{u.clubs.join(", ")}</p>
+                      )}
                     </td>
                     <td className="px-4 py-2.5 hidden md:table-cell">
                       <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold

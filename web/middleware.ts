@@ -8,7 +8,7 @@ const PROTECTED_PREFIXES = [
   "/dashboard", "/jogadores", "/jogos", "/pagamentos", "/estatisticas",
   "/configuracoes", "/temporadas", "/treinos", "/financeiro",
   "/gestao-contas", "/historico", "/comunicados", "/chat", "/mais", "/player",
-  "/alterar-password", "/resultados", "/liga",
+  "/alterar-password", "/resultados", "/liga", "/hoophub",
 ];
 
 function isProtected(path: string) {

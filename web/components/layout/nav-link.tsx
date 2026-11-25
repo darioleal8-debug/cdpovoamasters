@@ -11,13 +11,16 @@ interface NavLinkProps {
   badge?: number;
   exact?: boolean;
   external?: boolean;
+  /** Prefixos extra que também marcam este item como ativo (ex.: secções de uma área) */
+  matchPrefixes?: string[];
 }
 
-export function NavLink({ href, icon: Icon, label, badge, exact = false, external = false }: NavLinkProps) {
+export function NavLink({ href, icon: Icon, label, badge, exact = false, external = false, matchPrefixes = [] }: NavLinkProps) {
   const pathname = usePathname();
   const isActive = exact
     ? pathname === href
-    : pathname === href || pathname.startsWith(href + "/");
+    : pathname === href || pathname.startsWith(href + "/") ||
+      matchPrefixes.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
   return (
     <Link
