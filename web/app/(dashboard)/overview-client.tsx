@@ -8,6 +8,7 @@ import { TasksCard }          from "@/components/dashboard/tasks-card";
 import { NextTrainingCard }   from "@/components/dashboard/next-training-card";
 import { AnnouncementsHighlight } from "@/components/announcements/highlight-card";
 import { PushPrompt }          from "@/components/push/push-prompt";
+import { PendingPresenceConfirmations } from "@/components/trainings/pending-presence-confirmations";
 import type { AnnouncementDTO } from "@/lib/announcements/types";
 import { PlayerSeasonCard }   from "@/components/dashboard/player-season-card";
 import { BirthdayBanner }     from "@/components/birthday/birthday-banner";
@@ -296,6 +297,7 @@ function TrainerView({ data }: TrainerViewProps) {
   return (
     <div className="flex flex-col gap-5">
     <AnnouncementsHighlight items={data.announcements} href="/comunicados" />
+    <PendingPresenceConfirmations />
     <div className="grid gap-5 md:grid-cols-[1fr_340px]">
       <div className="flex flex-col gap-5 order-2 md:order-1">
         <TrainingConflictWarning seasonId={data.season?.id} />
@@ -325,6 +327,7 @@ function PlayerView({ data }: PlayerViewProps) {
     <div className="flex flex-col gap-5">
     <AnnouncementsHighlight items={data.announcements} href="/comunicados" />
     <PushPrompt />
+    <PendingPresenceConfirmations />
     <div className="grid gap-5 md:grid-cols-[1fr_340px]">
       <div className="flex flex-col gap-5">
         <NextGameDashboard
