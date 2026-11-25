@@ -1,11 +1,10 @@
 import { todayInClubTz } from "@/lib/time/club-time";
-import { isAttendanceOpen, attendanceCloseHHMM } from "@/lib/time/attendance-window";
+import { isAttendanceOpen } from "@/lib/time/attendance-window";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Clock, Dumbbell, MapPin, BookOpen, Pin, CalendarDays, CheckCircle2, XCircle, MessageSquare, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { GpsCheckinButton } from "@/components/trainings/gps-checkin-button";
 import { RsvpButtons } from "@/components/trainings/rsvp-buttons";
 import { TreinosPaginationWrapper } from "./TreinosPaginationWrapper";
 
@@ -72,10 +71,8 @@ export default async function MeusTreinosPage() {
 
   // Hora actual em Lisboa (Portugal usa Europe/Lisbon — UTC+1 no verão, UTC+0 no inverno)
   const nowDate      = new Date();
-  const lisbonNowStr = nowDate.toLocaleString("sv-SE", { timeZone: "Europe/Lisbon" });
   const today        = todayInClubTz();
   const yesterday    = todayInClubTz(new Date(nowDate.getTime() - 86_400_000));
-  const nowHHMM      = lisbonNowStr.slice(11, 16);
 
   const [{ data: upcomingRaw }, { data: pastRaw }] = season
     ? await Promise.all([
@@ -228,18 +225,6 @@ export default async function MeusTreinosPage() {
     const attendanceInfo = myAttendance ? ATTENDANCE_STATUS[myAttendance.status] : null;
     const isToday = t.date === today;
 
-    const startHHMM = t.start_time?.slice(0, 5) ?? null;
-
-    const checkinOpen   = isAttendanceOpen(t, nowDate);
-    const closeHHMM     = checkinOpen ? attendanceCloseHHMM(t) : null;
-    // still before training starts (today or future)
-    const checkinBefore = !checkinOpen && !!startHHMM &&
-                          (t.date > today || (t.date === today && nowHHMM < startHHMM));
-    // window has closed after the training
-    const checkinClosed = !checkinOpen && !checkinBefore && !!startHHMM && t.date <= today;
-
-    const showCheckinButton = checkinOpen  && playerRecord !== null && !myAttendance;
-    const showFutureNotice  = checkinBefore && t.date > today && playerRecord !== null && !myAttendance;
     const showAttendanceBadge = isPast || (myAttendance && myAttendance.status !== null);
 
     const deadlineIso = computeDeadline(t);
@@ -387,32 +372,10 @@ export default async function MeusTreinosPage() {
               </div>
             )}
 
-            {/* Marcação de presença por GPS */}
+            {/* A presença confirma-se no dashboard, depois do treino */}
             {!playerRecord && !isPast && (
               <p className="text-xs text-muted-foreground/70 italic">
                 Sem perfil de jogador associado — contacta o teu treinador.
-              </p>
-            )}
-
-            {showCheckinButton && (
-              <GpsCheckinButton trainingId={t.id} />
-            )}
-
-            {checkinBefore && playerRecord && !myAttendance && (
-              <p className="text-xs text-muted-foreground/60 italic">
-                A marcação de presença abre às {startHHMM}h.
-              </p>
-            )}
-
-            {checkinClosed && playerRecord && !myAttendance && (
-              <p className="text-xs text-muted-foreground/60 italic">
-                O registo de presença fechou às {closeHHMM}h.
-              </p>
-            )}
-
-            {showFutureNotice && (
-              <p className="text-xs text-muted-foreground/60 italic">
-                A marcação de presença está disponível no dia do treino a partir das {startHHMM ?? "hora de início"}h.
               </p>
             )}
 

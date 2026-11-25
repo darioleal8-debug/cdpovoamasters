@@ -8,9 +8,8 @@ import {
 } from "lucide-react";
 import { StatsSection } from "@/components/player/stats-section";
 import { lisbonDateTime } from "@/lib/event-time";
-import { isAttendanceOpen, attendanceCloseHHMM } from "@/lib/time/attendance-window";
 import { pickNextTraining } from "@/lib/time/pick-next-training";
-import { GpsCheckinButton } from "@/components/trainings/gps-checkin-button";
+import { PendingPresenceConfirmations } from "@/components/trainings/pending-presence-confirmations";
 import type { AvailabilityRosterRow } from "@/types/availability";
 import { getCallupsByGame } from "@/lib/callups/club-callups";
 import { CallupsList } from "@/components/player/callups-list";
@@ -166,22 +165,6 @@ export default async function MinhaAreaPage() {
     trainingRoster = (rosterRows ?? []) as AvailabilityRosterRow[];
   }
 
-  // ── Check-in GPS ──────────────────────────────────────────
-  const checkinOpen = nextTraining ? isAttendanceOpen(nextTraining, now) : false;
-  const closeHHMM   = checkinOpen && nextTraining ? attendanceCloseHHMM(nextTraining) : null;
-
-  let hasTrainingAttendance = false;
-  if (nextTraining && linkedPlayer?.id && checkinOpen) {
-    const { data: att } = await supabase
-      .from("training_attendance")
-      .select("id")
-      .eq("training_id", nextTraining.id)
-      .eq("player_id", linkedPlayer.id)
-      .in("status", ["present", "late", "auto_present"])
-      .maybeSingle();
-    hasTrainingAttendance = att !== null;
-  }
-
   // ── Próximo jogo (inline para calcular pending + evitar re-render) ────────────
   const { data: nextGameRaw } = await supabase
     .from("events")
@@ -303,6 +286,9 @@ export default async function MinhaAreaPage() {
       <AnnouncementsHighlight items={highlighted} href="/player/comunicados" />
       <PushPrompt />
 
+      {/* ── Confirmar presença nos treinos já terminados (acumulam até serem respondidos) ── */}
+      <PendingPresenceConfirmations />
+
       {/* ── Cartões de evento (client component com disponibilidade) ── */}
       <MinhaAreaTop
         playerFirstName={firstName}
@@ -383,33 +369,6 @@ export default async function MinhaAreaPage() {
 
       {/* ── Aniversários ── */}
       <BirthdayBanner isAdmin={false} />
-
-      {/* ── Check-in GPS (janela aberta) ── */}
-      {checkinOpen && linkedPlayer && !hasTrainingAttendance && nextTraining && (
-        <div
-          style={{
-            background: "#FFFDFA",
-            borderRadius: "8px",
-            boxShadow: "0 1px 0 rgba(26,22,18,.08), 0 8px 24px -12px rgba(26,22,18,.25)",
-            padding: "16px",
-          }}
-        >
-          <p
-            style={{
-              fontFamily: "var(--font-ibm-mono, monospace)",
-              fontSize: "10px",
-              fontWeight: 500,
-              letterSpacing: ".1em",
-              textTransform: "uppercase",
-              color: "#8C837A",
-              marginBottom: "8px",
-            }}
-          >
-            Marcar presença{closeHHMM ? ` · fecha às ${closeHHMM}h` : ""}
-          </p>
-          <GpsCheckinButton trainingId={nextTraining.id} />
-        </div>
-      )}
 
       {/* ── Foco do treino ── */}
       {nextTraining && trainingNote && (
