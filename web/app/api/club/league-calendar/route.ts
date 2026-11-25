@@ -5,8 +5,10 @@ import { clubIdForUser, leagueTeamNameForClub } from "@/lib/auth/club";
 
 /**
  * Espelho só de leitura do calendário da Liga para o clube do utilizador.
- * Devolve o nome da equipa da Liga associada ao clube (clubs.league_team_id) e os
- * jogos partilhados da Liga (events.club_id IS NULL). Não duplica nada.
+ * Devolve o nome da equipa da Liga associada ao clube (clubs.league_team_id) e TODOS os
+ * jogos da Liga (qualquer club_id): os partilhados (club_id NULL) e os que pertencem a outro
+ * clube (ex.: jogos do CD Póvoa). É o calendário oficial único — um reagendamento feito na
+ * Liga aparece logo a todos os clubes. Não duplica nada.
  */
 export async function GET() {
   const a = await authorize();
@@ -22,7 +24,6 @@ export async function GET() {
   const { data, error } = await db
     .from("events")
     .select("*")
-    .is("club_id", null)
     .eq("type", "jogo")
     .eq("competition", "Liga")
     .is("deleted_at", null)

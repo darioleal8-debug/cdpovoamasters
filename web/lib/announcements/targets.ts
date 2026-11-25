@@ -21,7 +21,7 @@ type GameRow = GameOption & { description?: string | null };
 
 /**
  * Jogos do clube ainda por terminar: os da própria época (is_club_game) e, se o clube estiver ligado a uma
- * equipa da Liga, os jogos partilhados da Liga/Taça dessa equipa (mesma regra do Dashboard).
+ * equipa da Liga, os jogos da Liga/Taça dessa equipa (qualquer club_id) (mesma regra do Dashboard).
  */
 export async function listUpcomingGames(db: Db, clubId: string, now: Date = new Date()): Promise<GameOption[]> {
   const today = todayInClubTz(new Date(now.getTime() - 86_400_000)); // inclui ontem: cobre jogos que acabam depois da meia-noite
@@ -42,7 +42,7 @@ export async function listUpcomingGames(db: Db, clubId: string, now: Date = new 
 
   if (teamName) {
     const { data: shared } = await db.from("events").select(cols)
-      .is("club_id", null).eq("type", "jogo").is("deleted_at", null)
+      .eq("type", "jogo").in("competition", ["Liga", "Taça"]).is("deleted_at", null)
       .not("description", "is", null)
       .gte("event_date", today).lte("event_date", horizon)
       .order("event_date", { ascending: true }).order("event_time", { ascending: true });

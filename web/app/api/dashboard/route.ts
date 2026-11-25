@@ -120,7 +120,6 @@ export async function GET(req: NextRequest) {
   if (ourTeamName) {
     const { data: ligaEvents } = await supabase.from("events")
       .select("id,title,event_date,event_time,location,competition,opponent,description")
-      .is("club_id", null)
       .eq("type", "jogo").eq("competition", "Liga")
       .is("deleted_at", null)
       .not("description", "is", null)
