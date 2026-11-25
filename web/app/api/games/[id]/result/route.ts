@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/auth/guards";
 import { MANAGERS } from "@/lib/auth/roles";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { gameContextForUser } from "@/lib/auth/game-context";
 
 export const runtime = "nodejs";
 
@@ -17,6 +18,7 @@ async function ensureCallupStats(
   sessionId: string,
   seasonId: string,
   eventId: string,
+  clubId: string | null,
 ) {
   // Check if there are any live plays for this session
   const { count: playsCount } = await admin
@@ -29,10 +31,10 @@ async function ensureCallupStats(
   if ((playsCount ?? 0) > 0) return;
 
   // Fetch all callups for this game
-  const { data: callups } = await admin
-    .from("game_callups")
-    .select("player_id")
-    .eq("game_id", eventId);
+  // Só os convocados do clube que regista o resultado (o mesmo jogo pode ter convocatórias de dois clubes)
+  let callupsQuery = admin.from("game_callups").select("player_id").eq("game_id", eventId);
+  if (clubId) callupsQuery = callupsQuery.eq("club_id", clubId);
+  const { data: callups } = await callupsQuery;
 
   if (!callups || callups.length === 0) return;
 
@@ -114,14 +116,22 @@ export async function POST(
     return fail("Só é possível registar resultado de jogos já realizados");
   }
 
-  const seasonId = event.season_id as string;
+  // Calendário único da Liga: sessão e estatísticas pertencem ao clube do utilizador e à sua época
+  const ctx = await gameContextForUser(admin, user.id, {
+    season_id: event.season_id as string | null,
+    club_id: event.club_id as string | null,
+  });
+  const seasonId = (ctx.seasonId ?? (event.season_id as string));
+  const sessionClubId = ctx.clubId ?? ((event.club_id as string | null) ?? null);
   const now = new Date().toISOString();
 
-  // Check existing session
-  const { data: existing } = await admin
+  // Check existing session (uma por clube e jogo)
+  let existingQuery = admin
     .from("game_sessions")
     .select("id, status")
-    .eq("event_id", eventId)
+    .eq("event_id", eventId);
+  existingQuery = sessionClubId ? existingQuery.eq("club_id", sessionClubId) : existingQuery.is("club_id", null);
+  const { data: existing } = await existingQuery
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -146,7 +156,7 @@ export async function POST(
       return fail(error.message, 500);
     }
     sessionId = (updated as { id: string }).id;
-    await ensureCallupStats(admin, sessionId, seasonId, eventId);
+    await ensureCallupStats(admin, sessionId, seasonId, eventId, sessionClubId);
     return NextResponse.json({ session: updated });
   } else {
     const { data: created, error } = await admin
@@ -154,7 +164,7 @@ export async function POST(
       .insert({
         event_id:             eventId,
         season_id:            seasonId,
-        club_id:              (event.club_id as string | null) ?? null,
+        club_id:              sessionClubId,
         opponent_name:        (event.opponent as string | null) ?? "Adversário",
         home_score:           homeScore,
         away_score:           awayScore,
@@ -179,7 +189,7 @@ export async function POST(
       return fail(error.message, 500);
     }
     sessionId = (created as { id: string }).id;
-    await ensureCallupStats(admin, sessionId, seasonId, eventId);
+    await ensureCallupStats(admin, sessionId, seasonId, eventId, sessionClubId);
     return NextResponse.json({ session: created }, { status: 201 });
   }
 }

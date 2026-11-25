@@ -167,22 +167,9 @@ export function GamesTable({ events, loading, onAdd, onEdit, onDelete, onCallups
           const session = gameSessions[row.original.id];
           const hasFinishedSession = session?.status === "finished";
           const showResultBtn = isPast;
-          if (readOnlyIds?.has(row.original.id)) {
-            const mapsUrl = buildMapsUrl(row.original.location);
-            return (
-              <div className="flex items-center justify-end gap-2">
-                <span className="text-[0.65rem] text-muted-foreground whitespace-nowrap">Calendário da Liga</span>
-                {mapsUrl && (
-                  <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
-                    <Button variant="ghost" size="sm" className="h-8 gap-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50 px-2">
-                      <Map className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline text-xs">Mapa</span>
-                    </Button>
-                  </a>
-                )}
-              </div>
-            );
-          }
+          // Jogo do calendário único da Liga: o clube opera (convocatória, live, resultado, stats), mas o
+          // reagendamento/remoção é feito só na Liga
+          const readOnly = readOnlyIds?.has(row.original.id) ?? false;
           return (
           <TooltipProvider delayDuration={400}>
             <div className="flex items-center justify-end gap-1">
@@ -254,6 +241,10 @@ export function GamesTable({ events, loading, onAdd, onEdit, onDelete, onCallups
                   )}
                 </>
               )}
+              {readOnly ? (
+                <span className="px-1 text-[0.65rem] text-muted-foreground whitespace-nowrap">Calendário da Liga</span>
+              ) : (
+                <>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <ShareButton
@@ -279,6 +270,8 @@ export function GamesTable({ events, loading, onAdd, onEdit, onDelete, onCallups
                 </TooltipTrigger>
                 <TooltipContent>Eliminar</TooltipContent>
               </Tooltip>
+                </>
+              )}
             </div>
           </TooltipProvider>
           );

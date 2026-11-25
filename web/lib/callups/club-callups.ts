@@ -13,17 +13,20 @@ export type { CalledUpPlayer };
 
 export async function getCallupsByGame(
   gameIds: string[],
+  /** Calendário único da Liga: o mesmo jogo pode ter convocatórias de dois clubes — filtra pelo do utilizador. */
+  clubId: string | null = null,
 ): Promise<Map<string, CalledUpPlayer[]>> {
   const out = new Map<string, CalledUpPlayer[]>();
   if (gameIds.length === 0) return out;
 
   const admin = await createAdminClient();
 
-  const { data: callups, error } = await admin
+  let callupsQuery = admin
     .from("game_callups")
     .select("game_id, player_id, created_at")
-    .in("game_id", gameIds)
-    .order("created_at", { ascending: true });
+    .in("game_id", gameIds);
+  if (clubId) callupsQuery = callupsQuery.eq("club_id", clubId);
+  const { data: callups, error } = await callupsQuery.order("created_at", { ascending: true });
   if (error || !callups || callups.length === 0) return out;
 
   const playerIds = [...new Set(callups.map((c) => c.player_id as string))];

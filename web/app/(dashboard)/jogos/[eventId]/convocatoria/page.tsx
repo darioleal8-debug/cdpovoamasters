@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { operatingSeasonId } from "@/lib/club/operating-season";
 import { useGameCallups } from "@/hooks/use-game-callups";
 import { useRoster } from "@/hooks/use-roster";
 import { useGameAvailability } from "@/hooks/use-game-availability";
@@ -98,7 +99,13 @@ export default function ConvocatoriaPage() {
   useEffect(() => {
     supabase
       .from("events").select("*").eq("id", params.eventId).single()
-      .then(({ data }) => { setEvent(data as Event); setEventLoading(false); });
+      .then(async ({ data }) => {
+        // Jogos da Liga têm a época do CD Póvoa: o clube convoca do seu próprio plantel
+        const ev = data as Event | null;
+        if (ev) ev.season_id = (await operatingSeasonId(supabase, ev.season_id ?? null)) as string;
+        setEvent(ev);
+        setEventLoading(false);
+      });
   }, [params.eventId]);
 
   // ── Fetch late payments ──────────────────────────────────

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { lisbonDateTime } from "@/lib/event-time";
+import { gameContextForUser } from "@/lib/auth/game-context";
 
 export const runtime = "nodejs";
 
@@ -26,17 +27,20 @@ export async function GET(
 
   const { data: game } = await supabase
     .from("events")
-    .select("id, season_id")
+    .select("id, season_id, club_id")
     .eq("id", gameId)
     .eq("type", "jogo")
     .maybeSingle();
   if (!game) return fail("Jogo não encontrado", 404);
 
+  // Calendário único da Liga: o plantel é o da época do próprio clube, não a do CD Póvoa
+  const ctx = await gameContextForUser(supabase, user.id, game);
+
   const { data: playerRecord } = await supabase
     .from("players")
     .select("id")
     .eq("user_id", user.id)
-    .eq("season_id", game.season_id)
+    .eq("season_id", ctx.seasonId ?? game.season_id)
     .maybeSingle();
 
   let own = null;
@@ -86,7 +90,7 @@ export async function POST(
 
   const { data: game } = await supabase
     .from("events")
-    .select("id, season_id, event_date, event_time")
+    .select("id, season_id, club_id, event_date, event_time")
     .eq("id", gameId)
     .eq("type", "jogo")
     .maybeSingle();
@@ -99,11 +103,12 @@ export async function POST(
   // Season-specific lookup first; fallback to most recent player record (same
   // pattern as minha-area / assiduidade — handles user_id not yet linked to the
   // current season's player row).
+  const ctx = await gameContextForUser(supabase, user.id, game);
   let playerRecord: { id: string } | null = null;
   {
     const { data: p1 } = await supabase
       .from("players").select("id")
-      .eq("user_id", user.id).eq("season_id", game.season_id)
+      .eq("user_id", user.id).eq("season_id", ctx.seasonId ?? game.season_id)
       .maybeSingle();
     if (p1) {
       playerRecord = p1;

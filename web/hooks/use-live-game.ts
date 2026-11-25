@@ -20,6 +20,7 @@ import type { PlayerWithUser } from "@/types/database";
 import type { CourtStint } from "@/lib/live/minutes";
 import { isShotEvent, isMadeShot, shotKindOf, classifyShotZone, resolveShotSpot, SHOT_SPOT_MESSAGES, FREE_THROW_POINT, BLOCKED_DESC } from "@/lib/live/shot-zones";
 import { useClubName } from "@/lib/club-context";
+import { operatingSeasonId } from "@/lib/club/operating-season";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -85,7 +86,12 @@ export function useLiveGame(
   // ── Season — derivada do evento, não da temporada activa ─
   useEffect(() => {
     supabase.from("events").select("season_id").eq("id", eventId).single()
-      .then(({ data }) => { if (data?.season_id) setSeasonId(data.season_id as string); });
+      .then(async ({ data }) => {
+        if (!data?.season_id) return;
+        // Jogos da Liga têm a época do CD Póvoa: cada clube opera sobre o seu próprio plantel
+        const sid = await operatingSeasonId(supabase, data.season_id as string);
+        if (sid) setSeasonId(sid);
+      });
   }, [eventId]);
 
   // ── Load functions ──────────────────────────────────────

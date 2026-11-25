@@ -2,6 +2,7 @@ import { todayInClubTz } from "@/lib/time/club-time";
 import { ClubName } from "@/lib/club-context";
 import { createClient } from "@/lib/supabase/server";
 import { getCallupsByGame } from "@/lib/callups/club-callups";
+import { clubIdForUser } from "@/lib/auth/club";
 import { redirect, notFound } from "next/navigation";
 import { authorize } from "@/lib/auth/guards";
 import { ArrowLeft, Calendar, Check, Clock, HelpCircle, MapPin, Shield, Users, X, Trophy } from "lucide-react";
@@ -122,7 +123,7 @@ export default async function GameDetailPage({ params }: Props) {
     null;
 
   // Convocados — visíveis a todo o plantel (helper lê com service role).
-  const callups = (await getCallupsByGame([id])).get(id) ?? [];
+  const callups = (await getCallupsByGame([id], await clubIdForUser(supabase, user.id))).get(id) ?? [];
   const callupIds = callups.map((c) => c.player_id);
 
   // Own availability

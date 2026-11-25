@@ -7,6 +7,8 @@ import { useLiveGame, DEFAULT_PERIOD_SECS } from "@/hooks/use-live-game";
 import { useLivePrefs } from "@/hooks/use-live-prefs";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { createClient } from "@/lib/supabase/client";
+import { operatingSeasonId } from "@/lib/club/operating-season";
+import { opponentIfTeamPlays } from "@/lib/league-mirror";
 import { deriveStats, withSecondsPlayed } from "@/lib/live/derive-stats";
 import { computeSecondsPlayed } from "@/lib/live/minutes";
 import { LIGHT_TOKENS, DARK_TOKENS, SANS, MONO } from "@/components/live/tokens";
@@ -45,8 +47,11 @@ interface ActivePlayer {
   number: number | null;
 }
 
-function resolveOpponent(ev: EventData | null): string {
+function resolveOpponent(ev: EventData | null, teamName: string | null = null): string {
   if (!ev) return "";
+  // Jogo da Liga (calendário único): o adversário depende da equipa do clube, não da flag is_home (que vem do CD Póvoa)
+  const side = teamName ? opponentIfTeamPlays(ev.description, teamName) : null;
+  if (side) return side.opponent;
   if (ev.opponent) return ev.opponent;
   if (ev.description) {
     try {
@@ -59,14 +64,16 @@ function resolveOpponent(ev: EventData | null): string {
   return "";
 }
 
-function formatGameInfo(ev: EventData | null, opponent: string): string {
+function formatGameInfo(ev: EventData | null, opponent: string, teamName: string | null = null): string {
   if (!opponent) return "";
   const parts: string[] = [`vs ${opponent}`];
   if (ev?.description) {
     try {
       const d = JSON.parse(ev.description) as { is_home?: boolean };
-      if (d.is_home === true) parts.push("Casa");
-      else if (d.is_home === false) parts.push("Fora");
+      const side = teamName ? opponentIfTeamPlays(ev.description, teamName) : null;
+      const isHome = side ? side.isHome : d.is_home;
+      if (isHome === true) parts.push("Casa");
+      else if (isHome === false) parts.push("Fora");
     } catch { /* */ }
   }
   if (ev?.event_date) {
@@ -126,6 +133,7 @@ export default function LiveGamePage() {
   // ── Event data (opponent, game_type, etc.) ───────────────
   const [isFriendly, setIsFriendly] = useState(false);
   const [eventData, setEventData] = useState<EventData | null>(null);
+  const [leagueTeamName, setLeagueTeamName] = useState<string | null>(null);
   useEffect(() => {
     const supabase = createClient();
     supabase
@@ -133,12 +141,18 @@ export default function LiveGamePage() {
       .select("game_type, opponent, description, title, event_date, event_time, location, competition, season_id")
       .eq("id", params.eventId)
       .single()
-      .then(({ data }) => {
+      .then(async ({ data }) => {
         if (data) {
-          setEventData(data as EventData);
+          // Plantel do próprio clube: nos jogos da Liga a época do evento é a do CD Póvoa
+          const seasonId = await operatingSeasonId(supabase, (data.season_id as string | null) ?? null);
+          setEventData({ ...(data as EventData), season_id: seasonId });
           if (data.game_type === "friendly") setIsFriendly(true);
         }
       });
+    fetch("/api/club/league-calendar?team=1")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { team_name?: string | null } | null) => setLeagueTeamName(j?.team_name ?? null))
+      .catch(() => {});
   }, [params.eventId]);
 
   const game = useLiveGame(params.eventId);
@@ -168,9 +182,9 @@ export default function LiveGamePage() {
 
   // Pre-fill opponent from event data
   useEffect(() => {
-    const resolved = resolveOpponent(eventData);
+    const resolved = resolveOpponent(eventData, leagueTeamName);
     if (resolved) setOpponentName(resolved);
-  }, [eventData]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eventData, leagueTeamName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load active roster when no callups exist
   useEffect(() => {
@@ -268,7 +282,7 @@ export default function LiveGamePage() {
   const tokens = prefs.dark ? DARK_TOKENS : LIGHT_TOKENS;
   const isLive = session?.status === "live";
   const isFinished = session?.status === "finished";
-  const resolvedOpponent = resolveOpponent(eventData);
+  const resolvedOpponent = resolveOpponent(eventData, leagueTeamName);
 
   // ── Shared layout props ───────────────────────────────────
   const layoutProps = session ? {
@@ -619,7 +633,7 @@ export default function LiveGamePage() {
               <Label>Opponent</Label>
               {resolvedOpponent && !editingOpponent ? (
                 <div className="flex items-center gap-2 text-sm">
-                  <span className="font-medium">{formatGameInfo(eventData, resolvedOpponent)}</span>
+                  <span className="font-medium">{formatGameInfo(eventData, resolvedOpponent, leagueTeamName)}</span>
                   <button
                     type="button"
                     onClick={() => setEditingOpponent(true)}

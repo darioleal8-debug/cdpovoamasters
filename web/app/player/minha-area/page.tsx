@@ -12,6 +12,8 @@ import { pickNextTraining } from "@/lib/time/pick-next-training";
 import { PendingPresenceConfirmations } from "@/components/trainings/pending-presence-confirmations";
 import type { AvailabilityRosterRow } from "@/types/availability";
 import { getCallupsByGame } from "@/lib/callups/club-callups";
+import { clubIdForUser } from "@/lib/auth/club";
+import { nextLeagueGameForClub } from "@/lib/league-next-game";
 import { CallupsList } from "@/components/player/callups-list";
 import { BirthdayBanner } from "@/components/birthday/birthday-banner";
 import { NextBirthdayNotice } from "@/components/birthday/next-birthday-notice";
@@ -188,7 +190,27 @@ export default async function MinhaAreaPage() {
     } catch { /* silently ignore */ }
   }
 
-  const nextGame: GameData | null = nextGameRaw
+  // Calendário único da Liga: clube ligado a uma equipa da Liga sem jogo próprio mais cedo usa o jogo oficial da Liga
+  const myClubIdValue = await clubIdForUser(supabase, user.id);
+  const leagueNext = myClubIdValue ? await nextLeagueGameForClub(supabase, myClubIdValue, today) : null;
+  const ownIsEarlier = !!nextGameRaw && !!leagueNext && (
+    (nextGameRaw.event_date as string) < leagueNext.event_date ||
+    ((nextGameRaw.event_date as string) === leagueNext.event_date &&
+      ((nextGameRaw.event_time as string | null) ?? "") <= (leagueNext.event_time ?? ""))
+  );
+  const useLeagueNext = !!leagueNext && (!nextGameRaw || !ownIsEarlier);
+
+  const nextGame: GameData | null = useLeagueNext && leagueNext
+    ? {
+        id:         leagueNext.id,
+        event_date: leagueNext.event_date,
+        event_time: leagueNext.event_time,
+        location:   leagueNext.location,
+        opponent:   leagueNext.opponent,
+        title:      leagueNext.title,
+        gameMeta:   { home_team: leagueNext.homeTeam, away_team: leagueNext.awayTeam, is_home: leagueNext.isHome },
+      }
+    : nextGameRaw
     ? {
         id:         nextGameRaw.id as string,
         event_date: nextGameRaw.event_date as string,
@@ -220,7 +242,7 @@ export default async function MinhaAreaPage() {
     .from("players").select("id").eq("user_id", user.id);
   const myPlayerIds = (myPlayers ?? []).map((p) => p.id as string);
   const nextGameCallups = nextGame
-    ? (await getCallupsByGame([nextGame.id])).get(nextGame.id) ?? []
+    ? (await getCallupsByGame([nextGame.id], myClubIdValue)).get(nextGame.id) ?? []
     : [];
   const gameCalledUp = nextGameCallups.some((c) => myPlayerIds.includes(c.player_id));
 
@@ -231,6 +253,7 @@ export default async function MinhaAreaPage() {
         .select("*", { count: "exact", head: true })
         .eq("game_id", nextGame.id)
         .eq("status", "available")
+        .match(myClubIdValue ? { club_id: myClubIdValue } : {})
     : { count: 0 };
 
   const trainingConfirmedCount = trainingRoster.filter((r) => r.status === "going").length;

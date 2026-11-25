@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/toaster";
 import { createClient } from "@/lib/supabase/client";
+import { myClubId } from "@/lib/club/my-club-id";
 import { Trophy, CalendarDays, Medal } from "lucide-react";
 import type { Event } from "@/types/database";
 
@@ -101,27 +102,31 @@ export default function JogosPage() {
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
-    const pastGameIds = events
+    const pastGameIds = agendaEvents
       .filter((e) => e.type === "jogo" && e.event_date < today)
       .map((e) => e.id);
     if (!pastGameIds.length) { setGameSessions({}); return; }
 
     const supabase = createClient();
-    supabase
-      .from("game_sessions")
-      .select("event_id, home_score, away_score, status")
-      .in("event_id", pastGameIds)
-      .then(({ data }) => {
-        if (!data) return;
-        const map: Record<string, GameSessionSummary> = {};
-        for (const s of data) map[s.event_id as string] = {
-          home_score: s.home_score as number,
-          away_score: s.away_score as number,
-          status:     s.status as string,
-        };
-        setGameSessions(map);
-      });
-  }, [events]);
+    // Um jogo da Liga pode ter uma sessão por clube: mostra só a do próprio clube
+    myClubId(supabase).then((clubId) => {
+      let q = supabase
+        .from("game_sessions")
+        .select("event_id, home_score, away_score, status")
+        .in("event_id", pastGameIds);
+      if (clubId) q = q.eq("club_id", clubId);
+      return q;
+    }).then(({ data }) => {
+      if (!data) return;
+      const map: Record<string, GameSessionSummary> = {};
+      for (const s of data) map[s.event_id as string] = {
+        home_score: s.home_score as number,
+        away_score: s.away_score as number,
+        status:     s.status as string,
+      };
+      setGameSessions(map);
+    });
+  }, [agendaEvents]);
 
   // ── Resultado modal ──────────────────────────────────────
   const [resultGame,   setResultGame]   = useState<Event | null>(null);

@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { authorize } from "@/lib/auth/guards";
 import { MANAGERS } from "@/lib/auth/roles";
+import { gameContextForUser } from "@/lib/auth/game-context";
 
 export const runtime = "nodejs";
 
@@ -89,7 +90,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { data: game } = await supabase
     .from("events")
-    .select("id, type, season_id")
+    .select("id, type, season_id, club_id")
     .eq("id", game_id)
     .maybeSingle();
   if (!game) return fail("Jogo não encontrado", 404);
@@ -101,7 +102,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .eq("id", body.player_id)
     .maybeSingle();
   if (!player) return fail("Jogador não encontrado", 404);
-  if (player.season_id !== game.season_id) {
+  // Calendário único da Liga: o jogo tem a época do CD Póvoa, o clube convoca do seu próprio plantel
+  const ctx = await gameContextForUser(supabase, user.id, game);
+  if (!ctx.seasonId || player.season_id !== ctx.seasonId) {
     return fail("Este jogador não pertence ao plantel da temporada deste jogo", 400);
   }
 

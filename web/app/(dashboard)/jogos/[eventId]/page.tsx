@@ -5,6 +5,7 @@ import { useClubName } from "@/lib/club-context";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { operatingSeasonId } from "@/lib/club/operating-season";
 import { useGameCallups } from "@/hooks/use-game-callups";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -98,8 +99,12 @@ export default function GameDetailPage() {
   useEffect(() => {
     supabase
       .from("events").select("*").eq("id", gameId).single()
-      .then(({ data, error }) => {
-        if (!error) setEvent(data as Event);
+      .then(async ({ data, error }) => {
+        if (!error && data) {
+          const ev = data as Event;
+          ev.season_id = (await operatingSeasonId(supabase, ev.season_id ?? null)) as string;
+          setEvent(ev);
+        }
         setEventLoading(false);
       });
   }, [gameId]);

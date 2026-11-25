@@ -10,7 +10,7 @@ import { clubIdForUser, leagueTeamNameForClub } from "@/lib/auth/club";
  * clube (ex.: jogos do CD Póvoa). É o calendário oficial único — um reagendamento feito na
  * Liga aparece logo a todos os clubes. Não duplica nada.
  */
-export async function GET() {
+export async function GET(req: Request) {
   const a = await authorize();
   if (!a.ok) return a.response;
 
@@ -20,6 +20,9 @@ export async function GET() {
 
   const teamName = await leagueTeamNameForClub(db, clubId);
   if (!teamName) return NextResponse.json({ team_name: null, events: [] });
+
+  // ?team=1 → só o nome da equipa (para ecrãs que só precisam de saber de que lado joga o clube)
+  if (new URL(req.url).searchParams.get("team") === "1") return NextResponse.json({ team_name: teamName, events: [] });
 
   const { data, error } = await db
     .from("events")
