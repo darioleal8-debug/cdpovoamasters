@@ -176,10 +176,10 @@ function MembersDialog({ club, onClose }: { club: Club; onClose: () => void }) {
 
   async function create() {
     setBusy(true);
-    const r = await api(`/api/master/clubs/${club.id}/members`, { method: "POST", body: JSON.stringify(form) });
+    const r = await api<{ linked_existing?: boolean }>(`/api/master/clubs/${club.id}/members`, { method: "POST", body: JSON.stringify(form) });
     setBusy(false);
     if (!r.ok) return err(r.data.error);
-    toast({ title: "Utilizador criado" });
+    toast({ title: r.data.linked_existing ? "Conta existente associada ao clube" : "Utilizador criado" });
     setForm({ name: "", email: "", password: "", role: "admin" });
     load();
   }
@@ -214,13 +214,14 @@ function MembersDialog({ club, onClose }: { club: Club; onClose: () => void }) {
           <Input placeholder="Nome" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <Input placeholder="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           <Input placeholder="Password inicial (mín. 10 caracteres)" type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          <p className="text-xs text-muted-foreground">Se o email já tem conta (ex.: delegado na Liga), deixa a password vazia: a conta existente é associada a este clube e mantém a sua password.</p>
           <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               {Object.entries(ROLE_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Button className="w-full" onClick={create} disabled={busy || !form.name || !form.email || form.password.length < 10}>
+          <Button className="w-full" onClick={create} disabled={busy || !form.name || !form.email || (form.password !== "" && form.password.length < 10)}>
             {busy && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Criar utilizador
           </Button>
         </div>

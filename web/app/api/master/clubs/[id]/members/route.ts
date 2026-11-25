@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { authorizeMaster } from "@/lib/auth/master";
+import { findAuthUserByEmail, isEmailExistsError, linkExistingAccountToClub } from "@/lib/auth/link-existing-account";
 
 const fail = (error: string, status = 400) => NextResponse.json({ error }, { status });
 const ROLES = ["admin", "treinador", "seccionista", "tesoureiro"] as const;
@@ -24,7 +25,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 // POST /api/master/clubs/:id/members { name, email, password, role }
-// Cria a conta (Auth + perfil) e associa SÓ a este clube.
+// Cria a conta (Auth + perfil) e associa SÓ a este clube. Se o email já tem conta (ex.: delegado da Liga),
+// associa essa conta ao clube em vez de falhar (a password só é exigida para contas novas).
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const m = await authorizeMaster();
   if (!m.ok) return m.response;
@@ -38,17 +40,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const password = body.password ?? "";
   const role = (body.role ?? "admin") as (typeof ROLES)[number];
   if (!name || !email || !/^\S+@\S+\.\S+$/.test(email)) return fail("Nome e email válidos são obrigatórios");
-  if (password.length < 10) return fail("A password deve ter pelo menos 10 caracteres");
   if (!ROLES.includes(role)) return fail("Papel inválido");
 
   const { data: club } = await admin.from("clubs").select("id").eq("id", clubId).maybeSingle();
   if (!club) return fail("Clube não encontrado", 404);
 
+  // Conta que já existe (ex.: delegado criado na Liga): associa-a a este clube, mantendo a password.
+  const existing = await findAuthUserByEmail(admin, email);
+  if (existing) {
+    const linked = await linkExistingAccountToClub(admin, { userId: existing.id, email: existing.email, name, role, clubId });
+    if (!linked.ok) return fail(linked.error, linked.status);
+    return NextResponse.json(
+      { member: { user_id: existing.id, name, email, role, active: true }, linked_existing: true },
+      { status: 200 },
+    );
+  }
+
+  if (password.length < 10) return fail("A password deve ter pelo menos 10 caracteres");
+
   const { data: created, error: authErr } = await admin.auth.admin.createUser({
     email, password, email_confirm: true, user_metadata: { name },
   });
   if (authErr) {
-    return authErr.message.includes("already registered")
+    return isEmailExistsError(authErr)
       ? fail("Este email já tem uma conta registada", 409)
       : fail(`Erro ao criar utilizador: ${authErr.message}`, 500);
   }
