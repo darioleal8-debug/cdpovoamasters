@@ -8,7 +8,7 @@ describe("buildShareLinks", () => {
   const by = (id: string) => links.find((l) => l.id === id)!.href;
 
   it("inclui as redes mais usadas", () => {
-    expect(links.map((l) => l.id)).toEqual(["whatsapp", "facebook", "x", "linkedin", "telegram", "email"]);
+    expect(links.map((l) => l.id)).toEqual(["whatsapp", "facebook", "x", "instagram", "telegram", "email"]);
   });
 
   it("codifica o URL e o título em cada rede", () => {
@@ -16,7 +16,7 @@ describe("buildShareLinks", () => {
     const t = encodeURIComponent(title);
     expect(by("facebook")).toBe(`https://www.facebook.com/sharer/sharer.php?u=${u}`);
     expect(by("x")).toBe(`https://twitter.com/intent/tweet?url=${u}&text=${t}`);
-    expect(by("linkedin")).toBe(`https://www.linkedin.com/sharing/share-offsite/?url=${u}`);
+    expect(by("instagram")).toBe("https://www.instagram.com/");
     expect(by("telegram")).toBe(`https://t.me/share/url?url=${u}&text=${t}`);
     expect(by("whatsapp")).toBe(`https://wa.me/?text=${encodeURIComponent(`${title} — ${url}`)}`);
     expect(by("email")).toContain(`subject=${t}`);
