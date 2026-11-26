@@ -63,25 +63,38 @@ export function playerPointsReliable(i: {
   return sum("home") === i.homeScore && sum("away") === i.awayScore;
 }
 
+export type SideReading = "full" | "partial" | "none";
+
 /**
- * Fiabilidade por equipa: os pontos individuais de uma equipa só contam quando a soma dos
- * jogadores dessa equipa é igual ao seu resultado e não há pontos por atribuir a essa equipa.
- * Uma equipa com leitura completa mantém as suas estatísticas mesmo que a adversária não.
+ * Leitura dos pontos individuais por equipa:
+ * - full: a soma dos jogadores é igual ao resultado da equipa e não há pontos por atribuir;
+ * - partial: há pontos por atribuir, mas o lido + por atribuir fecha exatamente o resultado
+ *   (os pontos lidos são confirmados, só estão incompletos);
+ * - none: não há pontos lidos ou a soma não reconcilia com o resultado (leitura falhada).
+ * Cada equipa é avaliada em separado: uma leitura incompleta de uma não esconde a outra.
  */
-export function reliableSides(i: {
+export function sideReadings(i: {
   homeScore: number;
   awayScore: number;
   players: { side: "home" | "away" | string; pontos: number | null }[];
   unattributed?: { home: number | null; away: number | null } | null;
-}): { home: boolean; away: boolean } {
-  const ok = (side: "home" | "away") => {
+}): { home: SideReading; away: SideReading } {
+  const read = (side: "home" | "away"): SideReading => {
     const ps = i.players.filter((p) => p.side === side);
-    if (!ps.some((p) => (p.pontos ?? 0) > 0)) return false;
+    const sum = ps.reduce((s, p) => s + (p.pontos ?? 0), 0);
+    if (sum <= 0) return "none";
+    const score = side === "home" ? i.homeScore : i.awayScore;
     const unattributed = (side === "home" ? i.unattributed?.home : i.unattributed?.away) ?? 0;
-    if (unattributed > 0) return false;
-    return ps.reduce((s, p) => s + (p.pontos ?? 0), 0) === (side === "home" ? i.homeScore : i.awayScore);
+    if (unattributed <= 0) return sum === score ? "full" : "none";
+    return sum + unattributed === score ? "partial" : "none";
   };
-  return { home: ok("home"), away: ok("away") };
+  return { home: read("home"), away: read("away") };
+}
+
+/** Equipas com leitura completa (compatibilidade). */
+export function reliableSides(i: Parameters<typeof sideReadings>[0]): { home: boolean; away: boolean } {
+  const r = sideReadings(i);
+  return { home: r.home === "full", away: r.away === "full" };
 }
 
 const label = (p: number) => (p <= 4 ? `${p}.º período` : `prolongamento${p > 5 ? ` ${p - 4}` : ""}`);
@@ -176,22 +189,27 @@ export function buildNewsFacts(i: NewsFactsInput): NewsFacts {
   }
 
   const reliable = playerPointsReliable(i);
-  const sides = reliableSides(i);
+  const reading = sideReadings(i);
 
-  if (sides.home || sides.away) {
+  if (reading.home !== "none" || reading.away !== "none") {
     const scorers = (side: "home" | "away") =>
       i.players.filter((p) => p.side === side && p.pontos > 0).sort((a, b) => b.pontos - a.pontos).slice(0, 3);
+    const fmt = (p: { nome: string; pontos: number; triplos?: number | null }) =>
+      `${p.nome} ${p.pontos} pts${p.triplos ? ` (${p.triplos} triplo${p.triplos > 1 ? "s" : ""})` : ""}`;
     for (const side of ["home", "away"] as const) {
       const team = side === "home" ? i.home : i.away;
-      if (sides[side]) {
+      const score = side === "home" ? i.homeScore : i.awayScore;
+      if (reading[side] === "full") {
         const top = scorers(side);
-        if (top.length) {
-          lines.push(`Marcadores confirmados ${team}: ${top.map((p) => `${p.nome} ${p.pontos} pts${p.triplos ? ` (${p.triplos} triplo${p.triplos > 1 ? "s" : ""})` : ""}`).join(", ")}.`);
-        }
+        if (top.length) lines.push(`Marcadores confirmados ${team}: ${top.map(fmt).join(", ")}.`);
+      } else if (reading[side] === "partial") {
+        const missing = (side === "home" ? i.unattributed?.home : i.unattributed?.away) ?? 0;
+        const top = scorers(side);
+        lines.push(`Pontos individuais confirmados ${team} (leitura parcial da folha: ${score - missing} de ${score} pontos atribuídos a jogadores; ${missing} por atribuir): ${top.map(fmt).join(", ")}. Estes valores são mínimos confirmados, não totais: escreve "pelo menos", e nunca digas que alguém foi o melhor marcador do ${team}.`);
       } else {
-        // Leitura incompleta desta equipa: não se citam os seus jogadores (a outra equipa mantém as estatísticas)
+        // Leitura falhada desta equipa: não se citam os seus jogadores
         forbiddenPlayerNames.push(...i.players.filter((p) => p.side === side).map((p) => p.nome.trim()).filter((n) => n.length >= 4));
-        lines.push(`Não há estatísticas individuais confirmadas do ${team} (leitura incompleta da folha) — não menciones jogadores nem pontuações individuais do ${team}.`);
+        lines.push(`Não há estatísticas individuais confirmadas do ${team} (leitura da folha não fiável) — não menciones jogadores nem pontuações individuais do ${team}.`);
       }
     }
   } else if (i.players.some((p) => p.pontos > 0)) {
