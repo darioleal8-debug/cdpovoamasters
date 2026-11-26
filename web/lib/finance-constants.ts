@@ -1,5 +1,6 @@
 export const INCOME_CATEGORIES = [
   { value: "cota",          label: "Cota",          color: "#22c55e" },
+  { value: "inscricao",     label: "Inscrição",     color: "#14b8a6" },
   { value: "patrocinio",    label: "Patrocínio",    color: "#3b82f6" },
   { value: "donativo",      label: "Donativo",      color: "#8b5cf6" },
   { value: "bilheteira",    label: "Bilheteira",    color: "#f59e0b" },

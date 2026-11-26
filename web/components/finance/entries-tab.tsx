@@ -199,8 +199,8 @@ export function EntriesTab() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">
-                      {e.source_type === "cota_jogador"
-                        ? <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-700 text-[11px] font-medium">Cota auto</span>
+                      {e.source_type === "cota_jogador" || e.source_type === "pagamento_jogador"
+                        ? <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-700 text-[11px] font-medium">{e.source_type === "cota_jogador" ? "Cota auto" : "Pagamento auto"}</span>
                         : e.player_name ?? "Manual"}
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-green-600">

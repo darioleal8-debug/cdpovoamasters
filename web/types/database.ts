@@ -759,7 +759,7 @@ export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, string> = {
 
 // ── Módulo Financeiro ─────────────────────────────────────────────────────────
 
-export type FinanceSourceType = "manual" | "cota_jogador";
+export type FinanceSourceType = "manual" | "cota_jogador" | "pagamento_jogador";
 export type CashMovementType  = "entrada" | "saida" | "transferencia";
 
 export interface FinancialEntry {
