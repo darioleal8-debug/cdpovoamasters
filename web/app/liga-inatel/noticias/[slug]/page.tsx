@@ -3,7 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { createPublicClient } from "@/lib/supabase/public";
 import { markdownToHtml } from "@/lib/markdown";
-import { reliableSides } from "@/lib/game-sheet/news-facts";
+import { sideReadings } from "@/lib/game-sheet/news-facts";
 import type { Metadata } from "next";
 import { ShareButtons } from "./_share-buttons";
 import { GamePhotoGallery } from "@/components/liga/game-photo-gallery";
@@ -158,17 +158,18 @@ export default async function LigaNoticiaDetailPage({ params }: Props) {
     article.game_id ? getGameResult(article.game_id) : Promise.resolve(null),
   ]);
 
-  // Pontos individuais: mostra-se cada equipa cuja leitura da folha bate certo com o seu resultado
-  // (uma equipa com leitura incompleta não esconde as estatísticas da outra)
-  const sides = gameResult
-    ? reliableSides({
+  // Pontos individuais: cada equipa é avaliada em separado. Leitura completa → tabela normal;
+  // leitura parcial (pontos por atribuir) → tabela com aviso; leitura falhada → não se mostra.
+  const readings = gameResult
+    ? sideReadings({
         homeScore: gameResult.home_score,
         awayScore: gameResult.away_score,
         players: rawPlayerStats,
         unattributed: { home: gameResult.home_unattributed_points, away: gameResult.away_unattributed_points },
       })
-    : { home: false, away: false };
-  const playerStats = rawPlayerStats.filter((p) => (p.side === "home" ? sides.home : p.side === "away" ? sides.away : false));
+    : { home: "none" as const, away: "none" as const };
+  const playerStats = rawPlayerStats.filter((p) => (p.side === "home" ? readings.home !== "none" : p.side === "away" ? readings.away !== "none" : false));
+  const missingPoints = { home: gameResult?.home_unattributed_points ?? 0, away: gameResult?.away_unattributed_points ?? 0 };
 
   const canonicalUrl = `https://www.hoophub.pt/liga-inatel/noticias/${slug}`;
 
@@ -386,8 +387,8 @@ export default async function LigaNoticiaDetailPage({ params }: Props) {
               {(homePlayers.length > 0 || awayPlayers.length > 0) && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
                   {[
-                    { label: homeTeam, players: homePlayers, topPts: homeTopPts },
-                    { label: awayTeam, players: awayPlayers, topPts: awayTopPts },
+                    { label: homeTeam, players: homePlayers, topPts: homeTopPts, partial: readings.home === "partial" ? missingPoints.home : 0, total: homeTotal || (gameResult?.home_score ?? 0) },
+                    { label: awayTeam, players: awayPlayers, topPts: awayTopPts, partial: readings.away === "partial" ? missingPoints.away : 0, total: awayTotal || (gameResult?.away_score ?? 0) },
                   ].map((team) =>
                     team.players.length > 0 ? (
                       <div key={team.label} style={{ background: "rgba(26,22,18,.03)", borderRadius: "8px", padding: "12px 14px", border: "1px solid rgba(26,22,18,.08)" }}>
@@ -398,6 +399,11 @@ export default async function LigaNoticiaDetailPage({ params }: Props) {
                         }}>
                           {team.label}
                         </p>
+                        {team.partial > 0 && (
+                          <p style={{ fontFamily: "var(--font-barlow, sans-serif)", fontSize: "11px", color: "#8C837A", margin: "-4px 0 8px", lineHeight: 1.4 }}>
+                            Leitura parcial da folha: {team.total - team.partial} de {team.total} pontos atribuídos a jogadores.
+                          </p>
+                        )}
                         <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "var(--font-barlow, sans-serif)", fontSize: "12px", fontVariantNumeric: "tabular-nums" }}>
                           <thead>
                             <tr>
@@ -409,7 +415,7 @@ export default async function LigaNoticiaDetailPage({ params }: Props) {
                           </thead>
                           <tbody>
                             {team.players.map((p, i) => {
-                              const isTop = p.pontos === team.topPts && team.topPts > 0;
+                              const isTop = team.partial === 0 && p.pontos === team.topPts && team.topPts > 0;
                               return (
                                 <tr key={i}>
                                   <td style={{ padding: "4px 4px", color: "#8C837A", fontSize: "11px" }}>{p.numero ?? "—"}</td>

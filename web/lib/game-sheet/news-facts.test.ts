@@ -42,7 +42,7 @@ describe("18. factos para a notícia (sem inventar)", () => {
         { nome: "Hong Sou", side: "home", pontos: 0 },
         { nome: "Gonçalo Campos", side: "away", pontos: 15 },
       ],
-      unattributed: { home: 32, away: 40 },
+      unattributed: { home: 10, away: 10 },
     });
     const text = f.lines.join("\n");
     expect(f.playerPointsReliable).toBe(false);
@@ -73,7 +73,7 @@ describe("18. factos para a notícia (sem inventar)", () => {
     expect(f.forbiddenPlayerNames).toEqual([]);
   });
 
-  it("leitura completa só numa equipa → usa essa equipa e proíbe só os jogadores da outra", () => {
+  it("equipa com leitura completa + equipa com leitura parcial → ambas aparecem, a parcial com ressalva", () => {
     const f = buildNewsFacts({
       ...REF,
       players: [
@@ -84,11 +84,24 @@ describe("18. factos para a notícia (sem inventar)", () => {
       unattributed: { home: 0, away: 40 },
     });
     const text = f.lines.join("\n");
-    expect(f.playerPointsReliable).toBe(false);
-    expect(text).toContain("Marcadores confirmados PowerTogether");
-    expect(text).toContain("Ana 33 pts (2 triplos), Bia 20 pts");
+    expect(text).toContain("Marcadores confirmados PowerTogether: Ana 33 pts (2 triplos), Bia 20 pts");
+    expect(text).toContain("Pontos individuais confirmados Matosinhos Basket (leitura parcial da folha: 15 de 55 pontos atribuídos");
+    expect(text).toContain("pelo menos");
+    expect(f.forbiddenPlayerNames).toEqual([]);
+  });
+
+  it("equipa cuja soma não reconcilia com o resultado → jogadores proibidos só dessa equipa", () => {
+    const f = buildNewsFacts({
+      ...REF,
+      players: [
+        { nome: "Ana", side: "home", pontos: 33 },
+        { nome: "Bia", side: "home", pontos: 20 },
+        { nome: "Rita Costa", side: "away", pontos: 15 },
+      ],
+      unattributed: { home: 0, away: 10 },
+    });
+    expect(f.lines.join("\n")).toContain("Marcadores confirmados PowerTogether");
     expect(f.forbiddenPlayerNames).toEqual(["Rita Costa"]);
-    expect(text).toContain("Não há estatísticas individuais confirmadas do");
   });
 
   it("deteta pontuações citadas que não constam dos factos", () => {
