@@ -152,6 +152,12 @@ export const AiSheetSchema = z.object({
   validation: z.preprocess((v) => (v && typeof v === "object" ? v : {}), z.object({
     notes: stringList,
   }).passthrough()),
+  /** Caixas (0–1) das zonas a ampliar: marcha do resultado e quadros dos plantéis A e B */
+  regions: z.preprocess((v) => (v && typeof v === "object" ? v : {}), z.object({
+    runningScore: region,
+    rosterA: region,
+    rosterB: region,
+  })),
   /** Avaliação da própria fotografia pelo modelo (para escolher a melhor entre várias folhas) */
   imageQuality: z.preprocess((v) => (v && typeof v === "object" ? v : {}), z.object({
     legibility: confidence,
@@ -181,6 +187,13 @@ export const AiScorePassSchema = z.object({
   warnings: stringList,
 });
 export type AiScorePass = z.infer<typeof AiScorePassSchema>;
+
+/** Resposta da leitura dedicada dos quadros dos plantéis (ampliações). */
+export const AiRosterPassSchema = z.object({
+  players: arr(AiPlayerSchema, 40),
+  warnings: stringList,
+});
+export type AiRosterPass = z.infer<typeof AiRosterPassSchema>;
 
 // ── Representação canónica (editável) ─────────────────────────────────────────
 
