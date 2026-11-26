@@ -3,7 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { createPublicClient } from "@/lib/supabase/public";
 import { markdownToHtml } from "@/lib/markdown";
-import { playerPointsReliable } from "@/lib/game-sheet/news-facts";
+import { reliableSides } from "@/lib/game-sheet/news-facts";
 import type { Metadata } from "next";
 import { ShareButtons } from "./_share-buttons";
 import { GamePhotoGallery } from "@/components/liga/game-photo-gallery";
@@ -158,17 +158,17 @@ export default async function LigaNoticiaDetailPage({ params }: Props) {
     article.game_id ? getGameResult(article.game_id) : Promise.resolve(null),
   ]);
 
-  // Pontos individuais só são mostrados se a leitura da folha bater certo com o resultado
-  const playerStats =
-    gameResult &&
-    playerPointsReliable({
-      homeScore: gameResult.home_score,
-      awayScore: gameResult.away_score,
-      players: rawPlayerStats,
-      unattributed: { home: gameResult.home_unattributed_points, away: gameResult.away_unattributed_points },
-    })
-      ? rawPlayerStats
-      : [];
+  // Pontos individuais: mostra-se cada equipa cuja leitura da folha bate certo com o seu resultado
+  // (uma equipa com leitura incompleta não esconde as estatísticas da outra)
+  const sides = gameResult
+    ? reliableSides({
+        homeScore: gameResult.home_score,
+        awayScore: gameResult.away_score,
+        players: rawPlayerStats,
+        unattributed: { home: gameResult.home_unattributed_points, away: gameResult.away_unattributed_points },
+      })
+    : { home: false, away: false };
+  const playerStats = rawPlayerStats.filter((p) => (p.side === "home" ? sides.home : p.side === "away" ? sides.away : false));
 
   const canonicalUrl = `https://www.hoophub.pt/liga-inatel/noticias/${slug}`;
 
