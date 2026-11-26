@@ -31,6 +31,17 @@ export interface Access {
   isLigaAdmin: boolean;
 }
 
+/** Conta mestre: sem limite de reanálises. */
+export const MASTER_ADMIN_EMAIL = "darioleal8@gmail.com";
+export const UNLIMITED_ANALYSES = 9999;
+export function isMasterAdmin(access: Pick<Access, "user">): boolean {
+  return access.user.email?.toLowerCase() === MASTER_ADMIN_EMAIL;
+}
+/** Limite de análises aplicável a este utilizador. */
+export function analysesLimit(access: Pick<Access, "user">): number {
+  return isMasterAdmin(access) ? UNLIMITED_ANALYSES : visionConfig().maxAnalyses;
+}
+
 /** Autenticação + papel (delegado de equipa e/ou admin da liga). */
 export async function authorizeGameSheet(): Promise<{ ok: true; access: Access } | { ok: false; response: NextResponse }> {
   const supabase = await createClient();
@@ -202,7 +213,7 @@ export async function importView(access: Access, row: ImportRow, game: GameInfo 
     model: row.model,
     sheet: row.sheet_data,
     analysis_count: row.analysis_count,
-    max_analyses: visionConfig().maxAnalyses,
+    max_analyses: analysesLimit(access),
     corrections: row.corrections,
     error: row.error,
     submission_id: row.submission_id,

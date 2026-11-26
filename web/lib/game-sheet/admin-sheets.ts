@@ -15,7 +15,7 @@ import { reanalyzeImport, runAndStore } from "./run";
 import { convertToProStatsIfNeeded, reanalyzeProStats, runProStatsAndStore } from "@/lib/match-docs/run";
 import { resolveDocKind } from "@/lib/match-docs/classify";
 import { AiSheetSchema, SheetDataSchema, type ImportStatus } from "./schema";
-import { BUCKET, loadImport, type Access, type GameInfo } from "./service";
+import { analysesLimit, BUCKET, loadImport, type Access, type GameInfo } from "./service";
 import { visionConfig } from "./vision";
 
 type AdminClient = Awaited<ReturnType<typeof createAdminClient>>;
@@ -159,7 +159,7 @@ export async function listGameSheets(access: Access, admin: AdminClient, game: G
     finished: await isGameFinished(access.supabase, game),
     candidates,
     best_key: best?.key ?? null,
-    max_analyses: visionConfig().maxAnalyses,
+    max_analyses: analysesLimit(access),
   };
 }
 

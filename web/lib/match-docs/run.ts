@@ -5,7 +5,7 @@
  */
 import { withAiAttribution } from "@/lib/ai-usage";
 import { createRawServiceClient } from "@/lib/supabase/service-raw";
-import { BUCKET, type Access, type GameInfo, type ImportRow } from "@/lib/game-sheet/service";
+import { BUCKET, isMasterAdmin, type Access, type GameInfo, type ImportRow } from "@/lib/game-sheet/service";
 import { createAdminClient } from "@/lib/supabase/server";
 import { sniffImageMime } from "@/lib/game-sheet/image";
 import { extractProStats, proStatsConfig, proStatsStatus } from "./pro-stats-extract";
@@ -88,7 +88,7 @@ export async function reanalyzeProStats(
   opts: { instructions?: string; maxAnalyses?: number } = {},
 ): Promise<{ ok: true; error?: string } | { ok: false; status: number; error: string }> {
   const max = opts.maxAnalyses ?? 3;
-  const adminOverride = access.isLigaAdmin;
+  const adminOverride = access.isLigaAdmin || isMasterAdmin(access);
   if (row.analysis_count >= max && !adminOverride) {
     return { ok: false, status: 429, error: `Limite de ${max} análises atingido para este documento.` };
   }
