@@ -5,7 +5,7 @@ import { callOpencvService, isPdf, sniffImageMime } from "./image";
 import { preparePdf } from "@/lib/match-docs/documents";
 import { rosterHintForEvent } from "@/lib/match-docs/service";
 import { emptySheetData, PROCESSING_VERSION, SHEET_SCHEMA_VERSION } from "./schema";
-import { BUCKET, enrichWithRoster, type Access, type GameInfo, type ImportRow } from "./service";
+import { BUCKET, enrichWithRoster, isMasterAdmin, type Access, type GameInfo, type ImportRow } from "./service";
 import { analyzeGameSheet, visionConfig } from "./vision";
 
 /**
@@ -128,7 +128,7 @@ export async function reanalyzeImport(
 ): Promise<ReanalyzeResult> {
   const { maxAnalyses } = visionConfig();
   // O admin da liga não fica preso ao limite quando dá instruções à IA (é a forma de corrigir a leitura)
-  const adminOverride = access.isLigaAdmin && Boolean(opts.instructions?.trim());
+  const adminOverride = isMasterAdmin(access) || (access.isLigaAdmin && Boolean(opts.instructions?.trim()));
   if (row.analysis_count >= maxAnalyses && !adminOverride) {
     return { ok: false, status: 429, error: `Limite de ${maxAnalyses} análises atingido para este boletim. Corrija os dados manualmente.` };
   }

@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { authorizeGameSheet, importView, jsonError, loadGameForAccess, loadImport } from "@/lib/game-sheet/service";
+import { analysesLimit, authorizeGameSheet, importView, jsonError, loadGameForAccess, loadImport } from "@/lib/game-sheet/service";
 import { reanalyzeImport } from "@/lib/game-sheet/run";
 import { MAX_ADMIN_INSTRUCTIONS } from "@/lib/game-sheet/prompt";
 import { convertToProStatsIfNeeded, reanalyzeProStats } from "@/lib/match-docs/run";
-import { visionConfig } from "@/lib/game-sheet/vision";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -42,7 +41,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (converted) { row.doc_type = "pro_stats"; row.updated_at = converted.updated_at; }
 
   if (row.doc_type === "pro_stats") {
-    const pr = await reanalyzeProStats(access, row, game, { instructions, maxAnalyses: visionConfig().maxAnalyses });
+    const pr = await reanalyzeProStats(access, row, game, { instructions, maxAnalyses: analysesLimit(access) });
     if (!pr.ok) return jsonError(pr.error, pr.status);
     const freshPro = await loadImport(access, row.id);
     return NextResponse.json({ ...(await importView(access, freshPro!, game)), analysis_error: pr.error ?? null, analysis_error_kind: null });

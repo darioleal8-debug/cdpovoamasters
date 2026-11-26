@@ -730,7 +730,7 @@ export function GameSheetReview({ importId, backHref }: { importId: string; back
                   void call("reanalyze");
                 }}
               >
-                {busy === "reanalyze" ? "A reanalisar… (até 1 min)" : `Reanalisar imagem (${view.analysis_count}/${view.max_analyses})`}
+                {busy === "reanalyze" ? "A reanalisar… (até 1 min)" : `Reanalisar imagem (${view.analysis_count}/${view.max_analyses >= 9999 ? "∞" : view.max_analyses})`}
               </button>
               <button style={{ ...btn("primary", busy !== null || !canConfirm), flex: 1, minWidth: 180 }} disabled={busy !== null || !canConfirm} onClick={() => call("confirm")}>
                 {busy === "confirm" ? "A submeter…" : view.status === "confirmed" && !dirty ? "Submeter de novo" : "Confirmar e submeter resultado"}
@@ -775,7 +775,7 @@ export function GameSheetReview({ importId, backHref }: { importId: string; back
                   void call("reanalyze");
                 }}
               >
-                {busy === "reanalyze" ? "A reanalisar… (até 1 min)" : aiInstructions.trim() ? `Reanalisar com as minhas instruções (${view.analysis_count})` : `Reanalisar imagem (${view.analysis_count}/${view.max_analyses})`}
+                {busy === "reanalyze" ? "A reanalisar… (até 1 min)" : aiInstructions.trim() ? `Reanalisar com as minhas instruções (${view.analysis_count})` : `Reanalisar imagem (${view.analysis_count}/${view.max_analyses >= 9999 ? "∞" : view.max_analyses})`}
               </button>
               <button
                 style={{ ...btn("primary", busy !== null || !canConfirm || !motivo.trim()), flex: 1, minWidth: 200 }}
