@@ -73,6 +73,24 @@ describe("18. factos para a notícia (sem inventar)", () => {
     expect(f.forbiddenPlayerNames).toEqual([]);
   });
 
+  it("leitura completa só numa equipa → usa essa equipa e proíbe só os jogadores da outra", () => {
+    const f = buildNewsFacts({
+      ...REF,
+      players: [
+        { nome: "Ana", side: "home", pontos: 33, triplos: 2 },
+        { nome: "Bia", side: "home", pontos: 20 },
+        { nome: "Rita Costa", side: "away", pontos: 15 },
+      ],
+      unattributed: { home: 0, away: 40 },
+    });
+    const text = f.lines.join("\n");
+    expect(f.playerPointsReliable).toBe(false);
+    expect(text).toContain("Marcadores confirmados PowerTogether");
+    expect(text).toContain("Ana 33 pts (2 triplos), Bia 20 pts");
+    expect(f.forbiddenPlayerNames).toEqual(["Rita Costa"]);
+    expect(text).toContain("Não há estatísticas individuais confirmadas do");
+  });
+
   it("deteta pontuações citadas que não constam dos factos", () => {
     const f = buildNewsFacts(REF);
     expect(unknownScores("Venceu por 55-53, depois de 38-47 no fim do 3.º período.", f.allowedScores)).toEqual([]);

@@ -63,6 +63,27 @@ export function playerPointsReliable(i: {
   return sum("home") === i.homeScore && sum("away") === i.awayScore;
 }
 
+/**
+ * Fiabilidade por equipa: os pontos individuais de uma equipa só contam quando a soma dos
+ * jogadores dessa equipa é igual ao seu resultado e não há pontos por atribuir a essa equipa.
+ * Uma equipa com leitura completa mantém as suas estatísticas mesmo que a adversária não.
+ */
+export function reliableSides(i: {
+  homeScore: number;
+  awayScore: number;
+  players: { side: "home" | "away" | string; pontos: number | null }[];
+  unattributed?: { home: number | null; away: number | null } | null;
+}): { home: boolean; away: boolean } {
+  const ok = (side: "home" | "away") => {
+    const ps = i.players.filter((p) => p.side === side);
+    if (!ps.some((p) => (p.pontos ?? 0) > 0)) return false;
+    const unattributed = (side === "home" ? i.unattributed?.home : i.unattributed?.away) ?? 0;
+    if (unattributed > 0) return false;
+    return ps.reduce((s, p) => s + (p.pontos ?? 0), 0) === (side === "home" ? i.homeScore : i.awayScore);
+  };
+  return { home: ok("home"), away: ok("away") };
+}
+
 const label = (p: number) => (p <= 4 ? `${p}.º período` : `prolongamento${p > 5 ? ` ${p - 4}` : ""}`);
 
 export function buildNewsFacts(i: NewsFactsInput): NewsFacts {
@@ -155,19 +176,26 @@ export function buildNewsFacts(i: NewsFactsInput): NewsFacts {
   }
 
   const reliable = playerPointsReliable(i);
+  const sides = reliableSides(i);
 
-  if (reliable) {
+  if (sides.home || sides.away) {
     const scorers = (side: "home" | "away") =>
       i.players.filter((p) => p.side === side && p.pontos > 0).sort((a, b) => b.pontos - a.pontos).slice(0, 3);
     for (const side of ["home", "away"] as const) {
       const team = side === "home" ? i.home : i.away;
-      const top = scorers(side);
-      if (top.length) {
-        lines.push(`Marcadores confirmados ${team}: ${top.map((p) => `${p.nome} ${p.pontos} pts${p.triplos ? ` (${p.triplos} triplo${p.triplos > 1 ? "s" : ""})` : ""}`).join(", ")}.`);
+      if (sides[side]) {
+        const top = scorers(side);
+        if (top.length) {
+          lines.push(`Marcadores confirmados ${team}: ${top.map((p) => `${p.nome} ${p.pontos} pts${p.triplos ? ` (${p.triplos} triplo${p.triplos > 1 ? "s" : ""})` : ""}`).join(", ")}.`);
+        }
+      } else {
+        // Leitura incompleta desta equipa: não se citam os seus jogadores (a outra equipa mantém as estatísticas)
+        forbiddenPlayerNames.push(...i.players.filter((p) => p.side === side).map((p) => p.nome.trim()).filter((n) => n.length >= 4));
+        lines.push(`Não há estatísticas individuais confirmadas do ${team} (leitura incompleta da folha) — não menciones jogadores nem pontuações individuais do ${team}.`);
       }
     }
   } else if (i.players.some((p) => p.pontos > 0)) {
-    // Leitura falhada: a soma dos pontos individuais não coincide com o resultado
+    // Leitura falhada nas duas equipas: a soma dos pontos individuais não coincide com o resultado
     forbiddenPlayerNames.push(...i.players.map((p) => p.nome.trim()).filter((n) => n.length >= 4));
     lines.push("Os pontos individuais lidos da folha de jogo NÃO coincidem com o resultado das equipas (leitura não fiável) — NÃO menciones jogadores, marcadores nem pontuações individuais. Constrói a notícia à volta dos parciais e da posição de cada equipa na classificação.");
   } else {
