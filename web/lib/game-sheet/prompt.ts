@@ -21,16 +21,34 @@ export const LAYOUTS: Record<string, SheetLayout> = {
 - Topo: competição, número do jogo, data, hora, local/pavilhão, árbitros (crew chief / umpire), marcador, cronometrista.
 - Equipa A (normalmente a equipa da casa) e Equipa B, cada uma com: descontos de tempo, faltas de equipa por período,
   e a lista de jogadores (Licença, Nome, N.º camisola, "Jogador em campo"/entrada (X), Faltas 1-5).
-- MARCHA DO RESULTADO ("Running Score"): 4 pares de colunas A | B com os números 1–160 impressos.
-  Para cada cesto, o marcador risca o NÚMERO DO ACUMULADO atingido e escreve AO LADO o número da camisola do jogador.
-    • Cesto de campo de 2 pontos: traço diagonal (/) sobre o acumulado.
-    • Cesto de 3 pontos: traço diagonal e o número do jogador DENTRO DE UM CÍRCULO.
-    • Lance livre convertido (1 ponto): ponto/círculo preenchido (●) sobre o acumulado.
-  No fim de cada período o último acumulado é circundado e é traçada uma linha horizontal por baixo.
-  As cores podem alternar por período (ex.: vermelho no 1.º e 3.º, azul/preto no 2.º e 4.º).
-- Em baixo: resultado por período (Período ①②③④ e prolongamentos), resultado final e equipa vencedora.
-- O número impresso na coluna é o ACUMULADO — não é o valor do lançamento. O valor do lançamento é a diferença
-  para o acumulado riscado anterior da mesma equipa.`,
+
+- MARCHA DO RESULTADO ("Running Score") — ESTRUTURA:
+  • Ocupa a parte inferior/central da folha em 4 BLOCOS lado a lado (normalmente acumulados 1–40, 41–80, 81–120, 121–160).
+  • Cada bloco tem a metade "A" (Equipa A) e a metade "B" (Equipa B).
+  • Cada metade tem DUAS colunas:
+      1) coluna do JOGADOR — começa vazia; o marcador escreve aqui o NÚMERO DA CAMISOLA de quem marcou o cesto;
+      2) coluna do ACUMULADO — números impressos (1, 2, 3, …); o marcador RISCA o número a que a equipa chegou
+         depois desse cesto (ou seja, a pontuação da equipa no jogo logo após o cesto).
+  • Identifica cada coluna pelo CONTEÚDO, não só pela posição: números impressos em sequência = acumulado;
+    números manuscritos = jogador. Na metade B as duas colunas podem estar pela ordem inversa da metade A.
+  • Cada cesto ocupa uma LINHA: o acumulado riscado e o número do jogador estão na MESMA linha horizontal.
+    Usa o número impresso como âncora da linha — primeiro localiza o acumulado riscado, depois lê o número
+    manuscrito exatamente na mesma linha (nunca na linha de cima ou de baixo).
+  • Os acumulados da equipa A e da equipa B são INDEPENDENTES: a ordem entre lançamentos das duas equipas
+    não está registada, só a ordem dentro de cada equipa.
+
+- MARCHA DO RESULTADO — VALOR DE CADA CESTO:
+  • O valor do cesto é SEMPRE a diferença entre o acumulado riscado e o acumulado riscado imediatamente antes
+    PELA MESMA EQUIPA: +1 = lance livre (FT), +2 = cesto de campo (2PT), +3 = triplo (3PT).
+  • Exemplo: a equipa A risca o 1 com o jogador 4 → lance livre do n.º 4 (1–0). Mais tarde risca o 4 com o jogador 3
+    → 4 − 1 = +3 → triplo do n.º 3.
+  • Pode haver marcas gráficas (● lance livre, / cesto de campo, número circundado triplo, cores diferentes por período),
+    mas servem apenas de confirmação. Se contradisserem a diferença de acumulados, PREVALECE A DIFERENÇA.
+  • O número impresso é o acumulado — nunca o confundas com o valor do lançamento nem com o número da camisola.
+  • No fim de cada período o último acumulado é circundado e é traçada uma linha horizontal por baixo; usa essas
+    linhas para atribuir o período a cada cesto.
+
+- Em baixo: resultado por período (Período ①②③④ e prolongamentos), resultado final e equipa vencedora.`,
   },
 };
 
@@ -76,17 +94,26 @@ ${layout.conventions}
 PROCEDIMENTO:
 1. Lê o documento inteiro antes de responder.
 2. Identifica as duas equipas (A e B) e os jogadores de cada uma (número de camisola, nome, faltas, se jogou).
-3. Percorre a marcha do resultado de cada equipa pela ordem dos acumulados. Para CADA acumulado riscado cria um evento com:
-   acumulado observado, número do jogador escrito ao lado (se legível), período, valor estimado (1/2/3) pela marca
-   (● = 1, / = 2, número circundado = 3) e o tipo (FT, 2PT, 3PT).
+3. Percorre a marcha do resultado UMA EQUIPA DE CADA VEZ: toda a equipa A (bloco 1 a 4, de cima para baixo em cada bloco),
+   depois toda a equipa B. Para CADA acumulado riscado cria um evento com: o acumulado riscado ("cumulativeScore"),
+   o número do jogador escrito na mesma linha ("playerNumber", se legível), o período, e o valor do cesto
+   ("points") calculado como a diferença para o acumulado anterior DA MESMA EQUIPA (o primeiro cesto compara com 0).
+   "shotType" deduz-se do valor: 1 = FT, 2 = 2PT, 3 = 3PT.
+   A ordem ("seq") é a ordem crescente dos acumulados da equipa.
 4. Não confundas o acumulado com os pontos do lançamento nem com números de camisola.
-5. Associa um lançamento a um jogador APENAS quando o número estiver visível ao lado da marcação. Caso contrário usa null.
-6. Compara a marcha com os parciais e o resultado final e regista as discrepâncias em "warnings".
-7. Para cada evento indica "confidence" (0–1). Abaixo de 0.6 quando houver dúvida real; explica a dúvida em "note" (curto).
-8. Indica em "region" a área aproximada da marcação na imagem, normalizada 0–1 (x,y = canto superior esquerdo; w,h = largura/altura).
-9. NUNCA inventes jogadores, lançamentos, pontuações ou estatísticas. Campo ilegível = null + aviso.
-10. Não calcules totais por jogador — isso é feito pela aplicação.
-11. Avalia a qualidade da FOTOGRAFIA em "imageQuality": legibility (0–1: quão legível está a escrita manuscrita),
+5. Associa um lançamento a um jogador APENAS quando o número estiver visível na mesma linha da marcação. Caso contrário usa null.
+6. Se a diferença para o acumulado anterior for maior que 3 (ex.: 12 → 17), é quase certo que falta uma marcação
+   intermédia: volta a olhar para essa zona antes de responder. Se continuar sem a encontrar, mantém o evento com o valor
+   real da diferença na nota, baixa "confidence" e regista o salto em "warnings". Não inventes o cesto em falta.
+7. AUTO-VERIFICAÇÃO antes de responder, para cada equipa: (a) os acumulados são estritamente crescentes; (b) o último
+   acumulado coincide com o resultado final da equipa; (c) o último acumulado de cada período coincide com a soma dos
+   parciais até esse período. Se algo não bater, relê a zona em causa e regista a discrepância em "warnings".
+8. Para cada evento indica "confidence" (0–1). Abaixo de 0.6 quando houver dúvida real; explica a dúvida em "note" (curto).
+9. Indica em "region" a área aproximada da marcação na imagem (a linha do acumulado riscado e do número do jogador),
+   normalizada 0–1 (x,y = canto superior esquerdo; w,h = largura/altura).
+10. NUNCA inventes jogadores, lançamentos, pontuações ou estatísticas. Campo ilegível = null + aviso.
+11. Não calcules totais por jogador — isso é feito pela aplicação.
+12. Avalia a qualidade da FOTOGRAFIA em "imageQuality": legibility (0–1: quão legível está a escrita manuscrita),
     wholeSheetVisible (a folha inteira está no enquadramento?) e issues (ex.: "desfocada", "reflexo", "cortada à direita",
     "inclinada", "sombra"). Sê exigente: serve para escolher a melhor entre várias fotografias da mesma folha.
 
@@ -130,7 +157,9 @@ export function buildRecheckPrompt(
 Volta a ler com atenção APENAS as marcações listadas (primeira leitura entre parênteses):
 ${list}
 
-Lembra: o número impresso é o acumulado; ● = lance livre (1), / = 2 pontos, número do jogador circundado = 3 pontos.
+Lembra: em cada metade (A ou B) há uma coluna do jogador (número manuscrito) e uma coluna do acumulado (número impresso,
+riscado). O jogador e o acumulado de um cesto estão na MESMA linha. O valor do cesto é a diferença para o acumulado
+riscado imediatamente antes da mesma equipa (+1 lance livre, +2 campo, +3 triplo); marcas gráficas só confirmam.
 Se continuares sem certeza, mantém null e confidence baixa. Não inventes.
 Responde só com JSON: { "events": [ { "id": "…", "cumulativeScore": 0, "points": 2, "shotType": "2PT", "playerNumber": 7, "confidence": 0.8, "note": null } ] }`;
 }
