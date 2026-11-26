@@ -163,40 +163,112 @@ export async function cropRegions(prepared: PreparedImage, regions: Region[]): P
     .toBuffer();
 }
 
-export interface ScoreTile { buffer: Buffer; label: string }
+export interface VisionCrop { buffer: Buffer; label: string }
+
+export type RegionKind = "runningScore" | "rosterA" | "rosterB";
 
 /**
- * Ampliações da folha para ler a marcha do resultado quando a leitura global falha.
- * O modelo reduz cada imagem a um orçamento fixo de píxeis, por isso uma folha inteira fica
- * com a escrita pequena ilegível; em ladrilhos cada zona chega com muito mais detalhe.
- *
- * Grelha de 2 colunas × `rows` linhas, com sobreposição:
- *  - colunas: 0–60 % e 40–100 % da largura (sobreposição de 20 %): um bloco da marcha com menos
- *    de 20 % da largura da folha fica sempre inteiro num dos ladrilhos (as colunas do jogador e do
- *    acumulado nunca ficam separadas);
- *  - linhas: faixas horizontais com 8 % de sobreposição (cada cesto é uma linha horizontal).
+ * Posição das zonas na folha INATEL inteira e na vertical (fração da imagem), medida numa
+ * fotografia real da folha. Servem de valor por omissão quando o modelo não localiza a zona.
  */
-export async function scoreTiles(prepared: PreparedImage, rows = 3): Promise<ScoreTile[]> {
-  const { width: W, height: H } = prepared;
-  const cols: [string, number, number][] = [
-    ["esquerda", 0, Math.round(W * 0.6)],
-    ["direita", Math.round(W * 0.4), W - Math.round(W * 0.4)],
+export const DEFAULT_REGIONS: Record<RegionKind, Region> = {
+  // tabela MARCHA DO RESULTADO: 4 blocos de 40 linhas, do cabeçalho "A B" à linha 40
+  runningScore: { x: 0.48, y: 0.175, w: 0.465, h: 0.607 },
+  // quadros dos plantéis (Nº ASSOC., nome, JOG Nº, ENT, faltas), com o nome da equipa
+  rosterA: { x: 0.03, y: 0.205, w: 0.47, h: 0.325 },
+  rosterB: { x: 0.03, y: 0.52, w: 0.47, h: 0.34 },
+};
+
+/**
+ * Usa a caixa localizada pelo modelo só se for plausível (dentro da imagem, tamanho e posição
+ * próximos do esperado para a folha INATEL); caso contrário usa a posição por omissão.
+ */
+export function resolveRegion(kind: RegionKind, modelRegion: Region | null | undefined): { region: Region; source: "model" | "template" } {
+  const d = DEFAULT_REGIONS[kind];
+  const r = modelRegion;
+  if (r && r.w > 0.05 && r.h > 0.05 && r.x >= 0 && r.y >= 0 && r.x + r.w <= 1.001 && r.y + r.h <= 1.001) {
+    const sizeOk = r.w / d.w >= 0.6 && r.w / d.w <= 1.6 && r.h / d.h >= 0.6 && r.h / d.h <= 1.6;
+    const near = Math.abs(r.x + r.w / 2 - (d.x + d.w / 2)) <= 0.18 && Math.abs(r.y + r.h / 2 - (d.y + d.h / 2)) <= 0.18;
+    if (sizeOk && near) return { region: r, source: "model" };
+  }
+  return { region: d, source: "template" };
+}
+
+async function cropNormalized(
+  prepared: PreparedImage,
+  box: { x0: number; y0: number; x1: number; y1: number },
+  target: { minHeight: number; maxHeight: number },
+): Promise<Buffer | null> {
+  const x0 = Math.max(0, Math.min(1, box.x0));
+  const y0 = Math.max(0, Math.min(1, box.y0));
+  const x1 = Math.max(0, Math.min(1, box.x1));
+  const y1 = Math.max(0, Math.min(1, box.y1));
+  const left = Math.floor(x0 * prepared.width);
+  const top = Math.floor(y0 * prepared.height);
+  const width = Math.floor((x1 - x0) * prepared.width);
+  const height = Math.floor((y1 - y0) * prepared.height);
+  if (width < 16 || height < 16) return null;
+  // O modelo reduz cada imagem a um orçamento fixo de píxeis: recortes pequenos são ampliados para
+  // a escrita chegar com detalhe; recortes enormes são reduzidos.
+  const outHeight = Math.max(target.minHeight, Math.min(target.maxHeight, height));
+  return sharp(prepared.buffer)
+    .extract({ left, top, width, height })
+    .resize({ height: outHeight, kernel: "lanczos3" })
+    .sharpen({ sigma: 0.8 })
+    .jpeg({ quality: 92 })
+    .toBuffer();
+}
+
+/** Recorte de uma zona (ex.: quadro de um plantel) com margem. */
+export async function regionCrop(prepared: PreparedImage, region: Region, label: string, pad = 0.015): Promise<VisionCrop | null> {
+  const buffer = await cropNormalized(
+    prepared,
+    { x0: region.x - pad, y0: region.y - pad, x1: region.x + region.w + pad, y1: region.y + region.h + pad },
+    { minHeight: 1400, maxHeight: 2200 },
+  );
+  return buffer ? { buffer, label } : null;
+}
+
+/** Quantos blocos da marcha (40 pontos cada) o jogo usa, pelo maior resultado final lido. */
+export function scoreBlocksNeeded(finalA: number | null, finalB: number | null): number[] {
+  const max = Math.max(finalA ?? 0, finalB ?? 0);
+  const n = max > 0 ? Math.min(4, Math.ceil(max / 40)) : 4;
+  return Array.from({ length: n }, (_, i) => i + 1);
+}
+
+/**
+ * Recortes da marcha do resultado, um por bloco e por metade (linhas 1–20 e 21–40), ampliados.
+ *
+ * A folha tem 4 blocos de igual largura lado a lado; cada bloco tem 4 colunas, da esquerda para a
+ * direita: [jogador A][acumulado A][acumulado B][jogador B]. Cada recorte leva uma pequena margem
+ * lateral (para não cortar as colunas dos jogadores) e as metades sobrepõem-se ~2 linhas (cada cesto
+ * é uma linha horizontal, por isso nunca fica partido ao meio entre recortes).
+ */
+export async function scoreBlockCrops(prepared: PreparedImage, region: Region, blocks: number[]): Promise<VisionCrop[]> {
+  const bw = region.w / 4;
+  const padX = bw * 0.05;
+  const halves: { name: string; from: number; to: number; rows: string }[] = [
+    { name: "metade superior", from: -0.012, to: 0.53, rows: "linhas 1–21" },
+    { name: "metade inferior", from: 0.47, to: 1.012, rows: "linhas 20–40" },
   ];
-  const step = Math.ceil(H / rows);
-  const overlap = Math.round(H * 0.08);
-  const tiles: ScoreTile[] = [];
-  for (let r = 0; r < rows; r++) {
-    const top = Math.max(0, r * step - overlap);
-    const height = Math.min(H - top, step + 2 * overlap);
-    for (const [name, left, width] of cols) {
-      const buf = await sharp(prepared.buffer)
-        .extract({ left, top, width, height })
-        .resize({ width: Math.min(2000, Math.max(1400, width)), kernel: "lanczos3" })
-        .sharpen({ sigma: 0.8 })
-        .jpeg({ quality: 92 })
-        .toBuffer();
-      tiles.push({ buffer: buf, label: `faixa ${r + 1}/${rows} (de cima para baixo), metade ${name}` });
+  const out: VisionCrop[] = [];
+  for (const k of blocks) {
+    const first = 40 * (k - 1) + 1;
+    for (const h of halves) {
+      const buffer = await cropNormalized(
+        prepared,
+        {
+          x0: region.x + (k - 1) * bw - padX,
+          x1: region.x + k * bw + padX,
+          y0: region.y + region.h * h.from,
+          y1: region.y + region.h * h.to,
+        },
+        { minHeight: 1500, maxHeight: 2400 },
+      );
+      if (!buffer) continue;
+      const rows = h.name === "metade superior" ? `${first}–${first + 20}` : `${first + 19}–${first + 39}`;
+      out.push({ buffer, label: `bloco ${k}, ${h.name} (acumulados impressos ${rows})` });
     }
   }
-  return tiles;
+  return out;
 }
