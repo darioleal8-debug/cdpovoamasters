@@ -28,7 +28,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const row = await loadImport(access, id);
   if (!row) return jsonError("Importação não encontrada", 404);
-  if (!["needs_review", "ready_to_confirm", "failed"].includes(row.status)) {
+  // O admin da liga pode reanalisar também um boletim já publicado (ex.: leitura antiga sem marcha):
+  // a reanálise devolve-o a "por rever" e o admin volta a aplicá-lo ao jogo. As equipas não.
+  const reanalyzable = ["needs_review", "ready_to_confirm", "failed", ...(access.isLigaAdmin ? ["published"] : [])];
+  if (!reanalyzable.includes(row.status)) {
     return jsonError("Só é possível reanalisar um boletim por confirmar", 409);
   }
   const game = await loadGameForAccess(access, row.event_id);
