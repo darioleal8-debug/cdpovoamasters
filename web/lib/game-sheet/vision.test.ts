@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import sharp from "sharp";
-import { analyzeGameSheet } from "./vision";
+import { analyzeGameSheet, mergeScoringEvents, needsScorePass } from "./vision";
+import { AiSheetSchema } from "./schema";
+import { scoreTiles } from "./image";
 import { prepareForVision, sniffImageMime, cropRegions } from "./image";
 
 const GAME = { home: "PowerTogether", away: "Matosinhos Basket" };
@@ -36,12 +38,16 @@ const AI_OK = {
 beforeEach(() => {
   process.env.DEEPSEEK_API_KEY = "test";
   process.env.DEEPSEEK_VISION_MODEL = "vision-test";
+  // O fixture AI_OK só lê 2 cestos (até 5 de 53 pontos): sem isto dispararia a leitura dedicada da marcha,
+  // que tem os seus próprios testes mais abaixo.
+  process.env.GAME_SHEET_SCORE_PASS = "off";
   vi.stubGlobal("fetch", vi.fn());
 });
 afterEach(() => {
   delete process.env.DEEPSEEK_API_KEY;
   delete process.env.DEEPSEEK_VISION_MODEL;
   delete process.env.GAME_SHEET_SECOND_PASS;
+  delete process.env.GAME_SHEET_SCORE_PASS;
   vi.unstubAllGlobals();
 });
 
@@ -134,5 +140,94 @@ describe("analyzeGameSheet", () => {
     const r = await analyzeGameSheet({ image: Buffer.from("not an image at all"), game: GAME });
     expect(!r.ok && r.kind).toBe("invalid_image");
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+});
+
+describe("leitura dedicada da marcha (ampliações)", () => {
+  const NO_EVENTS = {
+    ...AI_OK,
+    scoringEvents: [],
+    warnings: ["Marcha do resultado não foi possível transcrever com fiabilidade; scoringEvents deixados vazios."],
+  };
+  const PASS = {
+    scoringEvents: [
+      { team: "A", seq: 0, period: 1, cumulativeScore: 1, points: 1, shotType: "FT", playerNumber: 4, confidence: 0.9, note: null },
+      { team: "A", seq: 1, period: 1, cumulativeScore: 4, points: 3, shotType: "3PT", playerNumber: 3, confidence: 0.9, note: null },
+      // repetido por sobreposição de ladrilhos, com menos confiança: deve desaparecer
+      { team: "A", seq: 2, period: 1, cumulativeScore: 4, points: 3, shotType: "3PT", playerNumber: 3, confidence: 0.5, note: null },
+      { team: "B", seq: 0, period: 1, cumulativeScore: 2, points: 2, shotType: "2PT", playerNumber: 9, confidence: 0.8, note: null },
+    ],
+    warnings: [],
+  };
+
+  beforeEach(() => { delete process.env.GAME_SHEET_SCORE_PASS; });
+
+  it("sem cestos na leitura global, lê a marcha em ampliações e junta os eventos", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(apiResponse(NO_EVENTS))
+      .mockResolvedValueOnce(apiResponse(PASS));
+    const r = await analyzeGameSheet({ image: await sheetImage(1600, 2200), game: GAME });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.usage.calls.map((c) => c.purpose)).toEqual(["full", "score"]);
+    expect(r.usage.scorePass).toBe("done");
+    expect(r.sheet.events).toHaveLength(3);
+    expect(r.sheet.events.filter((e) => e.side === "home").map((e) => e.cumulative)).toEqual([1, 4]);
+    expect(r.sheet.events.every((e) => e.region === null)).toBe(true);
+    // o aviso "marcha ilegível" da 1.ª leitura deixa de se aplicar
+    expect(r.sheet.aiWarnings.some((w) => /ilegível|não foi possível/i.test(w))).toBe(false);
+    // a 2.ª chamada leva a folha inteira + 6 ampliações + texto
+    const body = JSON.parse((vi.mocked(fetch).mock.calls[1][1] as RequestInit).body as string);
+    const content = body.messages[1].content as { type: string }[];
+    expect(content.filter((p) => p.type === "image_url")).toHaveLength(7);
+    expect(content.at(-1)!.type).toBe("text");
+  });
+
+  it("se a leitura dedicada falhar, mantém a leitura global (sem estragar nada)", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(apiResponse(NO_EVENTS))
+      .mockResolvedValueOnce(apiResponse("upstream error", 400));
+    const r = await analyzeGameSheet({ image: await sheetImage(1600, 2200), game: GAME });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.usage.scorePass).toBe("failed");
+    expect(r.sheet.events).toHaveLength(0);
+    expect(r.sheet.final).toEqual({ home: 53, away: 55 });
+  });
+
+  it("não faz a leitura dedicada quando está desligada por configuração", async () => {
+    process.env.GAME_SHEET_SCORE_PASS = "off";
+    try {
+      vi.mocked(fetch).mockResolvedValueOnce(apiResponse(NO_EVENTS));
+      const r = await analyzeGameSheet({ image: await sheetImage(), game: GAME });
+      expect(r.ok && r.usage.calls.length).toBe(1);
+    } finally {
+      delete process.env.GAME_SHEET_SCORE_PASS;
+    }
+  });
+
+  it("needsScorePass: sem cestos, ou marcha muito abaixo do resultado final", () => {
+    const base = AiSheetSchema.parse(AI_OK); // 2 cestos (até 5) e finais 53–55
+    expect(needsScorePass({ ...base, scoringEvents: [] })).toBe(true);
+    expect(needsScorePass(base)).toBe(true); // A chega a 5 de 53
+    const full = { ...base, scoringEvents: base.scoringEvents.map((e) => ({ ...e, cumulativeScore: 53 })) };
+    const b = { ...full.scoringEvents[0], team: "B" as const, cumulativeScore: 55 };
+    expect(needsScorePass({ ...full, scoringEvents: [...full.scoringEvents, b] })).toBe(false);
+  });
+
+  it("mergeScoringEvents: deduplica por equipa+acumulado e reordena", () => {
+    const ev = AiSheetSchema.parse({ scoringEvents: PASS.scoringEvents }).scoringEvents;
+    const merged = mergeScoringEvents([], ev);
+    expect(merged.filter((e) => e.team === "A").map((e) => [e.seq, e.cumulativeScore, e.confidence])).toEqual([[0, 1, 0.9], [1, 4, 0.9]]);
+    expect(merged.find((e) => e.team === "B")!.seq).toBe(0);
+  });
+
+  it("scoreTiles: 2 colunas × 3 faixas, com sobreposição horizontal de 20 %", async () => {
+    const p = await prepareForVision(await sheetImage(1500, 2000));
+    const tiles = await scoreTiles(p);
+    expect(tiles).toHaveLength(6);
+    expect(tiles[0].label).toContain("faixa 1/3");
+    expect(tiles[1].label).toContain("direita");
+    for (const t of tiles) expect((await sharp(t.buffer).metadata()).width).toBeGreaterThanOrEqual(1400);
   });
 });

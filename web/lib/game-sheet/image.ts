@@ -162,3 +162,41 @@ export async function cropRegions(prepared: PreparedImage, regions: Region[]): P
     .jpeg({ quality: 92 })
     .toBuffer();
 }
+
+export interface ScoreTile { buffer: Buffer; label: string }
+
+/**
+ * Ampliações da folha para ler a marcha do resultado quando a leitura global falha.
+ * O modelo reduz cada imagem a um orçamento fixo de píxeis, por isso uma folha inteira fica
+ * com a escrita pequena ilegível; em ladrilhos cada zona chega com muito mais detalhe.
+ *
+ * Grelha de 2 colunas × `rows` linhas, com sobreposição:
+ *  - colunas: 0–60 % e 40–100 % da largura (sobreposição de 20 %): um bloco da marcha com menos
+ *    de 20 % da largura da folha fica sempre inteiro num dos ladrilhos (as colunas do jogador e do
+ *    acumulado nunca ficam separadas);
+ *  - linhas: faixas horizontais com 8 % de sobreposição (cada cesto é uma linha horizontal).
+ */
+export async function scoreTiles(prepared: PreparedImage, rows = 3): Promise<ScoreTile[]> {
+  const { width: W, height: H } = prepared;
+  const cols: [string, number, number][] = [
+    ["esquerda", 0, Math.round(W * 0.6)],
+    ["direita", Math.round(W * 0.4), W - Math.round(W * 0.4)],
+  ];
+  const step = Math.ceil(H / rows);
+  const overlap = Math.round(H * 0.08);
+  const tiles: ScoreTile[] = [];
+  for (let r = 0; r < rows; r++) {
+    const top = Math.max(0, r * step - overlap);
+    const height = Math.min(H - top, step + 2 * overlap);
+    for (const [name, left, width] of cols) {
+      const buf = await sharp(prepared.buffer)
+        .extract({ left, top, width, height })
+        .resize({ width: Math.min(2000, Math.max(1400, width)), kernel: "lanczos3" })
+        .sharpen({ sigma: 0.8 })
+        .jpeg({ quality: 92 })
+        .toBuffer();
+      tiles.push({ buffer: buf, label: `faixa ${r + 1}/${rows} (de cima para baixo), metade ${name}` });
+    }
+  }
+  return tiles;
+}
