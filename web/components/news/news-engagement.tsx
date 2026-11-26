@@ -140,15 +140,13 @@ export function NewsEngagement({ newsId, url, title, accent = "#F97316" }: Props
   }, [newsId]);
 
   const vote = useCallback(
-    async (v: 1 | -1) => {
+    async () => {
       if (!visitor || busy) return;
       const prev = data;
-      const next: 0 | 1 | -1 = data?.my_vote === v ? 0 : v;
+      const next: 0 | 1 = data?.my_vote === 1 ? 0 : 1;
       // Atualização imediata; o servidor confirma a seguir
       if (data) {
-        const likes = data.likes - (data.my_vote === 1 ? 1 : 0) + (next === 1 ? 1 : 0);
-        const dislikes = data.dislikes - (data.my_vote === -1 ? 1 : 0) + (next === -1 ? 1 : 0);
-        setData({ ...data, likes, dislikes, my_vote: next });
+        setData({ ...data, likes: data.likes + (next === 1 ? 1 : -1), my_vote: next });
       }
       setBusy(true);
       const fresh = await post({ action: "vote", news_id: newsId, visitor_id: visitor, vote: next });
@@ -239,7 +237,7 @@ export function NewsEngagement({ newsId, url, title, accent = "#F97316" }: Props
           <div style={{ display: "flex", gap: "10px" }}>
             <button
               type="button"
-              onClick={() => vote(1)}
+              onClick={vote}
               disabled={!visitor || busy}
               aria-pressed={data?.my_vote === 1}
               aria-label="Gostei desta notícia"
@@ -248,18 +246,6 @@ export function NewsEngagement({ newsId, url, title, accent = "#F97316" }: Props
               <Thumb />
               <span>Gostei</span>
               <span>{data ? data.likes : "–"}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => vote(-1)}
-              disabled={!visitor || busy}
-              aria-pressed={data?.my_vote === -1}
-              aria-label="Não gostei desta notícia"
-              style={voteStyle(data?.my_vote === -1)}
-            >
-              <Thumb down />
-              <span>Não gostei</span>
-              <span>{data ? data.dislikes : "–"}</span>
             </button>
           </div>
         </div>
