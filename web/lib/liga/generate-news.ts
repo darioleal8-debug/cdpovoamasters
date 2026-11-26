@@ -5,6 +5,7 @@ import { buildNewsFacts, mentionedPlayers, unknownScores, type LiveTeamStats } f
 import { parseGameMeta } from "@/types/competitions";
 import { resolveOurSide } from "@/lib/liga/live-build";
 import { aggressiveTerms, NEWS_TONE_RULES } from "@/lib/liga/news-tone";
+import { CUP_KEY, CUP_NAME } from "@/lib/cup";
 
 function slugify(text: string): string {
   return text
@@ -52,6 +53,14 @@ export const NEWS_FORMAT = `Responde APENAS com JSON válido (sem markdown) com 
   "corpo": "corpo da notícia, 120-400 palavras, em parágrafos separados por linha em branco"
 }`;
 
+/** Instruções editoriais da Taça: eliminatória a feijão único, sem classificação. */
+export const CUP_NEWS_STYLE = NEWS_STYLE
+  .replace("basquetebol da Liga INATEL Masters", `basquetebol da ${CUP_NAME} (competição por eliminatórias, separada da Liga)`)
+  .replace(
+    "5. Contexto da competição/classificação, se fornecido.\n6. Conclusão sobre o impacto do resultado.",
+    "5. Contexto da eliminatória (fase da Taça, quem avança). Não há classificação nem pontos na Taça — nunca a menciones.\n6. Conclusão: a equipa vencedora segue em frente na Taça; sem inventar adversários futuros além dos indicados."
+  );
+
 export type NewsPromptOverrides = {
   /** Substitui as instruções editoriais (NEWS_STYLE). O formato JSON é sempre acrescentado. */
   systemPrompt?: string;
@@ -79,13 +88,12 @@ async function prepareNews(gameId: string) {
 
   const event = eventRes.data;
   const result = resultRes.data;
-  if (event?.competition === "Taça") {
-    return { ok: false as const, error: "As notícias automáticas são só da Liga INATEL; para a Taça publica uma notícia manual." };
-  }
   if (!event || !result) {
     console.error(`[generateLigaNews] jogo ou resultado não encontrado para game_id=${gameId}`);
     return { ok: false as const, error: "Jogo ou resultado não encontrado" };
   }
+
+  const isCup = event.competition === CUP_KEY;
 
   const { data: allResults } = await adminClient
     .from("league_game_results")
@@ -116,7 +124,9 @@ async function prepareNews(gameId: string) {
   const gameGroup = groups.find((g) => g.series === gameSeries && g.series !== null);
 
   const standingsRows = gameGroup ? gameGroup.rows : standings.slice(0, 5);
-  const standingsTitle = gameGroup
+  const standingsTitle = isCup
+    ? ""
+    : gameGroup
     ? `CLASSIFICAÇÃO ACTUALIZADA DA ${gameGroup.label.toUpperCase()} (o jogo pertence à ${gameGroup.label}; a liga tem ${groups.filter((g) => g.series).length} séries)`
     : "CLASSIFICAÇÃO ACTUALIZADA (top 5)";
   const top5 = standingsRows
@@ -169,8 +179,10 @@ async function prepareNews(gameId: string) {
 
   let jornadaInfo = "";
   try {
-    const meta = JSON.parse(event.description ?? "{}") as { jornada?: number; volta?: number; serie?: string };
-    jornadaInfo = `Jornada ${meta.jornada ?? "?"}, Volta ${meta.volta ?? "?"}, Série ${meta.serie ?? "A"}`;
+    const meta = JSON.parse(event.description ?? "{}") as { jornada?: number; volta?: number; serie?: string; round_name?: string; taca_num?: number };
+    jornadaInfo = isCup
+      ? `${CUP_NAME} — ${meta.round_name ?? "Eliminatória"}${meta.taca_num ? ` (jogo ${meta.taca_num})` : ""}`
+      : `Jornada ${meta.jornada ?? "?"}, Volta ${meta.volta ?? "?"}, Série ${meta.serie ?? "A"}`;
   } catch { /* ignore */ }
 
   let photoCaptions = "";
@@ -201,14 +213,16 @@ ${facts.lines.join("\n")}
 ${submission?.notes ? `Notas: ${submission.notes}` : ""}
 ${photoCaptions ? `Descrição das fotografias do jogo: ${photoCaptions}` : ""}
 
-${standingsTitle}:
-${top5}
+${isCup ? `CONTEXTO DA COMPETIÇÃO: ${CUP_NAME} é uma competição por eliminatórias (um só jogo por eliminatória, sem empates). O vencedor avança à fase seguinte e o derrotado fica eliminado. Não existe classificação nem pontos.` : `${standingsTitle}:\n${top5}`}
 
 Regras:
-- Menciona o contexto da jornada e o impacto na classificação se relevante (a classificação é por série — refere a série, ex.: "na Série B", e nunca compares com equipas de outras séries)
+${isCup
+  ? `- Refere que se trata da ${CUP_NAME} e a fase (${jornadaInfo}); diz que ${winner} avança na Taça. Não menciones classificação, séries, pontos de campeonato nem jornadas
+- Não inventes o próximo adversário nem a data do jogo seguinte`
+  : `- Menciona o contexto da jornada e o impacto na classificação se relevante (a classificação é por série — refere a série, ex.: "na Série B", e nunca compares com equipas de outras séries)`}
 - Usa APENAS os dados fornecidos acima — nunca inventes pontuações, nomes ou factos`;
 
-  return { ok: true as const, adminClient, event, result, submission, facts, jornadaInfo, scoreStr, userPrompt, validation };
+  return { ok: true as const, adminClient, event, result, submission, facts, jornadaInfo, scoreStr, userPrompt, validation, isCup };
 }
 
 type DbPlayerRow = {
@@ -264,7 +278,7 @@ export async function getDefaultNewsPrompts(
 ): Promise<{ ok: true; system: string; user: string; format: string } | { ok: false; error: string }> {
   const prep = await prepareNews(gameId);
   if (!prep.ok) return prep;
-  return { ok: true, system: NEWS_STYLE, user: prep.userPrompt, format: `${NEWS_TONE_RULES}\n\n${NEWS_FORMAT}` };
+  return { ok: true, system: prep.isCup ? CUP_NEWS_STYLE : NEWS_STYLE, user: prep.userPrompt, format: `${NEWS_TONE_RULES}\n\n${NEWS_FORMAT}` };
 }
 
 export async function generateLigaNews(
@@ -273,12 +287,12 @@ export async function generateLigaNews(
 ): Promise<{ ok: true; news_id: string; newsContext: NewsContext; draft: boolean } | { ok: false; error: string }> {
   const prep = await prepareNews(gameId);
   if (!prep.ok) return prep;
-  const { adminClient, event, result, submission, facts, jornadaInfo, scoreStr, userPrompt: defaultUserPrompt, validation } = prep;
+  const { adminClient, event, result, submission, facts, jornadaInfo, scoreStr, userPrompt: defaultUserPrompt, validation, isCup } = prep;
   const draft = validation.draft;
 
   const customSystem = overrides.systemPrompt?.trim() ?? "";
   const customUser = overrides.userPrompt?.trim() ?? "";
-  const system = `${customSystem || NEWS_STYLE}\n\n${NEWS_TONE_RULES}\n\n${NEWS_FORMAT}`;
+  const system = `${customSystem || (isCup ? CUP_NEWS_STYLE : NEWS_STYLE)}\n\n${NEWS_TONE_RULES}\n\n${NEWS_FORMAT}`;
   const userPrompt = customUser || defaultUserPrompt;
 
   // Pontuações escritas pelo próprio admin no prompt contam como factos permitidos
@@ -348,7 +362,7 @@ export async function generateLigaNews(
   const entrada = (newsData.entrada ?? "").trim().slice(0, 200);
 
   const datePart = event.event_date.slice(0, 10);
-  const slug = `liga-inatel-${slugify(result.home_team_name)}-${slugify(result.away_team_name)}-${datePart}`;
+  const slug = `${isCup ? "taca-liga-inatel" : "liga-inatel"}-${slugify(result.home_team_name)}-${slugify(result.away_team_name)}-${datePart}`;
 
   const { data: existing } = await adminClient
     .from("news")
