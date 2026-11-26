@@ -5,7 +5,7 @@ import { createPublicClient } from "@/lib/supabase/public";
 import { markdownToHtml } from "@/lib/markdown";
 import { sideReadings } from "@/lib/game-sheet/news-facts";
 import type { Metadata } from "next";
-import { ShareButtons } from "./_share-buttons";
+import { NewsEngagement } from "@/components/news/news-engagement";
 import { GamePhotoGallery } from "@/components/liga/game-photo-gallery";
 import type { GalleryPhoto } from "@/components/liga/game-photo-gallery";
 
@@ -456,29 +456,8 @@ export default async function LigaNoticiaDetailPage({ params }: Props) {
           </div>
         )}
 
-        {/* Partilhar */}
-        <div
-          style={{
-            marginTop: "40px",
-            paddingTop: "24px",
-            borderTop: "1px solid rgba(26,22,18,.1)",
-          }}
-        >
-          <p
-            style={{
-              fontFamily: "var(--font-ibm-mono, monospace)",
-              fontSize: "10px",
-              fontWeight: 600,
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              color: "#8C837A",
-              margin: "0 0 12px",
-            }}
-          >
-            Partilhar
-          </p>
-          <ShareButtons url={canonicalUrl} title={article.title} />
-        </div>
+        {/* Votação, visualizações e partilha */}
+        <NewsEngagement newsId={article.id} url={canonicalUrl} title={article.title} />
 
         {/* CTAs de navegação */}
         <div

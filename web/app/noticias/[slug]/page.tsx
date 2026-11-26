@@ -3,6 +3,7 @@ import Image from "next/image";
 import { notFound, permanentRedirect } from "next/navigation";
 import { createPublicClient } from "@/lib/supabase/public";
 import { markdownToHtml } from "@/lib/markdown";
+import { NewsEngagement } from "@/components/news/news-engagement";
 import type { Metadata } from "next";
 
 export const revalidate = 300;
@@ -226,6 +227,14 @@ export default async function NoticiaDetailPage({ params }: Props) {
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: bodyHtml }}
         style={{ fontSize: 15, lineHeight: 1.75, color: GRAY }}
+      />
+
+      {/* Votação, visualizações e partilha */}
+      <NewsEngagement
+        newsId={article.id}
+        url={`https://hoophub.pt/noticias/${slug}`}
+        title={article.title}
+        accent={ORANGE}
       />
 
       {/* Footer nav */}
