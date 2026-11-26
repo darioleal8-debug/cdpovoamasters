@@ -175,6 +175,13 @@ export const AiRecheckSchema = z.object({
 });
 export type AiRecheck = z.infer<typeof AiRecheckSchema>;
 
+/** Resposta da leitura dedicada da marcha do resultado (ampliações da folha). */
+export const AiScorePassSchema = z.object({
+  scoringEvents: arr(AiScoringEventSchema, 300),
+  warnings: stringList,
+});
+export type AiScorePass = z.infer<typeof AiScorePassSchema>;
+
 // ── Representação canónica (editável) ─────────────────────────────────────────
 
 export const SheetPlayerSchema = z.object({

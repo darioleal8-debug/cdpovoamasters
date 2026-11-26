@@ -6,10 +6,12 @@
  * 1 chamada extra, e só se houver tempo dentro do orçamento).
  */
 import { deepseekJSONDetailed, type DeepSeekCallMeta, type DeepSeekErrorKind } from "@/lib/deepseek";
-import { AiRecheckSchema, AiSheetSchema, aiToSheetData, type AiSheet, type SheetData } from "./schema";
+import { AiRecheckSchema, AiScorePassSchema, AiSheetSchema, aiToSheetData, type AiSheet, type SheetData } from "./schema";
 import { analyzeSheet, doubtfulEvents } from "./engine";
-import { buildRecheckPrompt, buildSystemPrompt, buildUserPrompt, DEFAULT_LAYOUT } from "./prompt";
-import { cropRegions, prepareForVision, type ZoneMap } from "./image";
+import {
+  buildRecheckPrompt, buildScorePassSystemPrompt, buildScorePassUserPrompt, buildSystemPrompt, buildUserPrompt, DEFAULT_LAYOUT,
+} from "./prompt";
+import { cropRegions, prepareForVision, scoreTiles, type ZoneMap } from "./image";
 import { imageDetail } from "@/lib/match-docs/documents";
 
 export function visionConfig() {
@@ -17,6 +19,8 @@ export function visionConfig() {
   return {
     model: process.env.DEEPSEEK_VISION_MODEL || "deepseek-flash",
     secondPass: (process.env.GAME_SHEET_SECOND_PASS ?? "on") !== "off",
+    /** Leitura dedicada da marcha (ampliações) quando a leitura global não a consegue ler */
+    scorePass: (process.env.GAME_SHEET_SCORE_PASS ?? "on") !== "off",
     maxAnalyses: num(process.env.GAME_SHEET_MAX_ANALYSES, 3),
     maxOutputTokens: num(process.env.GAME_SHEET_MAX_OUTPUT_TOKENS, 8192),
     timeBudgetMs: num(process.env.GAME_SHEET_TIME_BUDGET_MS, 50_000),
@@ -25,11 +29,13 @@ export function visionConfig() {
 
 export interface VisionUsage {
   model: string;
-  calls: (DeepSeekCallMeta & { purpose: "full" | "recheck"; ok: boolean })[];
+  calls: (DeepSeekCallMeta & { purpose: "full" | "score" | "recheck"; ok: boolean })[];
   totalDurationMs: number;
   promptTokens: number;
   completionTokens: number;
   secondPass: "skipped" | "not_needed" | "done" | "failed";
+  /** Leitura dedicada da marcha do resultado em ampliações */
+  scorePass?: "skipped" | "not_needed" | "done" | "failed";
 }
 
 export type VisionResult =
@@ -45,6 +51,48 @@ function summarize(usage: VisionUsage, started: number): VisionUsage {
   usage.promptTokens = usage.calls.reduce((a, c) => a + (c.promptTokens ?? 0), 0);
   usage.completionTokens = usage.calls.reduce((a, c) => a + (c.completionTokens ?? 0), 0);
   return usage;
+}
+
+type AiEvent = AiSheet["scoringEvents"][number];
+
+/**
+ * A leitura global precisa de ajuda? Sem nenhum cesto, ou quando a marcha lida de uma equipa
+ * fica muito abaixo do resultado final que o próprio modelo leu (leitura truncada/parcial).
+ */
+export function needsScorePass(ai: AiSheet): boolean {
+  if (ai.scoringEvents.length === 0) return true;
+  for (const t of ["A", "B"] as const) {
+    const final = ai.finalScore[t];
+    if (final === null || final < 10) continue;
+    const max = Math.max(0, ...ai.scoringEvents.filter((e) => e.team === t).map((e) => e.cumulativeScore ?? 0));
+    if (max < final * 0.75) return true;
+  }
+  return false;
+}
+
+/**
+ * Junta os cestos da leitura global com os da leitura dedicada (as ampliações sobrepõem-se, por
+ * isso o mesmo cesto pode vir repetido). Um cesto é identificado por equipa + acumulado; em caso
+ * de conflito fica o de maior confiança. Reordena por acumulado e refaz o "seq" de cada equipa.
+ * Os cestos vindos de ampliações não têm região (as coordenadas seriam relativas ao ladrilho).
+ */
+export function mergeScoringEvents(base: AiEvent[], extra: AiEvent[]): AiEvent[] {
+  const fromExtra = new Set(extra);
+  const best = new Map<string, AiEvent>();
+  for (const e of [...base, ...extra]) {
+    if (e.team === null || e.cumulativeScore === null) continue;
+    const k = `${e.team}:${e.cumulativeScore}`;
+    const prev = best.get(k);
+    if (!prev || (e.confidence ?? 0) > (prev.confidence ?? 0)) best.set(k, e);
+  }
+  const out: AiEvent[] = [];
+  for (const team of ["A", "B"] as const) {
+    [...best.values()]
+      .filter((e) => e.team === team)
+      .sort((a, b) => a.cumulativeScore! - b.cumulativeScore!)
+      .forEach((e, i) => out.push({ ...e, seq: i, region: fromExtra.has(e) ? null : e.region }));
+  }
+  return out;
 }
 
 export async function analyzeGameSheet(input: {
@@ -94,7 +142,51 @@ export async function analyzeGameSheet(input: {
   if (!parsed.success) {
     return { ok: false, kind: "schema", error: "A resposta do modelo não segue o esquema esperado.", usage: summarize(usage, started) };
   }
-  const ai = parsed.data;
+  let ai = parsed.data;
+
+  // ── 1b. Leitura dedicada da marcha (ampliações), só se a global não a conseguiu ler ──
+  usage.scorePass = needsScorePass(ai) ? "skipped" : "not_needed";
+  if (usage.scorePass === "skipped" && cfg.scorePass) {
+    const remainingForScore = cfg.timeBudgetMs - (Date.now() - started);
+    if (remainingForScore > 15_000) {
+      const tiles = await scoreTiles(prepared).catch(() => []);
+      if (tiles.length > 0) {
+        const pass = await deepseekJSONDetailed<unknown>({
+          feature: "folha-jogo",
+          model: cfg.model,
+          system: buildScorePassSystemPrompt(DEFAULT_LAYOUT, input.adminInstructions),
+          user: [
+            { type: "image_url", image_url: { url: dataUrl(prepared.buffer), detail: imageDetail() } },
+            ...tiles.map((t) => ({ type: "image_url", image_url: { url: dataUrl(t.buffer), detail: imageDetail() } })),
+            { type: "text", text: buildScorePassUserPrompt(input.game, tiles.map((t) => t.label), ai.finalScore, input.rosterHint) },
+          ],
+          temperature: 0,
+          maxTokens: cfg.maxOutputTokens,
+          maxRetryTokens: cfg.maxOutputTokens * 2,
+          timeoutMs: remainingForScore - 5_000,
+        });
+        usage.calls.push({ ...pass.meta, purpose: "score", ok: pass.ok });
+        const sp = pass.ok ? AiScorePassSchema.safeParse(pass.data) : null;
+        if (sp?.success && sp.data.scoringEvents.length > 0) {
+          const merged = mergeScoringEvents(ai.scoringEvents, sp.data.scoringEvents);
+          const gained = merged.length > ai.scoringEvents.length;
+          // A leitura global desistiu da marcha: esse aviso deixa de ser verdadeiro
+          const warnings = gained && ai.scoringEvents.length === 0
+            ? ai.warnings.filter((w) => !/marcha|scoringEvents/i.test(w))
+            : ai.warnings;
+          ai = {
+            ...ai,
+            scoringEvents: merged,
+            warnings: [...warnings, ...sp.data.warnings, "Marcha do resultado lida numa 2.ª leitura dedicada, com ampliações da folha."].slice(0, 50),
+          };
+          usage.scorePass = "done";
+        } else {
+          usage.scorePass = "failed";
+        }
+      }
+    }
+  }
+
   const sheet = aiToSheetData(ai, input.game);
 
   // ── 2. Segunda leitura das regiões duvidosas (opcional, limitada) ──

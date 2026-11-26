@@ -56,7 +56,8 @@ export async function runAndStore(
     image: visionImage,
     game: { home: game.home, away: game.away, date: game.date },
     adminInstructions,
-    opencvZones: opencvResult?.zones,
+    // As zonas do microserviço são valores fixos por omissão (não deteção real) e apontam para sítios
+    // errados da folha FIBA: injetá-las no prompt desorienta o modelo. Continuam guardadas em cv_data.
   }));
 
   if (!result.ok) {
